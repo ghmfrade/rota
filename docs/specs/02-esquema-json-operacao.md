@@ -2,7 +2,7 @@
 
 **Projeto:** ROTA — Registro de Operação e Tabelas de Autos
 **Depende de:** [Spec 01 — Visão Geral do Sistema](01-visao-geral.md)
-**Status:** Em definição — v0.4
+**Status:** Em definição — v0.5
 **Escopo:** O contrato de dados — entidades, campos, tipos, regras de UUID e validações estruturais do JSON de operação. **Não é escopo desta spec:** fórmulas de tarifa (valor em R$), algoritmo de roteamento, algoritmo de redistribuição de horário em feriado, regras de tipificação, algoritmo exato de sugestão de menor distância (isso é a [Spec 03](03-regras-de-negocio-calculo.md)).
 
 ---
@@ -26,6 +26,7 @@ Documento (raiz)
 ├─ versao_schema
 └─ autos
    ├─ codigo, tipo, empresa
+   ├─ status ("proposta" | "vigente"), data_criacao? | data_publicacao?
    ├─ secoes[]                     (compartilhadas entre todos os Serviços do Autos)
    │  ├─ uuid, municipio, nome
    │  └─ servicos[]                 (uma entrada por Serviço que usa esta Seção)
@@ -34,7 +35,7 @@ Documento (raiz)
       ├─ uuid, numero_n, caracteristica_veiculo, carater
       ├─ locais[]                   (pontos comuns — sem tarifa — só deste Serviço)
       │  └─ uuid, nome, municipio, geolocalizacao_ida?, geolocalizacao_volta?
-      ├─ matriz_distancias[]        ({ secao_a_uuid, secao_b_uuid, distancia_m }) — todos os pares, computada
+      ├─ matriz_distancias[]        ({ secao_a_uuid, secao_b_uuid, valor_adotado_de_distancia, distancia_trecho_ida?, distancia_trecho_volta? }) — todos os pares, computada
       ├─ matriz_seccionamento[]     ({ secao_a_uuid, secao_b_uuid, distancia_km }) — pares habilitados p/ passagem parcial
       └─ itinerarios[]              (1 ou 2: sentido "ida" e/ou "volta")
          ├─ sentido
@@ -77,10 +78,19 @@ Decisões de nesting fixadas nesta spec (histórico completo em §13):
 | `codigo` | string | Sim | Código regulatório do Autos (ex.: `"0000"`). |
 | `tipo` | enum | Sim | `"Semiurbano"` \| `"Semiurbano Litorâneo"` \| `"Rodoviário"` \| `"Rodoviário Litorâneo"` (Spec 01 §7). |
 | `empresa` | string | Sim | Nome da empresa permissionária. |
+| `status` | enum | Sim | `"proposta"` \| `"vigente"`. Exceção deliberada e estreita ao princípio de "zero gestão" da Spec 01 §3 — não modela o ciclo de vida do SEI, é só uma etiqueta para o Comparador/Ingestor saberem o que estão lendo. Ver §4.1. |
+| `data_criacao` | string (data `YYYY-MM-DD`) | Condicional | Presente **apenas** quando `status = "proposta"`. Data em que o JSON foi gerado (clique em "salvar/exportar" no Formulário) — preenchida automaticamente, não editável pelo usuário. |
+| `data_publicacao` | string (data `YYYY-MM-DD`) | Condicional | Presente **apenas** quando `status = "vigente"`. Data de publicação, informada manualmente pelo usuário. |
 | `secoes` | array\<Seção\> | Sim | Seções compartilhadas entre os Serviços deste Autos. Ver §5. |
 | `servicos` | array\<Serviço\> | Sim | Mínimo 1 item. Ver §6. |
 
 `codigo`, `tipo` e `empresa` vêm das listas estáticas do Formulário ou, ao carregar um JSON vigente, do próprio JSON — desde que os três valores existam nas listas disponíveis no momento (regra de bloqueio de carregamento, Spec 01 §8).
+
+### 4.1 `status`, `data_criacao` e `data_publicacao`
+
+- Exatamente um dos dois campos de data está presente, de acordo com `status`: `data_criacao` se `"proposta"`, `data_publicacao` se `"vigente"` — nunca os dois, nunca nenhum.
+- Nenhum outro dado de fluxo acompanha esses campos: sem autor, sem prazo de vigência, sem publicação em DOE, sem histórico de mudança de status. Se o Autos precisar trocar de `proposta` para `vigente`, isso é feito gerando um novo JSON com o `status` e a data corretos — o próprio versionamento fica a cargo de quem usa o arquivo (nome de arquivo, SEI etc.), não do JSON.
+- Isso não substitui o papel de "vigente"/"proposta" como entrada do Comparador (Spec 01 §2): o Comparador recebe dois JSONs e ainda cabe ao usuário indicar qual é qual ao carregá-los — o campo aqui é só a autodeclaração de cada arquivo, não uma regra de negócio do Comparador.
 
 ---
 
@@ -159,9 +169,11 @@ Local é a entidade física (nome + município + geolocalização) de um ponto *
 
 ## 8. Matriz de Distâncias (`matriz_distancias`)
 
-Pertence ao Serviço. Contém a distância, em metros, entre **cada par possível** de Seções atendidas por este Serviço — todas as combinações, não apenas pares consecutivos na rota (ex.: um Serviço que passa por A, B, C e D tem entradas para AB, AC, AD, BC, BD e CD).
+Pertence ao Serviço — ou seja, é sobre o Serviço como um todo, cobrindo Ida e Volta juntas. Contém a distância entre **cada par possível** de Seções atendidas por este Serviço — todas as combinações, não apenas pares consecutivos na rota (ex.: um Serviço que passa por A, B, C e D tem entradas para AB, AC, AD, BC, BD e CD).
 
-É o dado bruto que (i) alimenta a sugestão de preenchimento da `matriz_seccionamento` (a menor distância para aquele par de Seções, dentre todos os Serviços do Autos que os atendem) e (ii) permite ao Comparador auditar a coerência das distâncias entre versões.
+É o dado agregado por Seção — diferente de `rota.trechos` (§10.3), que é granular **por Parada** e **por sentido** (inclui os Locais comuns intermediários entre duas Seções, ex.: entre A e B podem existir paradas comuns `a`, `b`, `c`; `rota.trechos` guarda A-a, a-b, b-c, c-B). `matriz_distancias` é a soma desses trechos entre a posição de uma Seção e a posição da outra, condensada num único par A-B — sem duração: o tempo de deslocamento já está guardado em `rota.trechos`, não precisa ser duplicado aqui.
+
+**`matriz_distancias` é inteiramente intra-Serviço** — usa só os itinerários deste Serviço, nunca dados de outro Serviço. A comparação entre Serviços do Autos (para sugerir a menor distância) acontece **somente** ao preencher a `matriz_seccionamento` (§9), que aí sim lê o `valor_adotado_de_distancia` de `matriz_distancias` de outros Serviços — mas essa é uma lógica do Formulário, não algo que `matriz_distancias` em si calcula ou registra.
 
 **ParDistância** (elemento do array):
 
@@ -169,11 +181,15 @@ Pertence ao Serviço. Contém a distância, em metros, entre **cada par possíve
 |---|---|---|---|
 | `secao_a_uuid` | string (UUIDv4) | Sim | `uuid` de uma Seção atendida por este Serviço. |
 | `secao_b_uuid` | string (UUIDv4) | Sim | Idem, distinto de `secao_a_uuid`. |
-| `distancia_m` | number | Sim | Distância entre as duas Seções, em metros, computada a partir da rota deste Serviço. |
+| `distancia_trecho_ida` | number | Condicional | Distância entre as duas Seções, em metros, somada a partir de `rota.trechos[].distancia_m` do itinerário de Ida deste Serviço. Presente apenas se o Serviço tem itinerário de Ida. |
+| `distancia_trecho_volta` | number | Condicional | Idem, a partir do itinerário de Volta. Presente apenas se o Serviço tem itinerário de Volta. |
+| `valor_adotado_de_distancia` | number | Sim | Distância que **este Serviço** adota como "a" distância entre estas duas Seções, calculada só a partir dos dados dele mesmo (nunca de outros Serviços do Autos). Quando os dois itinerários existem, é a média entre `distancia_trecho_ida` e `distancia_trecho_volta`; quando o Serviço é unidirecional, é igual ao único valor existente. O algoritmo exato de composição (média simples ou outro critério) fica para a Spec 03. |
 
-Congelada no momento da geração do JSON — o Comparador e o Ingestor apenas leem o valor, sem recalcular (mesmo princípio de `rota`, §10.2). Cada `distancia_m` aqui é obtida somando os `trechos` de `rota` (§10.2) entre as posições das duas Seções na sequência de paradas de um dos itinerários deste Serviço. O algoritmo exato (a partir de qual sentido, tratamento de ida/volta divergentes) é definido na Spec 03.
+Ao menos um de `distancia_trecho_ida` / `distancia_trecho_volta` deve estar presente, refletindo os itinerários que o Serviço de fato tem.
 
-Validação estrutural: deve existir exatamente uma entrada para cada combinação não-ordenada de duas Seções distintas referenciadas por paradas deste Serviço (união de Ida e Volta); `secao_a_uuid ≠ secao_b_uuid`; sem entradas duplicadas.
+Congelada no momento da geração do JSON — o Comparador e o Ingestor apenas leem o valor, sem recalcular (mesmo princípio de `rota`, §10.2).
+
+Validação estrutural: deve existir exatamente uma entrada para cada combinação não-ordenada de duas Seções distintas referenciadas por paradas deste Serviço (união de Ida e Volta); `secao_a_uuid ≠ secao_b_uuid`; sem entradas duplicadas; `distancia_trecho_ida` presente se e somente se o Serviço tem itinerário de Ida cujas paradas incluem as duas Seções (idem para `distancia_trecho_volta`).
 
 ---
 
@@ -291,7 +307,7 @@ Diff resultante no Comparador (Spec 01 §6, estendido a Seção, Local e Viagem)
 
 ## 13. Decisões Fechadas Nesta Spec
 
-Histórico completo — v0.1 → v0.3 desta spec:
+Histórico completo — v0.1 → v0.5 desta spec:
 
 1. **UUID em Viagem: obrigatória.** Mesma regra de Seção/Serviço/Local (§12).
 2. **Caráter do itinerário: campo explícito** (`carater` em Serviço), não derivado do conjunto de paradas.
@@ -309,6 +325,8 @@ Histórico completo — v0.1 → v0.3 desta spec:
 14. **Versionamento de schema: incluído** (`versao_schema` na raiz), por ser metadado estrutural do contrato, não de fluxo.
 15. **`offset_horario` migrou de Parada para Viagem** (`viagem.horarios_paradas[]`). O mesmo itinerário (mesma sequência física de paradas) pode ter viagens com offsets diferentes entre as paradas, pois o trânsito varia por horário — o offset por parada é, portanto, dado por Viagem, e a UX deve permitir o usuário ajustá-lo livremente. **Supera** a decisão v0.1/v0.2 desta spec, que fixava `offset_horario` na Parada (compartilhado por todas as viagens do itinerário).
 16. **`rota` ganha `trechos[]`** (§10.3): distância e duração de cada segmento consecutivo entre paradas, computadas e congeladas junto com a rota. Serve de (a) sugestão inicial para os offsets de cada Viagem e (b) dado-fonte para o cálculo de `matriz_distancias` (soma de trechos entre duas Seções).
+17. **`matriz_distancias` guarda `distancia_trecho_ida`, `distancia_trecho_volta` e `valor_adotado_de_distancia`** (média entre os dois, ou o único valor existente se o Serviço for unidirecional) — em vez de um único `distancia_m`. Reflete que a matriz pertence ao Serviço como um todo (Ida e Volta juntas), podendo os dois sentidos divergir levemente. **Não guarda duração** — o tempo de deslocamento já vive em `rota.trechos` (§10.3), não é duplicado aqui. **É inteiramente intra-Serviço** — nunca compara com dados de outros Serviços do Autos; a comparação entre Serviços só acontece ao preencher a `matriz_seccionamento` (§9).
+18. **`autos.status` (`"proposta"` \| `"vigente"`) + `data_criacao`/`data_publicacao` condicional** (§4.1) — **exceção deliberada e estreita** ao princípio de "zero gestão" da Spec 01 §3, registrada explicitamente lá. Não modela o ciclo de vida do SEI (sem rascunho/análise/aprovado, sem autor, sem prazo de vigência, sem DOE) — é só uma autodeclaração para o Comparador/Ingestor saberem o que estão lendo sem depender de nome de arquivo.
 
 Permanece em aberto (Spec 01 §9.4): **valores do enum `regra_feriado`**, a definir na Spec 03 junto do algoritmo de redistribuição.
 
@@ -320,6 +338,7 @@ Validações de forma do documento — não incluem regras de negócio (tarifa, 
 
 - `versao_schema` presente.
 - Todo `uuid` (Seção, Serviço, Local, Viagem) é string em formato UUIDv4; único dentro da sua categoria e escopo (Local: dentro do Serviço; Seção/Serviço/Viagem: no documento inteiro).
+- `autos.status` presente; exatamente um de `autos.data_criacao` (se `"proposta"`) / `autos.data_publicacao` (se `"vigente"`) presente, de acordo com `status` (§4.1).
 - `autos.servicos` tem ao menos 1 elemento.
 - Cada Seção em `autos.secoes`: `servicos` tem ao menos 1 elemento; cada `servico_uuid` referenciado existe em `autos.servicos` e tem ao menos uma Parada apontando para esta Seção; obrigatoriedade de `geolocalizacao_ida`/`geolocalizacao_volta` segue a direcionalidade do Serviço referenciado (§5.1); regra de centroide de 350 m (§5.2).
 - Cada Local em `servico.locais`: ao menos uma geolocalização preenchida; se ambas, ≤ 350 m pareado (§7.1).
@@ -344,6 +363,8 @@ Serviço único (`0000-1RO`) atendendo três Seções (Santos, São Vicente, Pra
     "codigo": "0000",
     "tipo": "Rodoviário",
     "empresa": "Viação Exemplo Ltda.",
+    "status": "proposta",
+    "data_criacao": "2026-07-01",
     "secoes": [
       {
         "uuid": "sec-0001-4a3b-9c4d-5e6f7a8b9c0d",
@@ -397,9 +418,9 @@ Serviço único (`0000-1RO`) atendendo três Seções (Santos, São Vicente, Pra
           }
         ],
         "matriz_distancias": [
-          { "secao_a_uuid": "sec-0001-4a3b-9c4d-5e6f7a8b9c0d", "secao_b_uuid": "sec-0002-4a3b-9c4d-5e6f7a8b9c0d", "distancia_m": 8000 },
-          { "secao_a_uuid": "sec-0002-4a3b-9c4d-5e6f7a8b9c0d", "secao_b_uuid": "sec-0003-4a3b-9c4d-5e6f7a8b9c0d", "distancia_m": 6000 },
-          { "secao_a_uuid": "sec-0001-4a3b-9c4d-5e6f7a8b9c0d", "secao_b_uuid": "sec-0003-4a3b-9c4d-5e6f7a8b9c0d", "distancia_m": 14000 }
+          { "secao_a_uuid": "sec-0001-4a3b-9c4d-5e6f7a8b9c0d", "secao_b_uuid": "sec-0002-4a3b-9c4d-5e6f7a8b9c0d", "distancia_trecho_ida": 8000, "distancia_trecho_volta": 8000, "valor_adotado_de_distancia": 8000 },
+          { "secao_a_uuid": "sec-0002-4a3b-9c4d-5e6f7a8b9c0d", "secao_b_uuid": "sec-0003-4a3b-9c4d-5e6f7a8b9c0d", "distancia_trecho_ida": 6000, "distancia_trecho_volta": 6100, "valor_adotado_de_distancia": 6050 },
+          { "secao_a_uuid": "sec-0001-4a3b-9c4d-5e6f7a8b9c0d", "secao_b_uuid": "sec-0003-4a3b-9c4d-5e6f7a8b9c0d", "distancia_trecho_ida": 14000, "distancia_trecho_volta": 14100, "valor_adotado_de_distancia": 14050 }
         ],
         "matriz_seccionamento": [
           { "secao_a_uuid": "sec-0001-4a3b-9c4d-5e6f7a8b9c0d", "secao_b_uuid": "sec-0002-4a3b-9c4d-5e6f7a8b9c0d", "distancia_km": 8 },
@@ -499,7 +520,7 @@ Ambos os pontos do segundo Serviço entram no mesmo cálculo de centroide da Se�
 
 ## 16. Campos Explicitamente Fora do JSON
 
-Reforçando Spec 01 §3: este esquema **não** tem, e não deve ganhar, campos de status/ciclo de vida, pendência, aprovação, data de vigência, autor, histórico de tratativas, ou qualquer metadado de fluxo. Esses dados vivem no SEI. Reforçando também §9 e §12 acima: o JSON **nunca** guarda valor monetário de tarifa — só distâncias.
+Reforçando Spec 01 §3: este esquema **não** tem, e não deve ganhar, campos de pendência, aprovação, prazo de vigência, publicação em DOE, autor, histórico de tratativas, permissões, ou qualquer outro metadado de fluxo do SEI. Esses dados vivem no SEI. A **única** exceção é `autos.status` + `data_criacao`/`data_publicacao` (§4.1) — deliberada, estreita, e documentada tanto aqui quanto na Spec 01 §3; não é uma porta aberta para outros campos de workflow. Reforçando também §9 e §12 acima: o JSON **nunca** guarda valor monetário de tarifa — só distâncias.
 
 ---
 

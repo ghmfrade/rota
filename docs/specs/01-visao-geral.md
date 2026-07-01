@@ -60,13 +60,14 @@ As três ferramentas **não compartilham estado**. O único contrato entre elas 
 - (Futuro) ingestão do JSON aprovado no banco oficial.
 
 **NÃO está no escopo do ROTA (é do SEI):**
-- Status/ciclo de vida do pedido (rascunho, proposta, análise, aprovado, vigente…).
-- Pendências (correção/acordo), manifestações, diálogo técnico↔empresa.
-- Aprovação, prazo/data de vigência, publicação em DOE, suplantação.
+- Status/ciclo de vida do pedido (rascunho, análise, aprovado…), pendências, manifestações, diálogo técnico↔empresa.
+- Prazo de vigência, publicação em DOE, suplantação.
 - Registro de quem pediu, quando, e histórico de tratativas.
 - Auditoria, permissões, autenticação de fluxo.
 
 Consequência: **o ROTA não tem modelo de estado nem de permissões.** O JSON carrega apenas **dados de operação** — nenhum campo de workflow.
+
+**Exceção deliberada e estreita:** o JSON se autodeclara `proposta` (com a data em que foi gerado) ou `vigente` (com a data de publicação, informada pelo usuário) — ver Spec 02 §4. Isso **não** é o ciclo de vida do SEI (rascunho→análise→aprovado→vigente, com pendências e aprovação); é só uma etiqueta binária para o Comparador/Ingestor saberem o que estão lendo sem depender de convenção de nome de arquivo. Não guarda autor, prazo, DOE, nem qualquer outro dado de fluxo.
 
 ---
 
