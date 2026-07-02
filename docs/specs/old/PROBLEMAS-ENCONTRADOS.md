@@ -1,7 +1,5 @@
 # Problemas Encontrados na Revisão das Specs 01 e 02
 
-Data da revisão: 2026-07-01
-
 ---
 
 ## 🔴 Problemas Estruturais (merecem correção antes da Spec 03)
@@ -10,13 +8,13 @@ Data da revisão: 2026-07-01
 
 **Referência:** Spec 02 §8 (linhas 170-192), validação estrutural §14 (linhas 348-349).
 
-**Problema:** A validação exige uma entrada para **cada par não-ordenado** de Seções distintas atendidas (união Ida+Volta), e exige que ao menos um de `distancia_trecho_ida`/`volta` esteja presente. Mas a distância só existe se **um mesmo itinerário** contém as duas Seções. 
+**Problema:** A validação exige uma entrada para **cada par não-ordenado** de Seções distintas atendidas (união Ida+Volta), e exige que ao menos um de `distancia_trecho_ida`/`volta` esteja presente. Mas a distância só existe se **um mesmo itinerário** contém as duas Seções.
 
 **Cenário de quebra:** Se uma Seção B é atendida **só na Ida** e uma Seção D é atendida **só na Volta** (caso legítimo: semidireta que difere entre sentidos, permitida pela Spec 01 §8), o par **B‑D não ocorre em nenhum itinerário** → nenhum trecho de rota conecta as duas → impossível calcular a distância → regra insatisfazível.
 
-**Solução necessária:** Decidir a regra de negócio na Spec 03:
-- **Opção A:** Exigir que Ida e Volta atendam o **mesmo conjunto** de Seções (restrição de modelo).
-- **Opção B:** Restringir os pares exigidos aos que **co-ocorrem num itinerário** (Ida ou Volta, mas no mesmo itinerário).
+**Solução adotada:**
+
+- **Opção A:** A ida e a volta devem ter as mesmas seções. Porém, podem ter paradas diferentes.
 - Alinhar com a validação estrutural da Spec 02 §14.
 
 ---
@@ -25,17 +23,17 @@ Data da revisão: 2026-07-01
 
 **Referência:** Spec 02 §8 (linha 184-186: metros) vs §9 (linha 208-210: km).
 
-**Problema:** 
-- `matriz_distancias` usa **metros**: `"valor_adotado_de_distancia": 8000` 
+**Problema:**
+
+- `matriz_distancias` usa **metros**: `"valor_adotado_de_distancia": 8000`
 - `matriz_seccionamento` usa **km**: `"distancia_km": 8`
 - A regra de sugestão (Spec 02 §9, linha 210) lê `valor_adotado_de_distancia` (metros) para preencher `distancia_km` (km) — conversão ÷1000 implícita, footgun clássico de erro de unidade.
 
 **Consequência:** Risco de conversão errada, valores não conferem durante validação/geração de PDF.
 
 **Solução:** Na Spec 03, deixar explícito:
-- Conversão metros → km (divisão por 1000, arredondamento?).
-- Validar que os valores batem na geração do JSON.
-- Reforçar na Spec 04 (Formulário) a conversão de unidades.
+
+- Alterar e garantir que tudo esteja em km.
 
 ---
 
@@ -47,7 +45,7 @@ Data da revisão: 2026-07-01
 
 **Impacto:** Reduz confiança no exemplo; código que valide formato quebra no exemplo.
 
-**Solução:** Gerar UUIDs reais (UUIDv4 válidos) para o exemplo, ou marcar explicitamente como "ilustrativo, não conforme para fins de validação".
+**Solução:** marcar explicitamente como "ilustrativo, não conforme para fins de validação".
 
 ---
 
@@ -55,7 +53,8 @@ Data da revisão: 2026-07-01
 
 **Referência:** Spec 02 §12 (linha 298: "Local: dentro do Serviço") vs Spec 01 §6 (linha 122: "a UUID vira o id da linha no PostgreSQL").
 
-**Problema:** 
+**Problema:**
+
 - Spec 02 define unicidade de Local como **local ao Serviço** ("Para Local, a unicidade é dentro do escopo do Serviço").
 - Spec 01 assume que UUID é **identidade global** para o Ingestor ("no Ingestor, a UUID vira o id da linha no PostgreSQL — a identidade do Serviço é a mesma em formulário → JSON → banco").
 
@@ -63,7 +62,7 @@ Data da revisão: 2026-07-01
 
 **Nota de risco:** Com UUIDv4 aleatório, a colisão é desprezível (~1/5×10³⁶). Mas o **contrato é mais fraco** que a garantia que o Ingestor assume.
 
-**Solução:** Estender a regra de unicidade de Local para **global** (único no documento inteiro), alinhando com Seção, Serviço e Viagem. Atualizar Spec 02 §12.
+**Solução:** Corrigir Spec 02 nessa parte, deixando claro que a regra de unicidade de Local para **global** (único no documento inteiro), alinhando com Seção, Serviço e Viagem. Atualizar Spec 02 §12.
 
 ---
 
@@ -74,6 +73,7 @@ Data da revisão: 2026-07-01
 **Referência:** Spec 01 §4 (glossário, linhas 82-83), §5 (linha 99-100), §8 (linha 152) vs Spec 02 §13.6 (linha 318).
 
 **Problema:** Spec 01 ainda descreve o modelo com terminologia antiga:
+
 - Glossário (§4): "Ponto (de operação)", "Papel do ponto", "Cada Autos tem seus próprios pontos".
 - §5: "Paradas (com pontos embutidos)" e "a `matriz_seccionamento` referencia pares desses pontos".
 - §8: "Ponto georreferenciado global deixa de existir. Cada Autos tem seus próprios pontos".
@@ -91,10 +91,12 @@ A Spec 02 §13.6 **eliminou explicitamente** o campo `papel` e substituiu "Ponto
 **Referência:** Spec 01 §5 (linhas 99-100), Spec 02 §2 (linhas 23-49).
 
 **Problema:**
+
 - Spec 01 diz: "Paradas (com pontos embutidos)" — **incorreto**. Na Spec 02, Paradas **referenciam** pontos por uuid, não os embutem.
 - Spec 01 diz: "a `matriz_seccionamento` referencia pares desses pontos" — **incorreto**. `matriz_seccionamento` referencia **Seções**, não pontos genéricos.
 
 **Árvore correta** (Spec 02 §2):
+
 ```
 autos.secoes[] (entidades, compartilhadas)
   └─ servicos[] (entrada por Serviço que usa a Seção)
@@ -115,6 +117,7 @@ servicos[].matriz_seccionamento[] (pares de secao_uuid)
 **Referência:** Spec 01 §6 (linhas 109-115), §8 (linha 153) vs Spec 02 §12 (linhas 291-299).
 
 **Problema:** Spec 01 menciona UUID em "Serviço" e "Ponto" (ao qual a Spec 02 chama "Seção" e "Local"). Mas a Spec 02 §12 tem **quatro** entidades com UUID obrigatória:
+
 1. **Seção**
 2. **Serviço**
 3. **Local**
@@ -130,7 +133,8 @@ Spec 01 §6 precisa ser atualizada para listar as 4, e §8 deve mencionar que Vi
 
 **Referência:** Spec 01 §9 (linhas 161-167).
 
-**Problema:** 
+**Problema:**
+
 - Itens 1‑3 estão resolvidos (UUID em Viagem, Caráter explícito, Horário relativo) e têm ~~risco~~ (riscados).
 - Item 4 (`regra_feriado`) está genuinamente em aberto para a Spec 03.
 - **Item 5** (limite de 350m, agora "Seção é entidade do Autos, regra de centroide cumulativo") diz "fixado na Spec 02" mas **não está riscado** — continua listado como aberto.
@@ -168,9 +172,11 @@ A Spec 02 §5.2 já reconhece: "como esta regra depende da ordem de inserção (
 **Risco:** Se o JSON vier de fora (ex.: manualmente editado), ninguém consegue validar se a regra dos 350m foi respeitada.
 
 **Solução:** Na Spec 03, documentar claramente:
+
 - A validação plena (cumulativa) é responsabilidade do **Formulário** (Spec 04).
+- Inserir nova regra que a validação no formulário não apenas verifica se o novo ponto encontra-se a menos que 350 metros do centroid, ele calcula o novo centroid que seria gerado considerando o novo ponto, e se a colocação desse novo ponto no local solicitado iria tornar ilegal algum dos pontos (fazer algum dos pontos já implantados estar a mais que 350 metros do novo centroid), proibindo portanto a inserção desse novo ponto nesse local e, acredito, garantindo que todos os pontos estejam a no máximo 350 do centroid do conjunto de pontos da seção.
 - Comparador (Spec 05) e Ingestor (Spec 06) **assumem válido**.
-- Se necessário validar JSON de origem desconhecida, usar uma heurística menos rigorosa (ex.: todos os pontos da Seção a ≤350m do centroide final?).
+- Se necessário validar JSON de origem desconhecida, verificar se todos os pontos da Seção estão a menos que 350m do centroide final.
 
 ---
 
@@ -188,10 +194,10 @@ A Spec 02 §5.2 já reconhece: "como esta regra depende da ordem de inserção (
 
 ## Resumo Executivo
 
-| Severidade | Qtd | Ação |
-|---|---|---|
-| 🔴 Estrutural | 4 | **Deve ser resolvido na Spec 03** (decisões de negócio) ou correção imediata em Spec 01/02 |
-| 🟡 Desalinhamento | 4 | **Atualizar Spec 01** para alinhar com Spec 02 |
-| 🟢 Menor | 3 | Registrar para Spec 03/04/05, documentação/risco baixo |
+| Severidade        | Qtd | Ação                                                                                                            |
+| ----------------- | --- | --------------------------------------------------------------------------------------------------------------- |
+| 🔴 Estrutural     | 4   | \*\*Correção imediata em Spec 01/02 e o que for necessário ser detalhado na spec 3, deixar preparado na 01 e 02 |
+| 🟡 Desalinhamento | 4   | **Atualizar Spec 01** para alinhar com Spec 02                                                                  |
+| 🟢 Menor          | 3   | Registrar para Spec 03/04/05, documentação/risco baixo                                                          |
 
-**Recomendação:** Antes de escrever a Spec 03, atualizar a Spec 01 (seções 4, 5, 6, 8, 9) para eliminar desalinhamento. Isso deixa as bases claras para a Spec 03 resolver os 4 problemas estruturais.
+**TAREFA:** Antes de escrever a Spec 03, atualizar a Spec 01 (seções 4, 5, 6, 8, 9) para eliminar desalinhamento, conforme instruções. Isso deixa as bases claras para a Spec 03 resolver os 4 problemas estruturais.

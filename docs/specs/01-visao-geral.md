@@ -78,10 +78,10 @@ Consequência: **o ROTA não tem modelo de estado nem de permissões.** O JSON c
 | **Autos de Linha** | Identificador regulatório principal (código `0000`). Agrupa um ou mais Serviços sob o mesmo processo administrativo. |
 | **Tipo de Autos** | Classificação: Semiurbano, Semiurbano Litorâneo, Rodoviário, Rodoviário Litorâneo. Define regras de variação permitida. |
 | **Serviço** | Variação operacional dentro de um Autos — combinação de itinerário (caráter: principal, parcial, semidireta etc.) e característica de veículo. Rótulo humano `0000-NXX`; identidade de máquina por **UUID estável** (ver §6). |
-| **Característica de veículo** | RO, ROL, EX, LE, SL e mistos (ver §7). |
-| **Ponto (de operação)** | Ponto físico georreferenciado (cidade + nome + coordenadas) usado por um Serviço. **Vive dentro do próprio JSON do Autos** — não há mais cadastro mestre global. Cada Autos tem seus próprios pontos, com id local ao documento. |
-| **Papel do ponto** | Contextual dentro de um itinerário: **Seção** (define tarifa; participa do seccionamento) ou **Ponto comum** (embarque/desembarque, sem tarifa). |
-| **Parada** | Ocorrência de um ponto dentro do itinerário de um Serviço, com papel (Seção/Ponto) e posição na sequência. |
+| **Característica de veículo** | Duas famílias (ver §7): **semiurbana** (SU, SUL) e **rodoviária** (RO, ROL, EX, LE, SL e mistos). O tipo do Autos fixa a família. |
+| **Seção** | Ponto físico georreferenciado que define tarifa e participa do seccionamento tarifário. É entidade do **Autos** (`autos.secoes[]`), compartilhada por todos os Serviços que passam por ali — cada Serviço contribui sua própria geolocalização de Ida e/ou Volta. **Vive dentro do próprio JSON do Autos** — não há cadastro mestre global. Ver Spec 02 §5. |
+| **Local** | Ponto físico georreferenciado **sem** relevância tarifária (embarque/desembarque comum), usado pelos itinerários de **um** Serviço. É entidade do **Serviço** (`servico.locais[]`), não compartilhada com outros Serviços. Ver Spec 02 §7. |
+| **Parada** | Ocorrência de uma Seção **ou** de um Local (nunca os dois, nunca nenhum) dentro do itinerário de um Serviço, com posição na sequência. |
 | **Seccionamento tarifário** | Regra que define entre quais pares de Seções é permitida a venda de passagem parcial. |
 | **Itinerário** | Sequência ordenada de paradas de um Serviço, em um sentido (Ida/Volta), com a rota georreferenciada entre elas. |
 | **Viagem** | Saída específica de um Serviço: horário de saída, horários de passagem por parada, dias da semana e regra de feriado. |
@@ -96,8 +96,22 @@ Consequência: **o ROTA não tem modelo de estado nem de permissões.** O JSON c
 
 O JSON é a peça central do projeto. Princípios:
 
-- **Só operação.** Contém a árvore completa de **um** Autos: identificação (código, tipo, empresa) + Serviços → Itinerários → Paradas (com pontos embutidos) → Seccionamento → Viagens → Horários. **Nenhum** campo de status, fluxo, autor, data ou aprovação.
-- **Autossuficiente.** Todos os pontos que o Autos usa estão embutidos no próprio JSON, com id local ao documento (a `matriz_seccionamento` referencia pares desses pontos). Não depende de nenhum cadastro externo para ser lido.
+- **Só operação.** Contém a árvore completa de **um** Autos: identificação (código, tipo, empresa) + Seções (compartilhadas entre Serviços) + Serviços → Locais → Itinerários → Paradas → Matriz de Distâncias → Seccionamento → Viagens → Horários. **Nenhum** campo de status, fluxo, autor, data ou aprovação. Árvore completa:
+
+  ```
+  autos.secoes[]                                (entidades, compartilhadas entre Serviços)
+    └─ servicos[]                                (uma entrada por Serviço que usa a Seção)
+
+  servicos[].locais[]                            (entidades, não compartilhadas)
+
+  servicos[].itinerarios[].paradas[]             (referências: secao_uuid XOR local_uuid)
+
+  servicos[].matriz_distancias[]                 (pares de secao_uuid, todas as combinações)
+  servicos[].matriz_seccionamento[]               (pares de secao_uuid, habilitados p/ passagem parcial)
+  ```
+
+  Ver árvore completa e detalhada na Spec 02 §2.
+- **Autossuficiente.** Todas as Seções e Locais que o Autos usa estão embutidos no próprio JSON, com `uuid` local ao documento — Paradas **referenciam** Seções/Locais por `uuid` (não os embutem), e a `matriz_seccionamento` referencia pares de **Seções**, não de pontos genéricos. Não depende de nenhum cadastro externo para ser lido.
 - **É o "salvar".** O formulário não persiste nada no servidor: exportar o JSON é salvar; retomar o trabalho é reimportar o JSON.
 - **É a baseline do comparativo.** O Comparador recebe dois JSONs (vigente e proposta) e produz o diff. O comparativo **não** está dentro do JSON nem do formulário.
 - **É a carga do banco.** No futuro, o Ingestor lê o JSON aprovado e materializa esses mesmos registros no PostgreSQL — reaproveitando as UUIDs como chave (ver §6).
@@ -108,33 +122,38 @@ O esquema detalhado é a **Spec 02**.
 
 ## 6. Identidade Estável (UUID)
 
-Para o Comparador casar "o mesmo Serviço" entre duas versões, cada Serviço (e cada Ponto) carrega uma **UUID estável**, distinta do rótulo humano:
+Para o Comparador casar "a mesma entidade" entre duas versões, cada uma das quatro entidades com identidade própria — **Seção**, **Serviço**, **Local** e **Viagem** (Spec 02 §12) — carrega uma **UUID estável**, distinta do rótulo humano:
 
-- **`numero_n`** (`0000-1RO`) é **só display** — sequencial por ordem de cadastro, sem lógica de posição, e potencialmente reaproveitável. Não serve como identidade.
-- **`uuid`** é gerada **no momento da criação** do Serviço/Ponto, client-side, como número aleatório (UUIDv4 via `crypto.randomUUID()`) — sem sequência, sem servidor, sem coordenação. Colisão é desprezível.
-- **Regra dura (Spec 02 e Spec 04):** importar um JSON **preserva** as UUIDs existentes; **apenas** Serviços/Pontos criados naquela edição ganham UUID nova. Se o formulário regenerasse UUIDs ao importar, o diff viraria "removeu tudo e criou tudo".
+- **`numero_n`** (`0000-1RO`, só em Serviço) é **só display** — sequencial por ordem de cadastro, sem lógica de posição, e potencialmente reaproveitável. Não serve como identidade.
+- **`uuid`** é gerada **no momento da criação** da entidade (Seção, Serviço, Local ou Viagem), client-side, como número aleatório (UUIDv4 via `crypto.randomUUID()`) — sem sequência, sem servidor, sem coordenação. Colisão é desprezível.
+- **Unicidade da `uuid` é no documento inteiro**, para as quatro entidades — inclusive Local, que apesar de não ser compartilhado entre Serviços não pode reaproveitar `uuid` de outro Local do mesmo documento (Spec 02 §12).
+- **Regra dura (Spec 02 e Spec 04):** importar um JSON **preserva** as UUIDs existentes; **apenas** entidades criadas naquela edição ganham UUID nova. Se o formulário regenerasse UUIDs ao importar, o diff viraria "removeu tudo e criou tudo".
 
 Diff resultante no Comparador:
-- mesma UUID nos dois JSONs → mesmo Serviço, compara campo a campo;
-- UUID só no vigente → removido/cancelado;
-- UUID só na proposta → novo.
+- mesma UUID nos dois JSONs → mesma entidade, compara campo a campo;
+- UUID só no vigente → removida/cancelada;
+- UUID só na proposta → nova.
 
-Bônus de arquitetura: no Ingestor, a UUID vira o id da linha no PostgreSQL — a identidade do Serviço é a mesma em formulário → JSON → banco, sem tradução.
+Bônus de arquitetura: no Ingestor, a UUID vira o id da linha no PostgreSQL — a identidade da entidade é a mesma em formulário → JSON → banco, sem tradução. Isso depende diretamente da unicidade global de `uuid` (mesmo para Local): se duas entidades do mesmo documento pudessem compartilhar `uuid`, o Ingestor não saberia qual linha do banco cada uma deveria virar.
 
 ---
 
 ## 7. Regras de Tipificação do Autos de Linha
 
-| Tipo de Autos | Permite variação de característica de veículo? | Observações |
-|---|---|---|
-| Semiurbano | Não (veículo único) | Múltiplos Serviços apenas por variação de itinerário/caráter |
-| Semiurbano Litorâneo | Não (veículo único) | Idem |
-| Rodoviário | Sim | RO, EX, LE, SL e mistos |
-| Rodoviário Litorâneo | Sim | Idem, mas `RO` é substituído por `ROL`. `RO` e `ROL` nunca coexistem no mesmo Autos. |
+A característica de veículo pertence a **duas famílias distintas, que nunca se misturam num mesmo Autos** — o `tipo` do Autos escolhe a família:
 
-**Códigos de característica de veículo:** RO (Convencional), ROL (Convencional Litorâneo), EX (Executivo), LE (Leito), SL (Semi-leito), e mistos MLEX, MLRO, MEXR, MLES, MEXS, MROS, MIST (misto de 3 tipos, raro).
+| Tipo de Autos | Família | Permite variação de característica? | Observações |
+|---|---|---|---|
+| Semiurbano | semiurbana | Não (veículo único) | Todos os Serviços usam `SU`; múltiplos Serviços apenas por variação de itinerário/caráter |
+| Semiurbano Litorâneo | semiurbana | Não (veículo único) | Todos usam `SUL` |
+| Rodoviário | rodoviária | Sim | `RO`, `EX`, `LE`, `SL` e mistos (nunca `SU`/`SUL`) |
+| Rodoviário Litorâneo | rodoviária | Sim | Idem, mas `RO` é substituído por `ROL`. `RO` e `ROL` nunca coexistem; `SU`/`SUL` nunca aparecem em Autos rodoviário. |
 
-Essas regras (tipo → característica permitida, exclusividade RO/ROL, veículo único no semiurbano) são **validações do formulário**, detalhadas na Spec 03.
+**Códigos de característica de veículo:**
+- **Família semiurbana:** SU (Semiurbano), SUL (Semiurbano Litorâneo).
+- **Família rodoviária:** RO (Rodoviário Convencional), ROL (Rodoviário Convencional Litorâneo), EX (Executivo), LE (Leito), SL (Semi-leito), e mistos MLEX, MLRO, MEXR, MLES, MEXS, MROS, MIST (misto rodoviário, raro).
+
+Essas regras (família por tipo, variação só no rodoviário, veículo único no semiurbano, exclusividade `SU`×`SUL` e `RO`×`ROL` por litoralidade) são **validações do formulário**, detalhadas na Spec 03 §10.
 
 ---
 
@@ -145,14 +164,15 @@ Essas regras (tipo → característica permitida, exclusividade RO/ROL, veículo
 - **JSON contém apenas dados de operação** — sem status, autor, data, comparativo ou qualquer metadado de fluxo.
 - **Comparativo é ferramenta separada.** Recebe JSON vigente + JSON proposta, compara na tela e gera **PDF comparativo próprio**, distinto do PDF operacional do formulário.
 - **Formulário não guarda nada no servidor.** Backend praticamente inexistente. Roteamento, cálculo de horários e geração do PDF são **client-side**.
-- **Roteamento via OSRM público** (`router.project-osrm.org`), chamado direto pelo front. Se o serviço estiver indisponível, exibir **mensagem de erro clara** (distância alimenta a tarifa, então não se prossegue com rota não roteada).
+- **Roteamento via OSRM público** (`router.project-osrm.org`), chamado direto pelo front. Se o serviço estiver indisponível, **não se prossegue com rota não roteada** e exibe-se uma **mensagem de erro clara** informando que o serviço de rotas está temporariamente fora do ar (ex.: *"Serviço de cálculo de rotas temporariamente indisponível — tente novamente em instantes."*). O motivo de bloquear é que a **distância roteada alimenta a tarifa**, então uma rota não calculada tornaria a tabela inválida — mas isso é a **justificativa** da decisão, **não** o texto da mensagem: a mensagem fala só da indisponibilidade do serviço. O algoritmo detalhado (mensagens por tipo de erro, retentativa) está na Spec 03 §3.5.
+- **Forçar o traçado da rota (pontos de rota).** O traçado que o OSRM sugere nem sempre é o que o ônibus percorre. O usuário pode inserir **pontos de rota** — vértices arrastáveis sobre a rota calculada, que forçam o traçado a passar por determinada via. **Não são Seção, Local nem Parada** e têm propósito único (condicionar a rota): sem tarifa, sem `uuid`, fora de `matriz_distancias`/`matriz_seccionamento` e da regra dos 350 m. São **persistidos no JSON** (`rota.pontos_de_rota`) só para reproduzir a rota forçada ao reeditar. Regra de negócio na Spec 03 §3.6, esquema na Spec 02 §10.4, interação de mapa na Spec 04.
 - **Mapa e tiles client-side** (OSM/MapLibre); imagem do mapa no PDF por captura do próprio canvas.
 - **Listas de Autos, empresas e tipos vêm de JSON estático** servido junto do app (no futuro, gerado a partir do PostgreSQL).
 - **Origem dos dados de identificação:** a empresa escolhe Autos/empresa/tipo a partir das listas para montar uma proposta **ou** carrega um JSON vigente que pré-preenche esses valores. Ao carregar JSON vigente, os valores usados são os do JSON — **desde que** empresa, Autos e tipo existam nas listas disponíveis. Caso não existam, **bloquear o carregamento** com mensagem clara (propor contra identidade obsoleta é pior que reescolher).
-- **Ponto georreferenciado global deixa de existir.** Cada Autos tem seus próprios pontos, embutidos no seu JSON, com id local ao documento. Sem cadastro mestre, sem reconciliação entre Autos, sem busca por raio como conceito central.
-- **UUID estável por Serviço e por Ponto**, gerada na criação (client-side, UUIDv4); `numero_n` é só display; importar preserva UUID, só o novo ganha UUID nova.
-- **Seção e Ponto são papéis contextuais** de um ponto dentro de um itinerário, não tipos de entidade distintos.
-- **Ida e Volta compartilham identidade de Seção** (mesmo nome/cidade), podendo divergir só em coordenadas. Quando divergem a ponto de não fazer sentido compartilhar, **cria-se dois Serviços** (um só de Ida com Volta vazia, outro só de Volta) e o cálculo tarifário considera só o sentido populado.
+- **Ponto georreferenciado global deixa de existir.** Cada Autos tem suas próprias Seções e Locais, embutidos no seu JSON, com `uuid` local ao documento. Sem cadastro mestre, sem reconciliação entre Autos, sem busca por raio como conceito central.
+- **UUID estável por Seção, Serviço, Local e Viagem**, gerada na criação (client-side, UUIDv4); `numero_n` (só em Serviço) é só display; importar preserva UUID, só a entidade nova ganha UUID nova.
+- **Seção e Local são entidades distintas**, não papéis contextuais de um mesmo ponto. Seção é entidade do Autos (compartilhada entre Serviços, define tarifa); Local é entidade do Serviço (não compartilhado, sem tarifa). O campo `papel` que existia num desenho anterior foi eliminado — o tipo é dado pela coleção que contém o ponto (`autos.secoes` vs. `servico.locais`). Ver Spec 02 §2, §13.6.
+- **Ida e Volta de um mesmo Serviço referenciam o mesmo conjunto de Seções** — quando os dois itinerários existem, toda Seção atendida pela Ida também é atendida pela Volta (e vice-versa), garantindo que `matriz_distancias` sempre tenha como calcular cada par (Spec 02 §2, §8). Só os Locais comuns intermediários podem divergir livremente entre os dois sentidos. Uma mesma Seção pode ter geolocalizações ligeiramente diferentes entre Ida e Volta (Spec 02 §5.2). Quando a divergência é grande o bastante para não fazer sentido compartilhar a Seção entre os sentidos, **cria-se dois Serviços** (um só de Ida com Volta vazia, outro só de Volta) e o cálculo tarifário considera só o sentido populado.
 - **Viagem tem frequência semanal** (dias da semana) + flag de feriado, não data fixa.
 - **Opção de Deslocamento é estatística calculada**, não dado de entrada.
 
@@ -160,11 +180,11 @@ Essas regras (tipo → característica permitida, exclusividade RO/ROL, veículo
 
 ## 9. Questões em Aberto
 
-1. ~~UUID em Viagem~~ — **decidido na Spec 02:** Viagem carrega UUID obrigatória, mesma regra de Serviço e Ponto.
+1. ~~UUID em Viagem~~ — **decidido na Spec 02:** Viagem carrega UUID obrigatória, mesma regra de Seção, Serviço e Local.
 2. ~~Caráter do itinerário~~ — **decidido na Spec 02:** vira campo explícito (`carater`) no Serviço, não derivado.
-3. ~~Horário na parada: relativo × absoluto~~ — **decidido na Spec 02:** offset relativo à saída (`offset_horario`) no nível da Parada, resolvido em horário absoluto por Viagem.
-4. **`regra_feriado` — valores do enum a definir na Spec 03**, junto do algoritmo de redistribuição proporcional de horários.
-5. **Limite de divergência espacial dentro de uma Seção — fixado na Spec 02:** Seção é entidade do Autos (não do Serviço), compartilhada por todos os Serviços que passam por ali (Spec 02 §5). A regra de 350 metros é um clustering por centroide cumulativo: cada novo ponto (Ida ou Volta, de qualquer Serviço) contribuído à Seção deve estar a ≤ 350 m do centroide dos pontos já aceitos nela. Acima disso, é necessária uma Seção separada. O algoritmo/momento de validação desse limite fica para a Spec 03/04.
+3. ~~Horário na parada: relativo × absoluto~~ — **decidido na Spec 02:** offset relativo à saída (`offset_horario`), no nível da **Viagem** (`viagem.horarios_paradas[]`, não da Parada — Spec 02 §13.15), resolvido em horário absoluto via `horario_saida + offset_horario`.
+4. ~~`regra_feriado` — valores do enum~~ — **decidido na Spec 03:** enum **binário** `"circula"` \| `"nao_circula"` (a Viagem roda ou não no feriado). Não há grade nem redistribuição de horário específica de feriado, e a etiqueta não afeta contagem de viagens/opções de deslocamento (Spec 03 §9). A "redistribuição proporcional" que se cogitava aqui era, na verdade, o recálculo de horários de passagem ao editar um horário a jusante (Spec 03 §8.2), sem relação com feriado.
+5. ~~Limite de divergência espacial dentro de uma Seção~~ — **fixado na Spec 02:** Seção é entidade do Autos (não do Serviço), compartilhada por todos os Serviços que passam por ali (Spec 02 §5). A regra de 350 metros é um clustering por centroide cumulativo: cada novo ponto (Ida ou Volta, de qualquer Serviço) contribuído à Seção deve estar a ≤ 350 m do centroide dos pontos já aceitos nela. Acima disso, é necessária uma Seção separada. O algoritmo/momento de validação desse limite (Spec 02 §5.2) fica detalhado na Spec 03/04.
 
 ---
 
