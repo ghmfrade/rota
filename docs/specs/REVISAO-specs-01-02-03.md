@@ -18,7 +18,17 @@ Cada item traz: severidade, referência, o problema, o cenário de quebra e a so
 
 **Cenário de quebra:** A Spec 04 (PDF operacional) e a Spec 05 (Comparador) **ambas** dependem dessa contagem (o Comparador precisa comparar "nº de opções de deslocamento" entre versões). Sem a fórmula, dois implementadores contam de formas diferentes e o número no PDF ≠ número no Comparador.
 
-**Solução:** Adicionar uma seção nova na Spec 03 (ex.: §9.4 ou uma §10 dedicada) definindo com precisão: (a) o conjunto de pares O-D compráveis de um Serviço = pares em `matriz_seccionamento` **mais** o par ponta-a-ponta; (b) se a unidade de contagem é "par × viagem", "par × viagem × dia da semana" ou só "par"; (c) que sentido conta (Ida, Volta, ambos); (d) confirmar que usa a semana padrão (sem feriado, coerente com §9.2). Fechar isto **antes** da Spec 04.
+**Solução:** Adicionar uma seção nova na Spec 03 (ex.: §9.4 ou uma §10 dedicada) definindo com precisão o conceito.
+Para o cálculo utiliza-se:
+(a) N° de conjuntos de pares O-D compráveis de um Serviço = pares em `matriz_seccionamento`
+(b) Total de Viagens semanais de cada viagem dentro de "viagens" (frequencia semanal daquele horário) em cada sentido existente na **semana_padrao**.
+
+cálculo:
+b_viagem_1_ida = len(dias_semana_da_viagem_1_ida)
+opcoes_de_deslocamento_ida = a _ (b_viagem_1_ida + b_viagem_2_ida + b_viagem_3_ida...)
+opcoes_de_deslocamento_volta = a _ (b_viagem_1_volta + b_viagem_2_volta + b_viagem_3_volta...)
+
+Fechar isto **antes** da Spec 04.
 
 ---
 
@@ -30,7 +40,42 @@ Cada item traz: severidade, referência, o problema, o cenário de quebra e a so
 
 **Cenário de quebra:** A validação de tipificação da Spec 04 precisa decidir, deterministicamente, se `MLRO` é permitido num Autos "Rodoviário Litorâneo". A spec atual não permite responder isso — a regra 3 sugere "não" (tem RO, não ROL), mas a tabela §10.2 sugere "sim" (mistos permitidos em ambos). Contradição.
 
-**Solução:** Produzir uma tabela **fechada, código-a-código**, mapeando cada um dos 7 mistos ao(s) `tipo`(s) permitido(s) — OU decidir explicitamente que **mistos são agnósticos à litoralidade** (permitidos em ambos os tipos rodoviários, e a regra 3 aplica-se só a `RO`/`ROL` puros). Qualquer das duas resolve; a spec precisa escolher uma antes de a Spec 04 implementar o bloqueio.
+**Solução:** Produzir uma tabela **fechada, código-a-código**, mapeando cada um dos `tipo`(s) permitido(s).
+
+Alterar Spec01 e 03, com as informações da tabela abaixo. O Semileito foi removido, ele não precisa existir.
+Alterar também o exemplo do json, para adequar aos codigos de `caracteristica_veiculo`.
+
+Detalhamento das características do veículo permitidas por tipo de Autos
+
+atributo: `caracteristica_veiculo`
+
+Tipo do Autos Semiurbano:
+
+- "SU" - Semiurbano
+
+Tipo do Autos Litorâneos:
+
+- "SUL" - Semiurbano Litorâneo
+
+Tipo do Autos Rodoviário
+
+- "CR": Convencional Rodoviário
+- "EX": Executivo
+- "LE": Leito
+- "ME": Misto Convencional Rodoviário e Executivo
+- "ML": Misto Convencional e Leito
+- "MX": Misto Executivo e Leito
+- "MM": Misto Convencional Rodoviário, Executivo e Leito.
+
+Tipo do Autos Rodoviário Litorâneo
+
+- "CL": Convencional Rodoviário Litorâneo
+- "EX": Executivo
+- "LE": Leito
+- "MEL": Misto Convencional Rodoviário Litorâneo e Executivo
+- "MLL": Misto Convencional Rodoviário Litorâneo e Leito
+- "MXL": Misto Executivo e Leito
+- "MML": Misto Convencional Rodoviário Litorâneo, Executivo e Leito.
 
 ---
 
@@ -54,7 +99,7 @@ Cada item traz: severidade, referência, o problema, o cenário de quebra e a so
 
 **Cenário de quebra:** Empresa faz alteração de uma linha existente, mas começa do zero (ou perdeu o JSON vigente). O Comparador fica inútil para aquela alteração.
 
-**Solução:** A Spec 04 deve tornar "carregar JSON vigente como base" o caminho **padrão e fortemente guiado** para *alterações* (vs. criação de linha nova), e documentar o modo de falha. Vale uma nota em Spec 01 §6 deixando claro que a estabilidade das UUIDs só funciona nesse fluxo.
+**Solução:** A Spec 04 deve tornar "carregar JSON vigente como base" o caminho **padrão e fortemente guiado** para _alterações_ (vs. criação de novo Autos de linha), e documentar o modo de falha. Vale uma nota em Spec 01 §6 deixando claro que a estabilidade das UUIDs só funciona nesse fluxo.
 
 ---
 
@@ -68,7 +113,7 @@ Cada item traz: severidade, referência, o problema, o cenário de quebra e a so
 
 **Cenário de quebra:** Vigente roteado em jan/2026, proposta roteada em jul/2026, mesmas paradas → diff falso de rota em todos os itinerários.
 
-**Solução:** Deixar consignado (para a Spec 05) que a comparação de rota deve se basear em sinais **estáveis/semânticos** — sequência de paradas, `pontos_de_rota`, e distâncias com **tolerância** — e não em igualdade bit-a-bit de `geometria`. Registrar já em Spec 03 §3.6.2 como orientação ao Comparador.
+**Solução:** Deixar consignado (para a Spec 05) que a comparação de rota deve se basear em sinais **estáveis/semânticos** — sequência de paradas, `pontos_de_rota`, e distâncias na `matriz_distancias` com **tolerância** — e não em igualdade bit-a-bit de `geometria`. Registrar já em Spec 03 §3.6.2 como orientação ao Comparador.
 
 ### P6. Remoção/edição de ponto de uma Seção pode quebrar o invariante dos 350 m; a justificativa em §7.2 está incorreta
 
@@ -88,7 +133,7 @@ Cada item traz: severidade, referência, o problema, o cenário de quebra e a so
 
 **Cenário de quebra:** Linha semiurbana circular (sai e volta ao mesmo terminal) não pode ser modelada, e nada avisa o usuário disso antecipadamente.
 
-**Solução:** Ou (a) declarar explicitamente em Spec 01 §3 que linhas circulares/com Seção repetida estão fora de escopo; ou (b) decidir suportá-las e ajustar §10.1/§14/§4.4 (identificar parada por posição, não só por Seção).
+**Solução:** Ou (a) declarar explicitamente em Spec 01 §3 que linhas circulares/com Seção repetida estão fora de escopo; Casos de linhas circulares deverão ser tratados como dois serviços em que um termina onde o outro começa, ficando responsabilidade do usuário conectar os horários de fim das viagens com o início da seguinte. (não são muitos casos desse no nosso sistema)
 
 ### P8. Dependência do OSRM demo público como infraestrutura de produção
 
@@ -96,7 +141,10 @@ Cada item traz: severidade, referência, o problema, o cenário de quebra e a so
 
 **Problema:** `router.project-osrm.org` é o **servidor de demonstração** do projeto OSRM — sem SLA, com limites de uso, e cujos termos desencorajam uso em produção. A Spec 03 §3.6 ainda assume comportamento específico (`waypoints` no serviço `route`) que o demo pode não honrar (a própria spec prevê fallback, o que evidencia a incerteza). Para uma ferramenta da ARTESP, depender do demo é risco operacional real, não só de indisponibilidade pontual.
 
-**Solução:** Registrar como decisão de arquitetura para a Spec 04: prever OSRM **auto-hospedado** (ou provedor com SLA) para produção, mantendo o demo apenas para desenvolvimento. Não bloqueia o desenho da Spec 04, mas deve constar como requisito não-funcional.
+**Solução:** Registrar como decisão de arquitetura para a Spec 04:
+
+- Ao carregar um arquivo JSON dos Autos, nunca depender do OSRM para abrir itinerarios. Os mapas carregam o itinerário salvo em "rota". Usa-se o OSRM gratuito apenas para alterar os itinerarios de alguma forma (inserir ou alterar local de secao, ponto de parada ou ponto de rota)
+- Registrar qual motor gerou a rota (alteraçao no spec 02) [`fonte_calculo`, `data_calculo`, `perfil`]
 
 ---
 
@@ -108,7 +156,7 @@ Cada item traz: severidade, referência, o problema, o cenário de quebra e a so
 
 **Problema:** A Spec 02 tipa `offset_horario`/`horario_saida` como `HH:MM:SS` (sugere 2 dígitos, validável por regex fixa); a Spec 03 admite hora com mais de 2 dígitos. Ambiguidade para a validação estrutural.
 
-**Solução:** Escolher um: como o domínio é intermunicipal (< 24 h), fixar `HH:MM:SS` com `HH` em 00–23 e alinhar as duas specs; ou permitir `HH+` explicitamente e ajustar a regra de validação nos dois documentos.
+**Solução:** Escolher um: como o domínio é intermunicipal (< 24 h), fixar os offsets (tempo de deslocamento)`HH:MM:SS` com `HH` em 00–23 e alinhar as duas specs.
 
 ### P10. Redação da unicidade de UUID: "dentro da sua categoria" vs "documento inteiro"
 
@@ -146,20 +194,20 @@ Cada item traz: severidade, referência, o problema, o cenário de quebra e a so
 
 ## Resumo executivo
 
-| # | Severidade | Tema | Ação principal |
-|---|---|---|---|
-| P1 | 🔴 | Opção de Deslocamento sem algoritmo | Definir cálculo na Spec 03 |
-| P2 | 🔴 | Mistos × litoralidade contraditório | Tabela fechada código-a-código na Spec 03 |
-| P3 | 🔴 | Origem do JSON "vigente" | Atribuir ação ao Formulário (Spec 04) |
-| P4 | 🔴 | Diff exige derivar do vigente | Guiar fluxo "importar vigente" na Spec 04 |
-| P5 | 🟡 | Diff de rota por geometria | Comparar por sinais estáveis (Spec 05) |
-| P6 | 🟡 | 350 m em remoção/edição | Revalidação obrigatória; corrigir §7.2 |
-| P7 | 🟡 | Linhas circulares | Declarar no não-escopo ou suportar |
-| P8 | 🟡 | OSRM demo em produção | Prever auto-hospedagem (req. não-funcional) |
-| P9 | 🟢 | Formato de tempo > 24 h | Uniformizar HH:MM:SS |
-| P10 | 🟢 | Redação unicidade UUID | Uniformizar "documento inteiro" |
-| P11 | 🟢 | Exemplo de seccionamento | Ajustar/anotar |
-| P12 | 🟢 | Notação §13.6/§13.15 | Reescrever referência |
-| P13 | 🟢 | Rótulo "semana padrão" no PDF | Requisito de exibição (Spec 04) |
+| #   | Severidade | Tema                                | Ação principal                              |
+| --- | ---------- | ----------------------------------- | ------------------------------------------- |
+| P1  | 🔴         | Opção de Deslocamento sem algoritmo | Definir cálculo na Spec 03                  |
+| P2  | 🔴         | Mistos × litoralidade contraditório | Tabela fechada código-a-código na Spec 03   |
+| P3  | 🔴         | Origem do JSON "vigente"            | Atribuir ação ao Formulário (Spec 04)       |
+| P4  | 🔴         | Diff exige derivar do vigente       | Guiar fluxo "importar vigente" na Spec 04   |
+| P5  | 🟡         | Diff de rota por geometria          | Comparar por sinais estáveis (Spec 05)      |
+| P6  | 🟡         | 350 m em remoção/edição             | Revalidação obrigatória; corrigir §7.2      |
+| P7  | 🟡         | Linhas circulares                   | Declarar no não-escopo ou suportar          |
+| P8  | 🟡         | OSRM demo em produção               | Prever auto-hospedagem (req. não-funcional) |
+| P9  | 🟢         | Formato de tempo > 24 h             | Uniformizar HH:MM:SS                        |
+| P10 | 🟢         | Redação unicidade UUID              | Uniformizar "documento inteiro"             |
+| P11 | 🟢         | Exemplo de seccionamento            | Ajustar/anotar                              |
+| P12 | 🟢         | Notação §13.6/§13.15                | Reescrever referência                       |
+| P13 | 🟢         | Rótulo "semana padrão" no PDF       | Requisito de exibição (Spec 04)             |
 
 **Recomendação para abrir caminho à Spec 04:** resolver **P1–P4** primeiro (P1 e P2 dentro da própria Spec 03; P3 e P4 como escopo explícito da Spec 04). P5–P8 podem ser registrados como notas direcionadas às specs 04/05. P9–P13 são correções de texto que podem ser feitas em lote nas Specs 01/02/03.

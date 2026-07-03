@@ -41,7 +41,7 @@ Documento (raiz)
          ├─ sentido
          ├─ paradas[]                (ordenadas; cada uma referencia UMA Seção OU UM Local)
          │  └─ ordem, secao_uuid? | local_uuid?
-         ├─ rota { geometria, distancia_km, duracao_s, trechos[], pontos_de_rota[] }
+         ├─ rota { geometria, distancia_km, duracao_s, fonte_calculo, data_calculo, perfil, trechos[], pontos_de_rota[] }
          │  ├─ trechos[]: parada_origem_ordem, parada_destino_ordem, distancia_km, duracao_s
          │  └─ pontos_de_rota[]: apos_parada_ordem, latitude, longitude   (só forçam o traçado; não geram parada/trecho)
          └─ viagens[]
@@ -93,6 +93,7 @@ Decisões de nesting fixadas nesta spec (histórico completo em §13):
 
 - Exatamente um dos dois campos de data está presente, de acordo com `status`: `data_criacao` se `"proposta"`, `data_publicacao` se `"vigente"` — nunca os dois, nunca nenhum.
 - Nenhum outro dado de fluxo acompanha esses campos: sem autor, sem prazo de vigência, sem publicação em DOE, sem histórico de mudança de status. Se o Autos precisar trocar de `proposta` para `vigente`, isso é feito gerando um novo JSON com o `status` e a data corretos — o próprio versionamento fica a cargo de quem usa o arquivo (nome de arquivo, SEI etc.), não do JSON.
+- **Quem faz essa transição é o Formulário (Spec 01 §2, §8), não uma edição manual.** O Formulário expõe uma ação explícita "definir como vigente": pede a `data_publicacao` (informada pelo usuário), troca `status` para `"vigente"`, remove `data_criacao`, grava `data_publicacao`, e **preserva todas as UUIDs** existentes (§12). Nenhum outro dado de operação muda. É assim que se produz, de forma controlada, o JSON `vigente` que vira baseline do Comparador (Spec 01 §2) e carga do Ingestor. A UI dessa ação é da Spec 04.
 - Isso não substitui o papel de "vigente"/"proposta" como entrada do Comparador (Spec 01 §2): o Comparador recebe dois JSONs e ainda cabe ao usuário indicar qual é qual ao carregá-los — o campo aqui é só a autodeclaração de cada arquivo, não uma regra de negócio do Comparador.
 - **Nota para a Spec 05 (Comparador):** `status`, `data_criacao` e `data_publicacao` são autodeclaração do documento, não dado de operação comparável — não devem participar do diff campo-a-campo entre vigente e proposta (senão todo diff acusaria falsamente "mudou a data de criação", já que esse campo muda a cada exportação).
 
@@ -135,6 +136,8 @@ Se um ponto candidato ultrapassar 350 m do centroide vigente, ele **não pode** 
 
 *Validação no momento da inserção (Formulário):* ao tentar inserir um novo ponto numa Seção, o Formulário não checa só a distância do candidato ao centroide atual — ele calcula o **centroide que resultaria** da inserção (centroide de todos os pontos já aceitos mais o candidato) e verifica se, sob esse novo centroide, **algum ponto já aceito** passaria a ficar a mais de 350 m dele. Se sim, a inserção é recusada (o ponto candidato não entra nesta Seção), mesmo que o candidato isolado estivesse a ≤ 350 m do centroide anterior. Isso garante o invariante de que todo ponto aceito numa Seção está sempre a ≤ 350 m do centroide final do conjunto — não apenas do centroide vigente no momento em que foi inserido.
 
+*Remoção e edição de coordenada também revalidam (obrigatório):* remover um ponto ou mover a geolocalização de um ponto existente desloca o centroide e **pode** romper o invariante nos pontos que ficaram — portanto **remoção e edição revalidam sempre** o conjunto resultante. Edição de coordenada é tratada como **remover + reinserir**, com a checagem plena acima aplicada à coordenada nova. O algoritmo detalhado está na Spec 03 §7.2.
+
 *Validação de um JSON de origem desconhecida (Comparador/Ingestor):* como esses leitores não têm o histórico de inserção, não podem reconstruir a sequência de checagens acima. Podem, porém, aplicar uma checagem mais fraca, mas suficiente para detectar violação grosseira: calcular o centroide de **todos** os pontos finais de cada Seção e verificar se todos estão a ≤ 350 m dele. Essa checagem é necessária mas não estritamente equivalente à validação incremental do Formulário (não reconstrói a ordem de inserção), mas basta para sinalizar um JSON claramente inválido.
 
 ---
@@ -144,8 +147,8 @@ Se um ponto candidato ultrapassar 350 m do centroide vigente, ele **não pode** 
 | Campo | Tipo | Obrigatório | Descrição |
 |---|---|---|---|
 | `uuid` | string (UUIDv4) | Sim | Identidade estável do Serviço. Gerada client-side (`crypto.randomUUID()`) na criação; preservada em reimportações (Spec 01 §6). |
-| `numero_n` | string | Sim | Rótulo de display, formato `"0000-NXX"` (ex.: `"0000-1RO"`). Não é identidade — apenas exibição. |
-| `caracteristica_veiculo` | enum | Sim | **Família semiurbana:** `SU` \| `SUL`. **Família rodoviária:** `RO` \| `ROL` \| `EX` \| `LE` \| `SL` \| `MLEX` \| `MLRO` \| `MEXR` \| `MLES` \| `MEXS` \| `MROS` \| `MIST` (Spec 01 §7). O `tipo` do Autos fixa a família (semiurbano → `SU`/`SUL`; rodoviário → família rodoviária) e as duas nunca se misturam. Quais valores são permitidos por `tipo` é regra de negócio da Spec 03 §10. |
+| `numero_n` | string | Sim | Rótulo de display, formato `"0000-NXX"` (ex.: `"0000-1CR"`). Não é identidade — apenas exibição. |
+| `caracteristica_veiculo` | enum | Sim | **Família semiurbana:** `SU` \| `SUL`. **Família rodoviária (Rodoviário):** `CR` \| `EX` \| `LE` \| `ME` \| `ML` \| `MX` \| `MM`. **Família rodoviária (Rodoviário Litorâneo):** `CL` \| `EX` \| `LE` \| `MEL` \| `MLL` \| `MXL` \| `MML` (Spec 01 §7). O `tipo` do Autos fixa a família e a litoralidade (semiurbano → `SU`/`SUL`; rodoviário → convencional `CR`/`CL` conforme litoralidade) e as duas famílias nunca se misturam. A tabela fechada de quais valores são permitidos por `tipo` é regra de negócio da Spec 03 §10.2. |
 | `carater` | enum | Sim | `"principal"` \| `"parcial"` \| `"semidireta"`. Campo explícito, declarado pela empresa — não derivado do conjunto de paradas. O glossário da Spec 01 usa "etc." ao listar valores; se surgirem outros, esta lista é a fonte de verdade e deve ser atualizada. |
 | `locais` | array\<Local\> | Não (default `[]`) | Pontos comuns (sem tarifa) usados pelos itinerários deste Serviço. Não compartilhados com outros Serviços. Ver §7. |
 | `matriz_distancias` | array\<ParDistância\> | Sim | Distância entre cada par de Seções atendidas por este Serviço, computada e congelada a partir da rota. Ver §8. |
@@ -257,10 +260,15 @@ A Parada **não** carrega horário — o tempo de passagem por cada parada é da
 | `geometria` | object (GeoJSON `LineString`) | Sim | Coordenadas `[longitude, latitude]` da rota street-snapped, retornada pelo OSRM, para este sentido, ponta a ponta. |
 | `distancia_km` | number | Sim | Distância total roteada, em km. Igual à soma de `trechos[].distancia_km`. O OSRM retorna a distância em metros; o Formulário converte para km ao montar este campo — nenhum campo de distância do documento fica em metros (§8). |
 | `duracao_s` | number | Sim | Duração total estimada, em segundos, retornada pelo OSRM (sem trânsito — baseline). Igual à soma de `trechos[].duracao_s`. |
+| `fonte_calculo` | string | Sim | Motor/instância que produziu esta rota (ex.: `"osrm:router.project-osrm.org"` ou o host auto-hospedado). Registra **com que engine** a rota foi congelada, para rastreabilidade e para o Comparador (Spec 05) saber que rotas de fontes/datas diferentes podem divergir por ruído do mapa, não por mudança de dado (Spec 03 §3.6.2). |
+| `data_calculo` | string (data `YYYY-MM-DD`) | Sim | Data em que a rota foi calculada e congelada. Duas rotas com as mesmas paradas mas `data_calculo` distante podem ter geometria/distância ligeiramente diferentes (mapa/versão do OSRM mudou) — isso é ruído, não alteração de operação. |
+| `perfil` | string | Sim | Perfil de roteamento usado (ex.: `"driving"`, Spec 03 §3.2). |
 | `trechos` | array\<Trecho\> | Sim | Distância e duração de cada segmento consecutivo entre paradas deste itinerário. Ver §10.3. |
 | `pontos_de_rota` | array\<PontoDeRota\> | Não (default `[]`) | Vértices que forçam o traçado da rota por vias específicas. Só condicionam o cálculo; não geram parada nem trecho. Ver §10.4. |
 
-`rota`, incluindo `trechos` e `pontos_de_rota`, é calculada e congelada no momento da geração do JSON — o Comparador e o Ingestor não recalculam contra o OSRM, apenas leem o que está no documento (a distância roteada alimenta a tarifa, então uma rota não calculada tornaria a tabela inválida — Spec 01 §8).
+`rota`, incluindo `trechos`, `pontos_de_rota` e os metadados `fonte_calculo`/`data_calculo`/`perfil`, é calculada e congelada no momento da geração do JSON — o Comparador e o Ingestor não recalculam contra o OSRM, apenas leem o que está no documento (a distância roteada alimenta a tarifa, então uma rota não calculada tornaria a tabela inválida — Spec 01 §8).
+
+**Ao reabrir um JSON, o mapa desenha a `rota.geometria` congelada — nunca reconsulta o OSRM só para exibir.** O OSRM só é chamado quando o usuário efetivamente **altera** o itinerário (inserir/mover Seção, Local ou ponto de rota), recalculando o trecho afetado. Isso remove a dependência do serviço público para a simples leitura/reedição (Spec 01 §8, Spec 03 §3).
 
 ### 10.3 Trecho (elemento de `rota.trechos`)
 
@@ -310,7 +318,7 @@ Validação estrutural: cada `apos_parada_ordem` referencia uma parada existente
 | Campo | Tipo | Obrigatório | Descrição |
 |---|---|---|---|
 | `uuid` | string (UUIDv4) | Sim | Identidade estável da viagem. Mesma regra de Seção/Serviço/Local: gerada client-side na criação, preservada em reimportações. Permite ao Comparador reportar "viagem das 08:00 adiantada para 08:15" em vez de "removeu uma, criou outra". |
-| `horario_saida` | string (`HH:MM:SS`) | Sim | Horário absoluto de saída desta viagem, a partir da primeira parada do itinerário. |
+| `horario_saida` | string (`HH:MM:SS`) | Sim | Horário absoluto de saída desta viagem, a partir da primeira parada do itinerário. `HH` em `00`–`23` (domínio intermunicipal, < 24 h — Spec 03 §8.1). |
 | `dias_semana` | array\<enum\> | Sim | Mínimo 1 elemento, sem repetição. Valores: `"segunda"`, `"terca"`, `"quarta"`, `"quinta"`, `"sexta"`, `"sabado"`, `"domingo"`. |
 | `regra_feriado` | enum | Sim | `"circula"` \| `"nao_circula"` — indica se esta Viagem **também roda em feriado** (`"circula"`, no mesmo horário e offsets, em qualquer dia em que o feriado caia — aditivo, não modificador de `dias_semana`) ou **não roda** (`"nao_circula"`). Binário; **não há** grade nem redistribuição de horário específica de feriado. É informação de exibição (tabela/PDF); significado fixado na Spec 03 §9; **não afeta** contagem de viagens/opções de deslocamento (que usam a semana padrão, sem feriado). |
 | `horarios_paradas` | array\<HorárioParada\> | Sim | Offset de passagem, a partir de `horario_saida`, para cada Parada do itinerário — específico desta Viagem. Ver §11.1. |
@@ -322,7 +330,7 @@ Todo o conjunto de paradas de um itinerário é fixo (definido em `itinerario.pa
 | Campo | Tipo | Obrigatório | Descrição |
 |---|---|---|---|
 | `parada_ordem` | integer | Sim | `ordem` da Parada (em `itinerario.paradas`) a que este horário se refere. |
-| `offset_horario` | string (`HH:MM:SS`) | Sim | Tempo decorrido desde `horario_saida` desta Viagem até a passagem por esta parada. Editável pelo usuário na UI (sugestão inicial vem de `rota.trechos`, acumulados — Spec 03/04 define o algoritmo de sugestão). |
+| `offset_horario` | string (`HH:MM:SS`) | Sim | Tempo decorrido desde `horario_saida` desta Viagem até a passagem por esta parada. `HH` em `00`–`23` (offset sempre < 24 h — Spec 03 §8.1). Editável pelo usuário na UI (sugestão inicial vem de `rota.trechos`, acumulados — Spec 03/04 define o algoritmo de sugestão). |
 
 Validações estruturais:
 - `horarios_paradas` tem exatamente um elemento para cada Parada existente em `itinerario.paradas` (mesmo conjunto de `ordem`, sem faltar nem sobrar).
@@ -338,7 +346,7 @@ Aplicam-se uniformemente a **Seção**, **Serviço**, **Local** e **Viagem**:
 - UUID é gerada **no momento da criação** da entidade, client-side, como UUIDv4 (`crypto.randomUUID()`).
 - UUID **nunca é regenerada** por edição do conteúdo da entidade — só existe uma vez, na criação.
 - Ao **importar um JSON**, todas as UUIDs existentes são preservadas tal como estão no arquivo. Somente entidades **novas**, criadas durante aquela sessão de edição, recebem UUID nova.
-- Duas entidades da mesma categoria nunca compartilham UUID dentro do mesmo documento (unicidade de `uuid` é validação estrutural). Para Seção, Serviço, Local e Viagem, a unicidade é **no documento inteiro** — mesmo Local sendo uma entidade não compartilhada entre Serviços (§7), sua UUID ainda precisa ser única globalmente, para que o Ingestor (Spec 06) possa usá-la diretamente como chave da linha no PostgreSQL sem ambiguidade entre Serviços de um mesmo Autos (ver também Spec 01 §6).
+- Cada `uuid` é **único no documento inteiro, entre todas as entidades** (Seção, Serviço, Local e Viagem) — não só dentro da própria categoria (unicidade de `uuid` é validação estrutural). Mesmo Local sendo uma entidade não compartilhada entre Serviços (§7), sua UUID ainda precisa ser única globalmente, para que o Ingestor (Spec 06) possa usá-la diretamente como chave da linha no PostgreSQL sem ambiguidade entre Serviços de um mesmo Autos (ver também Spec 01 §6).
 - `numero_n` (Serviço) é apenas rótulo de display — não deve ser usado como chave de identidade em nenhuma lógica de diff ou persistência.
 
 Diff resultante no Comparador (Spec 01 §6, estendido a Seção, Local e Viagem):
@@ -372,6 +380,7 @@ Histórico completo — v0.1 → v0.5 desta spec:
 18. **`autos.status` (`"proposta"` \| `"vigente"`) + `data_criacao`/`data_publicacao` condicional** (§4.1) — **exceção deliberada e estreita** ao princípio de "zero gestão" da Spec 01 §3, registrada explicitamente lá. Não modela o ciclo de vida do SEI (sem rascunho/análise/aprovado, sem autor, sem prazo de vigência, sem DOE) — é só uma autodeclaração para o Comparador/Ingestor saberem o que estão lendo sem depender de nome de arquivo.
 19. **`rota` ganha `pontos_de_rota[]`** (§10.4): vértices que forçam o traçado por vias específicas, persistidos **só** para reproduzir a rota forçada ao reeditar. Sem `uuid`, sem tarifa, não são Parada e não participam de `matriz_distancias`/`matriz_seccionamento` nem da regra dos 350 m; não alteram a contagem de `trechos`. Algoritmo na Spec 03 §3.6.
 20. **`regra_feriado` é binário** (`"circula"` \| `"nao_circula"`) — a Viagem também roda no feriado (mesmo horário/offsets, em qualquer dia em que o feriado caia — **aditivo**, não modificador de `dias_semana`) ou não roda. É **apenas informativo** (tabela/legenda/PDF): **não existe** grade nem redistribuição de horário específica de feriado, e a etiqueta **não afeta** contagem de viagens/opções de deslocamento, que usam a semana padrão (sem feriado). Fecha a questão em aberto da Spec 01 §9.4; significado detalhado na Spec 03 §9. (A "redistribuição proporcional" que se cogitava para feriado era, na verdade, o recálculo de horários de passagem ao editar um horário a jusante — Spec 03 §8.2, sem relação com feriado.)
+21. **`rota` ganha `fonte_calculo`, `data_calculo` e `perfil`** (§10.2): metadados que registram qual motor/instância de roteamento e qual data produziram a rota congelada. Motivados por dois pontos: (a) o servidor de demonstração do OSRM não tem SLA e pode ser trocado por instância auto-hospedada — a `fonte_calculo` rastreia a procedência; (b) rotas com mesmas paradas mas geradas em datas distantes podem divergir por mudança do mapa/OSRM, então o Comparador (Spec 05) trata divergência de `geometria`/`distancia_km` com **tolerância**, não igualdade bit-a-bit (Spec 03 §3.6.2). Ao **reabrir** um JSON, o mapa desenha `rota.geometria` congelada; o OSRM só é chamado quando o itinerário é efetivamente **alterado** (Spec 01 §8).
 
 ---
 
@@ -380,13 +389,14 @@ Histórico completo — v0.1 → v0.5 desta spec:
 Validações de forma do documento — não incluem regras de negócio (tarifa, roteamento, tipificação, algoritmo de sugestão de menor distância), que ficam na Spec 03:
 
 - `versao_schema` presente.
-- Todo `uuid` (Seção, Serviço, Local, Viagem) é string em formato UUIDv4; único dentro da sua categoria, **no documento inteiro** — inclusive Local, que apesar de não ser compartilhado entre Serviços (§7), ainda assim não pode reaproveitar `uuid` de outro Local de outro Serviço no mesmo documento (§12).
+- Todo `uuid` (Seção, Serviço, Local, Viagem) é string em formato UUIDv4 e **único no documento inteiro, entre todas as entidades** (Seção, Serviço, Local e Viagem) — não apenas dentro da própria categoria. Inclusive Local, que apesar de não ser compartilhado entre Serviços (§7), não pode reaproveitar `uuid` de nenhuma outra entidade do mesmo documento, para o Ingestor usar `uuid` como chave sem ambiguidade (§12, Spec 01 §6).
 - `autos.status` presente; exatamente um de `autos.data_criacao` (se `"proposta"`) / `autos.data_publicacao` (se `"vigente"`) presente, de acordo com `status` (§4.1).
 - `autos.servicos` tem ao menos 1 elemento.
 - Cada Seção em `autos.secoes`: `servicos` tem ao menos 1 elemento; cada `servico_uuid` referenciado existe em `autos.servicos` e tem ao menos uma Parada apontando para esta Seção; obrigatoriedade de `geolocalizacao_ida`/`geolocalizacao_volta` segue a direcionalidade do Serviço referenciado (§5.1); regra de centroide de 350 m (§5.2).
 - Cada Local em `servico.locais`: ao menos uma geolocalização preenchida; se ambas, ≤ 350 m pareado (§7.1).
 - `itinerarios` de um Serviço: 1 ou 2 elementos, com `sentido` distinto entre eles; **se os dois existem, o conjunto de Seções referenciadas por `paradas` de Ida é idêntico ao de Volta** (§2) — só os Locais comuns intermediários podem diferir entre os dois sentidos.
 - `paradas` de um itinerário: mínimo 2 elementos; `ordem` estritamente crescente, começando em 1, sem lacunas; exatamente um de `secao_uuid`/`local_uuid` por Parada, com referência íntegra (§10.1); **a primeira e a última Parada (menor e maior `ordem`) referenciam uma Seção (`secao_uuid`), nunca um Local** — Locais só aparecem como paradas intermediárias (§10.1).
+- `rota`: `fonte_calculo`, `data_calculo` (formato `YYYY-MM-DD`) e `perfil` presentes (§10.2).
 - `rota.trechos`: exatamente `paradas.length - 1` elementos, um por par consecutivo de paradas, sem lacunas nem repetição; `rota.distancia_km` e `rota.duracao_s` iguais à soma dos respectivos campos em `trechos`.
 - `rota.pontos_de_rota` (se presente): cada `apos_parada_ordem` referencia parada existente e está em `[1, paradas.length - 1]`; não altera a contagem de `trechos`; ausente/vazio é válido (§10.4).
 - Ao menos 2 Seções distintas referenciadas por paradas de um Serviço, para existir ao menos um par possível em `matriz_distancias`.
@@ -398,7 +408,7 @@ Validações de forma do documento — não incluem regras de negócio (tarifa, 
 
 ## 15. Exemplo de JSON Completo (mínimo)
 
-Serviço único (`0000-1RO`) atendendo três Seções (Santos, São Vicente, Praia Grande) e um Local comum sem tarifa, só na Ida.
+Serviço único (`0000-1CR`) atendendo três Seções (Santos, São Vicente, Praia Grande) e um Local comum sem tarifa, só na Ida.
 
 ```json
 {
@@ -450,8 +460,8 @@ Serviço único (`0000-1RO`) atendendo três Seções (Santos, São Vicente, Pra
     "servicos": [
       {
         "uuid": "b3f1c2a0-1e2d-4a3b-9c4d-5e6f7a8b9c0d",
-        "numero_n": "0000-1RO",
-        "caracteristica_veiculo": "RO",
+        "numero_n": "0000-1CR",
+        "caracteristica_veiculo": "CR",
         "carater": "principal",
         "locais": [
           {
@@ -468,8 +478,8 @@ Serviço único (`0000-1RO`) atendendo três Seções (Santos, São Vicente, Pra
         ],
         "matriz_seccionamento": [
           { "secao_a_uuid": "4da15f36-5bbe-4f4e-90e3-68029097c1b9", "secao_b_uuid": "6f51076b-aaf8-4546-8530-4da1e489c880", "distancia_km": 8 },
-          { "secao_a_uuid": "6f51076b-aaf8-4546-8530-4da1e489c880", "secao_b_uuid": "63344e28-4722-4a8b-ae9d-1862e8daded4", "distancia_km": 6 },
-          { "secao_a_uuid": "4da15f36-5bbe-4f4e-90e3-68029097c1b9", "secao_b_uuid": "63344e28-4722-4a8b-ae9d-1862e8daded4", "distancia_km": 14 }
+          { "secao_a_uuid": "6f51076b-aaf8-4546-8530-4da1e489c880", "secao_b_uuid": "63344e28-4722-4a8b-ae9d-1862e8daded4", "distancia_km": 6.05 },
+          { "secao_a_uuid": "4da15f36-5bbe-4f4e-90e3-68029097c1b9", "secao_b_uuid": "63344e28-4722-4a8b-ae9d-1862e8daded4", "distancia_km": 14.05 }
         ],
         "itinerarios": [
           {
@@ -484,6 +494,9 @@ Serviço único (`0000-1RO`) atendendo três Seções (Santos, São Vicente, Pra
               "geometria": { "type": "LineString", "coordinates": [[-46.3339, -23.9608], [-46.3919, -23.9631], [-46.4025, -24.0084]] },
               "distancia_km": 14,
               "duracao_s": 1800,
+              "fonte_calculo": "osrm:router.project-osrm.org",
+              "data_calculo": "2026-07-01",
+              "perfil": "driving",
               "trechos": [
                 { "parada_origem_ordem": 1, "parada_destino_ordem": 2, "distancia_km": 8, "duracao_s": 1080 },
                 { "parada_origem_ordem": 2, "parada_destino_ordem": 3, "distancia_km": 3.5, "duracao_s": 420 },
@@ -519,6 +532,9 @@ Serviço único (`0000-1RO`) atendendo três Seções (Santos, São Vicente, Pra
               "geometria": { "type": "LineString", "coordinates": [[-46.4020, -24.0081], [-46.3915, -23.9629], [-46.3342, -23.9611]] },
               "distancia_km": 14.1,
               "duracao_s": 1830,
+              "fonte_calculo": "osrm:router.project-osrm.org",
+              "data_calculo": "2026-07-01",
+              "perfil": "driving",
               "trechos": [
                 { "parada_origem_ordem": 1, "parada_destino_ordem": 2, "distancia_km": 6.1, "duracao_s": 750 },
                 { "parada_origem_ordem": 2, "parada_destino_ordem": 3, "distancia_km": 8, "duracao_s": 1080 }
@@ -545,9 +561,9 @@ Serviço único (`0000-1RO`) atendendo três Seções (Santos, São Vicente, Pra
 }
 ```
 
-*Notas:* `regra_feriado: "nao_circula"` é um dos dois valores válidos do enum binário (§11, Spec 03 §9) — aqui, a Viagem não roda em feriado. `Ponto de Embarque Praia` é um Local comum, só na Ida, sem geolocalização de Volta — por isso não aparece nas paradas do itinerário de Volta. O `pontos_de_rota` na Ida ilustra um único vértice de forçamento no trecho entre a parada 1 e a 2 (força a rota por uma via específica); o itinerário de Volta omite o campo (default `[]` — nenhum forçamento).
+*Notas:* `regra_feriado: "nao_circula"` é um dos dois valores válidos do enum binário (§11, Spec 03 §9) — aqui, a Viagem não roda em feriado. `Ponto de Embarque Praia` é um Local comum, só na Ida, sem geolocalização de Volta — por isso não aparece nas paradas do itinerário de Volta. O `pontos_de_rota` na Ida ilustra um único vértice de forçamento no trecho entre a parada 1 e a 2 (força a rota por uma via específica); o itinerário de Volta omite o campo (default `[]` — nenhum forçamento). A `matriz_seccionamento` deste Serviço reflete o modo **"distâncias do serviço"** (Spec 03 §6.3): cada `distancia_km` é igual ao `valor_adotado_de_distancia` do mesmo par em `matriz_distancias` (`8`, `6.05`, `14.05`) — como o Autos tem um único Serviço, o modo "menor distância" daria os mesmos valores. Qualquer valor aqui poderia ainda ter sido **editado manualmente** pelo usuário após a sugestão (Spec 02 §9, Spec 03 §6.4).
 
-Se um segundo Serviço do mesmo Autos (ex.: `0000-2RO`) também atendesse o Terminal Central de Santos, a entrada correspondente ganharia mais um elemento em `servicos`, sob a mesma Seção:
+Se um segundo Serviço do mesmo Autos (ex.: `0000-2CR`) também atendesse o Terminal Central de Santos, a entrada correspondente ganharia mais um elemento em `servicos`, sob a mesma Seção:
 
 ```json
 {
