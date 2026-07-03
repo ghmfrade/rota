@@ -3,7 +3,7 @@
 **Projeto:** ROTA — Registro de Operação e Tabelas de Autos
 **Depende de:** [Spec 01 — Visão Geral do Sistema](01-visao-geral.md) e [Spec 02 — Esquema do JSON de Operação](02-esquema-json-operacao.md)
 **Status:** Em definição — v0.1
-**Escopo:** Os algoritmos e decisões de negócio que produzem e validam os valores do JSON de operação — cálculo de rota (OSRM) e pontos de rota que forçam o traçado, cálculo de `matriz_distancias`, composição de `valor_adotado_de_distancia`, sugestão de menor distância para `matriz_seccionamento`, algoritmo de centroide e da regra dos 350 m, sugestão e redistribuição dos horários de passagem (`offset_horario`), enum binário de `regra_feriado`, regras de tipificação `tipo` × `caracteristica_veiculo`, e a referência (externa) à tabela de tarifa. **Não é escopo desta spec:** a forma do JSON (é a [Spec 02](02-esquema-json-operacao.md)); UI, mapa, import/export e PDF (Spec 04); diff (Spec 05); PostgreSQL (Spec 06). Onde um cálculo tem parte "de negócio" (aqui) e parte "de tela" (Spec 04), a fronteira está explícita em cada seção e consolidada em §12.
+**Escopo:** Os algoritmos e decisões de negócio que produzem e validam os valores do JSON de operação — cálculo de rota (OSRM) e pontos de rota que forçam o traçado, cálculo de `matriz_distancias`, composição de `valor_adotado_de_distancia`, sugestão de menor distância para `matriz_seccionamento`, algoritmo de centroide e da regra dos 350 m, sugestão e redistribuição dos horários de passagem (`offset_horario`), enum de `regra_feriado` (4 valores), regras de tipificação `tipo` × `caracteristica_veiculo`, e a referência (externa) à tabela de tarifa. **Não é escopo desta spec:** a forma do JSON (é a [Spec 02](02-esquema-json-operacao.md)); UI, mapa, import/export e PDF (Spec 04); diff (Spec 05); PostgreSQL (Spec 06). Onde um cálculo tem parte "de negócio" (aqui) e parte "de tela" (Spec 04), a fronteira está explícita em cada seção e consolidada em §12.
 
 ---
 
@@ -97,12 +97,12 @@ GET https://router.project-osrm.org/route/v1/driving/
 
 Da resposta usa-se `routes[0]`:
 
-| Fonte OSRM (`routes[0]`) | Campo do esquema | Conversão |
-|---|---|---|
-| `.geometry` (LineString `[lon,lat]`) | `rota.geometria` | cópia direta |
-| `.legs[i].distance` (metros) | `rota.trechos[i].distancia_km` | §3.4 |
-| `.legs[i].duration` (segundos) | `rota.trechos[i].duracao_s` | arredonda ao inteiro |
-| — | `rota.distancia_km`, `rota.duracao_s` | soma dos trechos (§3.4) |
+| Fonte OSRM (`routes[0]`)                        | Campo do esquema                                         | Conversão                                                                                                                                     |
+| ----------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.geometry` (LineString `[lon,lat]`)            | `rota.geometria`                                         | cópia direta                                                                                                                                  |
+| `.legs[i].distance` (metros)                    | `rota.trechos[i].distancia_km`                           | §3.4                                                                                                                                          |
+| `.legs[i].duration` (segundos)                  | `rota.trechos[i].duracao_s`                              | arredonda ao inteiro                                                                                                                          |
+| —                                               | `rota.distancia_km`, `rota.duracao_s`                    | soma dos trechos (§3.4)                                                                                                                       |
 | contexto da requisição (não vem de `routes[0]`) | `rota.fonte_calculo`, `rota.data_calculo`, `rota.perfil` | motor/instância usado (`fonte_calculo`), data do cálculo (`data_calculo`, `YYYY-MM-DD`) e perfil (`perfil`, ex.: `"driving"`) — Spec 02 §10.2 |
 
 **Sem pontos de rota:** o OSRM retorna **exatamente um `leg` por par consecutivo de coordenadas de entrada** — logo `legs.length == paradas.length - 1`, que é exatamente o que a Spec 02 §10.3 exige de `rota.trechos`. O `leg[i]` (entre a coordenada `i` e `i+1`) vira o `trecho` com `parada_origem_ordem = i+1`, `parada_destino_ordem = i+2`. Nenhuma agregação por Seção acontece aqui — os Locais comuns intermediários geram seus próprios legs/trechos, e a soma por Seção é a §4.
@@ -125,12 +125,12 @@ Usar a soma dos trechos (e não o `routes[0].distance/duration` global do OSRM) 
 
 O roteamento **alimenta a tarifa**; portanto não há degradação silenciosa nem fallback para linha reta.
 
-| Situação | Detecção | Ação |
-|---|---|---|
+| Situação                                    | Detecção                 | Ação                                                                                                                                                         |
+| ------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Serviço fora do ar / timeout / erro de rede | falha de HTTP ou timeout | **Não** produzir `rota`. Mensagem clara ("Não foi possível calcular a rota: serviço de roteamento indisponível. Tente novamente."). Permitir nova tentativa. |
-| Sem rota entre paradas | `code == "NoRoute"` | Bloquear; mensagem indicando que não há caminho viário entre as paradas na ordem dada. |
-| Ponto não ancorável na malha viária | `code == "NoSegment"` | Bloquear; mensagem identificando **qual parada** (a coordenada rejeitada) não pôde ser associada a uma via. |
-| Resposta `code != "Ok"` (qualquer outro) | leitura do envelope | Bloquear; mensagem genérica com o código retornado. |
+| Sem rota entre paradas                      | `code == "NoRoute"`      | Bloquear; mensagem indicando que não há caminho viário entre as paradas na ordem dada.                                                                       |
+| Ponto não ancorável na malha viária         | `code == "NoSegment"`    | Bloquear; mensagem identificando **qual parada** (a coordenada rejeitada) não pôde ser associada a uma via.                                                  |
+| Resposta `code != "Ok"` (qualquer outro)    | leitura do envelope      | Bloquear; mensagem genérica com o código retornado.                                                                                                          |
 
 - **Retry:** até 1 nova tentativa automática em falha de rede/timeout antes de exibir erro; erros semânticos (`NoRoute`, `NoSegment`) não são re-tentados (a entrada é que precisa mudar).
 - **Street-snapping:** confiado ao OSRM (âncora ao segmento roteável mais próximo). Não se envia `radiuses` por padrão; se no futuro se quiser limitar a distância de ancoragem, é decisão de UI (Spec 04) e não altera este contrato.
@@ -227,6 +227,7 @@ Para um par `{A, B}` e um itinerário `I` (de sentido ida ou volta):
    ```
 
    Isso inclui automaticamente os **Locais comuns intermediários** entre `A` e `B` (Spec 02 §8: entre A e B podem existir paradas `a`,`b`,`c`; somam-se A–a, a–b, b–c, c–B). A soma independe de `A` estar antes ou depois de `B` no sentido, porque distância roteada de trecho é sempre positiva e o intervalo é tomado por `min/max`.
+
 4. Arredonde a soma a 2 casas (§3.4). Como as parcelas já têm 2 casas, isto só normaliza.
 
 ### 4.3 Montagem de cada `ParDistância`
@@ -260,6 +261,7 @@ se só volta presente:    valor = distancia_trecho_volta
 Justificativa: Ida e Volta percorrem vias que podem diferir levemente (mãos, contornos), gerando distâncias roteadas próximas mas não idênticas (ex.: 6,00 e 6,10 → 6,05, como no exemplo da Spec 02 §15). A média simples é o critério mais defensável e previsível para "a distância do par" adotada pelo Serviço; não se pondera por sentido (não há razão operacional para privilegiar um) nem se toma o máximo/mínimo (introduziria viés sistemático). Arredondamento **half-up** a 2 casas.
 
 **Casos de borda:**
+
 - Média de dois valores de 2 casas pode gerar 3ª casa (`.005`) — o arredondamento a 2 casas resolve deterministicamente (half-up).
 - `valor_adotado_de_distancia` é **sempre** só a partir dos dados **deste** Serviço (Spec 02 §8) — a comparação entre Serviços só ocorre em §6.
 
@@ -271,10 +273,10 @@ Preenchem a sugestão de `matriz_seccionamento.distancia_km` (Spec 02 §9). São
 
 ### 6.1 Os dois modos (fechados)
 
-| Modo (botão) | O que sugere | Fonte |
-|---|---|---|
-| **"Sugerir menor distância"** | O **menor** `valor_adotado_de_distancia` do par entre **todos** os Serviços do Autos que atendem ambas as Seções | Multi-Serviço (§6.2) |
-| **"Sugerir distâncias do serviço"** | O `valor_adotado_de_distancia` do par **deste mesmo Serviço**, sem olhar os outros | Só o Serviço corrente (§6.3) |
+| Modo (botão)                        | O que sugere                                                                                                     | Fonte                        |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| **"Sugerir menor distância"**       | O **menor** `valor_adotado_de_distancia` do par entre **todos** os Serviços do Autos que atendem ambas as Seções | Multi-Serviço (§6.2)         |
+| **"Sugerir distâncias do serviço"** | O `valor_adotado_de_distancia` do par **deste mesmo Serviço**, sem olhar os outros                               | Só o Serviço corrente (§6.3) |
 
 Os dois preenchem o **mesmo** campo (`distancia_km`) e não coexistem por par — o último botão acionado (ou a edição manual) é o que vale. Ambos leem valores já em km (Spec 02 §8) — **sem conversão de unidade**.
 
@@ -332,7 +334,7 @@ Detalha o clustering da Spec 02 §5.2 (Seção) e a checagem pareada da §7.1 (L
 
 ### 7.2 Validação incremental de inserção — Seção (Formulário)
 
-Preserva o invariante: *todo ponto aceito numa Seção está a ≤ 350 m do centroide **final** do conjunto* — não apenas do centroide vigente quando foi inserido.
+Preserva o invariante: _todo ponto aceito numa Seção está a ≤ 350 m do centroide **final** do conjunto_ — não apenas do centroide vigente quando foi inserido.
 
 **Entrada:** conjunto `S` de pontos já aceitos na Seção; ponto candidato `P`.
 **Saída:** aceitar ou recusar `P`.
@@ -350,6 +352,7 @@ INSERIR(S, P):
 Ponto central (e diferença face a uma checagem ingênua): **não basta** testar `haversine(P, centroide(S)) ≤ 350`. Recalcula-se o centroide **incluindo** `P` e verifica-se **todos** os pontos do conjunto resultante — porque inserir `P` desloca o centroide e pode empurrar um ponto **já aceito** para fora dos 350 m. Se isso ocorre, `P` é recusado (mesmo que isoladamente estivesse a ≤ 350 m do centroide anterior). Recusado ⇒ o usuário deve criar uma **Seção distinta** (novo `uuid`, `nome` diferente).
 
 **Casos de borda:**
+
 - **1º ponto:** aceito sem checagem (não há centroide).
 - **2º ponto:** `C'` é o ponto médio; a condição vira "os dois pontos a ≤ 350 m do ponto médio", i.e. distância entre eles ≤ 700 m.
 - **Remoção de ponto (revalidação obrigatória).** Remover um ponto **desloca o centroide** do conjunto restante e **pode** empurrar um ponto que continuava para fora dos 350 m — não é verdade que "o centroide de um subconjunto nunca viola se o do conjunto maior não violava" (é falso como enunciado geral; há conjuntos que satisfazem o invariante e passam a violá-lo ao remover um ponto). Portanto, **ao remover** um ponto de uma Seção, revalida-se o conjunto resultante pela checagem estática de §7.3 (centroide de todos os pontos restantes; todos a ≤ 350 m). Se o conjunto restante violar, a UI sinaliza e o usuário deve corrigir (mover/remover outro ponto ou separar em Seção distinta) — política de UI na Spec 04; a **regra** é: revalida-se sempre.
@@ -439,7 +442,7 @@ Exemplo (o do enunciado): paradas `A`(1)→`a`(2)→`B`(3), baseline `A=0`, `a=3
 - **Monotonicidade (Spec 02 §11.1):** os offsets têm de ficar não decrescentes. A UI **não** permite fixar uma âncora com offset menor que a âncora anterior nem maior que a próxima âncora já fixada (senão a interpolação produziria valores fora de ordem). Política de bloqueio é Spec 04; a **regra** é esta.
 - **Trecho com `duracao_s = 0`:** admitido; a parada derivada coincide com a vizinha (igualdade é permitida).
 - **Por Viagem:** tudo isto é por Viagem — editar uma Viagem não mexe nas outras (Spec 02 §11.1).
-- **Fronteira Spec 04:** *quando* recalcular (a cada edição, ao soltar o campo) e *como* apresentar é UI; a **fórmula de interpolação** é esta spec.
+- **Fronteira Spec 04:** _quando_ recalcular (a cada edição, ao soltar o campo) e _como_ apresentar é UI; a **fórmula de interpolação** é esta spec.
 
 ### 8.3 Restaurar a sugestão inicial (desfazer edições manuais)
 
@@ -462,39 +465,43 @@ RESTAURAR(viagem):
 
 ---
 
-## 9. `regra_feriado` — Enum (binário)
+## 9. `regra_feriado` — Enum (4 valores)
 
-Resolve a questão em aberto desde a Spec 01 §9.4 / Spec 02 §11. **Não existe redistribuição de horários em feriado** — a operação de feriado é simplesmente "roda ou não roda". (O que antes era chamado de "redistribuição proporcional em feriado" era, na verdade, o recálculo de horários de passagem ao editar um horário a jusante — isso é a §8.2, não tem relação com feriado.)
+Resolve a questão em aberto desde a Spec 01 §9.4 / Spec 02 §11. A operação de feriado é sempre "roda ou não roda" **naquele dia** — **não existe** grade nem redistribuição de horários específica de feriado; quando opera num feriado, a Viagem usa o **mesmo** `horario_saida` e os mesmos `offset_horario`. O que os quatro valores definem é **como o feriado interage com os `dias_semana`**: se é indiferente, se suprime, se adiciona, ou se é a única condição de operação.
 
 ### 9.1 Enum (decisão fechada)
 
-Um Autos apresenta sua operação como a grade **semanal** (Viagens com `dias_semana`) **mais**, por Viagem, uma etiqueta binária de feriado. `regra_feriado` de cada Viagem assume um de **dois** valores:
+Um Autos apresenta sua operação como a grade **semanal** (Viagens com `dias_semana`) **mais**, por Viagem, uma etiqueta de feriado. `regra_feriado` de cada Viagem assume um de **quatro** valores. Para um **dia real** `D` — que tem um dia-da-semana `dia_semana(D)` e pode ou não ser feriado —, a Viagem opera em `D` conforme:
 
-| Valor | Significado |
-|---|---|
-| `"circula"` | A Viagem **também roda em dia de feriado**, no **mesmo** `horario_saida` e com os mesmos `offset_horario` — **em qualquer dia da semana em que o feriado caia**, inclusive dias que não estão em `dias_semana`. |
-| `"nao_circula"` | A Viagem **não roda** em dia de feriado. |
+| Valor                                | Opera no dia real `D` quando…                               | Efeito do feriado sobre a grade normal                                                                                                          |
+| ------------------------------------ | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"circula_inclusive_se_for_feriado"` | `dia_semana(D) ∈ dias_semana` — **seja `D` feriado ou não** | **Indiferente**: roda exatamente a grade normal; o feriado não suprime nem adiciona partidas.                                                   |
+| `"nao_circula_em_feriado"`           | `dia_semana(D) ∈ dias_semana` **e** `D` **não** é feriado   | **Suprime**: num feriado que cairia num dia servido, a Viagem **não** roda.                                                                     |
+| `"somente_em_feriado"`               | `dia_semana(D) ∈ dias_semana` **e** `D` **é** feriado       | **Condição única**: só opera quando o dia servido é feriado; num dia normal (não feriado) **não** roda, mesmo estando em `dias_semana`.         |
+| `"circula_em_feriado"`               | `dia_semana(D) ∈ dias_semana` **ou** `D` **é** feriado      | **Adiciona**: roda a grade normal **e também** em qualquer feriado — inclusive num dia da semana que **não** está em `dias_semana` (é aditivo). |
 
-- É **aditivo, não um modificador de `dias_semana`**: `"circula"` significa "se aquele dia for feriado, este horário opera" — independentemente do dia da semana. Ex.: uma Viagem que opera segunda e terça, com `regra_feriado: "circula"`, **também opera se um feriado cair numa quinta**.
-- Não há grade de horário específica de feriado nem redução/redistribuição de partidas: a Viagem repete seu horário normal (`"circula"`) ou é suprimida no feriado (`"nao_circula"`).
-- **Uso: apenas informativo.** Essa informação serve às **tabelas, legendas e observações** do PDF e da UX ("também opera em feriados" / "não opera em feriados"). Ela **não** gera partidas contáveis (§9.2).
+- **`somente_em_feriado` é o único que altera a operação em dias normais**: os outros três operam a grade `dias_semana` inteira num dia sem feriado; ele só opera quando o dia servido é feriado.
+- **`circula_em_feriado` é aditivo, não um modificador de `dias_semana`**: "se aquele dia for feriado, este horário também opera" — independentemente do dia da semana. Ex.: uma Viagem seg/ter com `regra_feriado: "circula_em_feriado"` **também opera se um feriado cair numa quinta**.
+- Não há grade de horário específica de feriado nem redução/redistribuição de partidas: em qualquer valor a Viagem repete seu horário normal ou é suprimida naquele dia, conforme a tabela.
+- **Uso: apenas informativo** para as tabelas, legendas e observações do PDF e da UX. A etiqueta **não** gera partidas contáveis (§9.2) — com a única ressalva de que `somente_em_feriado` faz a Viagem **não** aparecer na semana padrão (§9.2/§9.4), porque essa semana, por definição, não tem feriado.
 - O **calendário de feriados** (quais datas) é **externo** ao ROTA e ao JSON (fora de escopo — Spec 01 §3). A etiqueta diz **o que acontece** num feriado, não **quando** ele cai.
-- O placeholder `"nao_circula"` do exemplo da Spec 02 §15 continua válido — é um dos dois valores.
 
 ### 9.2 Feriado não altera contagens (viagens, opções de deslocamento)
 
 Regra de negócio crucial para estatísticas derivadas (nº de viagens, Opção de Deslocamento — Spec 01 §4) e para o Comparador (Spec 05):
 
-- Todas as contagens — nº de viagens e de opções de deslocamento (algoritmo em §9.4) — usam a **semana padrão**, que **por definição não tem feriado**: derivam **exclusivamente** de `dias_semana` (e do seccionamento). A operação de feriado (`regra_feriado`) **nunca** entra nessas contagens.
-- **Por quê:** o ROTA **não tem** registro de quais datas são feriado (calendário externo, §9.1), então não há como — nem faria sentido — somar as ocorrências de feriado a uma frequência semanal. A viagem é contada pela sua frequência normal.
-- **Exemplo:** Viagem às 08:00 com `dias_semana: [segunda, terca]` e `regra_feriado: "circula"`. Viagens na semana = **2** (segunda e terça). O fato de também rodar em feriados **não adiciona** viagens — mesmo que o feriado caísse numa quinta e a viagem operasse naquele dia real, isso é operação de feriado, fora da semana padrão. Idem para opções de deslocamento.
-- Assim, dois JSONs que difiram **apenas** em `regra_feriado` têm exatamente as mesmas contagens; a diferença aparece só na informação exibida (tabela/PDF), tratada pelo Comparador como mudança informativa, não de frequência.
-- **Requisito de exibição (Spec 04/05):** como o "nº de viagens" e as "opções de deslocamento" são valores **nominais da semana padrão** — que diverge da operação real em semanas com feriado —, o PDF e a UI devem **rotular explicitamente** essas contagens como *"semana padrão (sem feriado)"* e apresentar `regra_feriado` como **informação separada** ("também opera em feriados" / "não opera em feriados"), nunca somada à contagem. É só apresentação — nenhuma regra de cálculo muda; evita que o leitor confunda o número nominal com a operação de uma semana específica que contenha feriado.
+- Todas as contagens — nº de viagens e de opções de deslocamento (algoritmo em §9.4) — usam a **semana padrão**, que **por definição não tem feriado**. A contribuição de cada Viagem a essa semana é: **`len(dias_semana)`** para os três valores que operam a grade num dia normal (`circula_inclusive_se_for_feriado`, `nao_circula_em_feriado`, `circula_em_feriado`), e **`0`** para `somente_em_feriado` — que, por só operar em feriado, **nunca** aparece numa semana sem feriado.
+- **Por quê os três colapsam em `len(dias_semana)`:** como a semana padrão não tem feriado, o comportamento aditivo de `circula_em_feriado` não adiciona nada e o supressivo de `nao_circula_em_feriado` não suprime nada — os três operam exatamente os dias de `dias_semana`. O ROTA, além disso, **não tem** registro de quais datas são feriado (calendário externo, §9.1): não há como — nem faria sentido — somar ocorrências de feriado a uma frequência semanal.
+- **Exemplo (grade normal):** Viagem às 08:00 com `dias_semana: [segunda, terca]` e `regra_feriado: "circula_em_feriado"`. Viagens na semana = **2** (segunda e terça). O fato de também rodar em feriados **não adiciona** viagens — mesmo que o feriado caísse numa quinta e a viagem operasse naquele dia real, isso é operação de feriado, fora da semana padrão. Idem para opções de deslocamento.
+- **Exemplo (`somente_em_feriado`):** mesma Viagem às 08:00 `dias_semana: [segunda, terca]`, mas `regra_feriado: "somente_em_feriado"`. Viagens na semana padrão = **0** — ela só rodaria se segunda ou terça caíssem em feriado, e a semana padrão não tem feriado. Contribui `0` também às opções de deslocamento (§9.4).
+- Assim, dois JSONs que difiram **apenas** em `regra_feriado` têm as mesmas contagens **enquanto ambos os valores forem não-`somente_em_feriado`**; trocar de/para `somente_em_feriado` **altera** a contagem (aquela Viagem entra ou sai da semana padrão). Fora esse caso, a diferença aparece só na informação exibida (tabela/PDF), tratada pelo Comparador como mudança informativa, não de frequência.
+- **Requisito de exibição (Spec 04/05):** como o "nº de viagens" e as "opções de deslocamento" são valores **nominais da semana padrão** — que diverge da operação real em semanas com feriado —, o PDF e a UI devem **rotular explicitamente** essas contagens como _"semana padrão (sem feriado)"_ e apresentar `regra_feriado` como **informação separada**, com um rótulo por valor (ex.: "opera normalmente, feriado indiferente" / "não opera em feriados" / "opera **somente** em feriados" / "opera normalmente e também em feriados"), nunca somada à contagem. É só apresentação — nenhuma regra de cálculo muda; evita que o leitor confunda o número nominal com a operação de uma semana específica que contenha feriado. Atenção especial a `somente_em_feriado`: sua contagem nominal é `0`, então a UI deve deixar claro que a Viagem **existe** e opera em feriados, ainda que não conte na semana padrão.
 
 ### 9.3 Casos de borda
 
-- **Feriado num dia fora de `dias_semana`:** com `"circula"`, a Viagem **opera** naquele feriado (é aditivo — §9.1), mas isso só afeta a **informação exibida**; para contagem, continua valendo só a semana padrão (§9.2). Com `"nao_circula"`, não opera. *Quando* um feriado ocorre é do calendário externo (Spec 04/05/06).
-- **Feriado num dia dentro de `dias_semana` com `"nao_circula"`:** naquele feriado a Viagem **não** opera (embora fosse um dia normalmente servido) — de novo, só afeta a informação exibida, não a contagem da semana padrão.
+- **Feriado num dia fora de `dias_semana`:** só `"circula_em_feriado"` faz a Viagem **operar** naquele feriado (é aditivo — §9.1); os outros três **não** operam (o dia não está na grade, e `somente_em_feriado` exige feriado **dentro** de `dias_semana`). Em todos os casos isso só afeta a **informação exibida**; para contagem, continua valendo só a semana padrão (§9.2). _Quando_ um feriado ocorre é do calendário externo (Spec 04/05/06).
+- **Feriado num dia dentro de `dias_semana`:** `circula_inclusive_se_for_feriado`, `somente_em_feriado` e `circula_em_feriado` **operam** naquele feriado; `nao_circula_em_feriado` **não** opera (embora fosse um dia normalmente servido). Só afeta a informação exibida, não a contagem da semana padrão.
+- **Dia normal (não feriado) dentro de `dias_semana`:** os três primeiros valores **operam**; `somente_em_feriado` **não** opera — este é seu traço distintivo e a razão de contar `0` na semana padrão (§9.2).
 - **Mistura no mesmo itinerário:** válido — cada Viagem tem sua própria etiqueta, independentemente das demais.
 
 ### 9.4 Opção de Deslocamento — cálculo
@@ -504,16 +511,22 @@ A **Opção de Deslocamento** é a estatística derivada citada no glossário (S
 **É uma estatística por Serviço** (depois somada para o Autos). Combina duas grandezas do próprio Serviço:
 
 - **(a) Pares O-D compráveis** = número de pares habilitados em `matriz_seccionamento` do Serviço (Spec 02 §9). Cada par habilitado é um trecho origem-destino em que se pode vender passagem parcial; é exatamente o conjunto de "pares compráveis". Não há conversão nem dedução — é a cardinalidade do array.
-- **(b) Frequência semanal por sentido** = para cada Viagem do Serviço, o número de dias em `dias_semana` (a frequência daquele horário na **semana padrão**), somado por sentido (Ida/Volta). Feriado **não entra** (§9.2): usa-se só `dias_semana`.
+- **(b) Frequência semanal por sentido** = para cada Viagem do Serviço, sua contribuição à **semana padrão**, somada por sentido (Ida/Volta). Essa contribuição é `len(dias_semana)` para os três valores que operam a grade num dia normal, e **`0`** para `somente_em_feriado` (que nunca opera numa semana sem feriado — §9.2). Fora essa exceção, feriado **não entra**: usa-se só `dias_semana`.
 
 **Fórmula (por Serviço):**
 
 ```
 a = len(matriz_seccionamento)                      # pares O-D compráveis do Serviço
 
+# contribuição de cada Viagem à semana padrão (sem feriado):
+def freq_semana_padrao(viagem):
+    if viagem.regra_feriado == "somente_em_feriado":
+        return 0                       # só opera em feriado; a semana padrão não tem feriado
+    return len(viagem.dias_semana)     # os outros três operam a grade normal
+
 # frequência semanal somada, por sentido:
-freq_ida    = Σ  len(viagem.dias_semana)   para cada Viagem do itinerário de Ida
-freq_volta  = Σ  len(viagem.dias_semana)   para cada Viagem do itinerário de Volta
+freq_ida    = Σ  freq_semana_padrao(viagem)   para cada Viagem do itinerário de Ida
+freq_volta  = Σ  freq_semana_padrao(viagem)   para cada Viagem do itinerário de Volta
 
 opcoes_de_deslocamento_ida    = a * freq_ida
 opcoes_de_deslocamento_volta  = a * freq_volta
@@ -527,8 +540,10 @@ opcoes_de_deslocamento        = opcoes_de_deslocamento_ida + opcoes_de_deslocame
 **Exemplo:** um Serviço com `matriz_seccionamento` de **3** pares (`a = 3`); na Ida, duas Viagens — uma com `dias_semana` de 5 dias (seg–sex) e outra de 2 dias (sáb, dom) → `freq_ida = 5 + 2 = 7`; na Volta, uma Viagem de 5 dias → `freq_volta = 5`. Então `opcoes_ida = 3·7 = 21`, `opcoes_volta = 3·5 = 15`, `opcoes_de_deslocamento = 36`.
 
 **Casos de borda:**
+
 - **`matriz_seccionamento` vazia** (`a = 0`): a Opção de Deslocamento do Serviço é `0` — não há par comprável habilitado, ainda que existam viagens. É válido e esperado (default `[]`, Spec 02 §6).
-- **Neutralidade a feriado:** por §9.2, `regra_feriado` **nunca** entra em (b). Dois JSONs que difiram só em `regra_feriado` têm a mesma Opção de Deslocamento.
+- **Neutralidade a feriado (com uma exceção):** por §9.2, `regra_feriado` só entra em (b) através de `somente_em_feriado`, que **zera** a frequência daquela Viagem; os outros três valores dão `len(dias_semana)`. Dois JSONs que difiram só em `regra_feriado` têm a mesma Opção de Deslocamento **enquanto nenhum dos valores trocados for `somente_em_feriado`**.
+- **Viagem `somente_em_feriado`:** contribui `0` a `freq_ida`/`freq_volta` — logo `0` à Opção de Deslocamento — mesmo tendo `dias_semana` preenchido. Ela existe e opera (em feriados), mas fora da semana padrão.
 - **Congelamento:** como toda contagem derivada, é recomputável a qualquer momento a partir do JSON (não é persistida) — mas a **fórmula** é esta, para PDF (Spec 04) e Comparador (Spec 05) baterem.
 
 ---
@@ -548,29 +563,29 @@ Cada `caracteristica_veiculo` pertence a **uma de duas famílias**, e o `tipo` d
 
 A partição é **fechada e código-a-código**: cada `tipo` de Autos admite exatamente o conjunto abaixo — qualquer código fora dele é **inválido** para aquele Autos. A litoralidade é **intrínseca ao código** (não há um mesmo código servindo litorâneo e não-litorâneo): o convencional é `CR`/`CL`, e cada misto que embute o componente convencional tem sua variante litorânea própria. Isso elimina a ambiguidade antiga (um `M..` "genérico" não expressava um convencional litorâneo).
 
-| `tipo` do Autos | Família | Códigos permitidos (fechado) | Variação entre Serviços |
-|---|---|---|---|
-| **Semiurbano** | semiurbana | `SU` | **Não** — todos os Serviços têm `SU`; variam só por itinerário/`carater`. |
-| **Semiurbano Litorâneo** | semiurbana | `SUL` | **Não** — todos `SUL`. |
-| **Rodoviário** | rodoviária | `CR`, `EX`, `LE`, `ME`, `ML`, `MX`, `MM` | **Sim** — Serviços podem diferir dentro deste conjunto. |
-| **Rodoviário Litorâneo** | rodoviária | `CL`, `EX`, `LE`, `MEL`, `MLL`, `MXL`, `MML` | **Sim** — idem, dentro deste conjunto. |
+| `tipo` do Autos          | Família    | Códigos permitidos (fechado)                 | Variação entre Serviços                                                   |
+| ------------------------ | ---------- | -------------------------------------------- | ------------------------------------------------------------------------- |
+| **Semiurbano**           | semiurbana | `SU`                                         | **Não** — todos os Serviços têm `SU`; variam só por itinerário/`carater`. |
+| **Semiurbano Litorâneo** | semiurbana | `SUL`                                        | **Não** — todos `SUL`.                                                    |
+| **Rodoviário**           | rodoviária | `CR`, `EX`, `LE`, `ME`, `ML`, `MX`, `MM`     | **Sim** — Serviços podem diferir dentro deste conjunto.                   |
+| **Rodoviário Litorâneo** | rodoviária | `CL`, `EX`, `LE`, `MEL`, `MLL`, `MXL`, `MML` | **Sim** — idem, dentro deste conjunto.                                    |
 
 **Legenda dos códigos rodoviários (composição e litoralidade):**
 
-| Código | Composição | Componente convencional | Tipo em que aparece |
-|---|---|---|---|
-| `CR` | Convencional Rodoviário | `CR` (não-litorâneo) | Rodoviário |
-| `CL` | Convencional Rodoviário Litorâneo | `CL` (litorâneo) | Rodoviário Litorâneo |
-| `EX` | Executivo | — (sem convencional) | ambos |
-| `LE` | Leito | — | ambos |
-| `ME` | Misto Convencional + Executivo | `CR` (não-litorâneo) | Rodoviário |
-| `ML` | Misto Convencional + Leito | `CR` (não-litorâneo) | Rodoviário |
-| `MX` | Misto Executivo + Leito | — (sem convencional) | Rodoviário |
-| `MM` | Misto Convencional + Executivo + Leito | `CR` (não-litorâneo) | Rodoviário |
-| `MEL` | Misto Convencional Litorâneo + Executivo | `CL` (litorâneo) | Rodoviário Litorâneo |
-| `MLL` | Misto Convencional Litorâneo + Leito | `CL` (litorâneo) | Rodoviário Litorâneo |
-| `MXL` | Misto Executivo + Leito | — (sem convencional) | Rodoviário Litorâneo |
-| `MML` | Misto Convencional Litorâneo + Executivo + Leito | `CL` (litorâneo) | Rodoviário Litorâneo |
+| Código | Composição                                       | Componente convencional | Tipo em que aparece  |
+| ------ | ------------------------------------------------ | ----------------------- | -------------------- |
+| `CR`   | Convencional Rodoviário                          | `CR` (não-litorâneo)    | Rodoviário           |
+| `CL`   | Convencional Rodoviário Litorâneo                | `CL` (litorâneo)        | Rodoviário Litorâneo |
+| `EX`   | Executivo                                        | — (sem convencional)    | ambos                |
+| `LE`   | Leito                                            | —                       | ambos                |
+| `ME`   | Misto Convencional + Executivo                   | `CR` (não-litorâneo)    | Rodoviário           |
+| `ML`   | Misto Convencional + Leito                       | `CR` (não-litorâneo)    | Rodoviário           |
+| `MX`   | Misto Executivo + Leito                          | — (sem convencional)    | Rodoviário           |
+| `MM`   | Misto Convencional + Executivo + Leito           | `CR` (não-litorâneo)    | Rodoviário           |
+| `MEL`  | Misto Convencional Litorâneo + Executivo         | `CL` (litorâneo)        | Rodoviário Litorâneo |
+| `MLL`  | Misto Convencional Litorâneo + Leito             | `CL` (litorâneo)        | Rodoviário Litorâneo |
+| `MXL`  | Misto Executivo + Leito                          | — (sem convencional)    | Rodoviário Litorâneo |
+| `MML`  | Misto Convencional Litorâneo + Executivo + Leito | `CL` (litorâneo)        | Rodoviário Litorâneo |
 
 `EX` e `LE` (puros, sem componente convencional) são os **únicos** códigos que aparecem nos dois tipos rodoviários com o mesmo código. O misto Executivo+Leito, embora também não tenha convencional, usa **código distinto por tipo** (`MX` no Rodoviário, `MXL` no Rodoviário Litorâneo) para manter a partição por `tipo` estritamente disjunta e determinística — dado um código, o `tipo` compatível é sempre inequívoco.
 
@@ -604,18 +619,18 @@ A partição é **fechada e código-a-código**: cada `tipo` de Autos admite exa
 
 Consolidação do que **permanece em aberto** para a Spec 04. Esta spec define a **função**; a Spec 04 define **quando** chamá-la, **como** apresentar e **como** o usuário interage.
 
-| Tema | Spec 03 (aqui) | Spec 04 (Formulário/UI) |
-|---|---|---|
-| Roteamento (§3) | Forma da requisição OSRM, extração, conversão m→km, arredondamento, política de erro bloqueante | Momento de disparar o roteamento, indicador de carregamento, exibição da mensagem de erro, re-tentativa manual, desenho da rota no mapa |
-| Pontos de rota (§3.6) | Que forçam o traçado, entram como coordenadas intermediárias, nunca viram trecho/parada, persistem em `rota.pontos_de_rota` (só para forçar), mapeamento legs→trechos | Clique na rota para criar o ponto, arraste no mapa, recálculo ao soltar, feedback visual |
-| `matriz_distancias` (§4) | Algoritmo de soma de trechos por par de Seções | Quando recalcular, exibição da matriz |
-| `valor_adotado` (§5) | Fórmula (média/valor único) e arredondamento | — (puro cálculo) |
-| Sugestões de seccionamento (§6) | Os dois algoritmos: "menor distância" (mín. entre Serviços) e "distâncias do serviço" (valor do próprio Serviço) | Os dois botões, escopo em lote, apresentar sugestão, permitir edição, recálculo reativo |
-| Regra dos 350 m (§7) | Centroide, Haversine, validação incremental, checagem estática, pareada de Local | Feedback ao inserir ponto no mapa, mensagem de recusa, proposta de criar nova Seção |
-| Horários de passagem (§8) | Sugestão inicial por acúmulo de `duracao_s`; fórmula de redistribuição proporcional entre âncoras ao editar horário a jusante; reset à sugestão inicial (mantém `horario_saida`) | Edição por Viagem, quando recalcular, botões de reset (por Viagem/em lote) e confirmação, bloqueio de offset fora de ordem, apresentação |
-| `regra_feriado` (§9) | Enum binário (`circula`/`nao_circula`); feriado não altera contagens | Seleção da regra por Viagem no formulário, exibição no PDF; calendário de feriados externo |
-| Tipificação (§10) | Tabela e regras `tipo` × característica | Bloqueio/alerta ao cadastrar/trocar tipo, numeração de `numero_n` |
-| Tarifa (§11) | Contrato "distância→R$ externo, nada de R$ no JSON" | Carregar a tabela da portaria, renderizar valores no PDF |
+| Tema                            | Spec 03 (aqui)                                                                                                                                                                   | Spec 04 (Formulário/UI)                                                                                                                  |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Roteamento (§3)                 | Forma da requisição OSRM, extração, conversão m→km, arredondamento, política de erro bloqueante                                                                                  | Momento de disparar o roteamento, indicador de carregamento, exibição da mensagem de erro, re-tentativa manual, desenho da rota no mapa  |
+| Pontos de rota (§3.6)           | Que forçam o traçado, entram como coordenadas intermediárias, nunca viram trecho/parada, persistem em `rota.pontos_de_rota` (só para forçar), mapeamento legs→trechos            | Clique na rota para criar o ponto, arraste no mapa, recálculo ao soltar, feedback visual                                                 |
+| `matriz_distancias` (§4)        | Algoritmo de soma de trechos por par de Seções                                                                                                                                   | Quando recalcular, exibição da matriz                                                                                                    |
+| `valor_adotado` (§5)            | Fórmula (média/valor único) e arredondamento                                                                                                                                     | — (puro cálculo)                                                                                                                         |
+| Sugestões de seccionamento (§6) | Os dois algoritmos: "menor distância" (mín. entre Serviços) e "distâncias do serviço" (valor do próprio Serviço)                                                                 | Os dois botões, escopo em lote, apresentar sugestão, permitir edição, recálculo reativo                                                  |
+| Regra dos 350 m (§7)            | Centroide, Haversine, validação incremental, checagem estática, pareada de Local                                                                                                 | Feedback ao inserir ponto no mapa, mensagem de recusa, proposta de criar nova Seção                                                      |
+| Horários de passagem (§8)       | Sugestão inicial por acúmulo de `duracao_s`; fórmula de redistribuição proporcional entre âncoras ao editar horário a jusante; reset à sugestão inicial (mantém `horario_saida`) | Edição por Viagem, quando recalcular, botões de reset (por Viagem/em lote) e confirmação, bloqueio de offset fora de ordem, apresentação |
+| `regra_feriado` (§9)            | Enum de 4 valores; feriado não altera contagens, exceto `somente_em_feriado`, que conta `0` na semana padrão                                                                     | Seleção da regra por Viagem no formulário, exibição no PDF; calendário de feriados externo                                               |
+| Tipificação (§10)               | Tabela e regras `tipo` × característica                                                                                                                                          | Bloqueio/alerta ao cadastrar/trocar tipo, numeração de `numero_n`                                                                        |
+| Tarifa (§11)                    | Contrato "distância→R$ externo, nada de R$ no JSON"                                                                                                                              | Carregar a tabela da portaria, renderizar valores no PDF                                                                                 |
 
 Comparador (Spec 05) e Ingestor (Spec 06) usam desta spec apenas as **checagens estáticas** (§7.3, §7.4) e a **regra de contagem neutra a feriado** (§9.2) — nunca recalculam rota, matriz ou sugestão (leem o congelado, Spec 02 §8/§10.2).
 
@@ -633,7 +648,7 @@ Comparador (Spec 05) e Ingestor (Spec 06) usam desta spec apenas as **checagens 
 8. **Duas sugestões para `matriz_seccionamento.distancia_km`**, cada uma por botão (§6): **"menor distância"** = mín. `valor_adotado` entre todos os Serviços do Autos que atendem o par; **"distâncias do serviço"** = `valor_adotado` do próprio Serviço para o par. Ambas são sugestão de UI, não persistidas; o JSON guarda o valor confirmado.
 9. **Regra dos 350 m:** validação **incremental** no Formulário (recalcula centroide candidato, recusa se qualquer ponto do conjunto resultante > 350 m — preserva o invariante do centroide final); **revalidação obrigatória em remoção e em edição de coordenada** (edição = remover + reinserir com a checagem plena; a antiga justificativa de que remover nunca viola era incorreta); checagem **estática fraca** (centroide de todos os pontos finais) para Comparador/Ingestor; **pareada** para Local (§7).
 10. **Horários de passagem** (§8): sugestão inicial por acúmulo de `duracao_s` (primeira parada `00:00:00`); ao editar manualmente o horário de uma parada a jusante, as intermediárias são **reinterpoladas proporcionalmente** entre âncoras (a "redistribuição" real — nada a ver com feriado); e um **reset** que desfaz as edições manuais, voltando à sugestão inicial e mantendo só o `horario_saida` (§8.3, escopo por Viagem ou em lote na UI).
-11. **`regra_feriado` enum = `{circula, nao_circula}`** (binário — roda ou não roda no feriado); `"circula"` é **aditivo** (opera em qualquer dia em que o feriado caia, mesmo fora de `dias_semana`) e **apenas informativo** (tabela/legenda/PDF); **não há** redistribuição de horários em feriado; feriado **não altera** contagem de viagens nem de opções de deslocamento — as contagens usam a semana padrão, sem feriado (§9).
+11. **`regra_feriado` enum = `{circula_inclusive_se_for_feriado, nao_circula_em_feriado, somente_em_feriado, circula_em_feriado}`** (4 valores — como o feriado interage com `dias_semana`: indiferente, suprime, condição única, ou adiciona). `circula_em_feriado` é **aditivo** (opera em qualquer dia em que o feriado caia, mesmo fora de `dias_semana`); a etiqueta é **apenas informativa** (tabela/legenda/PDF); **não há** redistribuição de horários em feriado. Feriado **não altera** contagem de viagens nem de opções de deslocamento — as contagens usam a semana padrão, sem feriado —, **exceto** `somente_em_feriado`, que só opera em feriado e portanto conta `0` na semana padrão (§9).
 12. **Tipificação:** duas famílias que nunca se misturam — **semiurbana** (`SU`/`SUL`, veículo único por Autos) e **rodoviária** (convencional `CR`/`CL`, `EX`, `LE` + mistos, com variação). Partição **fechada código-a-código** por `tipo` (§10.2), com a litoralidade **intrínseca ao código** (`SU`×`SUL`, `CR`×`CL` nunca coexistem; cada misto com convencional tem variante litorânea própria — `ME`/`ML`/`MM` × `MEL`/`MLL`/`MML`). Semileito não existe (§10).
 13. **Tarifa distância→R$ é externa (portaria)**; JSON nunca guarda R$; ROTA só referencia a tabela na exibição/PDF (§11).
 

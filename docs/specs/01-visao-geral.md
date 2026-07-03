@@ -26,11 +26,11 @@ O sistema:
 
 As três ferramentas **não compartilham estado**. O único contrato entre elas é o **JSON de operação**.
 
-| Ferramenta | Entrada | Saída | Persistência |
-|---|---|---|---|
+| Ferramenta             | Entrada                                                                                    | Saída                                                                                         | Persistência                       |
+| ---------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- | ---------------------------------- |
 | **Formulário** (agora) | Listas estáticas de Autos/empresas/tipos; opcionalmente um JSON vigente para pré-preencher | PDF operacional + rotas; JSON de operação (`proposta` **ou** marcado como `vigente` — ver §8) | Nenhuma — nada é salvo no servidor |
-| **Comparador** (agora) | JSON vigente + JSON proposta | Diff na tela + PDF comparativo próprio | Nenhuma |
-| **Ingestor** (futuro) | JSON aprovado | Registros no PostgreSQL oficial | PostgreSQL |
+| **Comparador** (agora) | JSON vigente + JSON proposta                                                               | Diff na tela + PDF comparativo próprio                                                        | Nenhuma                            |
+| **Ingestor** (futuro)  | JSON aprovado                                                                              | Registros no PostgreSQL oficial                                                               | PostgreSQL                         |
 
 ```
                     ┌─────────────┐
@@ -53,6 +53,7 @@ As três ferramentas **não compartilham estado**. O único contrato entre elas 
 ## 3. Escopo e Não-Escopo
 
 **Está no escopo do ROTA:**
+
 - Entrada estruturada da operação, com mapa e validações de negócio.
 - Cálculo de rota (street-snapped) e de horários de passagem — client-side.
 - Geração do PDF operacional e do JSON — client-side.
@@ -60,6 +61,7 @@ As três ferramentas **não compartilham estado**. O único contrato entre elas 
 - (Futuro) ingestão do JSON aprovado no banco oficial.
 
 **NÃO está no escopo do ROTA (é do SEI):**
+
 - Status/ciclo de vida do pedido (rascunho, análise, aprovado…), pendências, manifestações, diálogo técnico↔empresa.
 - Prazo de vigência, publicação em DOE, suplantação.
 - Registro de quem pediu, quando, e histórico de tratativas.
@@ -75,22 +77,22 @@ Consequência: **o ROTA não tem modelo de estado nem de permissões.** O JSON c
 
 ## 4. Glossário
 
-| Termo | Definição |
-|---|---|
-| **Autos de Linha** | Identificador regulatório principal (código `0000`). Agrupa um ou mais Serviços sob o mesmo processo administrativo. |
-| **Tipo de Autos** | Classificação: Semiurbano, Semiurbano Litorâneo, Rodoviário, Rodoviário Litorâneo. Define regras de variação permitida. |
-| **Serviço** | Variação operacional dentro de um Autos — combinação de itinerário (caráter: principal, parcial, semidireta etc.) e característica de veículo. Rótulo humano `0000-NXX`; identidade de máquina por **UUID estável** (ver §6). |
-| **Característica de veículo** | Duas famílias (ver §7): **semiurbana** (SU, SUL) e **rodoviária** (convencional `CR`/`CL`, `EX`, `LE` e mistos). O tipo do Autos fixa a família. A tabela fechada código-a-código está na Spec 03 §10.2. |
-| **Seção** | Ponto físico georreferenciado que define tarifa e participa do seccionamento tarifário. É entidade do **Autos** (`autos.secoes[]`), compartilhada por todos os Serviços que passam por ali — cada Serviço contribui sua própria geolocalização de Ida e/ou Volta. **Vive dentro do próprio JSON do Autos** — não há cadastro mestre global. Ver Spec 02 §5. |
-| **Local** | Ponto físico georreferenciado **sem** relevância tarifária (embarque/desembarque comum), usado pelos itinerários de **um** Serviço. É entidade do **Serviço** (`servico.locais[]`), não compartilhada com outros Serviços. Ver Spec 02 §7. |
-| **Parada** | Ocorrência de uma Seção **ou** de um Local (nunca os dois, nunca nenhum) dentro do itinerário de um Serviço, com posição na sequência. |
-| **Seccionamento tarifário** | Regra que define entre quais pares de Seções é permitida a venda de passagem parcial. |
-| **Itinerário** | Sequência ordenada de paradas de um Serviço, em um sentido (Ida/Volta), com a rota georreferenciada entre elas. |
-| **Viagem** | Saída específica de um Serviço: horário de saída, horários de passagem por parada, dias da semana e regra de feriado. |
-| **Opção de Deslocamento** | Estatística **derivada** (par origem-destino comprável por viagem × seccionamento). Não é dado de entrada. Algoritmo de cálculo fechado na Spec 03 §9.4. |
-| **JSON de operação** | Artefato-contrato: fotografia completa e independente da operação de **um** Autos. Ver §5. |
+| Termo                         | Definição                                                                                                                                                                                                                                                                                                                                                   |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Autos de Linha**            | Identificador regulatório principal (código `0000`). Agrupa um ou mais Serviços sob o mesmo processo administrativo.                                                                                                                                                                                                                                        |
+| **Tipo de Autos**             | Classificação: Semiurbano, Semiurbano Litorâneo, Rodoviário, Rodoviário Litorâneo. Define regras de variação permitida.                                                                                                                                                                                                                                     |
+| **Serviço**                   | Variação operacional dentro de um Autos — combinação de itinerário (caráter: principal, parcial, semidireta etc.) e característica de veículo. Rótulo humano `0000-NXX`; identidade de máquina por **UUID estável** (ver §6).                                                                                                                               |
+| **Característica de veículo** | Duas famílias (ver §7): **semiurbana** (SU, SUL) e **rodoviária** (convencional `CR`/`CL`, `EX`, `LE` e mistos). O tipo do Autos fixa a família. A tabela fechada código-a-código está na Spec 03 §10.2.                                                                                                                                                    |
+| **Seção**                     | Ponto físico georreferenciado que define tarifa e participa do seccionamento tarifário. É entidade do **Autos** (`autos.secoes[]`), compartilhada por todos os Serviços que passam por ali — cada Serviço contribui sua própria geolocalização de Ida e/ou Volta. **Vive dentro do próprio JSON do Autos** — não há cadastro mestre global. Ver Spec 02 §5. |
+| **Local**                     | Ponto físico georreferenciado **sem** relevância tarifária (embarque/desembarque comum), usado pelos itinerários de **um** Serviço. É entidade do **Serviço** (`servico.locais[]`), não compartilhada com outros Serviços. Ver Spec 02 §7.                                                                                                                  |
+| **Parada**                    | Ocorrência de uma Seção **ou** de um Local (nunca os dois, nunca nenhum) dentro do itinerário de um Serviço, com posição na sequência.                                                                                                                                                                                                                      |
+| **Seccionamento tarifário**   | Regra que define entre quais pares de Seções é permitida a venda de passagem parcial.                                                                                                                                                                                                                                                                       |
+| **Itinerário**                | Sequência ordenada de paradas de um Serviço, em um sentido (Ida/Volta), com a rota georreferenciada entre elas.                                                                                                                                                                                                                                             |
+| **Viagem**                    | Saída específica de um Serviço: horário de saída, horários de passagem por parada, dias da semana e regra de feriado.                                                                                                                                                                                                                                       |
+| **Opção de Deslocamento**     | Estatística **derivada** (par origem-destino comprável por viagem × seccionamento). Não é dado de entrada. Algoritmo de cálculo fechado na Spec 03 §9.4.                                                                                                                                                                                                    |
+| **JSON de operação**          | Artefato-contrato: fotografia completa e independente da operação de **um** Autos. Ver §5.                                                                                                                                                                                                                                                                  |
 
-*Termos removidos por saírem de escopo:* Pedido de Alteração, Processo SEI (como entidade do sistema), Pendência, Manifestação, Justificativa, atores de fluxo. Passam a ser tratados no SEI.
+_Termos removidos por saírem de escopo:_ Pedido de Alteração, Processo SEI (como entidade do sistema), Pendência, Manifestação, Justificativa, atores de fluxo. Passam a ser tratados no SEI.
 
 ---
 
@@ -113,6 +115,7 @@ O JSON é a peça central do projeto. Princípios:
   ```
 
   Ver árvore completa e detalhada na Spec 02 §2.
+
 - **Autossuficiente.** Todas as Seções e Locais que o Autos usa estão embutidos no próprio JSON, com `uuid` local ao documento — Paradas **referenciam** Seções/Locais por `uuid` (não os embutem), e a `matriz_seccionamento` referencia pares de **Seções**, não de pontos genéricos. Não depende de nenhum cadastro externo para ser lido.
 - **É o "salvar".** O formulário não persiste nada no servidor: exportar o JSON é salvar; retomar o trabalho é reimportar o JSON.
 - **É a baseline do comparativo.** O Comparador recebe dois JSONs (vigente e proposta) e produz o diff. O comparativo **não** está dentro do JSON nem do formulário.
@@ -132,6 +135,7 @@ Para o Comparador casar "a mesma entidade" entre duas versões, cada uma das qua
 - **Regra dura (Spec 02 e Spec 04):** importar um JSON **preserva** as UUIDs existentes; **apenas** entidades criadas naquela edição ganham UUID nova. Se o formulário regenerasse UUIDs ao importar, o diff viraria "removeu tudo e criou tudo".
 
 Diff resultante no Comparador:
+
 - mesma UUID nos dois JSONs → mesma entidade, compara campo a campo;
 - UUID só no vigente → removida/cancelada;
 - UUID só na proposta → nova.
@@ -146,14 +150,15 @@ Bônus de arquitetura: no Ingestor, a UUID vira o id da linha no PostgreSQL — 
 
 A característica de veículo pertence a **duas famílias distintas, que nunca se misturam num mesmo Autos** — o `tipo` do Autos escolhe a família:
 
-| Tipo de Autos | Família | Permite variação de característica? | Observações |
-|---|---|---|---|
-| Semiurbano | semiurbana | Não (veículo único) | Todos os Serviços usam `SU`; múltiplos Serviços apenas por variação de itinerário/caráter |
-| Semiurbano Litorâneo | semiurbana | Não (veículo único) | Todos usam `SUL` |
-| Rodoviário | rodoviária | Sim | Convencional `CR`, `EX`, `LE` e mistos (`ME`, `ML`, `MX`, `MM`); nunca `SU`/`SUL` nem as formas litorâneas |
-| Rodoviário Litorâneo | rodoviária | Sim | Convencional é `CL` (litorâneo), nunca `CR`; `EX`, `LE` e mistos litorâneos (`MEL`, `MLL`, `MXL`, `MML`). `CR` e `CL` nunca coexistem; `SU`/`SUL` nunca aparecem em Autos rodoviário. |
+| Tipo de Autos        | Família    | Permite variação de característica? | Observações                                                                                                                                                                           |
+| -------------------- | ---------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Semiurbano           | semiurbana | Não (veículo único)                 | Todos os Serviços usam `SU`; múltiplos Serviços apenas por variação de itinerário/caráter                                                                                             |
+| Semiurbano Litorâneo | semiurbana | Não (veículo único)                 | Todos usam `SUL`                                                                                                                                                                      |
+| Rodoviário           | rodoviária | Sim                                 | Convencional `CR`, `EX`, `LE` e mistos (`ME`, `ML`, `MX`, `MM`); nunca `SU`/`SUL` nem as formas litorâneas                                                                            |
+| Rodoviário Litorâneo | rodoviária | Sim                                 | Convencional é `CL` (litorâneo), nunca `CR`; `EX`, `LE` e mistos litorâneos (`MEL`, `MLL`, `MXL`, `MML`). `CR` e `CL` nunca coexistem; `SU`/`SUL` nunca aparecem em Autos rodoviário. |
 
 **Códigos de característica de veículo:**
+
 - **Família semiurbana:** SU (Semiurbano), SUL (Semiurbano Litorâneo).
 - **Família rodoviária — Rodoviário (não-litorâneo):** CR (Convencional Rodoviário), EX (Executivo), LE (Leito), ME (Misto Convencional + Executivo), ML (Misto Convencional + Leito), MX (Misto Executivo + Leito), MM (Misto Convencional + Executivo + Leito).
 - **Família rodoviária — Rodoviário Litorâneo:** CL (Convencional Rodoviário Litorâneo), EX (Executivo), LE (Leito), MEL (Misto Convencional Litorâneo + Executivo), MLL (Misto Convencional Litorâneo + Leito), MXL (Misto Executivo + Leito), MML (Misto Convencional Litorâneo + Executivo + Leito).
@@ -171,8 +176,8 @@ Essas regras (família por tipo, variação só no rodoviário, veículo único 
 - **JSON contém apenas dados de operação** — sem status, autor, data, comparativo ou qualquer metadado de fluxo.
 - **Comparativo é ferramenta separada.** Recebe JSON vigente + JSON proposta, compara na tela e gera **PDF comparativo próprio**, distinto do PDF operacional do formulário.
 - **Formulário não guarda nada no servidor.** Backend praticamente inexistente. Roteamento, cálculo de horários e geração do PDF são **client-side**.
-- **Roteamento via OSRM público** (`router.project-osrm.org`), chamado direto pelo front. Se o serviço estiver indisponível, **não se prossegue com rota não roteada** e exibe-se uma **mensagem de erro clara** informando que o serviço de rotas está temporariamente fora do ar (ex.: *"Serviço de cálculo de rotas temporariamente indisponível — tente novamente em instantes."*). O motivo de bloquear é que a **distância roteada alimenta a tarifa**, então uma rota não calculada tornaria a tabela inválida — mas isso é a **justificativa** da decisão, **não** o texto da mensagem: a mensagem fala só da indisponibilidade do serviço. O algoritmo detalhado (mensagens por tipo de erro, retentativa) está na Spec 03 §3.5.
-- **OSRM só é chamado para *alterar* itinerários — nunca para *abrir* um JSON.** `router.project-osrm.org` é o **servidor de demonstração** do OSRM (sem SLA, com limites de uso, desencorajado para produção); para reduzir essa dependência a ferramenta **nunca** reconsulta o OSRM só para exibir. Ao carregar um Autos, o mapa desenha a `rota.geometria` **congelada** no JSON (Spec 02 §10.2). O OSRM gratuito é acionado **apenas** quando o usuário efetivamente altera um itinerário — inserir/mover Seção, Local ou ponto de rota — recalculando o trecho afetado. Isso mantém leitura e reedição funcionando mesmo com o demo instável, e abre caminho para eventual auto-hospedagem sem mudar o contrato.
+- **Roteamento via OSRM público** (`router.project-osrm.org`), chamado direto pelo front. Se o serviço estiver indisponível, **não se prossegue com rota não roteada** e exibe-se uma **mensagem de erro clara** informando que o serviço de rotas está temporariamente fora do ar (ex.: _"Serviço de cálculo de rotas temporariamente indisponível — tente novamente em instantes."_). O motivo de bloquear é que a **distância roteada alimenta a tarifa**, então uma rota não calculada tornaria a tabela inválida — mas isso é a **justificativa** da decisão, **não** o texto da mensagem: a mensagem fala só da indisponibilidade do serviço. O algoritmo detalhado (mensagens por tipo de erro, retentativa) está na Spec 03 §3.5.
+- **OSRM só é chamado para _alterar_ itinerários — nunca para _abrir_ um JSON.** `router.project-osrm.org` é o **servidor de demonstração** do OSRM (sem SLA, com limites de uso, desencorajado para produção); para reduzir essa dependência a ferramenta **nunca** reconsulta o OSRM só para exibir. Ao carregar um Autos, o mapa desenha a `rota.geometria` **congelada** no JSON (Spec 02 §10.2). O OSRM gratuito é acionado **apenas** quando o usuário efetivamente altera um itinerário — inserir/mover Seção, Local ou ponto de rota — recalculando o trecho afetado. Isso mantém leitura e reedição funcionando mesmo com o demo instável, e abre caminho para eventual auto-hospedagem sem mudar o contrato.
 - **Cada rota registra sua procedência.** `rota` guarda `fonte_calculo` (motor/instância que a gerou), `data_calculo` e `perfil` (Spec 02 §10.2). Assim o Comparador (Spec 05) sabe que rotas de fontes/datas diferentes podem divergir levemente por ruído do mapa — e compara por sinais estáveis, com tolerância, não bit-a-bit (Spec 03 §3.6.2).
 - **Forçar o traçado da rota (pontos de rota).** O traçado que o OSRM sugere nem sempre é o que o ônibus percorre. O usuário pode inserir **pontos de rota** — vértices arrastáveis sobre a rota calculada, que forçam o traçado a passar por determinada via. **Não são Seção, Local nem Parada** e têm propósito único (condicionar a rota): sem tarifa, sem `uuid`, fora de `matriz_distancias`/`matriz_seccionamento` e da regra dos 350 m. São **persistidos no JSON** (`rota.pontos_de_rota`) só para reproduzir a rota forçada ao reeditar. Regra de negócio na Spec 03 §3.6, esquema na Spec 02 §10.4, interação de mapa na Spec 04.
 - **Mapa e tiles client-side** (OSM/MapLibre); imagem do mapa no PDF por captura do próprio canvas.
@@ -193,7 +198,7 @@ Essas regras (família por tipo, variação só no rodoviário, veículo único 
 1. ~~UUID em Viagem~~ — **decidido na Spec 02:** Viagem carrega UUID obrigatória, mesma regra de Seção, Serviço e Local.
 2. ~~Caráter do itinerário~~ — **decidido na Spec 02:** vira campo explícito (`carater`) no Serviço, não derivado.
 3. ~~Horário na parada: relativo × absoluto~~ — **decidido na Spec 02:** offset relativo à saída (`offset_horario`), no nível da **Viagem** (`viagem.horarios_paradas[]`, não da Parada — Spec 02 §13 item 15), resolvido em horário absoluto via `horario_saida + offset_horario`.
-4. ~~`regra_feriado` — valores do enum~~ — **decidido na Spec 03:** enum **binário** `"circula"` \| `"nao_circula"` (a Viagem roda ou não no feriado). Não há grade nem redistribuição de horário específica de feriado, e a etiqueta não afeta contagem de viagens/opções de deslocamento (Spec 03 §9). A "redistribuição proporcional" que se cogitava aqui era, na verdade, o recálculo de horários de passagem ao editar um horário a jusante (Spec 03 §8.2), sem relação com feriado.
+4. ~~`regra_feriado` — valores do enum~~ — **decidido na Spec 03:** enum de **4 valores** — `"circula_inclusive_se_for_feriado"` (feriado indiferente), `"nao_circula_em_feriado"` (não roda em feriado), `"somente_em_feriado"` (só roda quando o dia servido é feriado) e `"circula_em_feriado"` (roda a grade e **também** em qualquer feriado, aditivo). Não há grade nem redistribuição de horário específica de feriado, e a etiqueta não afeta contagem de viagens/opções de deslocamento — exceto `"somente_em_feriado"`, que conta `0` na semana padrão por só operar em feriado (Spec 03 §9). A "redistribuição proporcional" que se cogitava aqui era, na verdade, o recálculo de horários de passagem ao editar um horário a jusante (Spec 03 §8.2), sem relação com feriado.
 5. ~~Limite de divergência espacial dentro de uma Seção~~ — **fixado na Spec 02:** Seção é entidade do Autos (não do Serviço), compartilhada por todos os Serviços que passam por ali (Spec 02 §5). A regra de 350 metros é um clustering por centroide cumulativo: cada novo ponto (Ida ou Volta, de qualquer Serviço) contribuído à Seção deve estar a ≤ 350 m do centroide dos pontos já aceitos nela. Acima disso, é necessária uma Seção separada. O algoritmo/momento de validação desse limite (Spec 02 §5.2) fica detalhado na Spec 03/04.
 
 ---
@@ -201,7 +206,7 @@ Essas regras (família por tipo, variação só no rodoviário, veículo único 
 ## 10. Próximos Documentos da Especificação
 
 - [x] **Spec 02 — Esquema do JSON de Operação** (o contrato: entidades, campos, UUIDs, validações estruturais)
-- [ ] **Spec 03 — Regras de Negócio e Cálculo** (seccionamento, tarifa, cálculo/redistribuição de horários, roteamento, `regra_feriado`, tipificação)
+- [x] **Spec 03 — Regras de Negócio e Cálculo** (seccionamento, tarifa, cálculo/redistribuição de horários, roteamento, `regra_feriado`, tipificação)
 - [ ] **Spec 04 — Formulário** (UI, mapa, import/export de JSON, geração do PDF operacional)
 - [ ] **Spec 05 — Comparador** (dois JSONs → diff → PDF comparativo)
 - [ ] **Spec 06 — Ingestor + Modelo PostgreSQL** (futuro: ingestão do JSON aprovado no banco oficial)
