@@ -2,14 +2,14 @@
 
 **Projeto:** ROTA — Registro de Operação e Tabelas de Autos
 **Depende de:** [Spec 01 — Visão Geral do Sistema](01-visao-geral.md) e [Spec 02 — Esquema do JSON de Operação](02-esquema-json-operacao.md)
-**Status:** Em definição — v0.1
-**Escopo:** Os algoritmos e decisões de negócio que produzem e validam os valores do JSON de operação — cálculo de rota (OSRM) e pontos de rota que forçam o traçado, cálculo de `matriz_distancias`, composição de `valor_adotado_de_distancia`, sugestão de menor distância para `matriz_seccionamento`, algoritmo de centroide e da regra dos 350 m, sugestão e redistribuição dos horários de passagem (`offset_horario`), enum binário de `regra_feriado`, regras de tipificação `tipo` × `caracteristica_veiculo`, e a referência (externa) à tabela de tarifa. **Não é escopo desta spec:** a forma do JSON (é a [Spec 02](02-esquema-json-operacao.md)); UI, mapa, import/export e PDF (Spec 04); diff (Spec 05); PostgreSQL (Spec 06). Onde um cálculo tem parte "de negócio" (aqui) e parte "de tela" (Spec 04), a fronteira está explícita em cada seção e consolidada em §12.
+**Status:** Em definição — v0.3 (descrição textual do itinerário por vias; município por geolocalização; `viagem_feriado` e contagens)
+**Escopo:** Os algoritmos e decisões de negócio que produzem e validam os valores do JSON de operação — cálculo de rota (OSRM) e pontos de rota que forçam o traçado, composição da `descricao_itinerario` a partir dos nomes de via do OSRM, determinação do município por geolocalização, cálculo de `matriz_distancias`, composição de `valor_adotado_de_distancia`, sugestão de menor distância para `matriz_seccionamento`, algoritmo de centroide e da regra dos 350 m, sugestão e redistribuição dos horários de passagem (`offset_horario`), semântica de `viagem_feriado` e contagem de viagens/opções de deslocamento, regras de tipificação `tipo` × `caracteristica_veiculo`, e a referência (externa) à tabela de tarifa. **Não é escopo desta spec:** a forma do JSON (é a [Spec 02](02-esquema-json-operacao.md)); UI, mapa, import/export e PDF (Spec 04); diff (Spec 05); PostgreSQL (Spec 06). Onde um cálculo tem parte "de negócio" (aqui) e parte "de tela" (Spec 04), a fronteira está explícita em cada seção e consolidada em §12.
 
 ---
 
 ## 1. Papel deste Documento
 
-A Spec 02 fechou **o que** cada campo é. Esta spec fecha **como** os campos calculados são produzidos e **quais regras** um documento precisa respeitar além da forma. Vários campos do esquema são explicitamente "computados e congelados" (`rota`, `rota.trechos`, `matriz_distancias`) ou "sugeridos e editáveis" (`matriz_seccionamento.distancia_km`, `viagem.horarios_paradas[].offset_horario`): esta spec define a função que os gera. Outros são enums cujos valores a Spec 02 empurrou para cá (`regra_feriado`) ou regras que a Spec 01 declarou "validações do formulário, detalhadas na Spec 03" (`tipo` × `caracteristica_veiculo`).
+A Spec 02 fechou **o que** cada campo é. Esta spec fecha **como** os campos calculados são produzidos e **quais regras** um documento precisa respeitar além da forma. Vários campos do esquema são explicitamente "computados e congelados" (`rota`, `rota.trechos`, `matriz_distancias`, `municipio`) ou "sugeridos e editáveis" (`matriz_seccionamento.distancia_km`, `viagem.horarios_paradas[].offset_horario`): esta spec define a função que os gera. Outros são semânticas que a Spec 02 empurrou para cá (`viagem_feriado`, §9) ou regras que a Spec 01 declarou "validações do formulário, detalhadas na Spec 03" (`tipo` × `caracteristica_veiculo`).
 
 Princípios herdados que restringem todo cálculo aqui:
 
@@ -62,6 +62,40 @@ Justificativa da escolha (média simples × geodésico):
 
 Todas as distâncias **ponto→centroide** usam a Haversine de §2.1.
 
+### 2.3 Determinação do município por geolocalização (ponto-em-polígono)
+
+*(Novo na v0.2, induzido pela Spec 04 §7.1.)* O campo `municipio` de Seção (Spec 02 §5) e de Local (Spec 02 §7) **não é digitado pelo usuário** — é derivado automaticamente da geolocalização escolhida no mapa. O valor derivado persiste no JSON (documento autossuficiente: Comparador/Ingestor/PDF leem o campo, não re-derivam).
+
+**Fontes de dados** — dois recursos estáticos servidos junto do app (mesma natureza das listas de Autos/empresas/tipos — Spec 01 §8):
+
+| Recurso | Conteúdo | Papel |
+|---|---|---|
+| `municipios_sp.geojson` | `FeatureCollection` com um `Feature` do tipo `Polygon` por município de SP (645), com `properties.codarea` = código IBGE de 7 dígitos | Geometria para o ponto-em-polígono |
+| `pop_municipios.csv` | Colunas `cod_municipio, populacao_residente, nome_municipio, estado` (645 linhas) | Nome de exibição: join `codarea == cod_municipio` → `nome_municipio` |
+
+**Algoritmo:**
+
+```
+MUNICIPIO(ponto):
+  para cada feature F de municipios_sp.geojson:
+      se PONTO_EM_POLIGONO(ponto, F.geometry):        # ray casting sobre [lon, lat]
+          return nome_municipio(F.properties.codarea) # join com o CSV
+  # fallback — ponto fora de todos os polígonos (imprecisão de borda, litoral):
+  F* = feature cuja fronteira tem a menor distância Haversine (§2.1) ao ponto
+  se distancia(ponto, fronteira de F*) <= 2_000 m:
+      return nome_municipio(F*.properties.codarea)
+  senão:
+      return ERRO ("município não derivável — fora do Estado de São Paulo")
+```
+
+- **Ponto-em-polígono:** ray casting padrão sobre as coordenadas `[lon, lat]` do polígono. Os polígonos municipais são disjuntos — o primeiro match é o único.
+- **Fallback de borda:** polígonos simplificados podem deixar pontos legítimos (orla, divisa, viaduto sobre rio-limite) marginalmente fora de todas as geometrias. Nesses casos adota-se o município do polígono mais próximo, com teto de **2 km**; acima disso o ponto é considerado fora de SP e a derivação **falha** (erro bloqueante — a Spec 04 §14 define a mensagem).
+- **Qual ponto decide o município:**
+  - **Seção:** o município é derivado do **centroide** (§2.2) dos pontos aceitos na Seção, e re-derivado a cada inserção/edição/remoção de ponto. Como a regra dos 350 m (§7) limita o raio do conjunto, na prática todos os pontos caem no mesmo município; o centroide resolve deterministicamente o caso raro de Seção encostada na divisa.
+  - **Local:** derivado do ponto único ou, quando Ida e Volta existem, do **ponto médio** dos dois.
+- **Momento:** a derivação roda no Formulário, na criação do ponto e a cada arrasto (Spec 04 §7.1); o resultado é exibido como campo somente-leitura e congelado no JSON na exportação. Leitores estáticos podem, opcionalmente, re-derivar como checagem fraca (mesma filosofia de §7.3) — não é obrigatório.
+- O nome derivado alimenta o padrão visual `Cidade - Nome da Seção` fixado na Spec 04 §7.1.
+
 ---
 
 ## 3. Roteamento — Chamada ao OSRM e montagem de `rota`
@@ -83,13 +117,15 @@ Serviço público, perfil `driving` (Spec 01 §8):
 ```
 GET https://router.project-osrm.org/route/v1/driving/
       {lon1},{lat1};{lon2},{lat2};…;{lonk},{latk}
-      ?overview=full&geometries=geojson&steps=false&annotations=false&continue_straight=false
+      ?overview=full&geometries=geojson&steps=true&annotations=false&continue_straight=false
       [&waypoints={índices das paradas}]     # presente só quando há pontos de rota — ver §3.6
 ```
 
 - Coordenadas em `lon,lat` (ordem do OSRM/GeoJSON), separadas por `;`, **na ordem das paradas** — e, havendo pontos de rota (§3.6), com estes **intercalados** na posição sequencial correta.
-- `overview=full` + `geometries=geojson`: geometria completa street-snapped já em GeoJSON `[lon,lat]`, pronta para `rota.geometria`.
-- `steps=false`, `annotations=false`: não precisamos de manobras nem de anotações por vértice — a granularidade que importa é a de **legs** (§3.3).
+- `overview=full` + `geometries=geojson`: geometria completa street-snapped já em GeoJSON `[lon,lat]`, pronta para `rota.geometria`. **A geometria vem sempre daqui** — nunca dos steps.
+- `steps=true`: pedimos as **manobras/steps** de cada leg **exclusivamente** para obter os **nomes das vias** (`step.name`) percorridas, insumo da `descricao_itinerario` (§3.7). Sem isso o OSRM não retorna nomes de ruas. A distância/duração que alimenta `rota.trechos` e as matrizes continua vindo da granularidade de **legs** (§3.3), não dos steps; a descrição textual **não** é por manobra, e sim por sequência limpa de nomes (§3.7).
+- `annotations=false`: não precisamos de anotações por vértice.
+- **Compatibilidade:** se a instância pública não retornar `steps` (ou retorná-los sem `name`), a rota, os trechos e as matrizes seguem válidos — apenas a `descricao_itinerario` fica sem nomes de via entre as Seções (só os marcos), tratada como caso de borda em §3.7.
 
 ### 3.3 Extração — mapa OSRM → esquema
 
@@ -100,6 +136,7 @@ Da resposta usa-se `routes[0]`:
 | `.geometry` (LineString `[lon,lat]`) | `rota.geometria` | cópia direta |
 | `.legs[i].distance` (metros) | `rota.trechos[i].distancia_km` | §3.4 |
 | `.legs[i].duration` (segundos) | `rota.trechos[i].duracao_s` | arredonda ao inteiro |
+| `.legs[i].steps[].name` (nomes de via) | `rota.descricao_itinerario` | limpeza + associação por Seção (§3.7) |
 | — | `rota.distancia_km`, `rota.duracao_s` | soma dos trechos (§3.4) |
 
 **Sem pontos de rota:** o OSRM retorna **exatamente um `leg` por par consecutivo de coordenadas de entrada** — logo `legs.length == paradas.length - 1`, que é exatamente o que a Spec 02 §10.3 exige de `rota.trechos`. O `leg[i]` (entre a coordenada `i` e `i+1`) vira o `trecho` com `parada_origem_ordem = i+1`, `parada_destino_ordem = i+2`. Nenhuma agregação por Seção acontece aqui — os Locais comuns intermediários geram seus próprios legs/trechos, e a soma por Seção é a §4.
@@ -196,6 +233,115 @@ trecho 2→3 = distancia/duração de (B→p4)+(p4→C)
 - **Congelados junto da rota.** `rota.pontos_de_rota[]` (Spec 02 §10.4) é gravado com o restante da `rota`. Como `rota.geometria`, `rota.trechos` e `rota.distancia_km` já refletem o traçado forçado e são congelados (Spec 02 §10.2), o documento é autoconsistente: quem só **lê** (Comparador, Ingestor, PDF) recebe a rota já forçada e **nunca recalcula** — os pontos de rota nem precisam ser reprocessados por esses leitores.
 - **Reedição fiel.** O ganho de persistir é para o Formulário: ao reimportar e **recalcular** a rota (por alterar paradas ou arrastar um ponto), os pontos de rota anteriores estão no arquivo e são reaplicados, reproduzindo o traçado forçado sem retrabalho manual.
 - **Leitores não os comparam como entidade.** Não têm `uuid`; o Comparador (Spec 05) trata mudança de traçado pelo efeito observável (`geometria`/`distancia_km`), não par-a-par de pontos de rota — política final é da Spec 05.
+
+### 3.7 Descrição textual do itinerário (`descricao_itinerario`)
+
+Produz o objeto `rota.descricao_itinerario` (Spec 02 §10.5) de **um** itinerário: uma descrição textual do caminho percorrido no sentido, que **intercala as Seções** (os marcos) com os **nomes das vias** (ruas, avenidas, rodovias) percorridas entre elas. Fica aqui, junto do roteamento, porque **depende da rota calculada**: os nomes de via vêm da mesma resposta do OSRM (§3.2, `steps=true`).
+
+#### 3.7.1 Fontes
+
+A descrição é derivada de **três** fontes, todas já disponíveis após o roteamento (§3):
+
+1. A **sequência ordenada de paradas** do itinerário (`itinerario.paradas`, por `ordem`).
+2. A **lista de Seções** presentes nessa sequência (paradas com `secao_uuid`) — os únicos marcos da descrição.
+3. Os **nomes das vias** retornados pelo roteador (`legs[].steps[].name` — §3.3), percorridas entre as paradas.
+
+#### 3.7.2 Regra principal — intercalar Seções e vias
+
+A descrição textual intercala, em ordem de travessia:
+
+- a **Seção inicial**;
+- os **nomes das vias** percorridas até a próxima Seção;
+- a **próxima Seção**;
+- os nomes das vias até a Seção seguinte;
+- e assim por diante, até a **Seção final**.
+
+Ex.: `Cidade A - Seção A, Rua 1, Avenida 2, Cidade B - Seção B, Rodovia 3, Cidade C - Seção C.`
+
+#### 3.7.3 Considerar apenas Seções (Locais são ignorados)
+
+A descrição usa **somente Seções** como marcos. Se o itinerário real for
+
+```
+Seção A → Local 1 → Local 2 → Seção B → Local 3 → Seção C
+```
+
+a descrição é montada como
+
+```
+Seção A, {vias entre A e B}, Seção B, {vias entre B e C}, Seção C
+```
+
+Os Locais 1, 2 e 3 **não** aparecem no texto nem em `itens` (Spec 02 §10.5). Eles continuam existindo normalmente em `paradas[]`, `rota.trechos`, `matriz_distancias`, horários internos e demais cálculos — só ficam fora da descrição textual.
+
+#### 3.7.4 Extração dos nomes de via
+
+- A chamada ao OSRM usa `steps=true` (§3.2) **exclusivamente** para obter `step.name`. A geometria continua vindo de `overview=full&geometries=geojson`; distância/duração continuam vindo dos **legs** (§3.3).
+- A granularidade da descrição **não é por manobra**: percorre-se, em ordem, os `steps` de cada leg entre duas Seções e coleta-se a **sequência de `step.name`**, que depois é limpa (§3.7.5). Não se descreve "vire à direita", só a via percorrida.
+- Com **pontos de rota** (§3.6), os steps refletem o traçado já forçado (as coordenadas intermediárias mudam as vias retornadas) — desejado. Os pontos de rota em si **não** geram item; só influenciam os nomes (Spec 02 §10.5).
+
+#### 3.7.5 Limpeza e normalização dos nomes (decisões fechadas)
+
+Sobre a sequência crua de `step.name` de um intervalo entre Seções:
+
+1. **Remover vazios/nulos:** descarta nomes `null`, `""` ou só espaços.
+2. **Remover repetições consecutivas** da mesma via: `Rua A, Rua A, Rua A` → `Rua A`. Comparação após normalização de espaços, ignorando diferença só de espaçamento.
+3. **Preservar repetições não consecutivas:** `Rua A, Avenida B, Rua A` permanece — a rota pode legitimamente voltar à mesma via.
+4. **Padronizar espaços:** colapsar espaços múltiplos e aparar as pontas; não alterar acentuação/caixa (o nome sai como o roteador entrega).
+5. **Não inventar nomes** que não vieram do roteamento.
+6. **Vias sem nome — decisão fechada: omitir.** Trecho retornado sem `name` (ou com `name` vazio) **não** gera item `via`; prefere-se omitir a poluir o PDF com marcador genérico. (A alternativa de usar `"via sem nome"` foi considerada e **descartada** nesta versão.) Consequência: um intervalo entre duas Seções pode não ter nenhuma via nomeada — as duas Seções ficam adjacentes na descrição (§3.7.8).
+
+#### 3.7.6 Associação entre vias e Seções
+
+Como `rota.trechos` é **por parada consecutiva** e pode conter Locais intermediários entre duas Seções (Spec 02 §8), a descrição concatena os nomes de via de **todos os trechos/legs entre duas Seções consecutivas**.
+
+Para paradas
+
+```
+1. Seção A   2. Local X   3. Local Y   4. Seção B   5. Local Z   6. Seção C
+```
+
+- **Bloco A → B:** considerar os legs dos trechos 1→2, 2→3 e 3→4; coletar seus `step.name`; limpar (§3.7.5); inserir tudo **entre** o item `secao` A e o item `secao` B.
+- **Bloco B → C:** considerar os legs dos trechos 4→5 e 5→6; idem, entre B e C.
+
+**Algoritmo:**
+
+```
+DESCRICAO(itinerario):
+  secoes_ordenadas = paradas do itinerário com secao_uuid, por ordem
+  itens = []
+  para i = 0 .. len(secoes_ordenadas)-1:
+      S = secoes_ordenadas[i]
+      itens += { tipo: "secao", secao_uuid: S.secao_uuid, rotulo: rotulo_UX(S) }   # "Cidade - Nome"
+      se i < len(secoes_ordenadas)-1:
+          T = secoes_ordenadas[i+1]
+          vias = concat(step.name de todos os legs entre a ordem de S e a de T)   # inclui Locais no meio
+          vias = LIMPA(vias)                                                       # §3.7.5
+          para nome in vias:  itens += { tipo: "via", nome: nome }
+  texto = juntar rótulos e nomes por ", " + "."     # string pronta para UX/PDF
+  return { texto, itens }
+```
+
+- `rotulo_UX(S)` é o padrão `Cidade - Nome da Seção` (§2.3, Spec 04 §7.1), com `Cidade` = `municipio` derivado.
+- A limpeza é feita **por intervalo entre Seções** (não global) — assim uma via que fecha o bloco A→B e reabre o B→C não é indevidamente deduplicada entre blocos; a deduplicação consecutiva de §3.7.5 vale dentro de cada bloco.
+
+#### 3.7.7 Congelamento, recálculo e pontos de rota
+
+- **Congelada no JSON** junto da rota (Spec 02 §10.2/§10.5): quem só **lê** (Comparador, Ingestor, PDF) usa `descricao_itinerario` como está, **sem** recalcular contra o OSRM.
+- **Ao abrir um JSON existente**, o Formulário **exibe a descrição gravada** e **não** chama o OSRM só para recompô-la (mesma política de §3.6.2 para a rota).
+- **Recalcula-se a descrição** exatamente quando se recalcula a rota — isto é, ao alterar itinerário, paradas, coordenadas ou pontos de rota. Em particular, **mover/adicionar/remover ponto de rota** recalcula `rota.geometria`, `rota.trechos`, `matriz_distancias` **e** `descricao_itinerario` (§3.6 regra 2), porque muda as vias percorridas.
+
+#### 3.7.8 Casos de borda
+
+- **Trecho sem nome de via em parte do caminho:** omite-se aquele nome (§3.7.5, regra 6); a descrição segue com os nomes existentes.
+- **Nenhuma via nomeada entre duas Seções:** as duas Seções ficam adjacentes em `itens` (`…, Seção A, Seção B, …`) — válido pela Spec 02 §10.5 (o mínimo exigido são os dois marcos).
+- **Via repetida muitas vezes:** repetições **consecutivas** colapsam a uma ocorrência; repetições **não consecutivas** permanecem (§3.7.5, regras 2–3).
+- **Itinerário com Locais entre Seções:** Locais nunca entram; suas vias entram no bloco da Seção anterior→próxima (§3.7.6).
+- **Itinerário com apenas duas Seções:** um único bloco; descrição = `Seção A, {vias}, Seção B` (dois marcos, mínimo da Spec 02 §10.5).
+- **Serviço unidirecional:** existe descrição só no sentido presente; o sentido ausente não tem `rota`, logo não tem descrição.
+- **Serviço bidirecional com Ida e Volta diferentes:** cada sentido tem sua própria descrição, baseada no seu traçado — podem divergir em vias e até na ordem dos marcos.
+- **Erro de roteamento (sem `rota` válida):** não há rota calculada ⇒ **não há descrição válida**; a geração fica bloqueada pela mesma pré-condição de §3.5 (sem rota, nada depois dela é produzido).
+- **OSRM sem `steps`/sem `name`:** a rota é válida, mas a descrição fica só com os marcos (Seções adjacentes) — degrada só a riqueza da descrição, sem invalidar o documento (§3.2, compatibilidade).
 
 ---
 
@@ -449,46 +595,75 @@ RESTAURAR(viagem):
     horario_saida permanece intacto
 ```
 
-- **Só os offsets voltam ao baseline.** `horario_saida`, `dias_semana`, `regra_feriado` e a identidade (`uuid`) da Viagem **não** são tocados — o reset é apenas dos horários de passagem intermediários/finais.
+- **Só os offsets voltam ao baseline.** `horario_saida`, `dia_semana`, `viagem_feriado` e a identidade (`uuid`) da Viagem **não** são tocados — o reset é apenas dos horários de passagem intermediários/finais.
 - **Idempotente e determinística:** o resultado depende só de `rota.trechos` + `horario_saida`; aplicar duas vezes dá o mesmo resultado.
 - **Escopo é UX (Spec 04):** o botão pode agir **por Viagem** (reseta uma) ou **em lote** (todas as Viagens de um itinerário/Serviço). Em qualquer escopo, o algoritmo por Viagem é o mesmo (rodar §8.1); a regra de negócio é "reset = re-aplicar a sugestão inicial, mantendo `horario_saida`". Quais botões e confirmação de descarte são Spec 04.
 - **Relação com §8.2:** §8.2 preserva as âncoras manuais e só reinterpola entre elas; §8.3 **elimina** as âncoras manuais e volta tudo ao baseline. São operações distintas — a UI expõe as duas.
 
 ---
 
-## 9. `regra_feriado` — Enum (binário)
+## 9. Viagens de feriado (`viagem_feriado`) e Contagens
 
-Resolve a questão em aberto desde a Spec 01 §9.4 / Spec 02 §11. **Não existe redistribuição de horários em feriado** — a operação de feriado é simplesmente "roda ou não roda". (O que antes era chamado de "redistribuição proporcional em feriado" era, na verdade, o recálculo de horários de passagem ao editar um horário a jusante — isso é a §8.2, não tem relação com feriado.)
+*(Reescrito na v0.2 — a Spec 02 §11 v0.6 estratificou Viagem por dia: `dia_semana` único + `viagem_feriado` booleano, substituindo `dias_semana[]` + o enum `regra_feriado` que esta seção definia.)* **Não existe redistribuição de horários em feriado** — a operação de feriado é uma grade própria, montada viagem a viagem. (O que antes era chamado de "redistribuição proporcional em feriado" era, na verdade, o recálculo de horários de passagem ao editar um horário a jusante — isso é a §8.2, não tem relação com feriado.)
 
-### 9.1 Enum (decisão fechada)
+### 9.1 Semântica (decisão fechada)
 
-Um Autos apresenta sua operação como a grade **semanal** (Viagens com `dias_semana`) **mais**, por Viagem, uma etiqueta binária de feriado. `regra_feriado` de cada Viagem assume um de **dois** valores:
+A operação de um itinerário é o conjunto das suas Viagens, cada uma valendo para **um único** `dia_semana`, em uma de duas grades:
 
-| Valor | Significado |
+| `viagem_feriado` | Significado |
 |---|---|
-| `"circula"` | A Viagem **também roda em dia de feriado**, no **mesmo** `horario_saida` e com os mesmos `offset_horario` — **em qualquer dia da semana em que o feriado caia**, inclusive dias que não estão em `dias_semana`. |
-| `"nao_circula"` | A Viagem **não roda** em dia de feriado. |
+| `false` | **Viagem comum** — opera normalmente quando `dia_semana` cai (grade de dias comuns). |
+| `true` | **Viagem de feriado** — opera **apenas** quando um **feriado** cai no `dia_semana` indicado (grade de feriados). Num feriado, a grade de feriados **substitui integralmente** a grade comum daquele dia: as viagens comuns do dia não operam; operam as viagens de feriado daquele dia. |
 
-- É **aditivo, não um modificador de `dias_semana`**: `"circula"` significa "se aquele dia for feriado, este horário opera" — independentemente do dia da semana. Ex.: uma Viagem que opera segunda e terça, com `regra_feriado: "circula"`, **também opera se um feriado cair numa quinta**.
-- Não há grade de horário específica de feriado nem redução/redistribuição de partidas: a Viagem repete seu horário normal (`"circula"`) ou é suprimida no feriado (`"nao_circula"`).
-- **Uso: apenas informativo.** Essa informação serve às **tabelas, legendas e observações** do PDF e da UX ("também opera em feriados" / "não opera em feriados"). Ela **não** gera partidas contáveis (§9.2).
-- O **calendário de feriados** (quais datas) é **externo** ao ROTA e ao JSON (fora de escopo — Spec 01 §3). A etiqueta diz **o que acontece** num feriado, não **quando** ele cai.
-- O placeholder `"nao_circula"` do exemplo da Spec 02 §15 continua válido — é um dos dois valores.
+- As duas grades são independentes: um dia de feriado pode ter mais, menos ou nenhuma viagem em relação ao dia comum correspondente. "Operação de feriado igual à comum" é obtida copiando a grade (ação de UX — Spec 04 §8.4 —, que cria Viagens novas, com UUIDs novas).
+- O **calendário de feriados** (quais datas) permanece **externo** ao ROTA e ao JSON (Spec 01 §3). O documento diz o que acontece num feriado que caia em cada dia da semana, não **quando** ele cai.
+- **Uso: informativo/operacional de exibição.** A grade de feriados serve às tabelas da UX e do PDF (Spec 04 §8.4, §13); ela **não** gera partidas contáveis (§9.2).
 
-### 9.2 Feriado não altera contagens (viagens, opções de deslocamento)
+### 9.2 Feriado não altera contagens
 
-Regra de negócio crucial para estatísticas derivadas (nº de viagens, Opção de Deslocamento — Spec 01 §4) e para o Comparador (Spec 05):
+Regra crucial para as estatísticas derivadas (§9.4) e para o Comparador (Spec 05):
 
-- Todas as contagens — nº de viagens e de opções de deslocamento — usam a **semana padrão**, que **por definição não tem feriado**: derivam **exclusivamente** de `dias_semana` (e do seccionamento). A operação de feriado (`regra_feriado`) **nunca** entra nessas contagens.
-- **Por quê:** o ROTA **não tem** registro de quais datas são feriado (calendário externo, §9.1), então não há como — nem faria sentido — somar as ocorrências de feriado a uma frequência semanal. A viagem é contada pela sua frequência normal.
-- **Exemplo:** Viagem às 08:00 com `dias_semana: [segunda, terca]` e `regra_feriado: "circula"`. Viagens na semana = **2** (segunda e terça). O fato de também rodar em feriados **não adiciona** viagens — mesmo que o feriado caísse numa quinta e a viagem operasse naquele dia real, isso é operação de feriado, fora da semana padrão. Idem para opções de deslocamento.
-- Assim, dois JSONs que difiram **apenas** em `regra_feriado` têm exatamente as mesmas contagens; a diferença aparece só na informação exibida (tabela/PDF), tratada pelo Comparador como mudança informativa, não de frequência.
+- Todas as contagens — nº de viagens semanais e de opções de deslocamento — usam a **semana padrão**, que **por definição não tem feriado**: consideram **exclusivamente** as Viagens com `viagem_feriado = false` (e o seccionamento). Viagens de feriado **nunca** entram nessas contagens.
+- **Por quê:** o ROTA não tem registro de quais datas são feriado (calendário externo, §9.1), então não há como — nem faria sentido — somar ocorrências de feriado a uma frequência semanal.
+- Dois JSONs que difiram **apenas** na grade de feriados têm exatamente as mesmas contagens; a diferença aparece na tabela de feriados (tratada pelo Comparador como mudança de operação de feriado, não de frequência semanal).
+- **Requisito de exibição (Spec 04 §10/§13):** as contagens devem ser sempre rotuladas como "semana padrão (sem feriados)".
 
 ### 9.3 Casos de borda
 
-- **Feriado num dia fora de `dias_semana`:** com `"circula"`, a Viagem **opera** naquele feriado (é aditivo — §9.1), mas isso só afeta a **informação exibida**; para contagem, continua valendo só a semana padrão (§9.2). Com `"nao_circula"`, não opera. *Quando* um feriado ocorre é do calendário externo (Spec 04/05/06).
-- **Feriado num dia dentro de `dias_semana` com `"nao_circula"`:** naquele feriado a Viagem **não** opera (embora fosse um dia normalmente servido) — de novo, só afeta a informação exibida, não a contagem da semana padrão.
-- **Mistura no mesmo itinerário:** válido — cada Viagem tem sua própria etiqueta, independentemente das demais.
+- **Grade de feriados vazia** (nenhuma Viagem com `viagem_feriado = true`): válido — significa que em feriados o serviço não opera. A Spec 04 §11 trata como alerta (não bloqueante), pois pode ser intencional.
+- **Viagem de feriado sem viagem comum correspondente:** válido — um horário pode existir só em feriados.
+- **Mistura de horários:** cada Viagem é independente; não há vínculo estrutural entre a viagem comum das 08:00 de segunda e a viagem de feriado das 08:00 de segunda (são entidades distintas, UUIDs distintas).
+
+### 9.4 Contagem de viagens e opções de deslocamento (fórmulas)
+
+Define o cálculo das estatísticas derivadas exibidas na revisão e no PDF (Spec 04 §10). Tudo sobre a **semana padrão** (§9.2): somente Viagens com `viagem_feriado = false`.
+
+**Viagens semanais, por Serviço e sentido:**
+
+```
+viagens_semana(servico, sentido) = | { v ∈ itinerario(sentido).viagens : v.viagem_feriado == false } |
+```
+
+Cada Viagem é uma partida num único dia (Spec 02 §11), então a contagem é o próprio número de objetos — sem multiplicação por dias. Total do Serviço = Ida + Volta; total do Autos = Σ dos Serviços.
+
+**Pares O-D compráveis, por Serviço:**
+
+```
+pares_compraveis(servico) = pares habilitados em matriz_seccionamento
+                            ∪ { par ponta-a-ponta }        # primeira e última Seção do itinerário
+```
+
+O par ponta-a-ponta (a viagem completa) é **sempre comprável**, esteja ou não habilitado na `matriz_seccionamento` — a união evita contá-lo duas vezes quando habilitado. Como Ida e Volta referenciam o mesmo conjunto de Seções (Spec 02 §2), o conjunto de pares é único por Serviço.
+
+**Opções de deslocamento, por Serviço e sentido** (Spec 01 §4: par origem-destino comprável × viagem):
+
+```
+opcoes(servico, sentido) = viagens_semana(servico, sentido) × | pares_compraveis(servico) |
+```
+
+Cada viagem oferece cada par comprável como uma opção de deslocamento direcionada (da Seção que vem antes para a que vem depois na travessia daquele sentido). Total do Serviço = Ida + Volta; total do Autos = Σ dos Serviços.
+
+**Estratificação por faixa de horário** (exibição — faixas definidas na Spec 04 §10): as mesmas fórmulas, restringindo as viagens àquelas cujo `horario_saida` cai na faixa.
 
 ---
 
@@ -548,12 +723,14 @@ Consolidação do que **permanece em aberto** para a Spec 04. Esta spec define a
 |---|---|---|
 | Roteamento (§3) | Forma da requisição OSRM, extração, conversão m→km, arredondamento, política de erro bloqueante | Momento de disparar o roteamento, indicador de carregamento, exibição da mensagem de erro, re-tentativa manual, desenho da rota no mapa |
 | Pontos de rota (§3.6) | Que forçam o traçado, entram como coordenadas intermediárias, nunca viram trecho/parada, persistem em `rota.pontos_de_rota` (só para forçar), mapeamento legs→trechos | Clique na rota para criar o ponto, arraste no mapa, recálculo ao soltar, feedback visual |
+| Descrição do itinerário (§3.7) | Deriva de paradas + Seções + `step.name` do OSRM; intercala só Seções e vias limpas; omite Locais e vias sem nome; congelada e recalculada com a rota | Painel "Descrição textual do itinerário" por Serviço/sentido, ações "Recalcular"/"Copiar"/"Ver itens", exibição no PDF e na revisão, bloqueio se ausente (Spec 04 §7.4/§11/§13) |
 | `matriz_distancias` (§4) | Algoritmo de soma de trechos por par de Seções | Quando recalcular, exibição da matriz |
 | `valor_adotado` (§5) | Fórmula (média/valor único) e arredondamento | — (puro cálculo) |
 | Sugestões de seccionamento (§6) | Os dois algoritmos: "menor distância" (mín. entre Serviços) e "distâncias do serviço" (valor do próprio Serviço) | Os dois botões, escopo em lote, apresentar sugestão, permitir edição, recálculo reativo |
 | Regra dos 350 m (§7) | Centroide, Haversine, validação incremental, checagem estática, pareada de Local | Feedback ao inserir ponto no mapa, mensagem de recusa, proposta de criar nova Seção |
 | Horários de passagem (§8) | Sugestão inicial por acúmulo de `duracao_s`; fórmula de redistribuição proporcional entre âncoras ao editar horário a jusante; reset à sugestão inicial (mantém `horario_saida`) | Edição por Viagem, quando recalcular, botões de reset (por Viagem/em lote) e confirmação, bloqueio de offset fora de ordem, apresentação |
-| `regra_feriado` (§9) | Enum binário (`circula`/`nao_circula`); feriado não altera contagens | Seleção da regra por Viagem no formulário, exibição no PDF; calendário de feriados externo |
+| `viagem_feriado` e contagens (§9) | Semântica das duas grades (comum/feriado); feriado não altera contagens; fórmulas de viagens semanais, pares compráveis e opções de deslocamento | Grade de dias comuns × grade de feriados, botão "copiar dias comuns", rótulo "semana padrão", faixas de horário; calendário de feriados externo |
+| Município (§2.3) | Fontes (`municipios_sp.geojson` + `pop_municipios.csv`), ponto-em-polígono, fallback de borda, qual ponto decide (centroide/ponto médio) | Momento de derivar (criação/arrasto), campo somente-leitura, mensagem de bloqueio "fora de SP" |
 | Tipificação (§10) | Tabela e regras `tipo` × característica | Bloqueio/alerta ao cadastrar/trocar tipo, numeração de `numero_n` |
 | Tarifa (§11) | Contrato "distância→R$ externo, nada de R$ no JSON" | Carregar a tabela da portaria, renderizar valores no PDF |
 
@@ -573,16 +750,19 @@ Comparador (Spec 05) e Ingestor (Spec 06) usam desta spec apenas as **checagens 
 8. **Duas sugestões para `matriz_seccionamento.distancia_km`**, cada uma por botão (§6): **"menor distância"** = mín. `valor_adotado` entre todos os Serviços do Autos que atendem o par; **"distâncias do serviço"** = `valor_adotado` do próprio Serviço para o par. Ambas são sugestão de UI, não persistidas; o JSON guarda o valor confirmado.
 9. **Regra dos 350 m:** validação **incremental** no Formulário (recalcula centroide candidato, recusa se qualquer ponto do conjunto resultante > 350 m — preserva o invariante do centroide final); checagem **estática fraca** (centroide de todos os pontos finais) para Comparador/Ingestor; **pareada** para Local (§7).
 10. **Horários de passagem** (§8): sugestão inicial por acúmulo de `duracao_s` (primeira parada `00:00:00`); ao editar manualmente o horário de uma parada a jusante, as intermediárias são **reinterpoladas proporcionalmente** entre âncoras (a "redistribuição" real — nada a ver com feriado); e um **reset** que desfaz as edições manuais, voltando à sugestão inicial e mantendo só o `horario_saida` (§8.3, escopo por Viagem ou em lote na UI).
-11. **`regra_feriado` enum = `{circula, nao_circula}`** (binário — roda ou não roda no feriado); `"circula"` é **aditivo** (opera em qualquer dia em que o feriado caia, mesmo fora de `dias_semana`) e **apenas informativo** (tabela/legenda/PDF); **não há** redistribuição de horários em feriado; feriado **não altera** contagem de viagens nem de opções de deslocamento — as contagens usam a semana padrão, sem feriado (§9).
+11. **Feriado = grade própria por dia da semana** (v0.2, substitui o enum `regra_feriado` da v0.1 — ver Spec 02 §13, item 21): Viagem de feriado (`viagem_feriado = true`) opera apenas quando um feriado cai no seu `dia_semana` e **substitui integralmente** a grade comum daquele dia; **não há** redistribuição de horários em feriado; feriado **não altera** contagem de viagens nem de opções de deslocamento — as contagens usam a semana padrão, sem feriado, e devem ser rotuladas como tal (§9).
 12. **Tipificação:** duas famílias que nunca se misturam — **semiurbana** (`SU`/`SUL`, veículo único por Autos) e **rodoviária** (`RO`/`ROL`/`EX`/`LE`/`SL` + mistos, com variação). O `tipo` do Autos fixa a família e a litoralidade fixa a forma convencional (`SU`×`SUL`, `RO`×`ROL` nunca coexistem) (§10).
 13. **Tarifa distância→R$ é externa (portaria)**; JSON nunca guarda R$; ROTA só referencia a tabela na exibição/PDF (§11).
+14. **Município derivado por ponto-em-polígono** (v0.2, §2.3): `municipio` de Seção e Local vem da geolocalização — ray casting sobre `municipios_sp.geojson` (join `codarea` → `nome_municipio` em `pop_municipios.csv`); fallback ao polígono mais próximo até 2 km; acima disso, erro bloqueante ("fora de SP"). Seção decide pelo centroide dos pontos aceitos; Local, pelo ponto único ou ponto médio Ida/Volta. O valor persiste congelado no JSON.
+15. **Fórmulas de contagem** (v0.2, §9.4): viagens semanais = nº de Viagens comuns do sentido (cada Viagem é uma partida num único dia — Spec 02 §11 v0.6); pares O-D compráveis = `matriz_seccionamento` ∪ par ponta-a-ponta; opções de deslocamento por sentido = viagens semanais × pares compráveis. Sempre na semana padrão, sem feriado; estratificação por faixa de horário é exibição (faixas na Spec 04 §10).
+16. **Descrição textual do itinerário** (v0.3, §3.7): `rota.descricao_itinerario` (Spec 02 §10.5) intercala **só as Seções** (marcos) com os **nomes das vias** entre elas. Nomes vêm de `steps[].name` do OSRM (`steps=true` — a geometria e as distâncias continuam de `overview=full`/legs); a sequência crua é limpa (remove vazios, colapsa repetições consecutivas, preserva não consecutivas, padroniza espaços) e **vias sem nome são omitidas** (não se usa marcador genérico). Locais **nunca** entram; pontos de rota não viram item (só mudam as vias). É derivada, **congelada** com a rota e **recalculada** quando a rota é recalculada (inclusive por ponto de rota); leitores só leem. Abrir JSON exibe a descrição gravada sem chamar OSRM.
 
-**Permanece para a Spec 04** (não é lacuna, é fronteira): tudo da coluna direita de §12 — momento de disparo, apresentação, interação, carregamento da tabela de tarifa e do calendário de feriados externos.
+**Resolvido pela Spec 04** (era a fronteira da coluna direita de §12): momento de disparo, apresentação e interação de cada regra. Permanecem externos: tabela de tarifa (portaria) e calendário de feriados.
 
 ---
 
 ## 14. Próximos Documentos
 
-- [ ] **Spec 04 — Formulário**: UI, mapa, import/export do JSON, geração do PDF operacional; consome os algoritmos desta spec e resolve a coluna "Spec 04" de §12.
+- [x] **Spec 04 — Formulário**: UI, mapa, import/export do JSON, geração do PDF operacional; consome os algoritmos desta spec e resolve a coluna "Spec 04" de §12.
 - [ ] **Spec 05 — Comparador**: diff entre dois JSONs, PDF comparativo; usa as checagens estáticas (§7.3/§7.4) e a regra de que feriado não altera contagens (§9.2), sem recalcular o congelado.
 - [ ] **Spec 06 — Ingestor + Modelo PostgreSQL**: ingestão do JSON aprovado; reaproveita UUIDs como chave e aplica as mesmas checagens estáticas.
