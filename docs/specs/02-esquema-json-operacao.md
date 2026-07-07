@@ -2,7 +2,7 @@
 
 **Projeto:** ROTA — Registro de Operação e Tabelas de Autos
 **Depende de:** [Spec 01 — Visão Geral do Sistema](01-visao-geral.md)
-**Status:** Em definição — v0.7 (descrição textual do itinerário por vias em `rota.descricao_itinerario`; Viagem estratificada por dia; município derivado)
+**Status:** Em definição — v0.9 (enum de `caracteristica_veiculo` definitivo: `CR`/`CL`, `EX`, `LE`, `ME`/`MEL`, `ML`/`MLL`, `MX`, `MM`/`MML`; sem `SL`; supera os códigos `RO`/`ROL`/mistos "M*" da v0.8; exemplo do §15 adequado)
 **Escopo:** O contrato de dados — entidades, campos, tipos, regras de UUID e validações estruturais do JSON de operação. **Não é escopo desta spec:** fórmulas de tarifa (valor em R$), algoritmo de roteamento, algoritmo de sugestão/redistribuição dos horários de passagem, semântica de `viagem_feriado` e contagens derivadas, derivação do município por geolocalização, regras de tipificação, algoritmo exato de sugestão de menor distância (isso é a [Spec 03](03-regras-de-negocio-calculo.md)).
 
 ---
@@ -147,8 +147,8 @@ Se um ponto candidato ultrapassar 350 m do centroide vigente, ele **não pode** 
 | Campo | Tipo | Obrigatório | Descrição |
 |---|---|---|---|
 | `uuid` | string (UUIDv4) | Sim | Identidade estável do Serviço. Gerada client-side (`crypto.randomUUID()`) na criação; preservada em reimportações (Spec 01 §6). |
-| `numero_n` | string | Sim | Rótulo de display, formato `"0000-NXX"` (ex.: `"0000-1RO"`). Não é identidade — apenas exibição. |
-| `caracteristica_veiculo` | enum | Sim | **Família semiurbana:** `SU` \| `SUL`. **Família rodoviária:** `RO` \| `ROL` \| `EX` \| `LE` \| `SL` \| `MLEX` \| `MLRO` \| `MEXR` \| `MLES` \| `MEXS` \| `MROS` \| `MIST` (Spec 01 §7). O `tipo` do Autos fixa a família (semiurbano → `SU`/`SUL`; rodoviário → família rodoviária) e as duas nunca se misturam. Quais valores são permitidos por `tipo` é regra de negócio da Spec 03 §10. |
+| `numero_n` | string | Sim | Rótulo de display, formato `"0000-NXX"` (ex.: `"0000-1CR"`). Não é identidade — apenas exibição. |
+| `caracteristica_veiculo` | enum | Sim | **Família semiurbana:** `SU` \| `SUL`. **Família rodoviária:** `CR` \| `CL` \| `EX` \| `LE` \| `ME` \| `MEL` \| `ML` \| `MLL` \| `MX` \| `MM` \| `MML` (Spec 01 §7). Não existe `SL` (Semileito). O `tipo` do Autos fixa a família (semiurbano → `SU`/`SUL`; rodoviário → família rodoviária) e as duas nunca se misturam. Quais valores são permitidos por `tipo` é regra de negócio da Spec 03 §10 (partição fechada código-a-código, inclusive dos mistos por litoralidade). |
 | `carater` | enum | Sim | `"principal"` \| `"parcial"` \| `"semidireta"`. Campo explícito, declarado pela empresa — não derivado do conjunto de paradas. O glossário da Spec 01 usa "etc." ao listar valores; se surgirem outros, esta lista é a fonte de verdade e deve ser atualizada. |
 | `locais` | array\<Local\> | Não (default `[]`) | Pontos comuns (sem tarifa) usados pelos itinerários deste Serviço. Não compartilhados com outros Serviços. Ver §7. |
 | `matriz_distancias` | array\<ParDistância\> | Sim | Distância entre cada par de Seções atendidas por este Serviço, computada e congelada a partir da rota. Ver §8. |
@@ -444,7 +444,7 @@ Validações de forma do documento — não incluem regras de negócio (tarifa, 
 
 ## 15. Exemplo de JSON Completo (mínimo)
 
-Serviço único (`0000-1RO`) atendendo três Seções (Santos, São Vicente, Praia Grande) e um Local comum sem tarifa, só na Ida.
+Serviço único (`0000-1CR`) atendendo três Seções (Santos, São Vicente, Praia Grande) e um Local comum sem tarifa, só na Ida.
 
 ```json
 {
@@ -496,8 +496,8 @@ Serviço único (`0000-1RO`) atendendo três Seções (Santos, São Vicente, Pra
     "servicos": [
       {
         "uuid": "b3f1c2a0-1e2d-4a3b-9c4d-5e6f7a8b9c0d",
-        "numero_n": "0000-1RO",
-        "caracteristica_veiculo": "RO",
+        "numero_n": "0000-1CR",
+        "caracteristica_veiculo": "CR",
         "carater": "principal",
         "locais": [
           {
@@ -650,7 +650,7 @@ Serviço único (`0000-1RO`) atendendo três Seções (Santos, São Vicente, Pra
 
 *Notas:* as Viagens são **estratificadas por dia** (§11): a partida das 08:00 da Ida aparece como duas Viagens comuns (`segunda` e `terca`, `viagem_feriado: false`) mais uma Viagem **de feriado** (`viagem_feriado: true`, `dia_semana: "segunda"` — opera apenas quando um feriado cai numa segunda); cada uma tem `uuid` e offsets próprios. `Ponto de Embarque Praia` é um Local comum, só na Ida, sem geolocalização de Volta — por isso não aparece nas paradas do itinerário de Volta. O `pontos_de_rota` na Ida ilustra um único vértice de forçamento no trecho entre a parada 1 e a 2 (força a rota por uma via específica); o itinerário de Volta omite o campo (default `[]` — nenhum forçamento). Os campos `municipio` foram derivados da geolocalização (Spec 03 §2.3), não digitados. Cada `rota` traz sua `descricao_itinerario` (§10.5): note que o **Local** `Ponto de Embarque Praia` (parada 3 da Ida) **não** aparece na descrição — só as três Seções entram como marcos, intercaladas pelos nomes das vias; a Volta tem sua própria descrição, baseada no traçado do sentido.
 
-Se um segundo Serviço do mesmo Autos (ex.: `0000-2RO`) também atendesse o Terminal Central de Santos, a entrada correspondente ganharia mais um elemento em `servicos`, sob a mesma Seção:
+Se um segundo Serviço do mesmo Autos (ex.: `0000-2CR`) também atendesse o Terminal Central de Santos, a entrada correspondente ganharia mais um elemento em `servicos`, sob a mesma Seção:
 
 ```json
 {

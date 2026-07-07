@@ -2,7 +2,7 @@
 
 **Projeto:** ROTA — Registro de Operação e Tabelas de Autos
 **Depende de:** [Spec 01 — Visão Geral](01-visao-geral.md), [Spec 02 — Esquema do JSON de Operação](02-esquema-json-operacao.md), [Spec 03 — Regras de Negócio e Cálculo](03-regras-de-negocio-calculo.md)
-**Status:** Em definição — v0.2 (descrição textual do itinerário por vias na UX, na revisão e no PDF)
+**Status:** Em definição — v0.3 (exemplos de `numero_n` adequados aos códigos definitivos de característica de veículo — Spec 01 v0.6 §7)
 **Escopo:** Como o usuário interage com o Formulário — telas, mapa, grade de horários, matrizes, descrição textual do itinerário, revisão, exportação de JSON e geração do PDF operacional. Esta spec define **quando** as regras das Specs 02/03 aparecem na tela, **como** o usuário interage com elas e **como** os resultados são apresentados. **Não é escopo desta spec (fronteira):** o schema do JSON (Spec 02); as fórmulas de cálculo, o algoritmo do OSRM, o algoritmo da regra dos 350 m, a estrutura interna de `offset_horario` e a regra de contagem de viagens/opções de deslocamento (Spec 03); o Comparador (Spec 05); o Ingestor (Spec 06); e qualquer workflow administrativo, aprovação, pendência, SEI ou permissões (fora do ROTA — Spec 01 §3).
 
 > **Nota de versão:** esta spec foi escrita junto com duas alterações que ela induziu nas specs anteriores: (a) a **estratificação de Viagem** por dia da semana (`dia_semana` único + `viagem_feriado` booleano — Spec 02 §11, v0.6, substituindo `dias_semana[]` + `regra_feriado`); (b) a **derivação automática do município** a partir da geolocalização (Spec 03 §2.3). As referências abaixo já apontam para as versões atualizadas.
@@ -327,11 +327,11 @@ Tela final antes da exportação. Consolida o painel de pendências em duas list
 Além das duas listas, a Revisão exibe, **para cada Serviço e sentido**, a **descrição textual do itinerário** (Spec 02 §10.5, §7.4), como conferência final antes de exportar:
 
 ```
-Serviço 0000-1RO — Ida
+Serviço 0000-1CR — Ida
 Descrição do itinerário:
 Santos - Terminal Central, Avenida Ana Costa, São Vicente - Terminal Norte, Praia Grande - Rodoviária Praia Grande.
 
-Serviço 0000-1RO — Volta
+Serviço 0000-1CR — Volta
 Descrição do itinerário:
 Praia Grande - Rodoviária Praia Grande, Avenida Presidente Wilson, São Vicente - Terminal Norte, Santos - Terminal Central.
 ```
@@ -412,8 +412,8 @@ Categorias e comportamento esperado (validações e textos de roteamento: Spec 0
 | ------------------------------------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | JSON inválido                                    | Bloqueia o carregamento; aponta o problema                        | "O arquivo não é um JSON de operação válido: [detalhe]. Verifique se o arquivo foi gerado pelo ROTA."                          |
 | Autos/empresa/tipo inexistente na lista estática | Bloqueia o carregamento (Spec 01 §8)                              | "O Autos [código] não consta na lista atual. Não é possível editar uma operação com identificação desatualizada."              |
-| Rota sem cálculo                                 | Pendência bloqueante; oferece recalcular                          | "O itinerário de Ida do Serviço 0000-1RO está sem rota calculada. Recalcule antes de exportar."                                |
-| Descrição do itinerário ausente/inválida         | Pendência bloqueante; oferece recalcular a descrição (§7.4)       | "O itinerário de Ida do Serviço 0000-1RO está sem a descrição textual por vias. Recalcule a descrição antes de exportar."      |
+| Rota sem cálculo                                 | Pendência bloqueante; oferece recalcular                          | "O itinerário de Ida do Serviço 0000-1CR está sem rota calculada. Recalcule antes de exportar."                                |
+| Descrição do itinerário ausente/inválida         | Pendência bloqueante; oferece recalcular a descrição (§7.4)       | "O itinerário de Ida do Serviço 0000-1CR está sem a descrição textual por vias. Recalcule a descrição antes de exportar."      |
 | OSRM indisponível                                | Erro com retentativa manual (retry automático: Spec 03 §3.5)      | "Serviço de cálculo de rotas temporariamente indisponível — tente novamente em instantes."                                     |
 | Sem rota entre paradas (`NoRoute`)               | Bloqueia; aponta o problema de traçado                            | "Não há caminho viário entre as paradas na ordem definida. Revise a ordem ou as posições."                                     |
 | Ponto não ancorável (`NoSegment`)                | Bloqueia; identifica **qual parada**                              | "A parada [Cidade - Nome] não pôde ser associada a uma via. Arraste o ponto para mais perto de uma rua."                       |

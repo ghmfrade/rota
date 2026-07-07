@@ -2,7 +2,7 @@
 
 **Projeto:** ROTA — Registro de Operação e Tabelas de Autos (WebApp de tabelas operacionais de linhas de ônibus intermunicipais)
 **Órgão:** ARTESP / SUCOL
-**Status:** Em definição — v0.4 (descrição textual do itinerário por vias no escopo; ajustes induzidos pela Spec 04: Viagem estratificada por dia; base de municípios)
+**Status:** Em definição — v0.6 (códigos de característica de veículo definitivos: `CR`/`CL`, `EX`, `LE`, `ME`/`MEL`, `ML`/`MLL`, `MX`, `MM`/`MML`; Semileito/`SL` não existe; supera os códigos `RO`/`ROL`/mistos "M*" da v0.5)
 **Stack:** Frontend React/Next.js (SPA, client-side) · sem backend transacional · roteamento via OSRM público · PostgreSQL apenas no Ingestor futuro
 **Substitui:** a v0.1 desta spec (sistema de gestão com ciclo de vida de Pedido). O antigo modelo de dados (Spec 02 v0.1) fica obsoleto na parte de workflow; seu conteúdo de domínio migra para o Esquema do JSON (Spec 02) e para o Modelo PostgreSQL do Ingestor (Spec 06).
 
@@ -81,7 +81,7 @@ Consequência: **o ROTA não tem modelo de estado nem de permissões.** O JSON c
 | **Autos de Linha**            | Identificador regulatório principal (código `0000`). Agrupa um ou mais Serviços sob o mesmo processo administrativo.                                                                                                                                                                                                                                        |
 | **Tipo de Autos**             | Classificação: Semiurbano, Semiurbano Litorâneo, Rodoviário, Rodoviário Litorâneo. Define regras de variação permitida.                                                                                                                                                                                                                                     |
 | **Serviço**                   | Variação operacional dentro de um Autos — combinação de itinerário (caráter: principal, parcial, semidireta etc.) e característica de veículo. Rótulo humano `0000-NXX`; identidade de máquina por **UUID estável** (ver §6).                                                                                                                               |
-| **Característica de veículo** | Duas famílias (ver §7): **semiurbana** (SU, SUL) e **rodoviária** (RO, ROL, EX, LE, SL e mistos). O tipo do Autos fixa a família.                                                                                                                                                                                                                           |
+| **Característica de veículo** | Duas famílias (ver §7): **semiurbana** (SU, SUL) e **rodoviária** (CR, CL, EX, LE e mistos). O tipo do Autos fixa a família.                                                                                                                                                                                                                           |
 | **Seção**                     | Ponto físico georreferenciado que define tarifa e participa do seccionamento tarifário. É entidade do **Autos** (`autos.secoes[]`), compartilhada por todos os Serviços que passam por ali — cada Serviço contribui sua própria geolocalização de Ida e/ou Volta. **Vive dentro do próprio JSON do Autos** — não há cadastro mestre global. Ver Spec 02 §5. |
 | **Local**                     | Ponto físico georreferenciado **sem** relevância tarifária (embarque/desembarque comum), usado pelos itinerários de **um** Serviço. É entidade do **Serviço** (`servico.locais[]`), não compartilhada com outros Serviços. Ver Spec 02 §7.                                                                                                                  |
 | **Parada**                    | Ocorrência de uma Seção **ou** de um Local (nunca os dois, nunca nenhum) dentro do itinerário de um Serviço, com posição na sequência.                                                                                                                                                                                                                      |
@@ -128,7 +128,7 @@ O esquema detalhado é a **Spec 02**.
 
 Para o Comparador casar "a mesma entidade" entre duas versões, cada uma das quatro entidades com identidade própria — **Seção**, **Serviço**, **Local** e **Viagem** (Spec 02 §12) — carrega uma **UUID estável**, distinta do rótulo humano:
 
-- **`numero_n`** (`0000-1RO`, só em Serviço) é **só display** — sequencial por ordem de cadastro, sem lógica de posição, e potencialmente reaproveitável. Não serve como identidade.
+- **`numero_n`** (`0000-1CR`, só em Serviço) é **só display** — sequencial por ordem de cadastro, sem lógica de posição, e potencialmente reaproveitável. Não serve como identidade.
 - **`uuid`** é gerada **no momento da criação** da entidade (Seção, Serviço, Local ou Viagem), client-side, como número aleatório (UUIDv4 via `crypto.randomUUID()`) — sem sequência, sem servidor, sem coordenação. Colisão é desprezível.
 - **Unicidade da `uuid` é no documento inteiro**, para as quatro entidades — inclusive Local, que apesar de não ser compartilhado entre Serviços não pode reaproveitar `uuid` de outro Local do mesmo documento (Spec 02 §12).
 - **Regra dura (Spec 02 e Spec 04):** importar um JSON **preserva** as UUIDs existentes; **apenas** entidades criadas naquela edição ganham UUID nova. Se o formulário regenerasse UUIDs ao importar, o diff viraria "removeu tudo e criou tudo".
@@ -151,15 +151,17 @@ A característica de veículo pertence a **duas famílias distintas, que nunca s
 | -------------------- | ---------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | Semiurbano           | semiurbana | Não (veículo único)                 | Todos os Serviços usam `SU`; múltiplos Serviços apenas por variação de itinerário/caráter                            |
 | Semiurbano Litorâneo | semiurbana | Não (veículo único)                 | Todos usam `SUL`                                                                                                     |
-| Rodoviário           | rodoviária | Sim                                 | `RO`, `EX`, `LE`, `SL` e mistos (nunca `SU`/`SUL`)                                                                   |
-| Rodoviário Litorâneo | rodoviária | Sim                                 | Idem, mas `RO` é substituído por `ROL`. `RO` e `ROL` nunca coexistem; `SU`/`SUL` nunca aparecem em Autos rodoviário. |
+| Rodoviário           | rodoviária | Sim                                 | `CR`, `EX`, `LE`, `ME`, `ML`, `MX`, `MM` (nunca `SU`/`SUL`)                                                          |
+| Rodoviário Litorâneo | rodoviária | Sim                                 | `CL`, `EX`, `LE`, `MEL`, `MLL`, `MX`, `MML`. `CR` e `CL` nunca coexistem; `SU`/`SUL` nunca aparecem em Autos rodoviário. |
 
 **Códigos de característica de veículo:**
 
 - **Família semiurbana:** SU (Semiurbano), SUL (Semiurbano Litorâneo).
-- **Família rodoviária:** RO (Rodoviário Convencional), ROL (Rodoviário Convencional Litorâneo), EX (Executivo), LE (Leito), SL (Semi-leito), e mistos MLEX, MLRO, MEXR, MLES, MEXS, MROS, MIST (misto rodoviário, raro).
+- **Família rodoviária:** CR (Convencional Rodoviário), CL (Convencional Rodoviário Litorâneo), EX (Executivo), LE (Leito), e mistos: ME / MEL (Misto Convencional e Executivo / Misto Convencional Litorâneo e Executivo), ML / MLL (Misto Convencional e Leito / Misto Convencional Litorâneo e Leito), MX (Misto Executivo e Leito — mesmo código nos dois tipos rodoviários, pois não existem executivo nem leito litorâneos), MM / MML (Misto Convencional, Executivo e Leito / Misto Convencional Litorâneo, Executivo e Leito).
 
-Essas regras (família por tipo, variação só no rodoviário, veículo único no semiurbano, exclusividade `SU`×`SUL` e `RO`×`ROL` por litoralidade) são **validações do formulário**, detalhadas na Spec 03 §10.
+**Não existe** característica "Semileito" (`SL`). `EX`, `LE` e `MX` não têm variante litorânea (executivo e leito litorâneos não existem) — mesmos códigos nos dois tipos rodoviários. A partição código-a-código por tipo está fechada na Spec 03 §10.2.
+
+Essas regras (família por tipo, variação só no rodoviário, veículo único no semiurbano, exclusividade por litoralidade — `SU`×`SUL`, `CR`×`CL`, `ME`×`MEL`, `ML`×`MLL`, `MM`×`MML`) são **validações do formulário**, detalhadas na Spec 03 §10.
 
 ---
 

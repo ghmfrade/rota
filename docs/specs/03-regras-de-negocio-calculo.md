@@ -2,7 +2,7 @@
 
 **Projeto:** ROTA — Registro de Operação e Tabelas de Autos
 **Depende de:** [Spec 01 — Visão Geral do Sistema](01-visao-geral.md) e [Spec 02 — Esquema do JSON de Operação](02-esquema-json-operacao.md)
-**Status:** Em definição — v0.3 (descrição textual do itinerário por vias; município por geolocalização; `viagem_feriado` e contagens)
+**Status:** Em definição — v0.5 (códigos de característica definitivos: `CR`/`CL`, `EX`, `LE`, `ME`/`MEL`, `ML`/`MLL`, `MX`, `MM`/`MML`; sem `SL`; partição código-a-código fechada em §10.2; supera os códigos `RO`/`ROL`/mistos "M\*" da v0.4)
 **Escopo:** Os algoritmos e decisões de negócio que produzem e validam os valores do JSON de operação — cálculo de rota (OSRM) e pontos de rota que forçam o traçado, composição da `descricao_itinerario` a partir dos nomes de via do OSRM, determinação do município por geolocalização, cálculo de `matriz_distancias`, composição de `valor_adotado_de_distancia`, sugestão de menor distância para `matriz_seccionamento`, algoritmo de centroide e da regra dos 350 m, sugestão e redistribuição dos horários de passagem (`offset_horario`), semântica de `viagem_feriado` e contagem de viagens/opções de deslocamento, regras de tipificação `tipo` × `caracteristica_veiculo`, e a referência (externa) à tabela de tarifa. **Não é escopo desta spec:** a forma do JSON (é a [Spec 02](02-esquema-json-operacao.md)); UI, mapa, import/export e PDF (Spec 04); diff (Spec 05); PostgreSQL (Spec 06). Onde um cálculo tem parte "de negócio" (aqui) e parte "de tela" (Spec 04), a fronteira está explícita em cada seção e consolidada em §12.
 
 ---
@@ -64,14 +64,14 @@ Todas as distâncias **ponto→centroide** usam a Haversine de §2.1.
 
 ### 2.3 Determinação do município por geolocalização (ponto-em-polígono)
 
-*(Novo na v0.2, induzido pela Spec 04 §7.1.)* O campo `municipio` de Seção (Spec 02 §5) e de Local (Spec 02 §7) **não é digitado pelo usuário** — é derivado automaticamente da geolocalização escolhida no mapa. O valor derivado persiste no JSON (documento autossuficiente: Comparador/Ingestor/PDF leem o campo, não re-derivam).
+_(Novo na v0.2, induzido pela Spec 04 §7.1.)_ O campo `municipio` de Seção (Spec 02 §5) e de Local (Spec 02 §7) **não é digitado pelo usuário** — é derivado automaticamente da geolocalização escolhida no mapa. O valor derivado persiste no JSON (documento autossuficiente: Comparador/Ingestor/PDF leem o campo, não re-derivam).
 
 **Fontes de dados** — dois recursos estáticos servidos junto do app (mesma natureza das listas de Autos/empresas/tipos — Spec 01 §8):
 
-| Recurso | Conteúdo | Papel |
-|---|---|---|
-| `municipios_sp.geojson` | `FeatureCollection` com um `Feature` do tipo `Polygon` por município de SP (645), com `properties.codarea` = código IBGE de 7 dígitos | Geometria para o ponto-em-polígono |
-| `pop_municipios.csv` | Colunas `cod_municipio, populacao_residente, nome_municipio, estado` (645 linhas) | Nome de exibição: join `codarea == cod_municipio` → `nome_municipio` |
+| Recurso                 | Conteúdo                                                                                                                              | Papel                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `municipios_sp.geojson` | `FeatureCollection` com um `Feature` do tipo `Polygon` por município de SP (645), com `properties.codarea` = código IBGE de 7 dígitos | Geometria para o ponto-em-polígono                                   |
+| `pop_municipios.csv`    | Colunas `cod_municipio, populacao_residente, nome_municipio, estado` (645 linhas)                                                     | Nome de exibição: join `codarea == cod_municipio` → `nome_municipio` |
 
 **Algoritmo:**
 
@@ -131,13 +131,13 @@ GET https://router.project-osrm.org/route/v1/driving/
 
 Da resposta usa-se `routes[0]`:
 
-| Fonte OSRM (`routes[0]`) | Campo do esquema | Conversão |
-|---|---|---|
-| `.geometry` (LineString `[lon,lat]`) | `rota.geometria` | cópia direta |
-| `.legs[i].distance` (metros) | `rota.trechos[i].distancia_km` | §3.4 |
-| `.legs[i].duration` (segundos) | `rota.trechos[i].duracao_s` | arredonda ao inteiro |
-| `.legs[i].steps[].name` (nomes de via) | `rota.descricao_itinerario` | limpeza + associação por Seção (§3.7) |
-| — | `rota.distancia_km`, `rota.duracao_s` | soma dos trechos (§3.4) |
+| Fonte OSRM (`routes[0]`)               | Campo do esquema                      | Conversão                             |
+| -------------------------------------- | ------------------------------------- | ------------------------------------- |
+| `.geometry` (LineString `[lon,lat]`)   | `rota.geometria`                      | cópia direta                          |
+| `.legs[i].distance` (metros)           | `rota.trechos[i].distancia_km`        | §3.4                                  |
+| `.legs[i].duration` (segundos)         | `rota.trechos[i].duracao_s`           | arredonda ao inteiro                  |
+| `.legs[i].steps[].name` (nomes de via) | `rota.descricao_itinerario`           | limpeza + associação por Seção (§3.7) |
+| —                                      | `rota.distancia_km`, `rota.duracao_s` | soma dos trechos (§3.4)               |
 
 **Sem pontos de rota:** o OSRM retorna **exatamente um `leg` por par consecutivo de coordenadas de entrada** — logo `legs.length == paradas.length - 1`, que é exatamente o que a Spec 02 §10.3 exige de `rota.trechos`. O `leg[i]` (entre a coordenada `i` e `i+1`) vira o `trecho` com `parada_origem_ordem = i+1`, `parada_destino_ordem = i+2`. Nenhuma agregação por Seção acontece aqui — os Locais comuns intermediários geram seus próprios legs/trechos, e a soma por Seção é a §4.
 
@@ -159,12 +159,12 @@ Usar a soma dos trechos (e não o `routes[0].distance/duration` global do OSRM) 
 
 O roteamento **alimenta a tarifa**; portanto não há degradação silenciosa nem fallback para linha reta.
 
-| Situação | Detecção | Ação |
-|---|---|---|
+| Situação                                    | Detecção                 | Ação                                                                                                                                                         |
+| ------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Serviço fora do ar / timeout / erro de rede | falha de HTTP ou timeout | **Não** produzir `rota`. Mensagem clara ("Não foi possível calcular a rota: serviço de roteamento indisponível. Tente novamente."). Permitir nova tentativa. |
-| Sem rota entre paradas | `code == "NoRoute"` | Bloquear; mensagem indicando que não há caminho viário entre as paradas na ordem dada. |
-| Ponto não ancorável na malha viária | `code == "NoSegment"` | Bloquear; mensagem identificando **qual parada** (a coordenada rejeitada) não pôde ser associada a uma via. |
-| Resposta `code != "Ok"` (qualquer outro) | leitura do envelope | Bloquear; mensagem genérica com o código retornado. |
+| Sem rota entre paradas                      | `code == "NoRoute"`      | Bloquear; mensagem indicando que não há caminho viário entre as paradas na ordem dada.                                                                       |
+| Ponto não ancorável na malha viária         | `code == "NoSegment"`    | Bloquear; mensagem identificando **qual parada** (a coordenada rejeitada) não pôde ser associada a uma via.                                                  |
+| Resposta `code != "Ok"` (qualquer outro)    | leitura do envelope      | Bloquear; mensagem genérica com o código retornado.                                                                                                          |
 
 - **Retry:** até 1 nova tentativa automática em falha de rede/timeout antes de exibir erro; erros semânticos (`NoRoute`, `NoSegment`) não são re-tentados (a entrada é que precisa mudar).
 - **Street-snapping:** confiado ao OSRM (âncora ao segmento roteável mais próximo). Não se envia `radiuses` por padrão; se no futuro se quiser limitar a distância de ancoragem, é decisão de UI (Spec 04) e não altera este contrato.
@@ -272,7 +272,7 @@ a descrição é montada como
 Seção A, {vias entre A e B}, Seção B, {vias entre B e C}, Seção C
 ```
 
-Os Locais 1, 2 e 3 **não** aparecem no texto nem em `itens` (Spec 02 §10.5). Eles continuam existindo normalmente em `paradas[]`, `rota.trechos`, `matriz_distancias`, horários internos e demais cálculos — só ficam fora da descrição textual.
+Os Locais 1, 2 e 3 **não** aparecem no texto nem em `itens` (Spec 02 §10.5). Locais segue Spec 02 §8.
 
 #### 3.7.4 Extração dos nomes de via
 
@@ -368,6 +368,7 @@ Para um par `{A, B}` e um itinerário `I` (de sentido ida ou volta):
    ```
 
    Isso inclui automaticamente os **Locais comuns intermediários** entre `A` e `B` (Spec 02 §8: entre A e B podem existir paradas `a`,`b`,`c`; somam-se A–a, a–b, b–c, c–B). A soma independe de `A` estar antes ou depois de `B` no sentido, porque distância roteada de trecho é sempre positiva e o intervalo é tomado por `min/max`.
+
 4. Arredonde a soma a 2 casas (§3.4). Como as parcelas já têm 2 casas, isto só normaliza.
 
 ### 4.3 Montagem de cada `ParDistância`
@@ -401,6 +402,7 @@ se só volta presente:    valor = distancia_trecho_volta
 Justificativa: Ida e Volta percorrem vias que podem diferir levemente (mãos, contornos), gerando distâncias roteadas próximas mas não idênticas (ex.: 6,00 e 6,10 → 6,05, como no exemplo da Spec 02 §15). A média simples é o critério mais defensável e previsível para "a distância do par" adotada pelo Serviço; não se pondera por sentido (não há razão operacional para privilegiar um) nem se toma o máximo/mínimo (introduziria viés sistemático). Arredondamento **half-up** a 2 casas.
 
 **Casos de borda:**
+
 - Média de dois valores de 2 casas pode gerar 3ª casa (`.005`) — o arredondamento a 2 casas resolve deterministicamente (half-up).
 - `valor_adotado_de_distancia` é **sempre** só a partir dos dados **deste** Serviço (Spec 02 §8) — a comparação entre Serviços só ocorre em §6.
 
@@ -412,10 +414,10 @@ Preenchem a sugestão de `matriz_seccionamento.distancia_km` (Spec 02 §9). São
 
 ### 6.1 Os dois modos (fechados)
 
-| Modo (botão) | O que sugere | Fonte |
-|---|---|---|
-| **"Sugerir menor distância"** | O **menor** `valor_adotado_de_distancia` do par entre **todos** os Serviços do Autos que atendem ambas as Seções | Multi-Serviço (§6.2) |
-| **"Sugerir distâncias do serviço"** | O `valor_adotado_de_distancia` do par **deste mesmo Serviço**, sem olhar os outros | Só o Serviço corrente (§6.3) |
+| Modo (botão)                        | O que sugere                                                                                                     | Fonte                        |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| **"Sugerir menor distância"**       | O **menor** `valor_adotado_de_distancia` do par entre **todos** os Serviços do Autos que atendem ambas as Seções | Multi-Serviço (§6.2)         |
+| **"Sugerir distâncias do serviço"** | O `valor_adotado_de_distancia` do par **deste mesmo Serviço**, sem olhar os outros                               | Só o Serviço corrente (§6.3) |
 
 Os dois preenchem o **mesmo** campo (`distancia_km`) e não coexistem por par — o último botão acionado (ou a edição manual) é o que vale. Ambos leem valores já em km (Spec 02 §8) — **sem conversão de unidade**.
 
@@ -473,7 +475,7 @@ Detalha o clustering da Spec 02 §5.2 (Seção) e a checagem pareada da §7.1 (L
 
 ### 7.2 Validação incremental de inserção — Seção (Formulário)
 
-Preserva o invariante: *todo ponto aceito numa Seção está a ≤ 350 m do centroide **final** do conjunto* — não apenas do centroide vigente quando foi inserido.
+Preserva o invariante: _todo ponto aceito numa Seção está a ≤ 350 m do centroide **final** do conjunto_ — não apenas do centroide vigente quando foi inserido.
 
 **Entrada:** conjunto `S` de pontos já aceitos na Seção; ponto candidato `P`.
 **Saída:** aceitar ou recusar `P`.
@@ -491,6 +493,7 @@ INSERIR(S, P):
 Ponto central (e diferença face a uma checagem ingênua): **não basta** testar `haversine(P, centroide(S)) ≤ 350`. Recalcula-se o centroide **incluindo** `P` e verifica-se **todos** os pontos do conjunto resultante — porque inserir `P` desloca o centroide e pode empurrar um ponto **já aceito** para fora dos 350 m. Se isso ocorre, `P` é recusado (mesmo que isoladamente estivesse a ≤ 350 m do centroide anterior). Recusado ⇒ o usuário deve criar uma **Seção distinta** (novo `uuid`, `nome` diferente).
 
 **Casos de borda:**
+
 - **1º ponto:** aceito sem checagem (não há centroide).
 - **2º ponto:** `C'` é o ponto médio; a condição vira "os dois pontos a ≤ 350 m do ponto médio", i.e. distância entre eles ≤ 700 m.
 - **Remoção de ponto:** ao remover um ponto de uma Seção, o invariante só relaxa; não requer revalidação dos demais (o centroide de um subconjunto não viola o limiar se o do conjunto maior não violava — na prática o Formulário pode revalidar por robustez, é decisão de UI).
@@ -579,7 +582,7 @@ Exemplo (o do enunciado): paradas `A`(1)→`a`(2)→`B`(3), baseline `A=0`, `a=3
 - **Monotonicidade (Spec 02 §11.1):** os offsets têm de ficar não decrescentes. A UI **não** permite fixar uma âncora com offset menor que a âncora anterior nem maior que a próxima âncora já fixada (senão a interpolação produziria valores fora de ordem). Política de bloqueio é Spec 04; a **regra** é esta.
 - **Trecho com `duracao_s = 0`:** admitido; a parada derivada coincide com a vizinha (igualdade é permitida).
 - **Por Viagem:** tudo isto é por Viagem — editar uma Viagem não mexe nas outras (Spec 02 §11.1).
-- **Fronteira Spec 04:** *quando* recalcular (a cada edição, ao soltar o campo) e *como* apresentar é UI; a **fórmula de interpolação** é esta spec.
+- **Fronteira Spec 04:** _quando_ recalcular (a cada edição, ao soltar o campo) e _como_ apresentar é UI; a **fórmula de interpolação** é esta spec.
 
 ### 8.3 Restaurar a sugestão inicial (desfazer edições manuais)
 
@@ -604,16 +607,16 @@ RESTAURAR(viagem):
 
 ## 9. Viagens de feriado (`viagem_feriado`) e Contagens
 
-*(Reescrito na v0.2 — a Spec 02 §11 v0.6 estratificou Viagem por dia: `dia_semana` único + `viagem_feriado` booleano, substituindo `dias_semana[]` + o enum `regra_feriado` que esta seção definia.)* **Não existe redistribuição de horários em feriado** — a operação de feriado é uma grade própria, montada viagem a viagem. (O que antes era chamado de "redistribuição proporcional em feriado" era, na verdade, o recálculo de horários de passagem ao editar um horário a jusante — isso é a §8.2, não tem relação com feriado.)
+_(Reescrito na v0.2 — a Spec 02 §11 v0.6 estratificou Viagem por dia: `dia_semana` único + `viagem_feriado` booleano, substituindo `dias_semana[]` + o enum `regra_feriado` que esta seção definia.)_ **Não existe redistribuição de horários em feriado** — a operação de feriado é uma grade própria, montada viagem a viagem. (O que antes era chamado de "redistribuição proporcional em feriado" era, na verdade, o recálculo de horários de passagem ao editar um horário a jusante — isso é a §8.2, não tem relação com feriado.)
 
 ### 9.1 Semântica (decisão fechada)
 
 A operação de um itinerário é o conjunto das suas Viagens, cada uma valendo para **um único** `dia_semana`, em uma de duas grades:
 
-| `viagem_feriado` | Significado |
-|---|---|
-| `false` | **Viagem comum** — opera normalmente quando `dia_semana` cai (grade de dias comuns). |
-| `true` | **Viagem de feriado** — opera **apenas** quando um **feriado** cai no `dia_semana` indicado (grade de feriados). Num feriado, a grade de feriados **substitui integralmente** a grade comum daquele dia: as viagens comuns do dia não operam; operam as viagens de feriado daquele dia. |
+| `viagem_feriado` | Significado                                                                                                                                                                                                                                                                             |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `false`          | **Viagem comum** — opera normalmente quando `dia_semana` cai (grade de dias comuns).                                                                                                                                                                                                    |
+| `true`           | **Viagem de feriado** — opera **apenas** quando um **feriado** cai no `dia_semana` indicado (grade de feriados). Num feriado, a grade de feriados **substitui integralmente** a grade comum daquele dia: as viagens comuns do dia não operam; operam as viagens de feriado daquele dia. |
 
 - As duas grades são independentes: um dia de feriado pode ter mais, menos ou nenhuma viagem em relação ao dia comum correspondente. "Operação de feriado igual à comum" é obtida copiando a grade (ação de UX — Spec 04 §8.4 —, que cria Viagens novas, com UUIDs novas).
 - O **calendário de feriados** (quais datas) permanece **externo** ao ROTA e ao JSON (Spec 01 §3). O documento diz o que acontece num feriado que caia em cada dia da semana, não **quando** ele cai.
@@ -676,31 +679,31 @@ Materializa a validação que a Spec 01 §7 declarou "detalhada na Spec 03" e qu
 Cada `caracteristica_veiculo` pertence a **uma de duas famílias**, e o `tipo` do Autos escolhe a família — as duas **nunca** se misturam num mesmo Autos:
 
 - **Família semiurbana** — `SU` (Semiurbano) e `SUL` (Semiurbano Litorâneo). Veículo **único** por Autos.
-- **Família rodoviária** — `RO` (Rodoviário Convencional), `ROL` (Rodoviário Litorâneo), `EX` (Executivo), `LE` (Leito), `SL` (Semileito) e os **mistos rodoviários** (`MLEX`, `MLRO`, `MEXR`, `MLES`, `MEXS`, `MROS`, `MIST`). Aceita **variação** entre Serviços.
+- **Família rodoviária** — `CR` (Convencional Rodoviário), `CL` (Convencional Rodoviário Litorâneo), `EX` (Executivo), `LE` (Leito) e os **mistos rodoviários**: `ME` (Convencional + Executivo), `MEL` (Convencional Litorâneo + Executivo), `ML` (Convencional + Leito), `MLL` (Convencional Litorâneo + Leito), `MX` (Executivo + Leito — mesmo código nos dois tipos rodoviários, pois não existem executivo nem leito litorâneos), `MM` (Convencional + Executivo + Leito) e `MML` (Convencional Litorâneo + Executivo + Leito). Aceita **variação** entre Serviços. **Não existe** característica "Semileito" (`SL`).
 
 ### 10.2 Tabela de características permitidas por tipo
 
-| `tipo` do Autos | Família | Característica(s) permitida(s) | Variação entre Serviços |
-|---|---|---|---|
-| **Semiurbano** | semiurbana | **`SU`** (veículo único) | **Não** — todos os Serviços do Autos têm `caracteristica_veiculo == "SU"`. Serviços distintos variam só por itinerário/`carater`. |
-| **Semiurbano Litorâneo** | semiurbana | **`SUL`** (veículo único) | **Não** — todos `== "SUL"`. |
-| **Rodoviário** | rodoviária | `RO`, `EX`, `LE`, `SL` + mistos rodoviários | **Sim** — Serviços podem ter características diferentes. Proibidos: `ROL`, `SU`, `SUL`. |
-| **Rodoviário Litorâneo** | rodoviária | `ROL`, `EX`, `LE`, `SL` + mistos rodoviários | **Sim** — variação permitida; a forma convencional é `ROL`, nunca `RO`. Proibidos: `RO`, `SU`, `SUL`. |
+| `tipo` do Autos          | Família    | Característica(s) permitida(s)              | Variação entre Serviços                                                                                                           |
+| ------------------------ | ---------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Semiurbano**           | semiurbana | **`SU`** (veículo único)                    | **Não** — todos os Serviços do Autos têm `caracteristica_veiculo == "SU"`. Serviços distintos variam só por itinerário/`carater`. |
+| **Semiurbano Litorâneo** | semiurbana | **`SUL`** (veículo único)                   | **Não** — todos `== "SUL"`.                                                                                                       |
+| **Rodoviário**           | rodoviária | `CR`, `EX`, `LE`, `ME`, `ML`, `MX`, `MM`    | **Sim** — Serviços podem ter características diferentes. Proibidos: `CL`, `MEL`, `MLL`, `MML`, `SU`, `SUL`.                       |
+| **Rodoviário Litorâneo** | rodoviária | `CL`, `EX`, `LE`, `MEL`, `MLL`, `MX`, `MML` | **Sim** — variação permitida; a forma convencional é `CL`, nunca `CR`. Proibidos: `CR`, `ME`, `ML`, `MM`, `SU`, `SUL`.            |
 
-> **Sobre os mistos rodoviários:** são combinações de tipos de veículo da família rodoviária (convencional/executivo/leito/semileito). A restrição litoral recai sobre o **componente convencional** de cada misto: num Autos litorâneo o componente convencional é `ROL`; num não-litorâneo, `RO` (§10.3, regra 3). O mapeamento exato de cada código misto a cada tipo segue essa regra de componente — se a operação exigir uma partição fechada código-a-código dos mistos entre Rodoviário e Rodoviário Litorâneo, ela é acrescentada aqui.
+> **Sobre os mistos rodoviários (partição fechada):** são combinações de tipos de veículo da família rodoviária (convencional/executivo/leito). A restrição litoral recai sobre o **componente convencional** de cada misto, expressa em **códigos distintos**: `ME`, `ML` e `MM` (componente `CR`) são exclusivos de **Rodoviário**; `MEL`, `MLL` e `MML` (componente `CL`) são exclusivos de **Rodoviário Litorâneo**. `MX` (executivo + leito, sem componente convencional) vale nos **dois** tipos, assim como `EX` e `LE` — executivo e leito **não têm forma litorânea**. A tabela acima é a partição código-a-código completa — não há mapeamento em aberto.
 
 ### 10.3 Regras (decisões fechadas)
 
-1. **Famílias não se misturam.** O `tipo` do Autos fixa a família (Semiurbano/Semiurbano Litorâneo → **semiurbana**; Rodoviário/Rodoviário Litorâneo → **rodoviária**). `SU`/`SUL` **só** em Autos semiurbano; `RO`/`ROL`/`EX`/`LE`/`SL`/mistos **só** em Autos rodoviário. Nunca há código de uma família num Autos da outra.
+1. **Famílias não se misturam.** O `tipo` do Autos fixa a família (Semiurbano/Semiurbano Litorâneo → **semiurbana**; Rodoviário/Rodoviário Litorâneo → **rodoviária**). `SU`/`SUL` **só** em Autos semiurbano; `CR`/`CL`/`EX`/`LE`/mistos **só** em Autos rodoviário. Nunca há código de uma família num Autos da outra.
 2. **Veículo único no semiurbano.** Em `Semiurbano` e `Semiurbano Litorâneo`, **todos** os Serviços do Autos compartilham a **mesma** `caracteristica_veiculo` (`SU` e `SUL`, respectivamente). Múltiplos Serviços existem apenas por variação de itinerário/`carater` (Spec 01 §7).
-3. **Litoralidade e exclusividade do convencional.** A litoralidade do Autos fixa a forma convencional e essas formas **nunca coexistem**: Autos litorâneo usa a forma litorânea (`SUL` no semiurbano, `ROL` no rodoviário) e **jamais** a não-litorânea (`SU`/`RO`); Autos não-litorâneo, o contrário. Logo `RO`/`ROL` nunca coexistem, `SU`/`SUL` nunca coexistem, e o componente convencional dos mistos segue a mesma regra.
+3. **Litoralidade e exclusividade do convencional.** A litoralidade do Autos fixa a forma convencional e essas formas **nunca coexistem**: Autos litorâneo usa a forma litorânea (`SUL` no semiurbano, `CL` no rodoviário) e **jamais** a não-litorânea (`SU`/`CR`); Autos não-litorâneo, o contrário. Logo `CR`/`CL` nunca coexistem, `SU`/`SUL` nunca coexistem, e os mistos com componente convencional seguem a mesma exclusividade em códigos distintos: `ME`×`MEL`, `ML`×`MLL` e `MM`×`MML` nunca coexistem num mesmo Autos. `EX`, `LE` e `MX` são **neutros à litoralidade** (mesmo código nos dois tipos rodoviários — executivo e leito não têm forma litorânea).
 4. **Variação no rodoviário.** Em `Rodoviário` e `Rodoviário Litorâneo`, Serviços podem ter `caracteristica_veiculo` distintas entre si, dentro do conjunto permitido do tipo (§10.2).
 5. **Coexistência de Serviços.** Dois Serviços podem coexistir no mesmo Autos sse: (a) cada um respeita a tabela §10.2 para o `tipo`; (b) no semiurbano, ambos têm a característica única do tipo; (c) `numero_n` de exibição não colide de forma enganosa (é só rótulo — Spec 02 §6 — mas o Formulário deve numerar sequencialmente por ordem de cadastro). A identidade real é o `uuid` (Spec 02 §12), nunca `numero_n`.
 
 ### 10.4 Casos de borda
 
-- **Trocar o `tipo` do Autos** com Serviços já cadastrados que violem o novo tipo: o Formulário deve bloquear/alertar — ex.: mudar de Rodoviário para Semiurbano com Serviços cujo veículo não é `SU`; mudar de Semiurbano para Rodoviário (o `SU` não é característica rodoviária válida); mudar litoralidade com `RO`↔`ROL` ou `SU`↔`SUL` inconsistente. Política de UI é Spec 04; a **regra** violada é esta §10.
-- **`MIST` (misto rodoviário, raro):** permitido nos dois tipos Rodoviários; sujeito à mesma regra de litoralidade (§10.3, regra 3) se embutir componente convencional.
+- **Trocar o `tipo` do Autos** com Serviços já cadastrados que violem o novo tipo: o Formulário deve bloquear/alertar — ex.: mudar de Rodoviário para Semiurbano com Serviços cujo veículo não é `SU`; mudar de Semiurbano para Rodoviário (o `SU` não é característica rodoviária válida); mudar litoralidade com `CR`↔`CL` (ou mistos `ME`↔`MEL`, `ML`↔`MLL`, `MM`↔`MML`) ou `SU`↔`SUL` inconsistente. Política de UI é Spec 04; a **regra** violada é esta §10.
+- **`MX` (misto executivo + leito):** mesmo código nos dois tipos Rodoviários — não existem executivo nem leito litorâneos, logo não há variante litorânea a distinguir (§10.3, regra 3). Já os mistos completos têm códigos distintos por litoralidade: `MM` (Rodoviário) × `MML` (Rodoviário Litorâneo).
 
 ---
 
@@ -719,20 +722,20 @@ Cada `caracteristica_veiculo` pertence a **uma de duas famílias**, e o `tipo` d
 
 Consolidação do que **permanece em aberto** para a Spec 04. Esta spec define a **função**; a Spec 04 define **quando** chamá-la, **como** apresentar e **como** o usuário interage.
 
-| Tema | Spec 03 (aqui) | Spec 04 (Formulário/UI) |
-|---|---|---|
-| Roteamento (§3) | Forma da requisição OSRM, extração, conversão m→km, arredondamento, política de erro bloqueante | Momento de disparar o roteamento, indicador de carregamento, exibição da mensagem de erro, re-tentativa manual, desenho da rota no mapa |
-| Pontos de rota (§3.6) | Que forçam o traçado, entram como coordenadas intermediárias, nunca viram trecho/parada, persistem em `rota.pontos_de_rota` (só para forçar), mapeamento legs→trechos | Clique na rota para criar o ponto, arraste no mapa, recálculo ao soltar, feedback visual |
-| Descrição do itinerário (§3.7) | Deriva de paradas + Seções + `step.name` do OSRM; intercala só Seções e vias limpas; omite Locais e vias sem nome; congelada e recalculada com a rota | Painel "Descrição textual do itinerário" por Serviço/sentido, ações "Recalcular"/"Copiar"/"Ver itens", exibição no PDF e na revisão, bloqueio se ausente (Spec 04 §7.4/§11/§13) |
-| `matriz_distancias` (§4) | Algoritmo de soma de trechos por par de Seções | Quando recalcular, exibição da matriz |
-| `valor_adotado` (§5) | Fórmula (média/valor único) e arredondamento | — (puro cálculo) |
-| Sugestões de seccionamento (§6) | Os dois algoritmos: "menor distância" (mín. entre Serviços) e "distâncias do serviço" (valor do próprio Serviço) | Os dois botões, escopo em lote, apresentar sugestão, permitir edição, recálculo reativo |
-| Regra dos 350 m (§7) | Centroide, Haversine, validação incremental, checagem estática, pareada de Local | Feedback ao inserir ponto no mapa, mensagem de recusa, proposta de criar nova Seção |
-| Horários de passagem (§8) | Sugestão inicial por acúmulo de `duracao_s`; fórmula de redistribuição proporcional entre âncoras ao editar horário a jusante; reset à sugestão inicial (mantém `horario_saida`) | Edição por Viagem, quando recalcular, botões de reset (por Viagem/em lote) e confirmação, bloqueio de offset fora de ordem, apresentação |
-| `viagem_feriado` e contagens (§9) | Semântica das duas grades (comum/feriado); feriado não altera contagens; fórmulas de viagens semanais, pares compráveis e opções de deslocamento | Grade de dias comuns × grade de feriados, botão "copiar dias comuns", rótulo "semana padrão", faixas de horário; calendário de feriados externo |
-| Município (§2.3) | Fontes (`municipios_sp.geojson` + `pop_municipios.csv`), ponto-em-polígono, fallback de borda, qual ponto decide (centroide/ponto médio) | Momento de derivar (criação/arrasto), campo somente-leitura, mensagem de bloqueio "fora de SP" |
-| Tipificação (§10) | Tabela e regras `tipo` × característica | Bloqueio/alerta ao cadastrar/trocar tipo, numeração de `numero_n` |
-| Tarifa (§11) | Contrato "distância→R$ externo, nada de R$ no JSON" | Carregar a tabela da portaria, renderizar valores no PDF |
+| Tema                              | Spec 03 (aqui)                                                                                                                                                                   | Spec 04 (Formulário/UI)                                                                                                                                                         |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Roteamento (§3)                   | Forma da requisição OSRM, extração, conversão m→km, arredondamento, política de erro bloqueante                                                                                  | Momento de disparar o roteamento, indicador de carregamento, exibição da mensagem de erro, re-tentativa manual, desenho da rota no mapa                                         |
+| Pontos de rota (§3.6)             | Que forçam o traçado, entram como coordenadas intermediárias, nunca viram trecho/parada, persistem em `rota.pontos_de_rota` (só para forçar), mapeamento legs→trechos            | Clique na rota para criar o ponto, arraste no mapa, recálculo ao soltar, feedback visual                                                                                        |
+| Descrição do itinerário (§3.7)    | Deriva de paradas + Seções + `step.name` do OSRM; intercala só Seções e vias limpas; omite Locais e vias sem nome; congelada e recalculada com a rota                            | Painel "Descrição textual do itinerário" por Serviço/sentido, ações "Recalcular"/"Copiar"/"Ver itens", exibição no PDF e na revisão, bloqueio se ausente (Spec 04 §7.4/§11/§13) |
+| `matriz_distancias` (§4)          | Algoritmo de soma de trechos por par de Seções                                                                                                                                   | Quando recalcular, exibição da matriz                                                                                                                                           |
+| `valor_adotado` (§5)              | Fórmula (média/valor único) e arredondamento                                                                                                                                     | — (puro cálculo)                                                                                                                                                                |
+| Sugestões de seccionamento (§6)   | Os dois algoritmos: "menor distância" (mín. entre Serviços) e "distâncias do serviço" (valor do próprio Serviço)                                                                 | Os dois botões, escopo em lote, apresentar sugestão, permitir edição, recálculo reativo                                                                                         |
+| Regra dos 350 m (§7)              | Centroide, Haversine, validação incremental, checagem estática, pareada de Local                                                                                                 | Feedback ao inserir ponto no mapa, mensagem de recusa, proposta de criar nova Seção                                                                                             |
+| Horários de passagem (§8)         | Sugestão inicial por acúmulo de `duracao_s`; fórmula de redistribuição proporcional entre âncoras ao editar horário a jusante; reset à sugestão inicial (mantém `horario_saida`) | Edição por Viagem, quando recalcular, botões de reset (por Viagem/em lote) e confirmação, bloqueio de offset fora de ordem, apresentação                                        |
+| `viagem_feriado` e contagens (§9) | Semântica das duas grades (comum/feriado); feriado não altera contagens; fórmulas de viagens semanais, pares compráveis e opções de deslocamento                                 | Grade de dias comuns × grade de feriados, botão "copiar dias comuns", rótulo "semana padrão", faixas de horário; calendário de feriados externo                                 |
+| Município (§2.3)                  | Fontes (`municipios_sp.geojson` + `pop_municipios.csv`), ponto-em-polígono, fallback de borda, qual ponto decide (centroide/ponto médio)                                         | Momento de derivar (criação/arrasto), campo somente-leitura, mensagem de bloqueio "fora de SP"                                                                                  |
+| Tipificação (§10)                 | Tabela e regras `tipo` × característica                                                                                                                                          | Bloqueio/alerta ao cadastrar/trocar tipo, numeração de `numero_n`                                                                                                               |
+| Tarifa (§11)                      | Contrato "distância→R$ externo, nada de R$ no JSON"                                                                                                                              | Carregar a tabela da portaria, renderizar valores no PDF                                                                                                                        |
 
 Comparador (Spec 05) e Ingestor (Spec 06) usam desta spec apenas as **checagens estáticas** (§7.3, §7.4) e a **regra de contagem neutra a feriado** (§9.2) — nunca recalculam rota, matriz ou sugestão (leem o congelado, Spec 02 §8/§10.2).
 
@@ -751,7 +754,7 @@ Comparador (Spec 05) e Ingestor (Spec 06) usam desta spec apenas as **checagens 
 9. **Regra dos 350 m:** validação **incremental** no Formulário (recalcula centroide candidato, recusa se qualquer ponto do conjunto resultante > 350 m — preserva o invariante do centroide final); checagem **estática fraca** (centroide de todos os pontos finais) para Comparador/Ingestor; **pareada** para Local (§7).
 10. **Horários de passagem** (§8): sugestão inicial por acúmulo de `duracao_s` (primeira parada `00:00:00`); ao editar manualmente o horário de uma parada a jusante, as intermediárias são **reinterpoladas proporcionalmente** entre âncoras (a "redistribuição" real — nada a ver com feriado); e um **reset** que desfaz as edições manuais, voltando à sugestão inicial e mantendo só o `horario_saida` (§8.3, escopo por Viagem ou em lote na UI).
 11. **Feriado = grade própria por dia da semana** (v0.2, substitui o enum `regra_feriado` da v0.1 — ver Spec 02 §13, item 21): Viagem de feriado (`viagem_feriado = true`) opera apenas quando um feriado cai no seu `dia_semana` e **substitui integralmente** a grade comum daquele dia; **não há** redistribuição de horários em feriado; feriado **não altera** contagem de viagens nem de opções de deslocamento — as contagens usam a semana padrão, sem feriado, e devem ser rotuladas como tal (§9).
-12. **Tipificação:** duas famílias que nunca se misturam — **semiurbana** (`SU`/`SUL`, veículo único por Autos) e **rodoviária** (`RO`/`ROL`/`EX`/`LE`/`SL` + mistos, com variação). O `tipo` do Autos fixa a família e a litoralidade fixa a forma convencional (`SU`×`SUL`, `RO`×`ROL` nunca coexistem) (§10).
+12. **Tipificação:** duas famílias que nunca se misturam — **semiurbana** (`SU`/`SUL`, veículo único por Autos) e **rodoviária** (`CR`/`CL`/`EX`/`LE` + mistos `ME`/`MEL`/`ML`/`MLL`/`MX`/`MM`/`MML`, com variação; **sem** `SL`/Semileito, que não existe). O `tipo` do Autos fixa a família e a litoralidade fixa a forma convencional em códigos distintos (`SU`×`SUL`, `CR`×`CL`, `ME`×`MEL`, `ML`×`MLL`, `MM`×`MML` nunca coexistem; `EX`/`LE`/`MX` neutros à litoralidade) — partição código-a-código fechada em §10.2 (§10).
 13. **Tarifa distância→R$ é externa (portaria)**; JSON nunca guarda R$; ROTA só referencia a tabela na exibição/PDF (§11).
 14. **Município derivado por ponto-em-polígono** (v0.2, §2.3): `municipio` de Seção e Local vem da geolocalização — ray casting sobre `municipios_sp.geojson` (join `codarea` → `nome_municipio` em `pop_municipios.csv`); fallback ao polígono mais próximo até 2 km; acima disso, erro bloqueante ("fora de SP"). Seção decide pelo centroide dos pontos aceitos; Local, pelo ponto único ou ponto médio Ida/Volta. O valor persiste congelado no JSON.
 15. **Fórmulas de contagem** (v0.2, §9.4): viagens semanais = nº de Viagens comuns do sentido (cada Viagem é uma partida num único dia — Spec 02 §11 v0.6); pares O-D compráveis = `matriz_seccionamento` ∪ par ponta-a-ponta; opções de deslocamento por sentido = viagens semanais × pares compráveis. Sempre na semana padrão, sem feriado; estratificação por faixa de horário é exibição (faixas na Spec 04 §10).
