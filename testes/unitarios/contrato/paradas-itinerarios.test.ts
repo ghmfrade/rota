@@ -5,9 +5,9 @@ import {
   esperarValido,
 } from "./utilitarios";
 
-// Contrato (categoria 1) — Paradas e Itinerários. Spec 02 §10, §10.1, §14.
-// A integridade referencial fina (referência existente + geolocalização do
-// sentido — RN-036) é escopo da TASK-004.
+// Contrato (categoria 1) e validação de domínio (categoria 2) — Paradas e
+// Itinerários. Spec 02 §10, §10.1, §14. Inclui a integridade referencial
+// fina de Parada (referência existente + geolocalização do sentido — RN-036).
 
 describe("paradas", () => {
   it("rn033: recusa Parada com secao_uuid e local_uuid simultâneos", () => {
@@ -61,6 +61,63 @@ describe("paradas", () => {
     delete ultima.secao_uuid;
     ultima.local_uuid = "c2afe932-bf0f-4338-8ff4-63cd908b9033";
     esperarInvalido(doc, "[RN-035]");
+  });
+
+  it("rn036: recusa secao_uuid que não existe em autos.secoes", () => {
+    const doc = documentoDaFixture();
+    doc.autos.servicos[0].itinerarios[0].paradas[1].secao_uuid =
+      "11111111-1111-4111-8111-111111111111";
+    esperarInvalido(doc, "[RN-036] secao_uuid não existe em autos.secoes");
+  });
+
+  it("rn036: recusa Seção cuja entrada em secao.servicos não aponta para o Serviço da Parada", () => {
+    const doc = documentoDaFixture();
+    // A entrada da Seção Terminal Norte passa a apontar para outro Serviço;
+    // as paradas que a referenciam ficam sem entrada para o Serviço corrente.
+    doc.autos.secoes[1].servicos[0].servico_uuid =
+      "22222222-2222-4222-8222-222222222222";
+    esperarInvalido(
+      doc,
+      "[RN-036] a Seção referenciada não tem entrada em secao.servicos para o Serviço desta Parada",
+    );
+  });
+
+  it("rn036: recusa entrada da Seção sem a geolocalização do sentido do itinerário", () => {
+    const doc = documentoDaFixture();
+    delete doc.autos.secoes[0].servicos[0].geolocalizacao_ida;
+    esperarInvalido(doc, "geolocalizacao_ida preenchida");
+  });
+
+  it("rn036: recusa local_uuid que não existe em servico.locais", () => {
+    const doc = documentoDaFixture();
+    doc.autos.servicos[0].itinerarios[0].paradas[2].local_uuid =
+      "33333333-3333-4333-8333-333333333333";
+    esperarInvalido(
+      doc,
+      "[RN-036] local_uuid não existe em servico.locais do mesmo Serviço",
+    );
+  });
+
+  it("rn036: recusa Parada da Volta referenciando Local que só tem geolocalizacao_ida", () => {
+    const doc = documentoDaFixture();
+    const paradaVolta = doc.autos.servicos[0].itinerarios[1].paradas[1];
+    delete paradaVolta.secao_uuid;
+    paradaVolta.local_uuid = "c2afe932-bf0f-4338-8ff4-63cd908b9033";
+    esperarInvalido(doc, "geolocalizacao_volta preenchida");
+  });
+
+  it("rn036: recusa Parada da Ida referenciando Local sem geolocalizacao_ida", () => {
+    const doc = documentoDaFixture();
+    const local = doc.autos.servicos[0].locais[0];
+    // geolocalizacao_volta entra no lugar para não violar RN-032 junto.
+    local.geolocalizacao_volta = local.geolocalizacao_ida;
+    delete local.geolocalizacao_ida;
+    esperarInvalido(doc, "geolocalizacao_ida preenchida");
+  });
+
+  it("rn036: aceita Local com geolocalização apenas do sentido em que é usado (fixture intacta)", () => {
+    // O Local da fixture só tem geolocalizacao_ida e só aparece na Ida.
+    esperarValido(documentoDaFixture());
   });
 });
 
