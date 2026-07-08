@@ -1,0 +1,626 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`RN-008/RN-010 — snapshot do contrato por versao_schema > a forma estrutural do contrato não muda sem revisão consciente 1`] = `
+{
+  "contrato": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "autos": {
+        "additionalProperties": false,
+        "properties": {
+          "codigo": {
+            "minLength": 1,
+            "type": "string",
+          },
+          "data_criacao": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "type": "string",
+          },
+          "data_publicacao": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "type": "string",
+          },
+          "empresa": {
+            "minLength": 1,
+            "type": "string",
+          },
+          "secoes": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "municipio": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "nome": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "servicos": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "geolocalizacao_ida": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "latitude": {
+                            "maximum": 90,
+                            "minimum": -90,
+                            "type": "number",
+                          },
+                          "longitude": {
+                            "maximum": 180,
+                            "minimum": -180,
+                            "type": "number",
+                          },
+                        },
+                        "required": [
+                          "latitude",
+                          "longitude",
+                        ],
+                        "type": "object",
+                      },
+                      "geolocalizacao_volta": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "latitude": {
+                            "maximum": 90,
+                            "minimum": -90,
+                            "type": "number",
+                          },
+                          "longitude": {
+                            "maximum": 180,
+                            "minimum": -180,
+                            "type": "number",
+                          },
+                        },
+                        "required": [
+                          "latitude",
+                          "longitude",
+                        ],
+                        "type": "object",
+                      },
+                      "servico_uuid": {
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "servico_uuid",
+                    ],
+                    "type": "object",
+                  },
+                  "minItems": 1,
+                  "type": "array",
+                },
+                "uuid": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "uuid",
+                "municipio",
+                "nome",
+                "servicos",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+          "servicos": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "caracteristica_veiculo": {
+                  "enum": [
+                    "SU",
+                    "SUL",
+                    "CR",
+                    "CL",
+                    "EX",
+                    "LE",
+                    "ME",
+                    "MEL",
+                    "ML",
+                    "MLL",
+                    "MX",
+                    "MM",
+                    "MML",
+                  ],
+                  "type": "string",
+                },
+                "carater": {
+                  "enum": [
+                    "principal",
+                    "parcial",
+                    "semidireta",
+                  ],
+                  "type": "string",
+                },
+                "itinerarios": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "paradas": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "local_uuid": {
+                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                              "type": "string",
+                            },
+                            "ordem": {
+                              "maximum": 9007199254740991,
+                              "minimum": 1,
+                              "type": "integer",
+                            },
+                            "secao_uuid": {
+                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "ordem",
+                          ],
+                          "type": "object",
+                        },
+                        "minItems": 2,
+                        "type": "array",
+                      },
+                      "rota": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "descricao_itinerario": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "itens": {
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "rotulo": {
+                                          "minLength": 1,
+                                          "type": "string",
+                                        },
+                                        "secao_uuid": {
+                                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                          "type": "string",
+                                        },
+                                        "tipo": {
+                                          "const": "secao",
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "tipo",
+                                        "secao_uuid",
+                                        "rotulo",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "nome": {
+                                          "minLength": 1,
+                                          "type": "string",
+                                        },
+                                        "tipo": {
+                                          "const": "via",
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "tipo",
+                                        "nome",
+                                      ],
+                                      "type": "object",
+                                    },
+                                  ],
+                                },
+                                "type": "array",
+                              },
+                              "texto": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "texto",
+                              "itens",
+                            ],
+                            "type": "object",
+                          },
+                          "distancia_km": {
+                            "minimum": 0,
+                            "type": "number",
+                          },
+                          "duracao_s": {
+                            "minimum": 0,
+                            "type": "number",
+                          },
+                          "geometria": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "coordinates": {
+                                "items": {
+                                  "prefixItems": [
+                                    {
+                                      "maximum": 180,
+                                      "minimum": -180,
+                                      "type": "number",
+                                    },
+                                    {
+                                      "maximum": 90,
+                                      "minimum": -90,
+                                      "type": "number",
+                                    },
+                                  ],
+                                  "type": "array",
+                                },
+                                "minItems": 2,
+                                "type": "array",
+                              },
+                              "type": {
+                                "const": "LineString",
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "type",
+                              "coordinates",
+                            ],
+                            "type": "object",
+                          },
+                          "pontos_de_rota": {
+                            "default": [],
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "apos_parada_ordem": {
+                                  "maximum": 9007199254740991,
+                                  "minimum": 1,
+                                  "type": "integer",
+                                },
+                                "latitude": {
+                                  "maximum": 90,
+                                  "minimum": -90,
+                                  "type": "number",
+                                },
+                                "longitude": {
+                                  "maximum": 180,
+                                  "minimum": -180,
+                                  "type": "number",
+                                },
+                              },
+                              "required": [
+                                "apos_parada_ordem",
+                                "latitude",
+                                "longitude",
+                              ],
+                              "type": "object",
+                            },
+                            "type": "array",
+                          },
+                          "trechos": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "distancia_km": {
+                                  "minimum": 0,
+                                  "type": "number",
+                                },
+                                "duracao_s": {
+                                  "minimum": 0,
+                                  "type": "number",
+                                },
+                                "parada_destino_ordem": {
+                                  "maximum": 9007199254740991,
+                                  "minimum": 1,
+                                  "type": "integer",
+                                },
+                                "parada_origem_ordem": {
+                                  "maximum": 9007199254740991,
+                                  "minimum": 1,
+                                  "type": "integer",
+                                },
+                              },
+                              "required": [
+                                "parada_origem_ordem",
+                                "parada_destino_ordem",
+                                "distancia_km",
+                                "duracao_s",
+                              ],
+                              "type": "object",
+                            },
+                            "type": "array",
+                          },
+                        },
+                        "required": [
+                          "geometria",
+                          "distancia_km",
+                          "duracao_s",
+                          "descricao_itinerario",
+                          "trechos",
+                          "pontos_de_rota",
+                        ],
+                        "type": "object",
+                      },
+                      "sentido": {
+                        "enum": [
+                          "ida",
+                          "volta",
+                        ],
+                        "type": "string",
+                      },
+                      "viagens": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "dia_semana": {
+                              "enum": [
+                                "segunda",
+                                "terca",
+                                "quarta",
+                                "quinta",
+                                "sexta",
+                                "sabado",
+                                "domingo",
+                              ],
+                              "type": "string",
+                            },
+                            "horario_saida": {
+                              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d$",
+                              "type": "string",
+                            },
+                            "horarios_paradas": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "offset_horario": {
+                                    "pattern": "^\\d{2}:[0-5]\\d:[0-5]\\d$",
+                                    "type": "string",
+                                  },
+                                  "parada_ordem": {
+                                    "maximum": 9007199254740991,
+                                    "minimum": 1,
+                                    "type": "integer",
+                                  },
+                                },
+                                "required": [
+                                  "parada_ordem",
+                                  "offset_horario",
+                                ],
+                                "type": "object",
+                              },
+                              "minItems": 1,
+                              "type": "array",
+                            },
+                            "uuid": {
+                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                              "type": "string",
+                            },
+                            "viagem_feriado": {
+                              "type": "boolean",
+                            },
+                          },
+                          "required": [
+                            "uuid",
+                            "horario_saida",
+                            "dia_semana",
+                            "viagem_feriado",
+                            "horarios_paradas",
+                          ],
+                          "type": "object",
+                        },
+                        "minItems": 1,
+                        "type": "array",
+                      },
+                    },
+                    "required": [
+                      "sentido",
+                      "paradas",
+                      "rota",
+                      "viagens",
+                    ],
+                    "type": "object",
+                  },
+                  "maxItems": 2,
+                  "minItems": 1,
+                  "type": "array",
+                },
+                "locais": {
+                  "default": [],
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "geolocalizacao_ida": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "latitude": {
+                            "maximum": 90,
+                            "minimum": -90,
+                            "type": "number",
+                          },
+                          "longitude": {
+                            "maximum": 180,
+                            "minimum": -180,
+                            "type": "number",
+                          },
+                        },
+                        "required": [
+                          "latitude",
+                          "longitude",
+                        ],
+                        "type": "object",
+                      },
+                      "geolocalizacao_volta": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "latitude": {
+                            "maximum": 90,
+                            "minimum": -90,
+                            "type": "number",
+                          },
+                          "longitude": {
+                            "maximum": 180,
+                            "minimum": -180,
+                            "type": "number",
+                          },
+                        },
+                        "required": [
+                          "latitude",
+                          "longitude",
+                        ],
+                        "type": "object",
+                      },
+                      "municipio": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "nome": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "uuid": {
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "uuid",
+                      "nome",
+                      "municipio",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "matriz_distancias": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "distancia_trecho_ida": {
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "distancia_trecho_volta": {
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "secao_a_uuid": {
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                        "type": "string",
+                      },
+                      "secao_b_uuid": {
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                        "type": "string",
+                      },
+                      "valor_adotado_de_distancia": {
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                    },
+                    "required": [
+                      "secao_a_uuid",
+                      "secao_b_uuid",
+                      "valor_adotado_de_distancia",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "matriz_seccionamento": {
+                  "default": [],
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "distancia_km": {
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "secao_a_uuid": {
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                        "type": "string",
+                      },
+                      "secao_b_uuid": {
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "secao_a_uuid",
+                      "secao_b_uuid",
+                      "distancia_km",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "numero_n": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "uuid": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "uuid",
+                "numero_n",
+                "caracteristica_veiculo",
+                "carater",
+                "locais",
+                "matriz_distancias",
+                "matriz_seccionamento",
+                "itinerarios",
+              ],
+              "type": "object",
+            },
+            "minItems": 1,
+            "type": "array",
+          },
+          "status": {
+            "enum": [
+              "proposta",
+              "vigente",
+            ],
+            "type": "string",
+          },
+          "tipo": {
+            "enum": [
+              "Semiurbano",
+              "Semiurbano Litorâneo",
+              "Rodoviário",
+              "Rodoviário Litorâneo",
+            ],
+            "type": "string",
+          },
+        },
+        "required": [
+          "codigo",
+          "tipo",
+          "empresa",
+          "status",
+          "secoes",
+          "servicos",
+        ],
+        "type": "object",
+      },
+      "versao_schema": {
+        "minLength": 1,
+        "type": "string",
+      },
+    },
+    "required": [
+      "versao_schema",
+      "autos",
+    ],
+    "type": "object",
+  },
+  "versao_schema": "1.0",
+}
+`;
