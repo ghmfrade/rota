@@ -1,0 +1,19 @@
+# Configuracao local/pessoal do Claude Code (caminhos e permissoes por maquina) —
+# nunca versionar; cada ambiente (Windows local, Codespaces) tem o seu.
+.claude/settings.local.json
+
+# Dependencias e build do Next.js (criados na TASK-001)
+node_modules/
+.next/
+out/
+dist/
+coverage/
+
+# Ambiente e logs
+.env
+.env.local
+*.log
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
