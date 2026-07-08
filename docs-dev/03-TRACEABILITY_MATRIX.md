@@ -113,7 +113,7 @@
 - ~~**Q-001**~~ — **decidida (DEC-026):** a Spec 03 §10.2 v0.5 fechou a partição código-a-código (`CR`, `ME`, `ML`, `MM` só Rodoviário; `CL`, `MEL`, `MLL`, `MML` só Litorâneo; `EX`/`LE`/`MX` em ambos; `SL` não existe). RN-021/RN-022 atualizadas.
 - **Q-004:** tolerância numérica de `distancia_km`/`duracao_s` para "rota alterada" no Comparador (Spec 05 §15.3) — afeta RN-087.
 - **Q-005:** formato do recurso estático das listas de Autos/empresas/tipos (Spec 01 §8 diz "JSON estático", sem schema fechado) — afeta RN-016/RN-017.
-- **Q-006:** algoritmo de "distância à fronteira" no fallback de 2 km do município (Spec 03 §2.3 usa Haversine ponto→fronteira sem definir amostragem dos vértices) — afeta RN-029.
+- ~~**Q-006**~~ — **decidida (DEC-031):** distância à fronteira no fallback de 2 km do município é a mínima **ponto→segmento** (Haversine) sobre os anéis do polígono, com curto-circuito por bounding box; teto de 2 km e erro "fora de SP" inalterados. RN-029 implementada (TASK-011).
 
 ## Conflitos entre specs
 

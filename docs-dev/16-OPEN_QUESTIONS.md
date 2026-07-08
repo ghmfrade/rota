@@ -70,7 +70,7 @@ Consolidação do que **exige decisão humana**. Nada aqui foi decidido — quan
 **Impacto se não decidir:** implementações diferentes podem divergir em pontos de borda; caso raro, mas bloqueante quando ocorre.
 **Opções possíveis:** 1. Distância mínima ponto→segmento sobre todos os segmentos do anel exterior (exato). 2. Distância aos vértices (aproximação, mais simples e errada em segmentos longos).
 **Recomendação técnica:** opção 1 (ponto→segmento), com curto-circuito por bounding box.
-**Decisão:** Pendente
+**Decisão:** **Decidida (DEC-031, 2026-07-08).** Opção 1: distância mínima ponto→segmento sobre todos os segmentos dos anéis do polígono, com curto-circuito por bounding box; teto de 2 km e erro "fora de SP" inalterados. Desbloqueia a TASK-011.
 
 ## Comparador
 
