@@ -52,6 +52,15 @@ Consolidação do que **exige decisão humana**. Nada aqui foi decidido — quan
 **Recomendação técnica:** arquivo único versionado, com vínculo explícito codigo→empresa/tipo (a UX da Spec 04 §5 pré-encadeia as seleções).
 **Decisão:** **Decidida (DEC-030, 2026-07-07).** Opção 1, arquivo único `data/autos_empresas.json` (gerado de `Autos_por_empresa.csv`) + `data/municipios.json` separado (gerado de `pop_municipios.csv`, casa com `municipios_sp.geojson` por código IBGE). `operante` nasce `true` para todos, a revisar depois.
 
+## Q-012 — Identidade obsoleta: existência independente ou coerência codigo↔empresa↔tipo?
+
+**Contexto:** RN-017 e Spec 04 §3.1 item 3 mandam bloquear o carregamento se `codigo`, `empresa` ou `tipo` não existirem nas listas estáticas atuais. Não está dito se basta cada campo existir **isoladamente** ou se o trio precisa ser **coerente** (o registro de `codigo` na lista ter exatamente aquela `empresa` e aquele `tipo`). Um JSON antigo poderia trazer um `codigo` ainda válido, mas com empresa já trocada na lista atual.
+**Spec relacionada:** Spec 01 §8; Spec 02 §4; Spec 04 §3.1 item 3, §14.
+**Impacto se não decidir:** define o comportamento de bloqueio quando o trio é internamente inconsistente com a lista. Baixo — TASK-006 já entrega a validação por existência independente.
+**Opções possíveis:** 1. Existência independente de cada campo (leitura literal da §3.1; implementada na TASK-006 como inferência controlada). 2. Coerência do trio (mais rígido; o Autos de `codigo` X deve ter aquela `empresa`/`tipo` na lista).
+**Recomendação técnica:** existência independente nesta versão — a mensagem da §14 fala do Autos/código; coerência é refinamento futuro, se houver caso real de troca de empresa mantendo código.
+**Decisão:** _(em aberto)_
+
 ## Mapa/roteamento
 
 ## Q-006 — Distância ponto→fronteira no fallback de município
