@@ -1,0 +1,3875 @@
+{
+  "versao_schema": "1.0",
+  "municipios": [
+    {
+      "codigo_ibge": "3500105",
+      "nome": "Adamantina",
+      "populacao_residente": 34687,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3500204",
+      "nome": "Adolfo",
+      "populacao_residente": 4351,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3500303",
+      "nome": "Aguaí",
+      "populacao_residente": 32072,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3500709",
+      "nome": "Agudos",
+      "populacao_residente": 37680,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3500758",
+      "nome": "Alambari",
+      "populacao_residente": 6141,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3500808",
+      "nome": "Alfredo Marcondes",
+      "populacao_residente": 4445,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3500907",
+      "nome": "Altair",
+      "populacao_residente": 3451,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3501004",
+      "nome": "Altinópolis",
+      "populacao_residente": 16818,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3501103",
+      "nome": "Alto Alegre",
+      "populacao_residente": 3841,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3501152",
+      "nome": "Alumínio",
+      "populacao_residente": 17301,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3501509",
+      "nome": "Alvinlândia",
+      "populacao_residente": 2885,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3501608",
+      "nome": "Americana",
+      "populacao_residente": 237240,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3501905",
+      "nome": "Amparo",
+      "populacao_residente": 68008,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3501707",
+      "nome": "Américo Brasiliense",
+      "populacao_residente": 33019,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3501806",
+      "nome": "Américo de Campos",
+      "populacao_residente": 5870,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3502002",
+      "nome": "Analândia",
+      "populacao_residente": 4589,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3502101",
+      "nome": "Andradina",
+      "populacao_residente": 59783,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3502200",
+      "nome": "Angatuba",
+      "populacao_residente": 24022,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3502309",
+      "nome": "Anhembi",
+      "populacao_residente": 5674,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3502408",
+      "nome": "Anhumas",
+      "populacao_residente": 4023,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3502507",
+      "nome": "Aparecida",
+      "populacao_residente": 32569,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3502606",
+      "nome": "Aparecida d'Oeste",
+      "populacao_residente": 4086,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3502705",
+      "nome": "Apiaí",
+      "populacao_residente": 24585,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3503000",
+      "nome": "Aramina",
+      "populacao_residente": 5420,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3503109",
+      "nome": "Arandu",
+      "populacao_residente": 6885,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3503158",
+      "nome": "Arapeí",
+      "populacao_residente": 2330,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3503208",
+      "nome": "Araraquara",
+      "populacao_residente": 242228,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3503307",
+      "nome": "Araras",
+      "populacao_residente": 130866,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3502754",
+      "nome": "Araçariguama",
+      "populacao_residente": 21522,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3502804",
+      "nome": "Araçatuba",
+      "populacao_residente": 200124,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3502903",
+      "nome": "Araçoiaba da Serra",
+      "populacao_residente": 32443,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3503356",
+      "nome": "Arco-Íris",
+      "populacao_residente": 2044,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3503406",
+      "nome": "Arealva",
+      "populacao_residente": 8130,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3503505",
+      "nome": "Areias",
+      "populacao_residente": 3577,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3503604",
+      "nome": "Areiópolis",
+      "populacao_residente": 10130,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3503703",
+      "nome": "Ariranha",
+      "populacao_residente": 7602,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3503802",
+      "nome": "Artur Nogueira",
+      "populacao_residente": 51456,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3503901",
+      "nome": "Arujá",
+      "populacao_residente": 86678,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3503950",
+      "nome": "Aspásia",
+      "populacao_residente": 1842,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3504008",
+      "nome": "Assis",
+      "populacao_residente": 101409,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3504107",
+      "nome": "Atibaia",
+      "populacao_residente": 158647,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3504206",
+      "nome": "Auriflama",
+      "populacao_residente": 13692,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3504404",
+      "nome": "Avanhandava",
+      "populacao_residente": 11263,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3504503",
+      "nome": "Avaré",
+      "populacao_residente": 92805,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3504305",
+      "nome": "Avaí",
+      "populacao_residente": 4483,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3504602",
+      "nome": "Bady Bassitt",
+      "populacao_residente": 27260,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3504701",
+      "nome": "Balbinos",
+      "populacao_residente": 3887,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3504909",
+      "nome": "Bananal",
+      "populacao_residente": 9969,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3505104",
+      "nome": "Barbosa",
+      "populacao_residente": 5640,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3505203",
+      "nome": "Bariri",
+      "populacao_residente": 31595,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3505302",
+      "nome": "Barra Bonita",
+      "populacao_residente": 34346,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3505351",
+      "nome": "Barra do Chapéu",
+      "populacao_residente": 5179,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3505401",
+      "nome": "Barra do Turvo",
+      "populacao_residente": 6876,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3505500",
+      "nome": "Barretos",
+      "populacao_residente": 122485,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3505609",
+      "nome": "Barrinha",
+      "populacao_residente": 32092,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3505708",
+      "nome": "Barueri",
+      "populacao_residente": 316473,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3505005",
+      "nome": "Barão de Antonina",
+      "populacao_residente": 3531,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3505807",
+      "nome": "Bastos",
+      "populacao_residente": 21503,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3505906",
+      "nome": "Batatais",
+      "populacao_residente": 58402,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3506003",
+      "nome": "Bauru",
+      "populacao_residente": 379146,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3506102",
+      "nome": "Bebedouro",
+      "populacao_residente": 76373,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3506201",
+      "nome": "Bento de Abreu",
+      "populacao_residente": 2606,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3506300",
+      "nome": "Bernardino de Campos",
+      "populacao_residente": 11607,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3506359",
+      "nome": "Bertioga",
+      "populacao_residente": 64188,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3506409",
+      "nome": "Bilac",
+      "populacao_residente": 7319,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3506508",
+      "nome": "Birigui",
+      "populacao_residente": 118979,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3506607",
+      "nome": "Biritiba Mirim",
+      "populacao_residente": 29683,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3506706",
+      "nome": "Boa Esperança do Sul",
+      "populacao_residente": 12978,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3506805",
+      "nome": "Bocaina",
+      "populacao_residente": 11259,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3506904",
+      "nome": "Bofete",
+      "populacao_residente": 10460,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3507001",
+      "nome": "Boituva",
+      "populacao_residente": 61081,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3507100",
+      "nome": "Bom Jesus dos Perdões",
+      "populacao_residente": 22006,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3507159",
+      "nome": "Bom Sucesso de Itararé",
+      "populacao_residente": 3555,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3507308",
+      "nome": "Boracéia",
+      "populacao_residente": 4715,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3507407",
+      "nome": "Borborema",
+      "populacao_residente": 14226,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3507456",
+      "nome": "Borebi",
+      "populacao_residente": 2713,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3507209",
+      "nome": "Borá",
+      "populacao_residente": 907,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3507506",
+      "nome": "Botucatu",
+      "populacao_residente": 145155,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3507605",
+      "nome": "Bragança Paulista",
+      "populacao_residente": 176811,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3507704",
+      "nome": "Braúna",
+      "populacao_residente": 5356,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3507753",
+      "nome": "Brejo Alegre",
+      "populacao_residente": 2565,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3507803",
+      "nome": "Brodowski",
+      "populacao_residente": 25201,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3507902",
+      "nome": "Brotas",
+      "populacao_residente": 23898,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3508009",
+      "nome": "Buri",
+      "populacao_residente": 20250,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3508108",
+      "nome": "Buritama",
+      "populacao_residente": 17210,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3508207",
+      "nome": "Buritizal",
+      "populacao_residente": 4356,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3504800",
+      "nome": "Bálsamo",
+      "populacao_residente": 9596,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3508405",
+      "nome": "Cabreúva",
+      "populacao_residente": 47011,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3508306",
+      "nome": "Cabrália Paulista",
+      "populacao_residente": 4299,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3508603",
+      "nome": "Cachoeira Paulista",
+      "populacao_residente": 31564,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3508702",
+      "nome": "Caconde",
+      "populacao_residente": 17101,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3508801",
+      "nome": "Cafelândia",
+      "populacao_residente": 16654,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3508900",
+      "nome": "Caiabu",
+      "populacao_residente": 3712,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3509007",
+      "nome": "Caieiras",
+      "populacao_residente": 95032,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3509106",
+      "nome": "Caiuá",
+      "populacao_residente": 5466,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3509205",
+      "nome": "Cajamar",
+      "populacao_residente": 92689,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3509254",
+      "nome": "Cajati",
+      "populacao_residente": 28515,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3509304",
+      "nome": "Cajobi",
+      "populacao_residente": 9133,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3509403",
+      "nome": "Cajuru",
+      "populacao_residente": 23830,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3509452",
+      "nome": "Campina do Monte Alegre",
+      "populacao_residente": 5954,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3509502",
+      "nome": "Campinas",
+      "populacao_residente": 1139047,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3509601",
+      "nome": "Campo Limpo Paulista",
+      "populacao_residente": 77632,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3509809",
+      "nome": "Campos Novos Paulista",
+      "populacao_residente": 4888,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3509700",
+      "nome": "Campos do Jordão",
+      "populacao_residente": 46974,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3509908",
+      "nome": "Cananéia",
+      "populacao_residente": 12289,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3509957",
+      "nome": "Canas",
+      "populacao_residente": 4931,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3510153",
+      "nome": "Canitar",
+      "populacao_residente": 6283,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3510302",
+      "nome": "Capela do Alto",
+      "populacao_residente": 22866,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3510401",
+      "nome": "Capivari",
+      "populacao_residente": 50068,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3510203",
+      "nome": "Capão Bonito",
+      "populacao_residente": 46337,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3510500",
+      "nome": "Caraguatatuba",
+      "populacao_residente": 134873,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3510609",
+      "nome": "Carapicuíba",
+      "populacao_residente": 386984,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3510708",
+      "nome": "Cardoso",
+      "populacao_residente": 11345,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3510807",
+      "nome": "Casa Branca",
+      "populacao_residente": 28083,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3511003",
+      "nome": "Castilho",
+      "populacao_residente": 19977,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3511102",
+      "nome": "Catanduva",
+      "populacao_residente": 115791,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3511201",
+      "nome": "Catiguá",
+      "populacao_residente": 7003,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3508504",
+      "nome": "Caçapava",
+      "populacao_residente": 96202,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3511300",
+      "nome": "Cedral",
+      "populacao_residente": 12618,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3511409",
+      "nome": "Cerqueira César",
+      "populacao_residente": 21469,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3511508",
+      "nome": "Cerquilho",
+      "populacao_residente": 44695,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3511607",
+      "nome": "Cesário Lange",
+      "populacao_residente": 19048,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3511706",
+      "nome": "Charqueada",
+      "populacao_residente": 15535,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3557204",
+      "nome": "Chavantes",
+      "populacao_residente": 12211,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3511904",
+      "nome": "Clementina",
+      "populacao_residente": 6982,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3512001",
+      "nome": "Colina",
+      "populacao_residente": 18486,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3512100",
+      "nome": "Colômbia",
+      "populacao_residente": 6629,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3512209",
+      "nome": "Conchal",
+      "populacao_residente": 28101,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3512308",
+      "nome": "Conchas",
+      "populacao_residente": 15232,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3512407",
+      "nome": "Cordeirópolis",
+      "populacao_residente": 24514,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3512506",
+      "nome": "Coroados",
+      "populacao_residente": 5400,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3512605",
+      "nome": "Coronel Macedo",
+      "populacao_residente": 4280,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3512704",
+      "nome": "Corumbataí",
+      "populacao_residente": 4195,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3512902",
+      "nome": "Cosmorama",
+      "populacao_residente": 8719,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3512803",
+      "nome": "Cosmópolis",
+      "populacao_residente": 59773,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3513009",
+      "nome": "Cotia",
+      "populacao_residente": 274413,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3513108",
+      "nome": "Cravinhos",
+      "populacao_residente": 33281,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3513207",
+      "nome": "Cristais Paulista",
+      "populacao_residente": 9272,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3513405",
+      "nome": "Cruzeiro",
+      "populacao_residente": 74961,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3513306",
+      "nome": "Cruzália",
+      "populacao_residente": 2108,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3513504",
+      "nome": "Cubatão",
+      "populacao_residente": 112476,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3513603",
+      "nome": "Cunha",
+      "populacao_residente": 22110,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3510906",
+      "nome": "Cássia dos Coqueiros",
+      "populacao_residente": 2799,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3510005",
+      "nome": "Cândido Mota",
+      "populacao_residente": 29449,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3510104",
+      "nome": "Cândido Rodrigues",
+      "populacao_residente": 2889,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3513702",
+      "nome": "Descalvado",
+      "populacao_residente": 31756,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3513801",
+      "nome": "Diadema",
+      "populacao_residente": 393237,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3513850",
+      "nome": "Dirce Reis",
+      "populacao_residente": 1620,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3513900",
+      "nome": "Divinolândia",
+      "populacao_residente": 11158,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3514007",
+      "nome": "Dobrada",
+      "populacao_residente": 8759,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3514106",
+      "nome": "Dois Córregos",
+      "populacao_residente": 24510,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3514205",
+      "nome": "Dolcinópolis",
+      "populacao_residente": 2207,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3514304",
+      "nome": "Dourado",
+      "populacao_residente": 8096,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3514403",
+      "nome": "Dracena",
+      "populacao_residente": 45474,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3514502",
+      "nome": "Duartina",
+      "populacao_residente": 12328,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3514601",
+      "nome": "Dumont",
+      "populacao_residente": 9471,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3514700",
+      "nome": "Echaporã",
+      "populacao_residente": 6205,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3514809",
+      "nome": "Eldorado",
+      "populacao_residente": 13069,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3514908",
+      "nome": "Elias Fausto",
+      "populacao_residente": 17699,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3514924",
+      "nome": "Elisiário",
+      "populacao_residente": 3138,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3514957",
+      "nome": "Embaúba",
+      "populacao_residente": 2323,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3515004",
+      "nome": "Embu das Artes",
+      "populacao_residente": 250691,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3515103",
+      "nome": "Embu-Guaçu",
+      "populacao_residente": 66970,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3515129",
+      "nome": "Emilianópolis",
+      "populacao_residente": 3014,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3515152",
+      "nome": "Engenheiro Coelho",
+      "populacao_residente": 19566,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3515186",
+      "nome": "Espírito Santo do Pinhal",
+      "populacao_residente": 39816,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3515194",
+      "nome": "Espírito Santo do Turvo",
+      "populacao_residente": 4157,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3557303",
+      "nome": "Estiva Gerbi",
+      "populacao_residente": 11295,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3515202",
+      "nome": "Estrela d'Oeste",
+      "populacao_residente": 9417,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3515301",
+      "nome": "Estrela do Norte",
+      "populacao_residente": 2703,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3515350",
+      "nome": "Euclides da Cunha Paulista",
+      "populacao_residente": 7924,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3515400",
+      "nome": "Fartura",
+      "populacao_residente": 16641,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3515608",
+      "nome": "Fernando Prestes",
+      "populacao_residente": 5942,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3515509",
+      "nome": "Fernandópolis",
+      "populacao_residente": 71186,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3515657",
+      "nome": "Fernão",
+      "populacao_residente": 1656,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3515707",
+      "nome": "Ferraz de Vasconcelos",
+      "populacao_residente": 179198,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3515806",
+      "nome": "Flora Rica",
+      "populacao_residente": 1487,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3515905",
+      "nome": "Floreal",
+      "populacao_residente": 2733,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3516101",
+      "nome": "Florínea",
+      "populacao_residente": 3851,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3516002",
+      "nome": "Flórida Paulista",
+      "populacao_residente": 12958,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3516200",
+      "nome": "Franca",
+      "populacao_residente": 352536,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3516309",
+      "nome": "Francisco Morato",
+      "populacao_residente": 165139,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3516408",
+      "nome": "Franco da Rocha",
+      "populacao_residente": 144849,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3516507",
+      "nome": "Gabriel Monteiro",
+      "populacao_residente": 2763,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3516705",
+      "nome": "Garça",
+      "populacao_residente": 42110,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3516804",
+      "nome": "Gastão Vidigal",
+      "populacao_residente": 3252,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3516853",
+      "nome": "Gavião Peixoto",
+      "populacao_residente": 4702,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3516903",
+      "nome": "General Salgado",
+      "populacao_residente": 10312,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3517000",
+      "nome": "Getulina",
+      "populacao_residente": 10232,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3517109",
+      "nome": "Glicério",
+      "populacao_residente": 4138,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3517307",
+      "nome": "Guaimbê",
+      "populacao_residente": 5512,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3517208",
+      "nome": "Guaiçara",
+      "populacao_residente": 11239,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3517604",
+      "nome": "Guapiara",
+      "populacao_residente": 17071,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3517505",
+      "nome": "Guapiaçu",
+      "populacao_residente": 21711,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3517901",
+      "nome": "Guaraci",
+      "populacao_residente": 10350,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3518008",
+      "nome": "Guarani d'Oeste",
+      "populacao_residente": 1968,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3518107",
+      "nome": "Guarantã",
+      "populacao_residente": 6427,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3518206",
+      "nome": "Guararapes",
+      "populacao_residente": 31043,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3518305",
+      "nome": "Guararema",
+      "populacao_residente": 31236,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3518404",
+      "nome": "Guaratinguetá",
+      "populacao_residente": 118044,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3517802",
+      "nome": "Guaraçaí",
+      "populacao_residente": 7441,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3518503",
+      "nome": "Guareí",
+      "populacao_residente": 15013,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3518602",
+      "nome": "Guariba",
+      "populacao_residente": 37498,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3518701",
+      "nome": "Guarujá",
+      "populacao_residente": 287634,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3518800",
+      "nome": "Guarulhos",
+      "populacao_residente": 1291771,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3517703",
+      "nome": "Guará",
+      "populacao_residente": 18606,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3518859",
+      "nome": "Guatapará",
+      "populacao_residente": 7320,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3517406",
+      "nome": "Guaíra",
+      "populacao_residente": 39279,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3518909",
+      "nome": "Guzolândia",
+      "populacao_residente": 4246,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3516606",
+      "nome": "Gália",
+      "populacao_residente": 6380,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3519006",
+      "nome": "Herculândia",
+      "populacao_residente": 9125,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3519055",
+      "nome": "Holambra",
+      "populacao_residente": 15094,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3519071",
+      "nome": "Hortolândia",
+      "populacao_residente": 236641,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3519105",
+      "nome": "Iacanga",
+      "populacao_residente": 10437,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3519204",
+      "nome": "Iacri",
+      "populacao_residente": 6131,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3519253",
+      "nome": "Iaras",
+      "populacao_residente": 8010,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3519303",
+      "nome": "Ibaté",
+      "populacao_residente": 32178,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3519501",
+      "nome": "Ibirarema",
+      "populacao_residente": 6385,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3519402",
+      "nome": "Ibirá",
+      "populacao_residente": 11690,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3519600",
+      "nome": "Ibitinga",
+      "populacao_residente": 60033,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3519709",
+      "nome": "Ibiúna",
+      "populacao_residente": 75605,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3519808",
+      "nome": "Icém",
+      "populacao_residente": 7819,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3519907",
+      "nome": "Iepê",
+      "populacao_residente": 7619,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3520103",
+      "nome": "Igarapava",
+      "populacao_residente": 26212,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3520202",
+      "nome": "Igaratá",
+      "populacao_residente": 10605,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3520004",
+      "nome": "Igaraçu do Tietê",
+      "populacao_residente": 23106,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3520301",
+      "nome": "Iguape",
+      "populacao_residente": 29115,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3520426",
+      "nome": "Ilha Comprida",
+      "populacao_residente": 13419,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3520442",
+      "nome": "Ilha Solteira",
+      "populacao_residente": 25549,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3520400",
+      "nome": "Ilhabela",
+      "populacao_residente": 34934,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3520509",
+      "nome": "Indaiatuba",
+      "populacao_residente": 255748,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3520608",
+      "nome": "Indiana",
+      "populacao_residente": 5090,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3520707",
+      "nome": "Indiaporã",
+      "populacao_residente": 4035,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3520806",
+      "nome": "Inúbia Paulista",
+      "populacao_residente": 3615,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3520905",
+      "nome": "Ipaussu",
+      "populacao_residente": 13712,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3521002",
+      "nome": "Iperó",
+      "populacao_residente": 36459,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3521101",
+      "nome": "Ipeúna",
+      "populacao_residente": 6831,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3521150",
+      "nome": "Ipiguá",
+      "populacao_residente": 6761,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3521200",
+      "nome": "Iporanga",
+      "populacao_residente": 4046,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3521309",
+      "nome": "Ipuã",
+      "populacao_residente": 14454,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3521408",
+      "nome": "Iracemápolis",
+      "populacao_residente": 21967,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3521606",
+      "nome": "Irapuru",
+      "populacao_residente": 7085,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3521507",
+      "nome": "Irapuã",
+      "populacao_residente": 6867,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3521705",
+      "nome": "Itaberá",
+      "populacao_residente": 17983,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3521903",
+      "nome": "Itajobi",
+      "populacao_residente": 16989,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3522000",
+      "nome": "Itaju",
+      "populacao_residente": 3618,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3522109",
+      "nome": "Itanhaém",
+      "populacao_residente": 112476,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3522158",
+      "nome": "Itaoca",
+      "populacao_residente": 3422,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3522208",
+      "nome": "Itapecerica da Serra",
+      "populacao_residente": 158522,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3522307",
+      "nome": "Itapetininga",
+      "populacao_residente": 157790,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3522406",
+      "nome": "Itapeva",
+      "populacao_residente": 89728,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3522505",
+      "nome": "Itapevi",
+      "populacao_residente": 232297,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3522604",
+      "nome": "Itapira",
+      "populacao_residente": 72022,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3522653",
+      "nome": "Itapirapuã Paulista",
+      "populacao_residente": 4306,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3522802",
+      "nome": "Itaporanga",
+      "populacao_residente": 14085,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3523008",
+      "nome": "Itapura",
+      "populacao_residente": 3979,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3522901",
+      "nome": "Itapuí",
+      "populacao_residente": 13659,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3523107",
+      "nome": "Itaquaquecetuba",
+      "populacao_residente": 369275,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3523206",
+      "nome": "Itararé",
+      "populacao_residente": 44438,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3523305",
+      "nome": "Itariri",
+      "populacao_residente": 15528,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3523404",
+      "nome": "Itatiba",
+      "populacao_residente": 121590,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3523503",
+      "nome": "Itatinga",
+      "populacao_residente": 19070,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3521804",
+      "nome": "Itaí",
+      "populacao_residente": 25180,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3523602",
+      "nome": "Itirapina",
+      "populacao_residente": 16148,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3523701",
+      "nome": "Itirapuã",
+      "populacao_residente": 5779,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3523800",
+      "nome": "Itobi",
+      "populacao_residente": 8046,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3523909",
+      "nome": "Itu",
+      "populacao_residente": 168240,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3524006",
+      "nome": "Itupeva",
+      "populacao_residente": 70616,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3524105",
+      "nome": "Ituverava",
+      "populacao_residente": 37571,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3522703",
+      "nome": "Itápolis",
+      "populacao_residente": 39493,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3524204",
+      "nome": "Jaborandi",
+      "populacao_residente": 6221,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3524303",
+      "nome": "Jaboticabal",
+      "populacao_residente": 71821,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3524402",
+      "nome": "Jacareí",
+      "populacao_residente": 240275,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3524501",
+      "nome": "Jaci",
+      "populacao_residente": 7613,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3524600",
+      "nome": "Jacupiranga",
+      "populacao_residente": 16097,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3524709",
+      "nome": "Jaguariúna",
+      "populacao_residente": 59347,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3524808",
+      "nome": "Jales",
+      "populacao_residente": 48776,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3524907",
+      "nome": "Jambeiro",
+      "populacao_residente": 6397,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3525003",
+      "nome": "Jandira",
+      "populacao_residente": 118045,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3525102",
+      "nome": "Jardinópolis",
+      "populacao_residente": 45282,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3525201",
+      "nome": "Jarinu",
+      "populacao_residente": 37535,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3525300",
+      "nome": "Jaú",
+      "populacao_residente": 133497,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3525409",
+      "nome": "Jeriquara",
+      "populacao_residente": 3863,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3525508",
+      "nome": "Joanópolis",
+      "populacao_residente": 12815,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3525706",
+      "nome": "José Bonifácio",
+      "populacao_residente": 36633,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3525607",
+      "nome": "João Ramalho",
+      "populacao_residente": 4371,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3525854",
+      "nome": "Jumirim",
+      "populacao_residente": 3056,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3525904",
+      "nome": "Jundiaí",
+      "populacao_residente": 443221,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3526001",
+      "nome": "Junqueirópolis",
+      "populacao_residente": 20448,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3526209",
+      "nome": "Juquitiba",
+      "populacao_residente": 27404,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3526100",
+      "nome": "Juquiá",
+      "populacao_residente": 17154,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3525805",
+      "nome": "Júlio Mesquita",
+      "populacao_residente": 4254,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3526308",
+      "nome": "Lagoinha",
+      "populacao_residente": 5083,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3526407",
+      "nome": "Laranjal Paulista",
+      "populacao_residente": 26261,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3526605",
+      "nome": "Lavrinhas",
+      "populacao_residente": 7171,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3526506",
+      "nome": "Lavínia",
+      "populacao_residente": 9689,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3526704",
+      "nome": "Leme",
+      "populacao_residente": 98161,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3526803",
+      "nome": "Lençóis Paulista",
+      "populacao_residente": 66505,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3526902",
+      "nome": "Limeira",
+      "populacao_residente": 291869,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3527009",
+      "nome": "Lindóia",
+      "populacao_residente": 7014,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3527108",
+      "nome": "Lins",
+      "populacao_residente": 74779,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3527207",
+      "nome": "Lorena",
+      "populacao_residente": 84855,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3527256",
+      "nome": "Lourdes",
+      "populacao_residente": 1950,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3527306",
+      "nome": "Louveira",
+      "populacao_residente": 51847,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3527504",
+      "nome": "Lucianópolis",
+      "populacao_residente": 2372,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3527405",
+      "nome": "Lucélia",
+      "populacao_residente": 20061,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3527702",
+      "nome": "Luiziânia",
+      "populacao_residente": 4701,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3527801",
+      "nome": "Lupércio",
+      "populacao_residente": 3981,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3527900",
+      "nome": "Lutécia",
+      "populacao_residente": 2661,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3527603",
+      "nome": "Luís Antônio",
+      "populacao_residente": 12265,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3528007",
+      "nome": "Macatuba",
+      "populacao_residente": 16829,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3528106",
+      "nome": "Macaubal",
+      "populacao_residente": 7481,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3528205",
+      "nome": "Macedônia",
+      "populacao_residente": 3963,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3528304",
+      "nome": "Magda",
+      "populacao_residente": 3165,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3528403",
+      "nome": "Mairinque",
+      "populacao_residente": 50027,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3528502",
+      "nome": "Mairiporã",
+      "populacao_residente": 93853,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3528601",
+      "nome": "Manduri",
+      "populacao_residente": 9871,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3528700",
+      "nome": "Marabá Paulista",
+      "populacao_residente": 4573,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3528809",
+      "nome": "Maracaí",
+      "populacao_residente": 12673,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3528858",
+      "nome": "Marapoama",
+      "populacao_residente": 3292,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3529104",
+      "nome": "Marinópolis",
+      "populacao_residente": 1860,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3528908",
+      "nome": "Mariápolis",
+      "populacao_residente": 3513,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3529203",
+      "nome": "Martinópolis",
+      "populacao_residente": 24881,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3529005",
+      "nome": "Marília",
+      "populacao_residente": 237627,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3529302",
+      "nome": "Matão",
+      "populacao_residente": 79033,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3529401",
+      "nome": "Mauá",
+      "populacao_residente": 418261,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3529500",
+      "nome": "Mendonça",
+      "populacao_residente": 6159,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3529609",
+      "nome": "Meridiano",
+      "populacao_residente": 4572,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3529658",
+      "nome": "Mesópolis",
+      "populacao_residente": 1952,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3529708",
+      "nome": "Miguelópolis",
+      "populacao_residente": 19441,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3529807",
+      "nome": "Mineiros do Tietê",
+      "populacao_residente": 11230,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3530003",
+      "nome": "Mira Estrela",
+      "populacao_residente": 3126,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3529906",
+      "nome": "Miracatu",
+      "populacao_residente": 18553,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3530102",
+      "nome": "Mirandópolis",
+      "populacao_residente": 27983,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3530201",
+      "nome": "Mirante do Paranapanema",
+      "populacao_residente": 15917,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3530300",
+      "nome": "Mirassol",
+      "populacao_residente": 63337,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3530409",
+      "nome": "Mirassolândia",
+      "populacao_residente": 4669,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3530508",
+      "nome": "Mococa",
+      "populacao_residente": 67681,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3530706",
+      "nome": "Mogi Guaçu",
+      "populacao_residente": 153658,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3530805",
+      "nome": "Mogi Mirim",
+      "populacao_residente": 92558,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3530607",
+      "nome": "Mogi das Cruzes",
+      "populacao_residente": 451505,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3530904",
+      "nome": "Mombuca",
+      "populacao_residente": 3722,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3531100",
+      "nome": "Mongaguá",
+      "populacao_residente": 61951,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3531209",
+      "nome": "Monte Alegre do Sul",
+      "populacao_residente": 8627,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3531308",
+      "nome": "Monte Alto",
+      "populacao_residente": 47574,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3531407",
+      "nome": "Monte Aprazível",
+      "populacao_residente": 22280,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3531506",
+      "nome": "Monte Azul Paulista",
+      "populacao_residente": 18151,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3531605",
+      "nome": "Monte Castelo",
+      "populacao_residente": 4222,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3531803",
+      "nome": "Monte Mor",
+      "populacao_residente": 64662,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3531704",
+      "nome": "Monteiro Lobato",
+      "populacao_residente": 4138,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3531001",
+      "nome": "Monções",
+      "populacao_residente": 1937,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3531902",
+      "nome": "Morro Agudo",
+      "populacao_residente": 27933,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3532009",
+      "nome": "Morungaba",
+      "populacao_residente": 13720,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3532058",
+      "nome": "Motuca",
+      "populacao_residente": 4034,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3532108",
+      "nome": "Murutinga do Sul",
+      "populacao_residente": 3737,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3532157",
+      "nome": "Nantes",
+      "populacao_residente": 2660,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3532207",
+      "nome": "Narandiba",
+      "populacao_residente": 5713,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3532306",
+      "nome": "Natividade da Serra",
+      "populacao_residente": 6999,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3532405",
+      "nome": "Nazaré Paulista",
+      "populacao_residente": 18217,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3532504",
+      "nome": "Neves Paulista",
+      "populacao_residente": 9699,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3532603",
+      "nome": "Nhandeara",
+      "populacao_residente": 9852,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3532702",
+      "nome": "Nipoã",
+      "populacao_residente": 4750,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3532801",
+      "nome": "Nova Aliança",
+      "populacao_residente": 6693,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3532827",
+      "nome": "Nova Campina",
+      "populacao_residente": 8497,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3532843",
+      "nome": "Nova Canaã Paulista",
+      "populacao_residente": 2032,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3532868",
+      "nome": "Nova Castilho",
+      "populacao_residente": 1062,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3532900",
+      "nome": "Nova Europa",
+      "populacao_residente": 9311,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3533007",
+      "nome": "Nova Granada",
+      "populacao_residente": 19419,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3533106",
+      "nome": "Nova Guataporanga",
+      "populacao_residente": 2156,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3533205",
+      "nome": "Nova Independência",
+      "populacao_residente": 4609,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3533304",
+      "nome": "Nova Luzitânia",
+      "populacao_residente": 2837,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3533403",
+      "nome": "Nova Odessa",
+      "populacao_residente": 62019,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3533254",
+      "nome": "Novais",
+      "populacao_residente": 4412,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3533502",
+      "nome": "Novo Horizonte",
+      "populacao_residente": 38324,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3533601",
+      "nome": "Nuporanga",
+      "populacao_residente": 7391,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3533700",
+      "nome": "Ocauçu",
+      "populacao_residente": 4331,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3533908",
+      "nome": "Olímpia",
+      "populacao_residente": 55074,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3534005",
+      "nome": "Onda Verde",
+      "populacao_residente": 4771,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3534104",
+      "nome": "Oriente",
+      "populacao_residente": 6085,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3534203",
+      "nome": "Orindiúva",
+      "populacao_residente": 6024,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3534302",
+      "nome": "Orlândia",
+      "populacao_residente": 38319,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3534401",
+      "nome": "Osasco",
+      "populacao_residente": 728615,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3534500",
+      "nome": "Oscar Bressane",
+      "populacao_residente": 2470,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3534609",
+      "nome": "Osvaldo Cruz",
+      "populacao_residente": 31272,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3534708",
+      "nome": "Ourinhos",
+      "populacao_residente": 103970,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3534807",
+      "nome": "Ouro Verde",
+      "populacao_residente": 7779,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3534757",
+      "nome": "Ouroeste",
+      "populacao_residente": 10294,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3534906",
+      "nome": "Pacaembu",
+      "populacao_residente": 14877,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3535002",
+      "nome": "Palestina",
+      "populacao_residente": 11476,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3535101",
+      "nome": "Palmares Paulista",
+      "populacao_residente": 9650,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3535200",
+      "nome": "Palmeira d'Oeste",
+      "populacao_residente": 8903,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3535309",
+      "nome": "Palmital",
+      "populacao_residente": 19594,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3535408",
+      "nome": "Panorama",
+      "populacao_residente": 14964,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3535507",
+      "nome": "Paraguaçu Paulista",
+      "populacao_residente": 41120,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3535606",
+      "nome": "Paraibuna",
+      "populacao_residente": 17667,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3535804",
+      "nome": "Paranapanema",
+      "populacao_residente": 19395,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3535903",
+      "nome": "Paranapuã",
+      "populacao_residente": 4031,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3536000",
+      "nome": "Parapuã",
+      "populacao_residente": 10580,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3535705",
+      "nome": "Paraíso",
+      "populacao_residente": 6099,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3536109",
+      "nome": "Pardinho",
+      "populacao_residente": 7153,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3536208",
+      "nome": "Pariquera-Açu",
+      "populacao_residente": 19233,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3536257",
+      "nome": "Parisi",
+      "populacao_residente": 2892,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3536307",
+      "nome": "Patrocínio Paulista",
+      "populacao_residente": 14512,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3536406",
+      "nome": "Paulicéia",
+      "populacao_residente": 7955,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3536570",
+      "nome": "Paulistânia",
+      "populacao_residente": 2090,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3536604",
+      "nome": "Paulo de Faria",
+      "populacao_residente": 7400,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3536505",
+      "nome": "Paulínia",
+      "populacao_residente": 110537,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3536703",
+      "nome": "Pederneiras",
+      "populacao_residente": 44827,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3536802",
+      "nome": "Pedra Bela",
+      "populacao_residente": 6557,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3536901",
+      "nome": "Pedranópolis",
+      "populacao_residente": 2787,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3537008",
+      "nome": "Pedregulho",
+      "populacao_residente": 15525,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3537107",
+      "nome": "Pedreira",
+      "populacao_residente": 43112,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3537156",
+      "nome": "Pedrinhas Paulista",
+      "populacao_residente": 2804,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3537206",
+      "nome": "Pedro de Toledo",
+      "populacao_residente": 11281,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3537305",
+      "nome": "Penápolis",
+      "populacao_residente": 61679,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3537404",
+      "nome": "Pereira Barreto",
+      "populacao_residente": 24095,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3537503",
+      "nome": "Pereiras",
+      "populacao_residente": 8737,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3537602",
+      "nome": "Peruíbe",
+      "populacao_residente": 68352,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3537701",
+      "nome": "Piacatu",
+      "populacao_residente": 5519,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3537800",
+      "nome": "Piedade",
+      "populacao_residente": 52970,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3537909",
+      "nome": "Pilar do Sul",
+      "populacao_residente": 27619,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3538006",
+      "nome": "Pindamonhangaba",
+      "populacao_residente": 165428,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3538105",
+      "nome": "Pindorama",
+      "populacao_residente": 14542,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3538204",
+      "nome": "Pinhalzinho",
+      "populacao_residente": 15224,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3538303",
+      "nome": "Piquerobi",
+      "populacao_residente": 3264,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3538501",
+      "nome": "Piquete",
+      "populacao_residente": 12490,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3538600",
+      "nome": "Piracaia",
+      "populacao_residente": 26029,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3538709",
+      "nome": "Piracicaba",
+      "populacao_residente": 423323,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3538808",
+      "nome": "Piraju",
+      "populacao_residente": 29436,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3538907",
+      "nome": "Pirajuí",
+      "populacao_residente": 22431,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3539004",
+      "nome": "Pirangi",
+      "populacao_residente": 10885,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3539103",
+      "nome": "Pirapora do Bom Jesus",
+      "populacao_residente": 18370,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3539202",
+      "nome": "Pirapozinho",
+      "populacao_residente": 25348,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3539301",
+      "nome": "Pirassununga",
+      "populacao_residente": 73545,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3539400",
+      "nome": "Piratininga",
+      "populacao_residente": 15108,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3539509",
+      "nome": "Pitangueiras",
+      "populacao_residente": 33674,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3539608",
+      "nome": "Planalto",
+      "populacao_residente": 4389,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3539707",
+      "nome": "Platina",
+      "populacao_residente": 3025,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3539905",
+      "nome": "Poloni",
+      "populacao_residente": 5592,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3540002",
+      "nome": "Pompéia",
+      "populacao_residente": 20196,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3540101",
+      "nome": "Pongaí",
+      "populacao_residente": 3395,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3540200",
+      "nome": "Pontal",
+      "populacao_residente": 37607,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3540259",
+      "nome": "Pontalinda",
+      "populacao_residente": 4127,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3540309",
+      "nome": "Pontes Gestal",
+      "populacao_residente": 2387,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3540408",
+      "nome": "Populina",
+      "populacao_residente": 4127,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3540507",
+      "nome": "Porangaba",
+      "populacao_residente": 10451,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3540606",
+      "nome": "Porto Feliz",
+      "populacao_residente": 56497,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3540705",
+      "nome": "Porto Ferreira",
+      "populacao_residente": 52649,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3540754",
+      "nome": "Potim",
+      "populacao_residente": 20392,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3540804",
+      "nome": "Potirendaba",
+      "populacao_residente": 18496,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3539806",
+      "nome": "Poá",
+      "populacao_residente": 103765,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3540853",
+      "nome": "Pracinha",
+      "populacao_residente": 2578,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3540903",
+      "nome": "Pradópolis",
+      "populacao_residente": 17078,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3541000",
+      "nome": "Praia Grande",
+      "populacao_residente": 349935,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3541059",
+      "nome": "Pratânia",
+      "populacao_residente": 5126,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3541109",
+      "nome": "Presidente Alves",
+      "populacao_residente": 3804,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3541208",
+      "nome": "Presidente Bernardes",
+      "populacao_residente": 14490,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3541307",
+      "nome": "Presidente Epitácio",
+      "populacao_residente": 39505,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3541406",
+      "nome": "Presidente Prudente",
+      "populacao_residente": 225668,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3541505",
+      "nome": "Presidente Venceslau",
+      "populacao_residente": 35201,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3541604",
+      "nome": "Promissão",
+      "populacao_residente": 35131,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3541653",
+      "nome": "Quadra",
+      "populacao_residente": 3405,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3541703",
+      "nome": "Quatá",
+      "populacao_residente": 13163,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3541802",
+      "nome": "Queiroz",
+      "populacao_residente": 3265,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3541901",
+      "nome": "Queluz",
+      "populacao_residente": 9159,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3542008",
+      "nome": "Quintana",
+      "populacao_residente": 7038,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3542107",
+      "nome": "Rafard",
+      "populacao_residente": 8965,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3542206",
+      "nome": "Rancharia",
+      "populacao_residente": 28588,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3542305",
+      "nome": "Redenção da Serra",
+      "populacao_residente": 4494,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3542404",
+      "nome": "Regente Feijó",
+      "populacao_residente": 20145,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3542503",
+      "nome": "Reginópolis",
+      "populacao_residente": 7662,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3542602",
+      "nome": "Registro",
+      "populacao_residente": 59947,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3542701",
+      "nome": "Restinga",
+      "populacao_residente": 6404,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3542800",
+      "nome": "Ribeira",
+      "populacao_residente": 3132,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3542909",
+      "nome": "Ribeirão Bonito",
+      "populacao_residente": 10989,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3543006",
+      "nome": "Ribeirão Branco",
+      "populacao_residente": 18627,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3543105",
+      "nome": "Ribeirão Corrente",
+      "populacao_residente": 4608,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3543253",
+      "nome": "Ribeirão Grande",
+      "populacao_residente": 7450,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3543303",
+      "nome": "Ribeirão Pires",
+      "populacao_residente": 115559,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3543402",
+      "nome": "Ribeirão Preto",
+      "populacao_residente": 698642,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3543204",
+      "nome": "Ribeirão do Sul",
+      "populacao_residente": 4677,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3543238",
+      "nome": "Ribeirão dos Índios",
+      "populacao_residente": 2025,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3543600",
+      "nome": "Rifaina",
+      "populacao_residente": 4049,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3543709",
+      "nome": "Rincão",
+      "populacao_residente": 9098,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3543808",
+      "nome": "Rinópolis",
+      "populacao_residente": 9259,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3543907",
+      "nome": "Rio Claro",
+      "populacao_residente": 201418,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3544103",
+      "nome": "Rio Grande da Serra",
+      "populacao_residente": 44170,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3544004",
+      "nome": "Rio das Pedras",
+      "populacao_residente": 31328,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3544202",
+      "nome": "Riolândia",
+      "populacao_residente": 10309,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3543501",
+      "nome": "Riversul",
+      "populacao_residente": 5599,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3544251",
+      "nome": "Rosana",
+      "populacao_residente": 17440,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3544301",
+      "nome": "Roseira",
+      "populacao_residente": 10832,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3544509",
+      "nome": "Rubinéia",
+      "populacao_residente": 3833,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3544400",
+      "nome": "Rubiácea",
+      "populacao_residente": 2700,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3544608",
+      "nome": "Sabino",
+      "populacao_residente": 5112,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3544707",
+      "nome": "Sagres",
+      "populacao_residente": 2474,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3544806",
+      "nome": "Sales",
+      "populacao_residente": 6437,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3544905",
+      "nome": "Sales Oliveira",
+      "populacao_residente": 11411,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3545001",
+      "nome": "Salesópolis",
+      "populacao_residente": 15202,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3545100",
+      "nome": "Salmourão",
+      "populacao_residente": 4808,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3545159",
+      "nome": "Saltinho",
+      "populacao_residente": 8161,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3545209",
+      "nome": "Salto",
+      "populacao_residente": 134319,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3545407",
+      "nome": "Salto Grande",
+      "populacao_residente": 9050,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3545308",
+      "nome": "Salto de Pirapora",
+      "populacao_residente": 43748,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3545506",
+      "nome": "Sandovalina",
+      "populacao_residente": 3645,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3545605",
+      "nome": "Santa Adélia",
+      "populacao_residente": 14018,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3545704",
+      "nome": "Santa Albertina",
+      "populacao_residente": 6393,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3546009",
+      "nome": "Santa Branca",
+      "populacao_residente": 13975,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3545803",
+      "nome": "Santa Bárbara d'Oeste",
+      "populacao_residente": 183347,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3546108",
+      "nome": "Santa Clara d'Oeste",
+      "populacao_residente": 2598,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3546207",
+      "nome": "Santa Cruz da Conceição",
+      "populacao_residente": 4277,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3546256",
+      "nome": "Santa Cruz da Esperança",
+      "populacao_residente": 2116,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3546306",
+      "nome": "Santa Cruz das Palmeiras",
+      "populacao_residente": 28864,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3546405",
+      "nome": "Santa Cruz do Rio Pardo",
+      "populacao_residente": 46442,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3546504",
+      "nome": "Santa Ernestina",
+      "populacao_residente": 6118,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3546603",
+      "nome": "Santa Fé do Sul",
+      "populacao_residente": 34794,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3546702",
+      "nome": "Santa Gertrudes",
+      "populacao_residente": 23611,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3546801",
+      "nome": "Santa Isabel",
+      "populacao_residente": 53174,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3546900",
+      "nome": "Santa Lúcia",
+      "populacao_residente": 7149,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3547007",
+      "nome": "Santa Maria da Serra",
+      "populacao_residente": 5243,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3547106",
+      "nome": "Santa Mercedes",
+      "populacao_residente": 2956,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3547403",
+      "nome": "Santa Rita d'Oeste",
+      "populacao_residente": 2733,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3547502",
+      "nome": "Santa Rita do Passa Quatro",
+      "populacao_residente": 24833,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3547601",
+      "nome": "Santa Rosa de Viterbo",
+      "populacao_residente": 23411,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3547650",
+      "nome": "Santa Salete",
+      "populacao_residente": 1645,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3547205",
+      "nome": "Santana da Ponte Pensa",
+      "populacao_residente": 1670,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3547304",
+      "nome": "Santana de Parnaíba",
+      "populacao_residente": 154105,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3547700",
+      "nome": "Santo Anastácio",
+      "populacao_residente": 17963,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3547809",
+      "nome": "Santo André",
+      "populacao_residente": 748919,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3547908",
+      "nome": "Santo Antônio da Alegria",
+      "populacao_residente": 6775,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3548005",
+      "nome": "Santo Antônio de Posse",
+      "populacao_residente": 23244,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3548054",
+      "nome": "Santo Antônio do Aracanguá",
+      "populacao_residente": 8379,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3548104",
+      "nome": "Santo Antônio do Jardim",
+      "populacao_residente": 6126,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3548203",
+      "nome": "Santo Antônio do Pinhal",
+      "populacao_residente": 7133,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3548302",
+      "nome": "Santo Expedito",
+      "populacao_residente": 3000,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3548500",
+      "nome": "Santos",
+      "populacao_residente": 418608,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3548401",
+      "nome": "Santópolis do Aguapeí",
+      "populacao_residente": 3899,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3551108",
+      "nome": "Sarapuí",
+      "populacao_residente": 10369,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3551207",
+      "nome": "Sarutaiá",
+      "populacao_residente": 3704,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3551306",
+      "nome": "Sebastianópolis do Sul",
+      "populacao_residente": 3130,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3551405",
+      "nome": "Serra Azul",
+      "populacao_residente": 12746,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3551603",
+      "nome": "Serra Negra",
+      "populacao_residente": 29894,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3551504",
+      "nome": "Serrana",
+      "populacao_residente": 43909,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3551702",
+      "nome": "Sertãozinho",
+      "populacao_residente": 126887,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3551801",
+      "nome": "Sete Barras",
+      "populacao_residente": 12730,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3551900",
+      "nome": "Severínia",
+      "populacao_residente": 14576,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3552007",
+      "nome": "Silveiras",
+      "populacao_residente": 6186,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3552106",
+      "nome": "Socorro",
+      "populacao_residente": 40122,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3552205",
+      "nome": "Sorocaba",
+      "populacao_residente": 723682,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3552304",
+      "nome": "Sud Mennucci",
+      "populacao_residente": 7355,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3552403",
+      "nome": "Sumaré",
+      "populacao_residente": 279545,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3552502",
+      "nome": "Suzano",
+      "populacao_residente": 307429,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3552551",
+      "nome": "Suzanápolis",
+      "populacao_residente": 3408,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3548609",
+      "nome": "São Bento do Sapucaí",
+      "populacao_residente": 11674,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3548708",
+      "nome": "São Bernardo do Campo",
+      "populacao_residente": 810729,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3548807",
+      "nome": "São Caetano do Sul",
+      "populacao_residente": 165655,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3548906",
+      "nome": "São Carlos",
+      "populacao_residente": 254857,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3549003",
+      "nome": "São Francisco",
+      "populacao_residente": 2602,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3549409",
+      "nome": "São Joaquim da Barra",
+      "populacao_residente": 48558,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3549508",
+      "nome": "São José da Bela Vista",
+      "populacao_residente": 7626,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3549607",
+      "nome": "São José do Barreiro",
+      "populacao_residente": 3853,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3549706",
+      "nome": "São José do Rio Pardo",
+      "populacao_residente": 52205,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3549805",
+      "nome": "São José do Rio Preto",
+      "populacao_residente": 480393,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3549904",
+      "nome": "São José dos Campos",
+      "populacao_residente": 697054,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3549102",
+      "nome": "São João da Boa Vista",
+      "populacao_residente": 92547,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3549201",
+      "nome": "São João das Duas Pontes",
+      "populacao_residente": 2580,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3549250",
+      "nome": "São João de Iracema",
+      "populacao_residente": 1846,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3549300",
+      "nome": "São João do Pau d'Alho",
+      "populacao_residente": 2242,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3549953",
+      "nome": "São Lourenço da Serra",
+      "populacao_residente": 16067,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3550001",
+      "nome": "São Luiz do Paraitinga",
+      "populacao_residente": 10337,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3550100",
+      "nome": "São Manuel",
+      "populacao_residente": 37289,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3550209",
+      "nome": "São Miguel Arcanjo",
+      "populacao_residente": 32039,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3550308",
+      "nome": "São Paulo",
+      "populacao_residente": 11451999,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3550407",
+      "nome": "São Pedro",
+      "populacao_residente": 38256,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3550506",
+      "nome": "São Pedro do Turvo",
+      "populacao_residente": 7217,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3550605",
+      "nome": "São Roque",
+      "populacao_residente": 79484,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3550704",
+      "nome": "São Sebastião",
+      "populacao_residente": 81595,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3550803",
+      "nome": "São Sebastião da Grama",
+      "populacao_residente": 10441,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3550902",
+      "nome": "São Simão",
+      "populacao_residente": 13442,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3551009",
+      "nome": "São Vicente",
+      "populacao_residente": 329911,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3552601",
+      "nome": "Tabapuã",
+      "populacao_residente": 11323,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3552700",
+      "nome": "Tabatinga",
+      "populacao_residente": 14769,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3552809",
+      "nome": "Taboão da Serra",
+      "populacao_residente": 273542,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3552908",
+      "nome": "Taciba",
+      "populacao_residente": 6260,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3553005",
+      "nome": "Taguaí",
+      "populacao_residente": 12669,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3553104",
+      "nome": "Taiaçu",
+      "populacao_residente": 5677,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3553203",
+      "nome": "Taiúva",
+      "populacao_residente": 6548,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3553302",
+      "nome": "Tambaú",
+      "populacao_residente": 21435,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3553401",
+      "nome": "Tanabi",
+      "populacao_residente": 25265,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3553609",
+      "nome": "Tapiratiba",
+      "populacao_residente": 11816,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3553500",
+      "nome": "Tapiraí",
+      "populacao_residente": 7996,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3553658",
+      "nome": "Taquaral",
+      "populacao_residente": 2619,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3553708",
+      "nome": "Taquaritinga",
+      "populacao_residente": 52260,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3553807",
+      "nome": "Taquarituba",
+      "populacao_residente": 24350,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3553856",
+      "nome": "Taquarivaí",
+      "populacao_residente": 6876,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3553906",
+      "nome": "Tarabai",
+      "populacao_residente": 6536,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3553955",
+      "nome": "Tarumã",
+      "populacao_residente": 14882,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3554003",
+      "nome": "Tatuí",
+      "populacao_residente": 123942,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3554102",
+      "nome": "Taubaté",
+      "populacao_residente": 310739,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3554201",
+      "nome": "Tejupá",
+      "populacao_residente": 4127,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3554300",
+      "nome": "Teodoro Sampaio",
+      "populacao_residente": 22173,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3554409",
+      "nome": "Terra Roxa",
+      "populacao_residente": 7904,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3554508",
+      "nome": "Tietê",
+      "populacao_residente": 37663,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3554607",
+      "nome": "Timburi",
+      "populacao_residente": 2464,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3554656",
+      "nome": "Torre de Pedra",
+      "populacao_residente": 2046,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3554706",
+      "nome": "Torrinha",
+      "populacao_residente": 9335,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3554755",
+      "nome": "Trabiju",
+      "populacao_residente": 1682,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3554805",
+      "nome": "Tremembé",
+      "populacao_residente": 51173,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3554904",
+      "nome": "Três Fronteiras",
+      "populacao_residente": 6804,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3554953",
+      "nome": "Tuiuti",
+      "populacao_residente": 6778,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3555109",
+      "nome": "Tupi Paulista",
+      "populacao_residente": 15854,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3555000",
+      "nome": "Tupã",
+      "populacao_residente": 63928,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3555208",
+      "nome": "Turiúba",
+      "populacao_residente": 1818,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3555307",
+      "nome": "Turmalina",
+      "populacao_residente": 1669,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3555356",
+      "nome": "Ubarana",
+      "populacao_residente": 5365,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3555406",
+      "nome": "Ubatuba",
+      "populacao_residente": 92981,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3555505",
+      "nome": "Ubirajara",
+      "populacao_residente": 5132,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3555604",
+      "nome": "Uchoa",
+      "populacao_residente": 10394,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3555703",
+      "nome": "União Paulista",
+      "populacao_residente": 1603,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3555901",
+      "nome": "Uru",
+      "populacao_residente": 1387,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3556008",
+      "nome": "Urupês",
+      "populacao_residente": 13744,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3555802",
+      "nome": "Urânia",
+      "populacao_residente": 8833,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3556107",
+      "nome": "Valentim Gentil",
+      "populacao_residente": 14098,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3556206",
+      "nome": "Valinhos",
+      "populacao_residente": 126373,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3556305",
+      "nome": "Valparaíso",
+      "populacao_residente": 24241,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3556354",
+      "nome": "Vargem",
+      "populacao_residente": 10512,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3556453",
+      "nome": "Vargem Grande Paulista",
+      "populacao_residente": 50415,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3556404",
+      "nome": "Vargem Grande do Sul",
+      "populacao_residente": 40133,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3556602",
+      "nome": "Vera Cruz",
+      "populacao_residente": 10176,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3556701",
+      "nome": "Vinhedo",
+      "populacao_residente": 76540,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3556800",
+      "nome": "Viradouro",
+      "populacao_residente": 17414,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3556909",
+      "nome": "Vista Alegre do Alto",
+      "populacao_residente": 8109,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3556958",
+      "nome": "Vitória Brasil",
+      "populacao_residente": 1794,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3557006",
+      "nome": "Votorantim",
+      "populacao_residente": 127923,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3557105",
+      "nome": "Votuporanga",
+      "populacao_residente": 96634,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3556503",
+      "nome": "Várzea Paulista",
+      "populacao_residente": 115771,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3557154",
+      "nome": "Zacarias",
+      "populacao_residente": 2692,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3500402",
+      "nome": "Águas da Prata",
+      "populacao_residente": 7369,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3500501",
+      "nome": "Águas de Lindóia",
+      "populacao_residente": 17930,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3500550",
+      "nome": "Águas de Santa Bárbara",
+      "populacao_residente": 7177,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3500600",
+      "nome": "Águas de São Pedro",
+      "populacao_residente": 2780,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3501202",
+      "nome": "Álvares Florence",
+      "populacao_residente": 3915,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3501301",
+      "nome": "Álvares Machado",
+      "populacao_residente": 27255,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3501400",
+      "nome": "Álvaro de Carvalho",
+      "populacao_residente": 4808,
+      "estado": "SP"
+    },
+    {
+      "codigo_ibge": "3533809",
+      "nome": "Óleo",
+      "populacao_residente": 2512,
+      "estado": "SP"
+    }
+  ]
+}

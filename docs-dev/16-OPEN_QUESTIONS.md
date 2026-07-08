@@ -50,7 +50,7 @@ Consolidação do que **exige decisão humana**. Nada aqui foi decidido — quan
 **Impacto se não decidir:** TASK-002/013/015 travam; a validação de identidade obsoleta (RN-017) depende dos campos.
 **Opções possíveis:** 1. Um arquivo único `{autos:[{codigo,tipo,empresa,operante}], empresas:[...], tipos:[...]}`. 2. Arquivos separados.
 **Recomendação técnica:** arquivo único versionado, com vínculo explícito codigo→empresa/tipo (a UX da Spec 04 §5 pré-encadeia as seleções).
-**Decisão:** Pendente
+**Decisão:** **Decidida (DEC-030, 2026-07-07).** Opção 1, arquivo único `data/autos_empresas.json` (gerado de `Autos_por_empresa.csv`) + `data/municipios.json` separado (gerado de `pop_municipios.csv`, casa com `municipios_sp.geojson` por código IBGE). `operante` nasce `true` para todos, a revisar depois.
 
 ## Mapa/roteamento
 
