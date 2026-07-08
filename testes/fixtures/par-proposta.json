@@ -1,0 +1,135 @@
+{
+  "versao_schema": "1.0",
+  "autos": {
+    "codigo": "3000",
+    "tipo": "Rodoviário",
+    "empresa": "Viação Comparada Ltda.",
+    "status": "proposta",
+    "data_criacao": "2026-07-01",
+    "secoes": [
+      {
+        "uuid": "66666666-6666-4666-8666-666666666666",
+        "municipio": "Santos",
+        "nome": "Terminal Santos",
+        "servicos": [
+          {
+            "servico_uuid": "dddddddd-4444-4444-8444-dddddddddddd",
+            "geolocalizacao_ida": { "latitude": -23.9608, "longitude": -46.3339 },
+            "geolocalizacao_volta": { "latitude": -23.9611, "longitude": -46.3342 }
+          }
+        ]
+      },
+      {
+        "uuid": "77777777-7777-4777-8777-777777777777",
+        "municipio": "São Vicente",
+        "nome": "Terminal São Vicente",
+        "servicos": [
+          {
+            "servico_uuid": "dddddddd-4444-4444-8444-dddddddddddd",
+            "geolocalizacao_ida": { "latitude": -23.9631, "longitude": -46.3919 },
+            "geolocalizacao_volta": { "latitude": -23.9629, "longitude": -46.3915 }
+          }
+        ]
+      }
+    ],
+    "servicos": [
+      {
+        "uuid": "dddddddd-4444-4444-8444-dddddddddddd",
+        "numero_n": "3000-1CR",
+        "caracteristica_veiculo": "CR",
+        "carater": "principal",
+        "locais": [],
+        "matriz_distancias": [
+          { "secao_a_uuid": "66666666-6666-4666-8666-666666666666", "secao_b_uuid": "77777777-7777-4777-8777-777777777777", "distancia_trecho_ida": 8, "distancia_trecho_volta": 8, "valor_adotado_de_distancia": 9 }
+        ],
+        "matriz_seccionamento": [
+          { "secao_a_uuid": "66666666-6666-4666-8666-666666666666", "secao_b_uuid": "77777777-7777-4777-8777-777777777777", "distancia_km": 8 }
+        ],
+        "itinerarios": [
+          {
+            "sentido": "ida",
+            "paradas": [
+              { "ordem": 1, "secao_uuid": "66666666-6666-4666-8666-666666666666" },
+              { "ordem": 2, "secao_uuid": "77777777-7777-4777-8777-777777777777" }
+            ],
+            "rota": {
+              "geometria": { "type": "LineString", "coordinates": [[-46.3339, -23.9608], [-46.3919, -23.9631]] },
+              "distancia_km": 8,
+              "duracao_s": 1080,
+              "descricao_itinerario": {
+                "texto": "Santos - Terminal Santos, Rodovia dos Imigrantes, São Vicente - Terminal São Vicente.",
+                "itens": [
+                  { "tipo": "secao", "secao_uuid": "66666666-6666-4666-8666-666666666666", "rotulo": "Santos - Terminal Santos" },
+                  { "tipo": "via", "nome": "Rodovia dos Imigrantes" },
+                  { "tipo": "secao", "secao_uuid": "77777777-7777-4777-8777-777777777777", "rotulo": "São Vicente - Terminal São Vicente" }
+                ]
+              },
+              "trechos": [
+                { "parada_origem_ordem": 1, "parada_destino_ordem": 2, "distancia_km": 8, "duracao_s": 1080 }
+              ],
+              "pontos_de_rota": []
+            },
+            "viagens": [
+              {
+                "uuid": "d1d1d1d1-0000-4000-8000-000000000001",
+                "horario_saida": "08:30:00",
+                "dia_semana": "segunda",
+                "viagem_feriado": false,
+                "horarios_paradas": [
+                  { "parada_ordem": 1, "offset_horario": "00:00:00" },
+                  { "parada_ordem": 2, "offset_horario": "00:35:00" }
+                ]
+              },
+              {
+                "uuid": "d1d1d1d1-0000-4000-8000-000000000009",
+                "horario_saida": "12:00:00",
+                "dia_semana": "segunda",
+                "viagem_feriado": false,
+                "horarios_paradas": [
+                  { "parada_ordem": 1, "offset_horario": "00:00:00" },
+                  { "parada_ordem": 2, "offset_horario": "00:35:00" }
+                ]
+              }
+            ]
+          },
+          {
+            "sentido": "volta",
+            "paradas": [
+              { "ordem": 1, "secao_uuid": "77777777-7777-4777-8777-777777777777" },
+              { "ordem": 2, "secao_uuid": "66666666-6666-4666-8666-666666666666" }
+            ],
+            "rota": {
+              "geometria": { "type": "LineString", "coordinates": [[-46.3915, -23.9629], [-46.3342, -23.9611]] },
+              "distancia_km": 8,
+              "duracao_s": 1080,
+              "descricao_itinerario": {
+                "texto": "São Vicente - Terminal São Vicente, Rodovia dos Imigrantes, Santos - Terminal Santos.",
+                "itens": [
+                  { "tipo": "secao", "secao_uuid": "77777777-7777-4777-8777-777777777777", "rotulo": "São Vicente - Terminal São Vicente" },
+                  { "tipo": "via", "nome": "Rodovia dos Imigrantes" },
+                  { "tipo": "secao", "secao_uuid": "66666666-6666-4666-8666-666666666666", "rotulo": "Santos - Terminal Santos" }
+                ]
+              },
+              "trechos": [
+                { "parada_origem_ordem": 1, "parada_destino_ordem": 2, "distancia_km": 8, "duracao_s": 1080 }
+              ],
+              "pontos_de_rota": []
+            },
+            "viagens": [
+              {
+                "uuid": "d1d1d1d1-0000-4000-8000-000000000002",
+                "horario_saida": "18:00:00",
+                "dia_semana": "segunda",
+                "viagem_feriado": false,
+                "horarios_paradas": [
+                  { "parada_ordem": 1, "offset_horario": "00:00:00" },
+                  { "parada_ordem": 2, "offset_horario": "00:35:00" }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
