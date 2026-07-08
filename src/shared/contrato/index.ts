@@ -18,6 +18,7 @@ export const esquemaDocumentoOperacao = esquemaDocumentoOperacaoBase.superRefine
 );
 
 export * from "./esquema";
+export * from "./fabricas";
 export {
   coletarViolacoesEstruturais,
   type ViolacaoEstrutural,
