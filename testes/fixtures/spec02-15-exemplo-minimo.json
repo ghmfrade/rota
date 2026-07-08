@@ -1,0 +1,199 @@
+{
+  "versao_schema": "1.0",
+  "autos": {
+    "codigo": "0000",
+    "tipo": "Rodoviário",
+    "empresa": "Viação Exemplo Ltda.",
+    "status": "proposta",
+    "data_criacao": "2026-07-01",
+    "secoes": [
+      {
+        "uuid": "4da15f36-5bbe-4f4e-90e3-68029097c1b9",
+        "municipio": "Santos",
+        "nome": "Terminal Central",
+        "servicos": [
+          {
+            "servico_uuid": "b3f1c2a0-1e2d-4a3b-9c4d-5e6f7a8b9c0d",
+            "geolocalizacao_ida": { "latitude": -23.9608, "longitude": -46.3339 },
+            "geolocalizacao_volta": { "latitude": -23.9611, "longitude": -46.3342 }
+          }
+        ]
+      },
+      {
+        "uuid": "6f51076b-aaf8-4546-8530-4da1e489c880",
+        "municipio": "São Vicente",
+        "nome": "Terminal Norte",
+        "servicos": [
+          {
+            "servico_uuid": "b3f1c2a0-1e2d-4a3b-9c4d-5e6f7a8b9c0d",
+            "geolocalizacao_ida": { "latitude": -23.9631, "longitude": -46.3919 },
+            "geolocalizacao_volta": { "latitude": -23.9629, "longitude": -46.3915 }
+          }
+        ]
+      },
+      {
+        "uuid": "63344e28-4722-4a8b-ae9d-1862e8daded4",
+        "municipio": "Praia Grande",
+        "nome": "Rodoviária Praia Grande",
+        "servicos": [
+          {
+            "servico_uuid": "b3f1c2a0-1e2d-4a3b-9c4d-5e6f7a8b9c0d",
+            "geolocalizacao_ida": { "latitude": -24.0084, "longitude": -46.4025 },
+            "geolocalizacao_volta": { "latitude": -24.0081, "longitude": -46.4020 }
+          }
+        ]
+      }
+    ],
+    "servicos": [
+      {
+        "uuid": "b3f1c2a0-1e2d-4a3b-9c4d-5e6f7a8b9c0d",
+        "numero_n": "0000-1CR",
+        "caracteristica_veiculo": "CR",
+        "carater": "principal",
+        "locais": [
+          {
+            "uuid": "c2afe932-bf0f-4338-8ff4-63cd908b9033",
+            "nome": "Ponto de Embarque Praia",
+            "municipio": "Praia Grande",
+            "geolocalizacao_ida": { "latitude": -24.0050, "longitude": -46.3980 }
+          }
+        ],
+        "matriz_distancias": [
+          { "secao_a_uuid": "4da15f36-5bbe-4f4e-90e3-68029097c1b9", "secao_b_uuid": "6f51076b-aaf8-4546-8530-4da1e489c880", "distancia_trecho_ida": 8, "distancia_trecho_volta": 8, "valor_adotado_de_distancia": 8 },
+          { "secao_a_uuid": "6f51076b-aaf8-4546-8530-4da1e489c880", "secao_b_uuid": "63344e28-4722-4a8b-ae9d-1862e8daded4", "distancia_trecho_ida": 6, "distancia_trecho_volta": 6.1, "valor_adotado_de_distancia": 6.05 },
+          { "secao_a_uuid": "4da15f36-5bbe-4f4e-90e3-68029097c1b9", "secao_b_uuid": "63344e28-4722-4a8b-ae9d-1862e8daded4", "distancia_trecho_ida": 14, "distancia_trecho_volta": 14.1, "valor_adotado_de_distancia": 14.05 }
+        ],
+        "matriz_seccionamento": [
+          { "secao_a_uuid": "4da15f36-5bbe-4f4e-90e3-68029097c1b9", "secao_b_uuid": "6f51076b-aaf8-4546-8530-4da1e489c880", "distancia_km": 8 },
+          { "secao_a_uuid": "6f51076b-aaf8-4546-8530-4da1e489c880", "secao_b_uuid": "63344e28-4722-4a8b-ae9d-1862e8daded4", "distancia_km": 6 },
+          { "secao_a_uuid": "4da15f36-5bbe-4f4e-90e3-68029097c1b9", "secao_b_uuid": "63344e28-4722-4a8b-ae9d-1862e8daded4", "distancia_km": 14 }
+        ],
+        "itinerarios": [
+          {
+            "sentido": "ida",
+            "paradas": [
+              { "ordem": 1, "secao_uuid": "4da15f36-5bbe-4f4e-90e3-68029097c1b9" },
+              { "ordem": 2, "secao_uuid": "6f51076b-aaf8-4546-8530-4da1e489c880" },
+              { "ordem": 3, "local_uuid": "c2afe932-bf0f-4338-8ff4-63cd908b9033" },
+              { "ordem": 4, "secao_uuid": "63344e28-4722-4a8b-ae9d-1862e8daded4" }
+            ],
+            "rota": {
+              "geometria": { "type": "LineString", "coordinates": [[-46.3339, -23.9608], [-46.3919, -23.9631], [-46.4025, -24.0084]] },
+              "distancia_km": 14,
+              "duracao_s": 1800,
+              "descricao_itinerario": {
+                "texto": "Santos - Terminal Central, Avenida Ana Costa, Rodovia dos Imigrantes, São Vicente - Terminal Norte, Avenida Presidente Wilson, Praia Grande - Rodoviária Praia Grande.",
+                "itens": [
+                  { "tipo": "secao", "secao_uuid": "4da15f36-5bbe-4f4e-90e3-68029097c1b9", "rotulo": "Santos - Terminal Central" },
+                  { "tipo": "via", "nome": "Avenida Ana Costa" },
+                  { "tipo": "via", "nome": "Rodovia dos Imigrantes" },
+                  { "tipo": "secao", "secao_uuid": "6f51076b-aaf8-4546-8530-4da1e489c880", "rotulo": "São Vicente - Terminal Norte" },
+                  { "tipo": "via", "nome": "Avenida Presidente Wilson" },
+                  { "tipo": "secao", "secao_uuid": "63344e28-4722-4a8b-ae9d-1862e8daded4", "rotulo": "Praia Grande - Rodoviária Praia Grande" }
+                ]
+              },
+              "trechos": [
+                { "parada_origem_ordem": 1, "parada_destino_ordem": 2, "distancia_km": 8, "duracao_s": 1080 },
+                { "parada_origem_ordem": 2, "parada_destino_ordem": 3, "distancia_km": 3.5, "duracao_s": 420 },
+                { "parada_origem_ordem": 3, "parada_destino_ordem": 4, "distancia_km": 2.5, "duracao_s": 300 }
+              ],
+              "pontos_de_rota": [
+                { "apos_parada_ordem": 1, "latitude": -23.9615, "longitude": -46.3650 }
+              ]
+            },
+            "viagens": [
+              {
+                "uuid": "ba65e897-1113-4c79-922b-ae0e790f55c4",
+                "horario_saida": "08:00:00",
+                "dia_semana": "segunda",
+                "viagem_feriado": false,
+                "horarios_paradas": [
+                  { "parada_ordem": 1, "offset_horario": "00:00:00" },
+                  { "parada_ordem": 2, "offset_horario": "00:37:00" },
+                  { "parada_ordem": 3, "offset_horario": "00:52:00" },
+                  { "parada_ordem": 4, "offset_horario": "01:10:00" }
+                ]
+              },
+              {
+                "uuid": "0f7c2b1d-9a4e-4d2b-8c3f-6e5a1b2c3d4e",
+                "horario_saida": "08:00:00",
+                "dia_semana": "terca",
+                "viagem_feriado": false,
+                "horarios_paradas": [
+                  { "parada_ordem": 1, "offset_horario": "00:00:00" },
+                  { "parada_ordem": 2, "offset_horario": "00:37:00" },
+                  { "parada_ordem": 3, "offset_horario": "00:52:00" },
+                  { "parada_ordem": 4, "offset_horario": "01:10:00" }
+                ]
+              },
+              {
+                "uuid": "7e1d4c3b-2a5f-4e6d-9b8c-0a1f2e3d4c5b",
+                "horario_saida": "08:00:00",
+                "dia_semana": "segunda",
+                "viagem_feriado": true,
+                "horarios_paradas": [
+                  { "parada_ordem": 1, "offset_horario": "00:00:00" },
+                  { "parada_ordem": 2, "offset_horario": "00:37:00" },
+                  { "parada_ordem": 3, "offset_horario": "00:52:00" },
+                  { "parada_ordem": 4, "offset_horario": "01:10:00" }
+                ]
+              }
+            ]
+          },
+          {
+            "sentido": "volta",
+            "paradas": [
+              { "ordem": 1, "secao_uuid": "63344e28-4722-4a8b-ae9d-1862e8daded4" },
+              { "ordem": 2, "secao_uuid": "6f51076b-aaf8-4546-8530-4da1e489c880" },
+              { "ordem": 3, "secao_uuid": "4da15f36-5bbe-4f4e-90e3-68029097c1b9" }
+            ],
+            "rota": {
+              "geometria": { "type": "LineString", "coordinates": [[-46.4020, -24.0081], [-46.3915, -23.9629], [-46.3342, -23.9611]] },
+              "distancia_km": 14.1,
+              "duracao_s": 1830,
+              "descricao_itinerario": {
+                "texto": "Praia Grande - Rodoviária Praia Grande, Avenida Presidente Wilson, São Vicente - Terminal Norte, Rodovia dos Imigrantes, Avenida Ana Costa, Santos - Terminal Central.",
+                "itens": [
+                  { "tipo": "secao", "secao_uuid": "63344e28-4722-4a8b-ae9d-1862e8daded4", "rotulo": "Praia Grande - Rodoviária Praia Grande" },
+                  { "tipo": "via", "nome": "Avenida Presidente Wilson" },
+                  { "tipo": "secao", "secao_uuid": "6f51076b-aaf8-4546-8530-4da1e489c880", "rotulo": "São Vicente - Terminal Norte" },
+                  { "tipo": "via", "nome": "Rodovia dos Imigrantes" },
+                  { "tipo": "via", "nome": "Avenida Ana Costa" },
+                  { "tipo": "secao", "secao_uuid": "4da15f36-5bbe-4f4e-90e3-68029097c1b9", "rotulo": "Santos - Terminal Central" }
+                ]
+              },
+              "trechos": [
+                { "parada_origem_ordem": 1, "parada_destino_ordem": 2, "distancia_km": 6.1, "duracao_s": 750 },
+                { "parada_origem_ordem": 2, "parada_destino_ordem": 3, "distancia_km": 8, "duracao_s": 1080 }
+              ]
+            },
+            "viagens": [
+              {
+                "uuid": "a3d26471-1e60-403c-965b-42ed79cedd6e",
+                "horario_saida": "17:30:00",
+                "dia_semana": "segunda",
+                "viagem_feriado": false,
+                "horarios_paradas": [
+                  { "parada_ordem": 1, "offset_horario": "00:00:00" },
+                  { "parada_ordem": 2, "offset_horario": "00:15:00" },
+                  { "parada_ordem": 3, "offset_horario": "00:35:00" }
+                ]
+              },
+              {
+                "uuid": "5b9e8d7c-6f5a-4b3c-8d2e-1f0a9b8c7d6e",
+                "horario_saida": "17:30:00",
+                "dia_semana": "terca",
+                "viagem_feriado": false,
+                "horarios_paradas": [
+                  { "parada_ordem": 1, "offset_horario": "00:00:00" },
+                  { "parada_ordem": 2, "offset_horario": "00:15:00" },
+                  { "parada_ordem": 3, "offset_horario": "00:35:00" }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

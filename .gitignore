@@ -8,6 +8,12 @@ node_modules/
 out/
 dist/
 coverage/
+next-env.d.ts
+*.tsbuildinfo
+
+# Artefatos de teste (Playwright)
+test-results/
+playwright-report/
 
 # Ambiente e logs
 .env

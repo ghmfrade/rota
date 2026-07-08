@@ -57,13 +57,12 @@ Português em código, comentários, docs e mensagens. Nomenclatura oficial das 
 
 ## Comandos
 
-> ⚠ **Pendente** — preencher quando a TASK-001 criar o scaffold Next.js.
-
-- Dev: _(pendente)_
-- Typecheck: _(pendente)_
-- Lint: _(pendente)_
-- Testes unitários: _(pendente)_
-- E2E: _(pendente)_
+- Dev: `npm run dev`
+- Build (export estático em `out/`): `npm run build`
+- Typecheck: `npm run typecheck`
+- Lint: `npm run lint`
+- Testes unitários (Vitest): `npm test` (watch: `npm run test:watch`)
+- E2E (Playwright): `npm run test:e2e` — sobe `next dev` sozinho; requer navegador instalado (`npx playwright install chromium`)
 
 ## Limites do enforcement automático
 
