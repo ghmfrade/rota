@@ -215,6 +215,7 @@
 **Descrição:** Comparador/Ingestor, sem histórico de inserção, validam a Seção pela checagem fraca: centroide de todos os pontos finais, todos a ≤ 350 m. Violação → **alerta técnico** (Comparador não bloqueia).
 **Origem:** Spec 02 §5.2; Spec 03 §7.3; Spec 05 §4.1.
 **Tipo:** Validação. **Criticidade:** Média. **Afeta:** C, I, T.
+**Observações:** severidade nos leitores estáticos = alerta técnico, nunca bloqueante — o pareado de Local (RN-032) segue a mesma regra (Q-013 decidida → DEC-032).
 
 ## RN-029 — Município derivado por ponto-em-polígono
 
@@ -243,6 +244,7 @@
 **Descrição:** Local tem ao menos uma de `geolocalizacao_ida`/`geolocalizacao_volta` (independentemente opcionais). Se ambas presentes, distância Haversine entre elas ≤ 350 m; acima disso, dois Locais distintos com nomes diferentes. Parada de sentido X só referencia Local com `geolocalizacao_X` preenchida.
 **Origem:** Spec 02 §7.1; Spec 03 §7.4.
 **Tipo:** Validação. **Criticidade:** Alta. **Afeta:** F, C, I, J, T.
+**Observações:** bloqueante no gesto de edição do Formulário; nos leitores estáticos (import, Comparador, Ingestor) é **alerta técnico não bloqueante** (Q-013 decidida → DEC-032).
 
 ---
 

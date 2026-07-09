@@ -21,6 +21,15 @@ Consolidação do que **exige decisão humana**. Nada aqui foi decidido — quan
 **Recomendação técnica:** opção 1, em edição pontual de spec autorizada por humano.
 **Decisão:** **Decidida (DEC-027, 2026-07-07).** §3.7.3 corrigido: Locais não aparecem no texto nem em `itens`; remete a Spec 02 §8 (sem par próprio em `matriz_distancias`).
 
+## Q-013 — Severidade do 350 m pareado de Local (RN-032) nos leitores estáticos
+
+**Contexto:** A checagem dos 350 m entre `geolocalizacao_ida` e `geolocalizacao_volta` do mesmo Local (RN-032; Spec 03 §7.4) é bloqueante no gesto de inserção do Formulário. Para leitores estáticos (import do Formulário, Comparador, Ingestor), a Spec 05 §4.1 lista explicitamente como **alerta técnico** apenas a checagem fraca de Seção por centroide (RN-028); não há linha dedicada ao pareado de Local. Faltava fixar a severidade da checagem pareada de Local **no leitor** (bloqueante × alerta técnico). Levantada na TASK-012 como inferência controlada.
+**Spec relacionada:** Spec 03 §7.4; Spec 05 §4.1; Spec 02 §7.1.
+**Impacto se não decidir:** a TASK-012 (import) e a TASK-035 (Comparador) precisam saber se um Local com Ida/Volta a > 350 m recusa o arquivo ou só sinaliza; risco de dois leitores tratarem o mesmo arquivo de forma diferente.
+**Opções possíveis:** 1. Alerta técnico (não bloqueia), igual à checagem de Seção (RN-028). 2. Bloqueante no leitor.
+**Recomendação técnica:** opção 1 — RN-091 trata "350 m estático" genericamente como alerta técnico e a Spec 03 §7.4 aplica a pareada a leitores; não faz sentido ser mais rígido com o Local (parada secundária, sem relevância tarifária) do que com a Seção.
+**Decisão:** **Decidida (DEC-032, 2026-07-09).** Opção 1: no leitor estático, o 350 m pareado de Local é **alerta técnico não bloqueante**. Implementada na TASK-012 (`shared/checagens-leitor`).
+
 ## Arquitetura
 
 ## Q-003 — Stack de bibliotecas (validação, PDF, testes)
