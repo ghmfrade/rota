@@ -75,7 +75,7 @@
 ## TASK-008 — Módulo de tipificação tipo × característica
 
 **Prioridade:** Alta · **Fase:** Validações de domínio
-**Resumo:** Tabela da Spec 03 §10.2 como módulo puro: características permitidas por tipo, famílias, litoralidade, veículo único no semiurbano; usado por schema, dropdown e revalidação na troca de tipo.
+**Resumo:** Tabela da Spec 03 §10.2 como módulo puro: características permitidas por tipo, famílias, litoralidade, veículo único no semiurbano, forma convencional (padrão) por tipo e reconversão de Serviços na troca de tipo (DEC-034); usado por schema, dropdown e etapa Identificação.
 **Regras RN:** RN-019..023. **Depende de:** TASK-003. (Q-001 decidida — DEC-026: partição fechada, sem bloqueio.)
 **Critérios de aceite resumidos:** matriz completa testada; `SU` em Rodoviário recusado; `CR`+`CL` juntos recusados; `ME`/`ML`/`MM` recusados em Litorâneo e `MEL`/`MLL`/`MML` recusados em Rodoviário; `EX`/`LE`/`MX` aceitos nos dois; `SL` inexistente no enum.
 **Testes esperados:** unitários (tabela inteira, válidos e inválidos).
@@ -130,9 +130,9 @@
 ## TASK-015 — Etapa Identificação
 
 **Prioridade:** Alta · **Fase:** Formulário
-**Resumo:** Seleção de Autos/empresa/tipo das listas; campos não editáveis pós-criação; troca de tipo revalida tipificação; selo de status.
+**Resumo:** Seleção de Autos/empresa/tipo das listas; `codigo`/`empresa` não editáveis pós-criação; `tipo` editável (troca reconverte Serviços incompatíveis à forma convencional do tipo + aviso — DEC-034); selo de status.
 **Regras RN:** RN-016, RN-023. **Depende de:** TASK-008, TASK-013.
-**Testes esperados:** E2E; unitário da revalidação.
+**Testes esperados:** E2E; unitário da reconversão na troca de tipo.
 
 ## TASK-016 — Etapa Serviços (CRUD + duplicar)
 

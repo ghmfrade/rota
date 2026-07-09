@@ -173,11 +173,11 @@
 **Tipo:** Validação. **Criticidade:** Alta. **Afeta:** F, C, I, J, T.
 **Observações:** Q-001 **decidida** (DEC-026): partição código-a-código fechada na Spec 03 §10.2; `SL` não existe.
 
-## RN-023 — Trocar o tipo revalida os Serviços
+## RN-023 — Trocar o tipo reconverte os Serviços ao padrão do tipo
 
-**Descrição:** Trocar o `tipo` do Autos com Serviços cadastrados que violem o novo tipo gera bloqueio/alerta no Formulário.
-**Origem:** Spec 03 §10.4; Spec 04 §5.
-**Tipo:** Validação | UI. **Criticidade:** Média. **Afeta:** F, T.
+**Descrição:** O `tipo` do Autos é editável a qualquer momento (documento novo ou carregado; `codigo`/`empresa` não são editáveis após criado). Ao trocar o `tipo`, cada Serviço cuja `caracteristica_veiculo` não pertença ao novo tipo é **reconvertido automaticamente para a forma convencional (padrão) do tipo** (`Rodoviário`→`CR`, `Rodoviário Litorâneo`→`CL`, `Semiurbano`→`SU`, `Semiurbano Litorâneo`→`SUL`), com **aviso** listando o que mudou. **Nunca bloqueia** (a reconversão é sempre possível — o padrão pertence ao tipo).
+**Origem:** Spec 03 §10.4; Spec 04 §5; DEC-034.
+**Tipo:** Domínio | UI. **Criticidade:** Média. **Afeta:** F, T.
 
 ## RN-024 — `carater` é campo explícito
 

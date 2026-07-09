@@ -2,7 +2,7 @@
 
 **Projeto:** ROTA — Registro de Operação e Tabelas de Autos
 **Depende de:** [Spec 01 — Visão Geral do Sistema](01-visao-geral.md) e [Spec 02 — Esquema do JSON de Operação](02-esquema-json-operacao.md)
-**Status:** Em definição — v0.5 (códigos de característica definitivos: `CR`/`CL`, `EX`, `LE`, `ME`/`MEL`, `ML`/`MLL`, `MX`, `MM`/`MML`; sem `SL`; partição código-a-código fechada em §10.2; supera os códigos `RO`/`ROL`/mistos "M\*" da v0.4)
+**Status:** Em definição — v0.6 (§10.4: trocar o `tipo` reconverte Serviços incompatíveis à forma convencional do tipo, com aviso, nunca bloqueia — DEC-034. v0.5: códigos de característica definitivos: `CR`/`CL`, `EX`, `LE`, `ME`/`MEL`, `ML`/`MLL`, `MX`, `MM`/`MML`; sem `SL`; partição código-a-código fechada em §10.2; supera os códigos `RO`/`ROL`/mistos "M\*" da v0.4)
 **Escopo:** Os algoritmos e decisões de negócio que produzem e validam os valores do JSON de operação — cálculo de rota (OSRM) e pontos de rota que forçam o traçado, composição da `descricao_itinerario` a partir dos nomes de via do OSRM, determinação do município por geolocalização, cálculo de `matriz_distancias`, composição de `valor_adotado_de_distancia`, sugestão de menor distância para `matriz_seccionamento`, algoritmo de centroide e da regra dos 350 m, sugestão e redistribuição dos horários de passagem (`offset_horario`), semântica de `viagem_feriado` e contagem de viagens/opções de deslocamento, regras de tipificação `tipo` × `caracteristica_veiculo`, e a referência (externa) à tabela de tarifa. **Não é escopo desta spec:** a forma do JSON (é a [Spec 02](02-esquema-json-operacao.md)); UI, mapa, import/export e PDF (Spec 04); diff (Spec 05); PostgreSQL (Spec 06). Onde um cálculo tem parte "de negócio" (aqui) e parte "de tela" (Spec 04), a fronteira está explícita em cada seção e consolidada em §12.
 
 ---
@@ -702,7 +702,7 @@ Cada `caracteristica_veiculo` pertence a **uma de duas famílias**, e o `tipo` d
 
 ### 10.4 Casos de borda
 
-- **Trocar o `tipo` do Autos** com Serviços já cadastrados que violem o novo tipo: o Formulário deve bloquear/alertar — ex.: mudar de Rodoviário para Semiurbano com Serviços cujo veículo não é `SU`; mudar de Semiurbano para Rodoviário (o `SU` não é característica rodoviária válida); mudar litoralidade com `CR`↔`CL` (ou mistos `ME`↔`MEL`, `ML`↔`MLL`, `MM`↔`MML`) ou `SU`↔`SUL` inconsistente. Política de UI é Spec 04; a **regra** violada é esta §10.
+- **Trocar o `tipo` do Autos** com Serviços já cadastrados que violem o novo tipo: o Formulário **reconverte** cada Serviço incompatível para a **forma convencional (padrão)** do novo tipo — `Rodoviário`→`CR`, `Rodoviário Litorâneo`→`CL`, `Semiurbano`→`SU`, `Semiurbano Litorâneo`→`SUL` — e **avisa** quais mudaram; **nunca bloqueia** (DEC-034). Ex.: de Rodoviário para Semiurbano, todo Serviço vira `SU`; de Semiurbano para Rodoviário, o `SU` (inválido no rodoviário) vira `CR`; ao mudar a litoralidade, `CR`→`CL` e os mistos não-litorâneos `ME`/`ML`/`MM`→`CL` (reconversão sempre ao padrão, **não** remapeamento por código como `ME`→`MEL`). A reconversão é sempre possível — o padrão pertence ao tipo — por isso não há caso de bloqueio. A política de UI (o aviso) é Spec 04 §5; a **regra** de reconversão é esta §10.
 - **`MX` (misto executivo + leito):** mesmo código nos dois tipos Rodoviários — não existem executivo nem leito litorâneos, logo não há variante litorânea a distinguir (§10.3, regra 3). Já os mistos completos têm códigos distintos por litoralidade: `MM` (Rodoviário) × `MML` (Rodoviário Litorâneo).
 
 ---

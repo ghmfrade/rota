@@ -24,7 +24,7 @@
 **Pode ser referenciado por:** validação de tipificação de cada Serviço.
 **Tem UUID estável?** Não (enum).
 **Entra no JSON?** Sim. **Entra no PDF?** Sim. **Participa de tarifa?** Não. **Participa de rota?** Não.
-**Observações de implementação:** trocar o tipo com Serviços incompatíveis é bloqueio/alerta (RN-023).
+**Observações de implementação:** o `tipo` é editável a qualquer momento; ao trocá-lo, Serviços com `caracteristica_veiculo` incompatível são reconvertidos para a forma convencional (padrão) do tipo, com aviso — nunca bloqueia (RN-023, DEC-034).
 
 ## Empresa
 

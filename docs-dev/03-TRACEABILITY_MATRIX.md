@@ -24,7 +24,7 @@
 | RN-017 | Spec 01 §8; 04 §3.1/§14 | Import | F | validação de carregamento | U + INT | Alta |
 | RN-018 | Spec 02 §14; 04 §6 | Autos/Seções | F/C/I | validador estrutural + remoção em cascata | U | Média |
 | RN-019..022 | Spec 01 §7; 03 §10 | Tipificação | F/C/I | módulo de tipificação (tabela por tipo) | U (tabela completa, casos inválidos) | Alta |
-| RN-023 | Spec 03 §10.4; 04 §5 | Troca de tipo | F | revalidação reativa | U + E2E | Média |
+| RN-023 | Spec 03 §10.4; 04 §5; DEC-034 | Troca de tipo | F | reconversão ao padrão + aviso | U + E2E | Média |
 | RN-024 | Spec 02 §6 | Serviço.carater | F/C | schema enum | CONTRATO | Média |
 | RN-025 | Spec 02 §5 | Seção | F/C/I | modelo de dados | CONTRATO | Alta |
 | RN-026 | Spec 02 §5.1 | SeçãoServiço | F/C/I | validador (direcionalidade × geoloc) | U | Alta |
