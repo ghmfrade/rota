@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import type { SessaoFormulario } from "@/formulario/sessao";
+import { identidadeDaSessao, type SessaoFormulario } from "@/formulario/sessao";
 import { coletarPendencias } from "@/formulario/pendencias";
+import { EtapaIdentificacao } from "@/formulario/identificacao";
 import { ETAPAS, rotuloEtapa, type IdEtapa } from "./etapas";
 import { PainelPendencias } from "./painel-pendencias";
 
@@ -23,6 +24,7 @@ import { PainelPendencias } from "./painel-pendencias";
 
 interface PropsLayoutFormulario {
   sessao: SessaoFormulario;
+  aoAtualizarSessao: (sessao: SessaoFormulario) => void;
 }
 
 interface DadosCabecalho {
@@ -33,25 +35,29 @@ interface DadosCabecalho {
 }
 
 // Cabeçalho persistente (Spec 04 §4): código do Autos, empresa, tipo e selo de
-// status. No modo "carregado" os dados vêm do documento (Spec 02 §4). No modo
-// "novo" a identidade ainda não foi escolhida (é a etapa Identificação —
-// TASK-015): exibe "a definir" e não há selo de status (inferência controlada
-// registrada na análise da TASK-014 — não inventar `status` para um documento
-// que ainda não o tem; `status` só existe com identidade definida).
+// status. Lê a identidade corrente da sessão (Spec 02 §4), qualquer que seja o
+// modo. No modo "novo" antes de o usuário selecionar o Autos na etapa
+// Identificação (TASK-015) a identidade é indefinida: exibe "a definir" e não há
+// selo de status (inferência controlada da TASK-014 — não inventar `status` para
+// um documento que ainda não o tem). Depois de definida, o cabeçalho reflete
+// reativamente as edições da Identificação (ex.: troca de `tipo`).
 function dadosCabecalho(sessao: SessaoFormulario): DadosCabecalho {
-  if (sessao.modo === "carregado") {
-    const { autos } = sessao.documento;
+  const identidade = identidadeDaSessao(sessao);
+  if (identidade) {
     return {
-      codigo: autos.codigo,
-      empresa: autos.empresa,
-      tipo: autos.tipo,
-      status: autos.status,
+      codigo: identidade.codigo,
+      empresa: identidade.empresa,
+      tipo: identidade.tipo,
+      status: identidade.status,
     };
   }
   return { codigo: "a definir", empresa: "a definir", tipo: "a definir" };
 }
 
-export function LayoutFormulario({ sessao }: PropsLayoutFormulario) {
+export function LayoutFormulario({
+  sessao,
+  aoAtualizarSessao,
+}: PropsLayoutFormulario) {
   const [etapaAtual, definirEtapa] = useState<IdEtapa>("identificacao");
 
   // Pendências recomputadas a cada render a partir da sessão (NEG-004: nada
@@ -124,9 +130,17 @@ export function LayoutFormulario({ sessao }: PropsLayoutFormulario) {
         aria-label={rotuloEtapa(etapaAtual)}
       >
         <h2>{rotuloEtapa(etapaAtual)}</h2>
-        <p>
-          Etapa em construção — o conteúdo será implementado nas próximas tasks.
-        </p>
+        {etapaAtual === "identificacao" ? (
+          <EtapaIdentificacao
+            sessao={sessao}
+            aoAtualizarSessao={aoAtualizarSessao}
+          />
+        ) : (
+          <p>
+            Etapa em construção — o conteúdo será implementado nas próximas
+            tasks.
+          </p>
+        )}
       </section>
     </div>
   );

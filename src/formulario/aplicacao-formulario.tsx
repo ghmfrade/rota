@@ -27,5 +27,5 @@ export function AplicacaoFormulario() {
     );
   }
 
-  return <LayoutFormulario sessao={sessao} />;
+  return <LayoutFormulario sessao={sessao} aoAtualizarSessao={definirSessao} />;
 }
