@@ -1,3 +1,5 @@
+import { TelaInicial } from "@/formulario/tela-inicial";
+
 export default function PaginaInicial() {
   return (
     <main>
@@ -8,6 +10,7 @@ export default function PaginaInicial() {
         o processamento ocorre no navegador; nada é salvo no servidor —
         exportar o JSON de operação é o salvar.
       </p>
+      <TelaInicial />
     </main>
   );
 }

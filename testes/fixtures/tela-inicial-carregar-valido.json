@@ -1,0 +1,87 @@
+{
+  "versao_schema": "1.0",
+  "autos": {
+    "codigo": "1",
+    "tipo": "Semiurbano",
+    "empresa": "RAPIDO LUXO CAMPINAS LTDA",
+    "status": "proposta",
+    "data_criacao": "2026-07-01",
+    "secoes": [
+      {
+        "uuid": "6fa6d5b7-8fc1-4492-8924-b3377ba88824",
+        "municipio": "Santos",
+        "nome": "Terminal Santos",
+        "servicos": [
+          {
+            "servico_uuid": "4734ea4b-9107-4808-b919-bf4af223834a",
+            "geolocalizacao_ida": { "latitude": -23.9608, "longitude": -46.3339 }
+          }
+        ]
+      },
+      {
+        "uuid": "77365fa8-d785-4af3-a57a-fc28a0397fbc",
+        "municipio": "São Vicente",
+        "nome": "Terminal São Vicente",
+        "servicos": [
+          {
+            "servico_uuid": "4734ea4b-9107-4808-b919-bf4af223834a",
+            "geolocalizacao_ida": { "latitude": -23.9631, "longitude": -46.3919 }
+          }
+        ]
+      }
+    ],
+    "servicos": [
+      {
+        "uuid": "4734ea4b-9107-4808-b919-bf4af223834a",
+        "numero_n": "0001-1SU",
+        "caracteristica_veiculo": "SU",
+        "carater": "principal",
+        "locais": [],
+        "matriz_distancias": [
+          { "secao_a_uuid": "6fa6d5b7-8fc1-4492-8924-b3377ba88824", "secao_b_uuid": "77365fa8-d785-4af3-a57a-fc28a0397fbc", "distancia_trecho_ida": 8, "valor_adotado_de_distancia": 8 }
+        ],
+        "matriz_seccionamento": [
+          { "secao_a_uuid": "6fa6d5b7-8fc1-4492-8924-b3377ba88824", "secao_b_uuid": "77365fa8-d785-4af3-a57a-fc28a0397fbc", "distancia_km": 8 }
+        ],
+        "itinerarios": [
+          {
+            "sentido": "ida",
+            "paradas": [
+              { "ordem": 1, "secao_uuid": "6fa6d5b7-8fc1-4492-8924-b3377ba88824" },
+              { "ordem": 2, "secao_uuid": "77365fa8-d785-4af3-a57a-fc28a0397fbc" }
+            ],
+            "rota": {
+              "geometria": { "type": "LineString", "coordinates": [[-46.3339, -23.9608], [-46.3919, -23.9631]] },
+              "distancia_km": 8,
+              "duracao_s": 1080,
+              "descricao_itinerario": {
+                "texto": "Santos - Terminal Santos, Rodovia dos Imigrantes, São Vicente - Terminal São Vicente.",
+                "itens": [
+                  { "tipo": "secao", "secao_uuid": "6fa6d5b7-8fc1-4492-8924-b3377ba88824", "rotulo": "Santos - Terminal Santos" },
+                  { "tipo": "via", "nome": "Rodovia dos Imigrantes" },
+                  { "tipo": "secao", "secao_uuid": "77365fa8-d785-4af3-a57a-fc28a0397fbc", "rotulo": "São Vicente - Terminal São Vicente" }
+                ]
+              },
+              "trechos": [
+                { "parada_origem_ordem": 1, "parada_destino_ordem": 2, "distancia_km": 8, "duracao_s": 1080 }
+              ],
+              "pontos_de_rota": []
+            },
+            "viagens": [
+              {
+                "uuid": "c1c1c1c1-0000-4000-8000-000000000101",
+                "horario_saida": "07:00:00",
+                "dia_semana": "segunda",
+                "viagem_feriado": false,
+                "horarios_paradas": [
+                  { "parada_ordem": 1, "offset_horario": "00:00:00" },
+                  { "parada_ordem": 2, "offset_horario": "00:35:00" }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
