@@ -4,9 +4,11 @@ import {
   TIPOS_DE_AUTOS,
 } from "../../../src/shared/contrato/esquema";
 import {
+  caracteristicaPadrao,
   caracteristicaPermitida,
   caracteristicasPermitidas,
   familiaDoTipo,
+  reconverterServicosParaTipo,
   servicosIncompativeisComTipo,
   TABELA_TIPIFICACAO,
   validarConjuntoDeCaracteristicas,
@@ -206,6 +208,111 @@ describe("servicosIncompativeisComTipo — revalidação ao trocar tipo (RN-023)
     expect(
       servicosIncompativeisComTipo("Rodoviário", ["CR", "EX", "MX"]),
     ).toEqual([]);
+  });
+});
+
+describe("caracteristicaPadrao — forma convencional do tipo (DEC-034)", () => {
+  it("Rodoviário → CR", () => {
+    expect(caracteristicaPadrao("Rodoviário")).toBe("CR");
+  });
+
+  it("Rodoviário Litorâneo → CL", () => {
+    expect(caracteristicaPadrao("Rodoviário Litorâneo")).toBe("CL");
+  });
+
+  it("Semiurbano → SU", () => {
+    expect(caracteristicaPadrao("Semiurbano")).toBe("SU");
+  });
+
+  it("Semiurbano Litorâneo → SUL", () => {
+    expect(caracteristicaPadrao("Semiurbano Litorâneo")).toBe("SUL");
+  });
+
+  it("o padrão é sempre permitido no próprio tipo (garante que nunca bloqueia)", () => {
+    for (const tipo of TIPOS_DE_AUTOS) {
+      expect(caracteristicaPermitida(tipo, caracteristicaPadrao(tipo))).toBe(
+        true,
+      );
+    }
+  });
+});
+
+describe("reconverterServicosParaTipo — troca de tipo (RN-023, DEC-034)", () => {
+  it("Rodoviário → Semiurbano: todo Serviço vira SU, alterações registram de/para", () => {
+    const { caracteristicas, alteracoes } = reconverterServicosParaTipo(
+      "Semiurbano",
+      ["CR", "EX"],
+    );
+    expect(caracteristicas).toEqual(["SU", "SU"]);
+    expect(alteracoes).toEqual([
+      { indice: 0, de: "CR", para: "SU" },
+      { indice: 1, de: "EX", para: "SU" },
+    ]);
+  });
+
+  it("Semiurbano → Rodoviário: o SU (inválido no rodoviário) vira CR", () => {
+    const { caracteristicas, alteracoes } = reconverterServicosParaTipo(
+      "Rodoviário",
+      ["SU", "SU"],
+    );
+    expect(caracteristicas).toEqual(["CR", "CR"]);
+    expect(alteracoes).toHaveLength(2);
+    expect(alteracoes.every((a) => a.para === "CR")).toBe(true);
+  });
+
+  it("troca de litoralidade: CR e ME viram CL; EX (neutro) é preservado", () => {
+    const { caracteristicas, alteracoes } = reconverterServicosParaTipo(
+      "Rodoviário Litorâneo",
+      ["CR", "EX", "ME"],
+    );
+    // EX é neutro à litoralidade — permanece; CR e ME (não-litorâneos) → CL.
+    expect(caracteristicas).toEqual(["CL", "EX", "CL"]);
+    expect(alteracoes).toEqual([
+      { indice: 0, de: "CR", para: "CL" },
+      { indice: 2, de: "ME", para: "CL" },
+    ]);
+  });
+
+  it("reconversão é sempre ao padrão (cega), não remapeamento por código (ME→MEL)", () => {
+    const { caracteristicas } = reconverterServicosParaTipo("Rodoviário Litorâneo", [
+      "ME",
+    ]);
+    // Regra da DEC-034: vai para o padrão CL, e não para o correspondente MEL.
+    expect(caracteristicas).toEqual(["CL"]);
+  });
+
+  it("conjunto já compatível não gera alteração e preserva os valores", () => {
+    const entrada: Parameters<typeof reconverterServicosParaTipo>[1] = [
+      "CR",
+      "EX",
+      "MX",
+    ];
+    const { caracteristicas, alteracoes } = reconverterServicosParaTipo(
+      "Rodoviário",
+      entrada,
+    );
+    expect(caracteristicas).toEqual(["CR", "EX", "MX"]);
+    expect(alteracoes).toEqual([]);
+  });
+
+  it("conjunto vazio → sem alterações", () => {
+    expect(reconverterServicosParaTipo("Rodoviário", [])).toEqual({
+      caracteristicas: [],
+      alteracoes: [],
+    });
+  });
+
+  it("nunca produz característica inválida no novo tipo (nunca bloqueia)", () => {
+    // Para todo par (novo tipo, conjunto arbitrário de características), o
+    // resultado da reconversão é integralmente permitido no novo tipo.
+    for (const tipo of TIPOS_DE_AUTOS) {
+      const { caracteristicas } = reconverterServicosParaTipo(tipo, [
+        ...CARACTERISTICAS_DE_VEICULO,
+      ]);
+      for (const c of caracteristicas) {
+        expect(caracteristicaPermitida(tipo, c)).toBe(true);
+      }
+    }
   });
 });
 

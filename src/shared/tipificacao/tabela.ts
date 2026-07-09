@@ -22,6 +22,12 @@ export interface RegraDoTipo {
   // mesma característica única; no rodoviário há variação (§10.3 regra 4).
   veiculoUnico: boolean;
   permitidas: readonly CaracteristicaDeVeiculo[];
+  // Forma convencional (padrão) do tipo (DEC-034): o destino da reconversão de
+  // um Serviço incompatível quando o `tipo` do Autos é trocado. No semiurbano é
+  // o próprio veículo único (`SU`/`SUL`); no rodoviário é o convencional
+  // (`CR`/`CL`). É sempre um valor de `permitidas` — logo a reconversão nunca
+  // produz combinação inválida (nunca há bloqueio na troca de tipo).
+  padrao: CaracteristicaDeVeiculo;
 }
 
 // Spec 03 §10.2 — tabela de características permitidas por `tipo` (partição
@@ -35,21 +41,25 @@ export const TABELA_TIPIFICACAO: Readonly<Record<TipoDeAutos, RegraDoTipo>> = {
     familia: "semiurbana",
     veiculoUnico: true,
     permitidas: ["SU"],
+    padrao: "SU",
   },
   "Semiurbano Litorâneo": {
     familia: "semiurbana",
     veiculoUnico: true,
     permitidas: ["SUL"],
+    padrao: "SUL",
   },
   Rodoviário: {
     familia: "rodoviaria",
     veiculoUnico: false,
     permitidas: ["CR", "EX", "LE", "ME", "ML", "MX", "MM"],
+    padrao: "CR",
   },
   "Rodoviário Litorâneo": {
     familia: "rodoviaria",
     veiculoUnico: false,
     permitidas: ["CL", "EX", "LE", "MEL", "MLL", "MX", "MML"],
+    padrao: "CL",
   },
 };
 
@@ -122,10 +132,10 @@ export function validarConjuntoDeCaracteristicas(
   return violacoes;
 }
 
-// RN-023 — regra pura por trás da revalidação ao trocar o `tipo` do Autos:
-// dado o novo `tipo` e as características dos Serviços já cadastrados, retorna
-// os índices dos Serviços que passariam a violar o novo `tipo` (§10.4). O
-// gatilho e a mensagem de UI (bloqueio/alerta) são da Spec 04 (outra task).
+// RN-023 (detecção) — dado o novo `tipo` e as características dos Serviços já
+// cadastrados, retorna os índices dos Serviços que passariam a violar o novo
+// `tipo` (§10.4). É a base da reconversão (`reconverterServicosParaTipo`) e
+// serve também para uma prévia de UI de quantos Serviços mudarão.
 export function servicosIncompativeisComTipo(
   tipo: TipoDeAutos,
   caracteristicas: readonly CaracteristicaDeVeiculo[],
@@ -137,4 +147,50 @@ export function servicosIncompativeisComTipo(
     }
   });
   return incompativeis;
+}
+
+// Forma convencional (padrão) do `tipo` (DEC-034): `Rodoviário`→`CR`,
+// `Rodoviário Litorâneo`→`CL`, `Semiurbano`→`SU`, `Semiurbano Litorâneo`→`SUL`.
+// É o destino da reconversão de um Serviço incompatível na troca de tipo.
+export function caracteristicaPadrao(
+  tipo: TipoDeAutos,
+): CaracteristicaDeVeiculo {
+  return TABELA_TIPIFICACAO[tipo].padrao;
+}
+
+// Uma alteração produzida pela reconversão: qual Serviço mudou, de qual
+// característica para qual (a `para` é sempre a forma convencional do tipo).
+export interface AlteracaoDeReconversao {
+  indice: number;
+  de: CaracteristicaDeVeiculo;
+  para: CaracteristicaDeVeiculo;
+}
+
+export interface ResultadoDeReconversao {
+  // Conjunto de características na mesma ordem da entrada, já reconvertido.
+  caracteristicas: CaracteristicaDeVeiculo[];
+  // Só as posições que mudaram — base do aviso de UI (Spec 04 §5).
+  alteracoes: AlteracaoDeReconversao[];
+}
+
+// RN-023 (aplicação) — DEC-034: ao trocar o `tipo` do Autos, cada Serviço cuja
+// `caracteristica_veiculo` não pertença ao novo tipo é reconvertido para a
+// forma convencional (padrão) do tipo; os Serviços já compatíveis são
+// preservados. **Nunca bloqueia** — o padrão sempre pertence ao tipo, então o
+// resultado é sempre válido (§10.2). Função pura: devolve o conjunto novo e a
+// lista de alterações; o aviso e o gatilho de UI são da Spec 04 (TASK-015).
+export function reconverterServicosParaTipo(
+  tipo: TipoDeAutos,
+  caracteristicas: readonly CaracteristicaDeVeiculo[],
+): ResultadoDeReconversao {
+  const padrao = caracteristicaPadrao(tipo);
+  const alteracoes: AlteracaoDeReconversao[] = [];
+  const convertidas = caracteristicas.map((caracteristica, indice) => {
+    if (caracteristicaPermitida(tipo, caracteristica)) {
+      return caracteristica;
+    }
+    alteracoes.push({ indice, de: caracteristica, para: padrao });
+    return padrao;
+  });
+  return { caracteristicas: convertidas, alteracoes };
 }
