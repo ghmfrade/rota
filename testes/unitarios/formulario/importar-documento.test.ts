@@ -193,6 +193,23 @@ describe("importarDocumento — entrada bloqueante (RN-091 parte F)", () => {
     expect(resultado.erro.categoria).toBe("json_invalido");
   });
 
+  test("alerta técnico (350 m) NÃO bloqueia o carregamento — vem em alertas (RN-028/091, TASK-012)", () => {
+    // Documento schema-válido, porém com a Volta da 1ª Seção a ~1 km da Ida:
+    // a checagem estática fraca acusa, mas o import prossegue (não bloqueia).
+    const doc = documentoExemploMinimo();
+    const listas = listasReconhecendo(doc);
+    doc.autos.secoes[0].servicos[0].geolocalizacao_volta = {
+      latitude: -23.97,
+      longitude: -46.3339,
+    };
+
+    const resultado = importarDocumento(JSON.stringify(doc), listas);
+
+    expect(resultado.ok).toBe(true);
+    if (!resultado.ok) return;
+    expect(resultado.alertas.some((a) => a.codigo === "350m_secao")).toBe(true);
+  });
+
   test("a ordem é schema antes de identidade: JSON inválido não vira identidade obsoleta", () => {
     // Listas que NÃO reconhecem nada + JSON estruturalmente inválido: deve
     // reportar json_invalido (etapa 2 antes da etapa 3).
