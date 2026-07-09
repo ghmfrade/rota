@@ -133,3 +133,12 @@ Consolidação do que **exige decisão humana**. Nada aqui foi decidido — quan
 **Opções possíveis:** 1. Sem persistência local (literal à spec). 2. Rascunho em localStorage com aviso, apagado ao exportar. 
 **Recomendação técnica:** opção 2, formalizada por adenda à Spec 04 antes de implementar.
 **Decisão:** Pendente
+
+## Q-014 — Destino de navegação de pendências sem entidade única de origem
+
+**Contexto:** A Spec 04 §4/§11 torna cada item do painel de pendências clicável, "levando à etapa/entidade correspondente". Pendências ligadas a uma entidade (Seção, Serviço, Local, Viagem, itinerário) têm origem clara; mas alertas de **escopo global do documento** — o caso concreto é "documento criado do zero" (§11, alerta de ausência de preservação de identidade, §3.2) — não têm entidade única de origem. Levantada na análise da TASK-014 como inferência controlada.
+**Spec relacionada:** Spec 04 §4, §11, §3.2.
+**Impacto se não decidir:** a TASK-014 (painel de pendências) não sabe para onde navegar ao clicar num alerta global; inferência pendente no coletor de pendências.
+**Opções possíveis:** (a) etapa Revisão (onde §11 lista o alerta); (b) etapa Identificação (origem da identidade do documento); (c) não navegável (só informativo).
+**Recomendação técnica:** (a) — a §11 é a própria tela de Revisão e é onde esse alerta é listado; destino coerente e não arbitrário; impacto baixo (só UX).
+**Decisão:** **Decidida (DEC-033, 2026-07-09).** Opção (a): alertas sem entidade única de origem (ex.: "documento criado do zero") navegam para a etapa **Revisão**; pendências com entidade específica continuam indo à sua etapa/entidade de origem (§11).
