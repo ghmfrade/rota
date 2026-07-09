@@ -4,35 +4,53 @@ import { useState } from "react";
 import { carregarListasAutosEmpresas } from "@/shared/dados-estaticos";
 import type { ListasAutosEmpresas } from "@/shared/dados-estaticos";
 import { importarDocumento } from "@/formulario/importacao";
-import type { ResultadoImportacao } from "@/formulario/importacao";
+import type {
+  AlertaTecnico,
+  ResultadoImportacao,
+} from "@/formulario/importacao";
+import type { DocumentoOperacao } from "@/shared/contrato";
 
 // Tela Inicial do Formulário (Spec 04 §3, TASK-013): as duas ações de entrada
 // — carregar um JSON de operação existente ou criar um Autos do zero a partir
 // das listas estáticas. "Carregar" é sempre o caminho recomendado (Spec 04
 // §2.2/§3): é o único que preserva UUIDs e mantém o Comparador útil (RN-004).
 //
-// Esta tela SÓ decide a entrada. A montagem em etapas (stepper, painel de
-// pendências) é a TASK-014; a seleção de Autos/empresa/tipo nas listas
-// estáticas (RN-016) e o reforço do aviso quando o Autos já é `operante`
-// (Spec 04 §3.2) são a TASK-015 — aqui o "criar do zero" só confirma o aviso
-// obrigatório e sinaliza a entrada em modo de novo documento, sem inventar
-// estrutura de documento (RN-010; docs-dev/04 princípio 2).
+// Esta tela SÓ decide a entrada. Ao concluir uma das ações, ELEVA o resultado
+// ao container (`AplicacaoFormulario`, TASK-014) por callback — não guarda o
+// estado terminal nem monta o editor: a casca em etapas (stepper, cabeçalho,
+// painel de pendências) é a TASK-014; a seleção de Autos/empresa/tipo (RN-016)
+// e o reforço do aviso quando o Autos já é `operante` (Spec 04 §3.2) são a
+// TASK-015. Aqui o "criar do zero" só confirma o aviso obrigatório e sinaliza a
+// entrada em modo de novo documento, sem inventar estrutura (RN-010).
 //
 // Toda a validação de carregamento (schema, 350 m/tipificação como alerta não
-// bloqueante, identidade obsoleta — RN-004/016/017) já vive em
-// `importarDocumento` (TASK-006/012); esta tela só chama a função pura e
-// traduz o resultado em UI. Leitura de arquivo via File API do navegador —
-// nada sobe para servidor (RN-095/096, NEG-009).
+// bloqueante, identidade obsoleta — RN-004/016/017) vive em `importarDocumento`
+// (TASK-006/012); esta tela só chama a função pura e traduz o resultado: sucesso
+// vira `aoCarregar`, erro fica exibido aqui. Leitura de arquivo via File API do
+// navegador — nada sobe para servidor (RN-095/096, NEG-009).
 
+export interface PropsTelaInicial {
+  /** Carregamento válido de um JSON existente — UUIDs preservadas (RN-004). */
+  aoCarregar: (
+    documento: DocumentoOperacao,
+    alertasImportacao: AlertaTecnico[],
+  ) => void;
+  /** Início de um documento do zero, após o aviso obrigatório (Spec 04 §3.2). */
+  aoCriarDoZero: () => void;
+}
+
+// Estados só de UI da própria tela de entrada — os terminais (carregado, novo)
+// foram elevados ao container e por isso saíram daqui.
 type EstadoEntrada =
   | { tipo: "nenhuma" }
   | { tipo: "confirmando_zero" }
-  | { tipo: "zero_iniciado" }
-  | { tipo: "carregado"; resultado: Extract<ResultadoImportacao, { ok: true }> }
-  | { tipo: "erro_carregar"; resultado: Extract<ResultadoImportacao, { ok: false }> }
+  | {
+      tipo: "erro_carregar";
+      resultado: Extract<ResultadoImportacao, { ok: false }>;
+    }
   | { tipo: "erro_listas"; mensagem: string };
 
-export function TelaInicial() {
+export function TelaInicial({ aoCarregar, aoCriarDoZero }: PropsTelaInicial) {
   const [entrada, definirEntrada] = useState<EstadoEntrada>({ tipo: "nenhuma" });
 
   // `carregarListasAutosEmpresas` já é memoizada (import dinâmico do bundle,
@@ -58,11 +76,11 @@ export function TelaInicial() {
 
     const texto = await arquivo.text();
     const resultado = importarDocumento(texto, listas);
-    definirEntrada(
-      resultado.ok
-        ? { tipo: "carregado", resultado }
-        : { tipo: "erro_carregar", resultado },
-    );
+    if (resultado.ok) {
+      aoCarregar(resultado.documento, resultado.alertas);
+    } else {
+      definirEntrada({ tipo: "erro_carregar", resultado });
+    }
   }
 
   return (
@@ -123,36 +141,13 @@ export function TelaInicial() {
           <button
             type="button"
             data-testid="confirmar-criar-zero"
-            onClick={() => definirEntrada({ tipo: "zero_iniciado" })}
+            onClick={aoCriarDoZero}
           >
             Entendi, criar do zero
           </button>
           <button type="button" onClick={() => definirEntrada({ tipo: "nenhuma" })}>
             Cancelar
           </button>
-        </div>
-      )}
-
-      {entrada.tipo === "zero_iniciado" && (
-        <p data-testid="mensagem-novo-documento">
-          Novo documento iniciado. Prossiga selecionando o Autos, a empresa e o
-          tipo nas listas estáticas.
-        </p>
-      )}
-
-      {entrada.tipo === "carregado" && (
-        <div data-testid="mensagem-sucesso-carregar">
-          <p>
-            Você está editando uma operação anterior. As entidades existentes
-            manterão suas UUIDs.
-          </p>
-          {entrada.resultado.alertas.length > 0 && (
-            <ul>
-              {entrada.resultado.alertas.map((alerta, indice) => (
-                <li key={indice}>{alerta.mensagem}</li>
-              ))}
-            </ul>
-          )}
         </div>
       )}
 

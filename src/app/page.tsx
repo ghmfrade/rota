@@ -1,4 +1,4 @@
-import { TelaInicial } from "@/formulario/tela-inicial";
+import { AplicacaoFormulario } from "@/formulario/aplicacao-formulario";
 
 export default function PaginaInicial() {
   return (
@@ -10,7 +10,7 @@ export default function PaginaInicial() {
         o processamento ocorre no navegador; nada é salvo no servidor —
         exportar o JSON de operação é o salvar.
       </p>
-      <TelaInicial />
+      <AplicacaoFormulario />
     </main>
   );
 }
