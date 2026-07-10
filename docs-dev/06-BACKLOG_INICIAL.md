@@ -353,6 +353,15 @@
 **Resumo:** Testes de regressão permanentes: round-trip import→export preserva UUIDs; schema fechado rejeita campos de fluxo/R$; snapshot do contrato por `versao_schema`.
 **Regras RN:** RN-004, RN-010, RN-013. **Depende de:** TASK-006, TASK-007, TASK-041.
 
+## TASK-043 — Consolidar o arredondamento half-up num único primitivo em `shared/`
+
+**Prioridade:** Baixa · **Fase:** Qualidade
+**Resumo:** Origem: ressalva não bloqueante da revisão de aderência da TASK-021 (`docs-dev/14-REVISOES/TASK-021-20260710.md`, seção "Problemas encontrados"). Hoje existem duas implementações independentes da mesma semântica de arredondamento half-up a N casas (`Number.EPSILON` + `Math.round`) — `arredondar2` em `src/shared/contrato/validacoes-estruturais.ts` (fixo a 2 casas, usado na checagem estrutural de somas do contrato) e `arredondaHalfUp` em `src/formulario/roteamento/extrair-rota.ts` (parametrizado, usado na conversão m→km do cliente OSRM; `duracao_s` chama `Math.round` direto em vez do helper, de forma não uniforme). Consolidar num único primitivo puro em `shared/` (ex.: `shared/geo/` ou novo módulo de cálculo), reaproveitado pelos dois pontos e usado uniformemente (inclusive para `duracao_s`). **Refator puro — nenhuma mudança de comportamento observável**; a regra de arredondamento continua a da Spec 03 §3.4/RN-050, só a implementação deixa de estar duplicada.
+**Regras RN:** RN-050 (regra já existente; task não cria regra nova, só consolida a implementação). **Depende de:** TASK-003, TASK-021.
+**Fora de escopo:** qualquer mudança na regra de arredondamento em si, na regra dos 350 m ou em qualquer outro cálculo; qualquer alteração de comportamento observável do schema ou do cliente OSRM; não expandir para outras duplicações não citadas na ressalva de origem.
+**Critérios de aceite resumidos:** existe exatamente um primitivo de arredondamento half-up no repositório; `validacoes-estruturais.ts` e `extrair-rota.ts` (incluindo `duracao_s`) o consomem; nenhum teste existente muda de resultado.
+**Testes esperados:** unitários do primitivo consolidado (mesmos casos já cobertos nas duas suítes atuais, incluindo os casos de borda 0,005→0,01 e o caso de fechamento de trechos); suíte completa (`npm test`) permanece 100% verde sem alteração de expectativas.
+
 ---
 
 ## Ordem recomendada de execução
@@ -360,7 +369,7 @@
 ```text
 001 → 002 → 003 → 004/005 (paralelo) → 041 → 006 → 007 → 042
 → 008/009 (paralelo) → 010 → 011 → 012
-→ 013 → 014 → 015 → 016 → 020 → 021 → 022 → 023 → 024 → 017 → 018 → 019 → 025
+→ 013 → 014 → 015 → 016 → 020 → 021 → 043 → 022 → 023 → 024 → 017 → 018 → 019 → 025
 → 026 → 027 → 028 → 029 → 030 → 031 → 032
 → 033 → 034
 → 035 → 036 → 037 → 038 → 039
