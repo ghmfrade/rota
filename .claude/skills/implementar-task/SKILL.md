@@ -28,4 +28,8 @@ Exatamente o formato **"Implementação concluída"** de `docs-dev/04-AI_IMPLEME
 5. Pontos de atenção (dívidas, inferências controladas, follow-ups);
 6. Aderência à spec (resultado do checklist `docs-dev/07-CHECKLIST_ADERENCIA_SPEC.md`; violações são impeditivas).
 
+## Commit
+
+Após a entrega, comite **só o código e os testes desta task** com a mensagem `Implementa TASK-XXX: <título>` (convenção de dois commits por task — `docs-dev/04-AI_IMPLEMENTATION_PROTOCOL.md`). A revisão é um commit à parte, feito por `/revisar-aderencia`.
+
 Depois da entrega, o próximo passo do ciclo é `/revisar-aderencia`.

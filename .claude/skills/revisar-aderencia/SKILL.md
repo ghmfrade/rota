@@ -22,12 +22,25 @@ Revise a implementação da task indicada (diff da branch/commit atual, salvo in
 - Workflow indevido ou campo de fluxo no JSON (NEG-001..007 de `docs-dev/11-NEGATIVE_REQUIREMENTS.md`);
 - Preservação do contrato JSON e da regra de UUID (RN-004..007);
 - Testes: existem, cobrem casos inválidos, não dependem do OSRM real (mock);
-- Lacunas: regra da task sem teste; critério de aceite não verificado (matriz `docs-dev/03-TRACEABILITY_MATRIX.md`).
+- Lacunas: regra da task sem teste; critério de aceite não verificado (matriz `docs-dev/03-TRACEABILITY_MATRIX.md`);
+- **Consequências sobre outras tasks:** a revisão foca na task atual, mas é obrigatório apontar o que a task atual afeta ou depende em outras (o contrato JSON e as fronteiras entre módulos ligam tasks). Falar de outras tasks é esperado — o que muda é o rigor da afirmação (regra abaixo).
+
+## Regra de afirmação sobre outras tasks (anti-alucinação)
+
+Toda afirmação sobre o que **outra** task faz ou não faz — que arquivo emite tal alerta, que função já cobre tal caso, que a etapa X já exibe tal mensagem — só entra no parecer como fato se o arquivo real dessa task foi **aberto e lido nesta revisão** e citado com `caminho/arquivo.ts:linha`.
+
+- Proibido afirmar comportamento de outra task por **inferência** (do nome da task, da RN, do que "deveria" fazer) ou por **memória** de conversas/pareceres anteriores. Pareceres antigos são snapshots datados, não fonte de verdade sobre o código de hoje.
+- Não deu para abrir e conferir o arquivo? Escreva **"não verificado nesta revisão"** em vez de afirmar. Uma pendência aberta e honesta vale mais que um fato inventado.
+- Referência solta a outra task, sem afirmar comportamento, é sempre permitida como ponteiro (ex.: "contadores ficam para a TASK-031").
 
 ## Entrega
 
 1. Percorra `docs-dev/07-CHECKLIST_ADERENCIA_SPEC.md` **item a item** (marque `N/A` quando não se aplicar; qualquer item aplicável não atendido → ressalva ou reprovação).
-2. Preencha o `docs-dev/14-REVIEW_REPORT_TEMPLATE.md` completo.
+2. Preencha o `docs-dev/14-REVIEW_REPORT_TEMPLATE.md` completo e **salve-o** em `docs-dev/14-REVISOES/TASK-XXX-<AAAAMMDD>.md` (o template manda arquivar o parecer junto da task). O parecer é sempre um arquivo, nunca só texto na conversa.
 3. Parecer objetivo pelos critérios do template: **aprovado** (escopo exato, RN com testes, checklist limpo), **aprovado com ressalvas** (desvios menores, sem violar RN Alta nem NEG-xxx; ressalvas viram condições explícitas) ou **reprovado** (violação de RN Alta, NEG-xxx, escopo relevante, testes ausentes ou verificações falhando) — com a lista de problemas ordenada por severidade.
+
+## Commit
+
+Comite o parecer salvo com a mensagem `Registra revisão de aderência da TASK-XXX: <parecer>` (segundo commit da convenção de dois commits por task — `docs-dev/04-AI_IMPLEMENTATION_PROTOCOL.md`). Este commit nunca é vazio: ele contém o arquivo do parecer.
 
 Só depois de revisão aprovada avança-se para a próxima task (`docs-dev/00` §3).

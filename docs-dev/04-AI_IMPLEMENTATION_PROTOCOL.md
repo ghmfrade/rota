@@ -35,9 +35,20 @@ Este documento instrui **qualquer IA** (Claude, Codex ou outra) que for implemen
 10. Implementar apenas o escopo da task.
 11. Criar ou ajustar testes (casos válidos E inválidos).
 12. Rodar verificações disponíveis (typecheck, lint, testes).
-13. Fazer revisão de aderência (07-CHECKLIST_ADERENCIA_SPEC.md).
-14. Entregar resumo final (formato abaixo).
+13. Entregar resumo final (formato abaixo).
+14. Commit da implementação: `Implementa TASK-XXX: <título>` — só código e testes da task.
+15. Fazer revisão de aderência (07-CHECKLIST_ADERENCIA_SPEC.md).
+16. Salvar o parecer em `docs-dev/14-REVISOES/TASK-XXX-<AAAAMMDD>.md` e comitar: `Registra revisão de aderência da TASK-XXX: <parecer>`.
 ```
+
+## Convenção de commits por task (obrigatória)
+
+Cada task fecha em **dois commits**, nunca em um só e nunca com commit vazio:
+
+1. **Implementação** — `Implementa TASK-XXX: <título>`. Contém apenas o código e os testes do escopo da task.
+2. **Revisão de aderência** — `Registra revisão de aderência da TASK-XXX: <aprovado | com ressalvas | reprovado>`. Contém o arquivo do parecer salvo em `docs-dev/14-REVISOES/TASK-XXX-<AAAAMMDD>.md` (o template manda arquivar o parecer junto da task — `14-REVIEW_REPORT_TEMPLATE.md`).
+
+O parecer **sempre** é salvo em arquivo; o commit de revisão nunca é vazio.
 
 ## Formato obrigatório da resposta ANTES da implementação
 
