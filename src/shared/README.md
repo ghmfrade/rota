@@ -4,3 +4,4 @@ Base comum das ferramentas: schema do contrato JSON de operação (Spec 02), val
 
 - `contrato/` — schema do JSON de operação (Spec 02).
 - `dados-estaticos/` — schemas e carregadores dos recursos estáticos servidos junto do app (Spec 01 §8; DEC-030): listas de Autos/empresas/tipos (`data/autos_empresas.json`), base de municípios (`data/municipios.json`) e geometrias municipais (`public/dados/municipios_sp.geojson`).
+- `mapa/` — mapa base client-side (Spec 01 §8 — OSM/MapLibre): componente reutilizável por Formulário e Comparador (por isso vive em `shared/`, RN-097). Submódulos puros (`config`/`estilo`/`geometria`/`captura`) são testáveis sem WebGL; o componente `mapa.tsx` (`"use client"`) importa maplibre-gl e só roda no navegador — testes de node importam os submódulos diretamente, nunca o índice. URL de tiles configurável via `NEXT_PUBLIC_TILES_URL` (default OSM), espelhando o padrão do OSRM (DEC-029).
