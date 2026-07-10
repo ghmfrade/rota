@@ -3,6 +3,8 @@ import {
   reconverterServicosParaTipo,
   type TipoDeAutos,
 } from "@/shared/tipificacao";
+import { regenerarSufixoNumeroN } from "@/formulario/servicos/numero-n";
+import type { ServicoEmConstrucao } from "@/formulario/sessao";
 
 // Aplicação da troca do `tipo` do Autos sobre um documento carregado (RN-023;
 // DEC-034; Spec 03 §10.4; Spec 04 §5). A regra pura — quais Serviços mudam e
@@ -57,12 +59,19 @@ export function aplicarTrocaDeTipoNoDocumento(
   );
 
   // Reescreve só os Serviços que a reconversão alterou; os demais mantêm a
-  // referência original. `editarEntidade` reafirma a `uuid` (RN-003).
+  // referência original. `editarEntidade` reafirma a `uuid` (RN-003). Além da
+  // característica, o sufixo do `numero_n` é regenerado para a nova característica
+  // (DEC-037), preservando o número sequencial — o rótulo nunca fica
+  // inconsistente com a característica real.
   const servicosConvertidos = servicos.map((servico, indice) =>
     servico.caracteristica_veiculo === caracteristicas[indice]
       ? servico
       : editarEntidade(servico, {
           caracteristica_veiculo: caracteristicas[indice],
+          numero_n: regenerarSufixoNumeroN(
+            servico.numero_n,
+            caracteristicas[indice],
+          ),
         }),
   );
 
@@ -84,4 +93,48 @@ export function aplicarTrocaDeTipoNoDocumento(
   );
 
   return { documento: documentoNovo, alteracoes: alteracoesDeServico };
+}
+
+export interface ResultadoDaTrocaEmConstrucao {
+  servicos: ServicoEmConstrucao[];
+  alteracoes: AlteracaoDeServico[];
+}
+
+/**
+ * Troca de tipo aplicada aos Serviços EM CONSTRUÇÃO (modo novo, DEC-035): mesma
+ * regra da reconversão (RN-023/DEC-034) — característica incompatível vira o
+ * padrão do tipo e o sufixo do `numero_n` é regenerado (DEC-037) —, sobre o
+ * subconjunto de sessão em vez do documento. Não muta a entrada.
+ */
+export function aplicarTrocaDeTipoEmConstrucao(
+  servicos: readonly ServicoEmConstrucao[],
+  novoTipo: TipoDeAutos,
+): ResultadoDaTrocaEmConstrucao {
+  const { caracteristicas, alteracoes } = reconverterServicosParaTipo(
+    novoTipo,
+    servicos.map((servico) => servico.caracteristica_veiculo),
+  );
+
+  const convertidos = servicos.map((servico, indice) =>
+    servico.caracteristica_veiculo === caracteristicas[indice]
+      ? servico
+      : {
+          ...servico,
+          caracteristica_veiculo: caracteristicas[indice],
+          numero_n: regenerarSufixoNumeroN(
+            servico.numero_n,
+            caracteristicas[indice],
+          ),
+        },
+  );
+
+  const alteracoesDeServico: AlteracaoDeServico[] = alteracoes.map(
+    (alteracao) => ({
+      numero_n: servicos[alteracao.indice].numero_n,
+      de: alteracao.de,
+      para: alteracao.para,
+    }),
+  );
+
+  return { servicos: convertidos, alteracoes: alteracoesDeServico };
 }

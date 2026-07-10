@@ -10,7 +10,7 @@
 | RN-003 | Spec 02 §12 | Edição | F | reducers/stores de edição | U (regressão) | Alta |
 | RN-004 | Spec 01 §6; 02 §12; 04 §3.1 | Import/export | F | importador de JSON | U + INT (import→export idempotente) | **Alta** |
 | RN-005 | Spec 02 §12/§14 | Documento | F/C/I | validador estrutural | U + CONTRATO | Alta |
-| RN-006 | Spec 01 §6; 02 §6/§12 | Serviço | F/C/I | diff/persistência nunca usam `numero_n` | U (diff por uuid) | Alta |
+| RN-006 | Spec 01 §6; 02 §6/§12; DEC-037 | Serviço | F/C/I | diff/persistência nunca usam `numero_n`; sufixo regenerado na troca de característica | U (diff por uuid; regeneração de sufixo) | Alta |
 | RN-007 | Spec 02 §12; 04 §6/§8.3-4 | Cópias | F | ações duplicar/copiar | U | Alta |
 | RN-008 | Spec 02 §3/§14 | Raiz | F/C/I | schema | CONTRATO | Média |
 | RN-009 | Spec 01 §5; 02 §1 | Documento | F/C/I | schema + leitores sem fetch externo | CONTRATO + INT | Alta |
@@ -24,7 +24,7 @@
 | RN-017 | Spec 01 §8; 04 §3.1/§14 | Import | F | validação de carregamento | U + INT | Alta |
 | RN-018 | Spec 02 §14; 04 §6 | Autos/Seções | F/C/I | validador estrutural + remoção em cascata | U | Média |
 | RN-019..022 | Spec 01 §7; 03 §10 | Tipificação | F/C/I | módulo de tipificação (tabela por tipo) | U (tabela completa, casos inválidos) | Alta |
-| RN-023 | Spec 03 §10.4; 04 §5; DEC-034 | Troca de tipo | F | reconversão ao padrão + aviso | U + E2E | Média |
+| RN-023 | Spec 03 §10.4; 04 §5; DEC-034; DEC-037 | Troca de tipo | F | reconversão ao padrão + aviso + regeneração do sufixo `numero_n` | U + E2E | Média |
 | RN-024 | Spec 02 §6 | Serviço.carater | F/C | schema enum | CONTRATO | Média |
 | RN-025 | Spec 02 §5 | Seção | F/C/I | modelo de dados | CONTRATO | Alta |
 | RN-026 | Spec 02 §5.1 | SeçãoServiço | F/C/I | validador (direcionalidade × geoloc) | U | Alta |

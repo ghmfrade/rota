@@ -2,6 +2,8 @@
 export { EtapaIdentificacao } from "./identificacao";
 export {
   aplicarTrocaDeTipoNoDocumento,
+  aplicarTrocaDeTipoEmConstrucao,
   type AlteracaoDeServico,
   type ResultadoDaTrocaDeTipo,
+  type ResultadoDaTrocaEmConstrucao,
 } from "./reconversao";

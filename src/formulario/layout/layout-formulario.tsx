@@ -4,6 +4,7 @@ import { useState } from "react";
 import { identidadeDaSessao, type SessaoFormulario } from "@/formulario/sessao";
 import { coletarPendencias } from "@/formulario/pendencias";
 import { EtapaIdentificacao } from "@/formulario/identificacao";
+import { EtapaServicos } from "@/formulario/servicos";
 import { ETAPAS, rotuloEtapa, type IdEtapa } from "./etapas";
 import { PainelPendencias } from "./painel-pendencias";
 
@@ -135,6 +136,8 @@ export function LayoutFormulario({
             sessao={sessao}
             aoAtualizarSessao={aoAtualizarSessao}
           />
+        ) : etapaAtual === "servicos" ? (
+          <EtapaServicos sessao={sessao} aoAtualizarSessao={aoAtualizarSessao} />
         ) : (
           <p>
             Etapa em construção — o conteúdo será implementado nas próximas

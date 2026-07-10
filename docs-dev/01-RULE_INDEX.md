@@ -50,8 +50,8 @@
 
 ## RN-006 — `numero_n` é só display
 
-**Descrição:** `numero_n` (`"0000-NXX"`, só em Serviço) é rótulo de exibição — sequencial por ordem de cadastro, potencialmente reaproveitável. Nunca é chave de identidade em diff, persistência ou lógica.
-**Origem:** Spec 01 §6; Spec 02 §6, §12; Spec 03 §10.3 regra 5.
+**Descrição:** `numero_n` (`"0000-NXX"`, só em Serviço) é rótulo de exibição — sequencial por ordem de cadastro, potencialmente reaproveitável. Nunca é chave de identidade em diff, persistência ou lógica. O sufixo embute a `caracteristica_veiculo` (ex.: `"0000-1CR"`) e é **regenerado quando a característica muda** — por edição direta ou reconversão na troca de tipo (RN-023) —, preservando o número sequencial e permanecendo editável (DEC-037). Regenerar o rótulo nunca o torna identidade.
+**Origem:** Spec 01 §6; Spec 02 §6, §12; Spec 03 §10.3 regra 5; DEC-037.
 **Tipo:** Domínio. **Criticidade:** Alta. **Afeta:** F, C, I, J, P, T.
 **Exemplos inválidos:** Comparador casando Serviços por `numero_n`; Ingestor usando `numero_n` como chave.
 
@@ -175,8 +175,8 @@
 
 ## RN-023 — Trocar o tipo reconverte os Serviços ao padrão do tipo
 
-**Descrição:** O `tipo` do Autos é editável a qualquer momento (documento novo ou carregado; `codigo`/`empresa` não são editáveis após criado). Ao trocar o `tipo`, cada Serviço cuja `caracteristica_veiculo` não pertença ao novo tipo é **reconvertido automaticamente para a forma convencional (padrão) do tipo** (`Rodoviário`→`CR`, `Rodoviário Litorâneo`→`CL`, `Semiurbano`→`SU`, `Semiurbano Litorâneo`→`SUL`), com **aviso** listando o que mudou. **Nunca bloqueia** (a reconversão é sempre possível — o padrão pertence ao tipo).
-**Origem:** Spec 03 §10.4; Spec 04 §5; DEC-034.
+**Descrição:** O `tipo` do Autos é editável a qualquer momento (documento novo ou carregado; `codigo`/`empresa` não são editáveis após criado). Ao trocar o `tipo`, cada Serviço cuja `caracteristica_veiculo` não pertença ao novo tipo é **reconvertido automaticamente para a forma convencional (padrão) do tipo** (`Rodoviário`→`CR`, `Rodoviário Litorâneo`→`CL`, `Semiurbano`→`SU`, `Semiurbano Litorâneo`→`SUL`), com **aviso** listando o que mudou. **Nunca bloqueia** (a reconversão é sempre possível — o padrão pertence ao tipo). A reconversão também **regenera o sufixo do `numero_n`** de cada Serviço convertido para a nova característica, preservando o sequencial (RN-006; DEC-037).
+**Origem:** Spec 03 §10.4; Spec 04 §5; DEC-034; DEC-037.
 **Tipo:** Domínio | UI. **Criticidade:** Média. **Afeta:** F, T.
 
 ## RN-024 — `carater` é campo explícito

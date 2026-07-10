@@ -15,8 +15,10 @@ import {
 } from "@/formulario/sessao";
 import {
   aplicarTrocaDeTipoNoDocumento,
+  aplicarTrocaDeTipoEmConstrucao,
   type AlteracaoDeServico,
 } from "./reconversao";
+import { servicosEmConstrucaoDaSessao } from "@/formulario/sessao";
 
 // Etapa Identificação do Formulário (Spec 04 §5; TASK-015). Exibe/edita a
 // identidade do Autos:
@@ -100,13 +102,19 @@ export function EtapaIdentificacao({
       });
       return;
     }
-    // Modo novo: sem Serviços nesta task, a troca só ajusta o tipo (a
-    // reconversão de Serviços do modo novo, quando existirem, é da TASK-016).
+    // Modo novo: reconverte os Serviços em construção incompatíveis com o novo
+    // tipo (RN-023/DEC-034), regenerando o sufixo do `numero_n` (DEC-037), e
+    // ajusta o tipo — com o mesmo aviso do modo carregado.
     if (!sessao.identidade) return;
-    definirReconversao([]);
+    const { servicos, alteracoes } = aplicarTrocaDeTipoEmConstrucao(
+      servicosEmConstrucaoDaSessao(sessao),
+      novoTipo,
+    );
+    definirReconversao(alteracoes);
     aoAtualizarSessao({
-      modo: "novo",
+      ...sessao,
       identidade: { ...sessao.identidade, tipo: novoTipo },
+      servicosEmConstrucao: servicos,
     });
   }
 

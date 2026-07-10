@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 import type { DocumentoOperacao } from "@/shared/contrato";
-import { aplicarTrocaDeTipoNoDocumento } from "@/formulario/identificacao";
+import {
+  aplicarTrocaDeTipoEmConstrucao,
+  aplicarTrocaDeTipoNoDocumento,
+} from "@/formulario/identificacao";
+import type { ServicoEmConstrucao } from "@/formulario/sessao";
 import {
   documentoBidirecionalMultiServico,
   documentoUnidirecional,
@@ -14,8 +18,9 @@ import {
 // não-mutação da entrada. Nenhum teste toca rede/OSRM.
 
 // Ajusta as características dos Serviços de um documento base preservando o
-// resto da estrutura (schema-válido). `numero_n` é reescrito só para deixar o
-// aviso legível nos cenários.
+// resto da estrutura (schema-válido). `numero_n` segue a convenção real
+// `"<codigo>-<seq><caracteristica>"` (Spec 02 §6) para exercitar a regeneração
+// de sufixo (DEC-037) — não mais um rótulo simplificado que a mascarava.
 function comCaracteristicas(
   base: DocumentoOperacao,
   caracteristicas: DocumentoOperacao["autos"]["servicos"][number]["caracteristica_veiculo"][],
@@ -23,7 +28,7 @@ function comCaracteristicas(
   const servicos = base.autos.servicos.map((servico, indice) => ({
     ...servico,
     caracteristica_veiculo: caracteristicas[indice],
-    numero_n: `N0${indice + 1}`,
+    numero_n: `${base.autos.codigo}-${indice + 1}${caracteristicas[indice]}`,
   }));
   return { ...base, autos: { ...base.autos, servicos } };
 }
@@ -46,8 +51,16 @@ describe("aplicarTrocaDeTipoNoDocumento — reconversão ao padrão (RN-023)", (
     expect(
       documento.autos.servicos.map((s) => s.caracteristica_veiculo),
     ).toEqual(["EX", "CL"]);
-    // Aviso só do Serviço que mudou, por `numero_n` (RN-006).
-    expect(alteracoes).toEqual([{ numero_n: "N02", de: "ME", para: "CL" }]);
+    // Aviso só do Serviço que mudou, pelo `numero_n` anterior (RN-006).
+    expect(alteracoes).toEqual([
+      { numero_n: "1000-2ME", de: "ME", para: "CL" },
+    ]);
+    // DEC-037: o sufixo do `numero_n` acompanha a nova característica; o neutro
+    // (EX, não reconvertido) mantém o rótulo.
+    expect(documento.autos.servicos.map((s) => s.numero_n)).toEqual([
+      "1000-1EX",
+      "1000-2CL",
+    ]);
   });
 
   test("Semiurbano → Rodoviário: SU (inválido no rodoviário) vira CR", () => {
@@ -62,6 +75,8 @@ describe("aplicarTrocaDeTipoNoDocumento — reconversão ao padrão (RN-023)", (
     expect(alteracoes).toEqual([
       { numero_n: doc.autos.servicos[0].numero_n, de: "SU", para: "CR" },
     ]);
+    // DEC-037: "2000-1SU" → "2000-1CR".
+    expect(documento.autos.servicos[0].numero_n).toBe("2000-1CR");
   });
 
   test("Rodoviário → Semiurbano: todos os Serviços viram SU", () => {
@@ -78,8 +93,13 @@ describe("aplicarTrocaDeTipoNoDocumento — reconversão ao padrão (RN-023)", (
       documento.autos.servicos.map((s) => s.caracteristica_veiculo),
     ).toEqual(["SU", "SU"]);
     expect(alteracoes).toEqual([
-      { numero_n: "N01", de: "CR", para: "SU" },
-      { numero_n: "N02", de: "ME", para: "SU" },
+      { numero_n: "1000-1CR", de: "CR", para: "SU" },
+      { numero_n: "1000-2ME", de: "ME", para: "SU" },
+    ]);
+    // DEC-037: ambos os sufixos viram SU.
+    expect(documento.autos.servicos.map((s) => s.numero_n)).toEqual([
+      "1000-1SU",
+      "1000-2SU",
     ]);
   });
 
@@ -129,5 +149,52 @@ describe("aplicarTrocaDeTipoNoDocumento — reconversão ao padrão (RN-023)", (
     expect(doc.autos.servicos.map((s) => s.caracteristica_veiculo)).toEqual(
       caracteristicasOriginais,
     );
+  });
+});
+
+describe("aplicarTrocaDeTipoEmConstrucao — reconversão no modo novo (RN-023; DEC-035/037)", () => {
+  function servico(
+    uuid: string,
+    numero_n: string,
+    caracteristica: ServicoEmConstrucao["caracteristica_veiculo"],
+  ): ServicoEmConstrucao {
+    return {
+      uuid,
+      numero_n,
+      caracteristica_veiculo: caracteristica,
+      carater: "principal",
+      direcionalidade: "ambos",
+    };
+  }
+
+  test("incompatível vira o padrão do tipo e regenera o sufixo; compatível intacto", () => {
+    const entrada = [
+      servico("11111111-1111-4111-8111-111111111111", "1000-1EX", "EX"),
+      servico("22222222-2222-4222-8222-222222222222", "1000-2ME", "ME"),
+    ];
+    const { servicos, alteracoes } = aplicarTrocaDeTipoEmConstrucao(
+      entrada,
+      "Rodoviário Litorâneo",
+    );
+
+    expect(servicos.map((s) => s.caracteristica_veiculo)).toEqual(["EX", "CL"]);
+    expect(servicos.map((s) => s.numero_n)).toEqual(["1000-1EX", "1000-2CL"]);
+    expect(alteracoes).toEqual([
+      { numero_n: "1000-2ME", de: "ME", para: "CL" },
+    ]);
+    // Preserva a uuid (identidade do futuro Serviço) e não muta a entrada.
+    expect(servicos.map((s) => s.uuid)).toEqual(entrada.map((s) => s.uuid));
+    expect(entrada[1].caracteristica_veiculo).toBe("ME");
+    // Serviço compatível mantém a MESMA referência.
+    expect(servicos[0]).toBe(entrada[0]);
+  });
+
+  test("lista vazia: nenhuma alteração", () => {
+    const { servicos, alteracoes } = aplicarTrocaDeTipoEmConstrucao(
+      [],
+      "Semiurbano",
+    );
+    expect(servicos).toEqual([]);
+    expect(alteracoes).toEqual([]);
   });
 });
