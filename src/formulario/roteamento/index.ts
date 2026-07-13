@@ -1,8 +1,10 @@
 // Cliente OSRM do Formulário (Spec 03 §3.1–§3.6; RN-014/041/042/043/047/048/
 // 049/050/051) — URL, intercalação e extração legs→trechos (com e sem pontos
 // de rota), conversão m→km e tratamento de falha (retry, taxonomia
-// bloqueante, mensagens). Descrição textual (TASK-025) fica fora deste
-// módulo.
+// bloqueante, mensagens); e o motor headless de estado de rota ao vivo
+// "abrir congelado × editar recalcula" (TASK-024; RN-015/046/052). Descrição
+// textual em si (TASK-025) e o fio dos gestos de mapa (TASK-017/018/019)
+// ficam fora deste módulo.
 export {
   montarUrlOsrm,
   urlBaseOsrm,
@@ -33,3 +35,10 @@ export {
   type FalhaOsrm,
   type ResultadoRoteamento,
 } from "./falhas-osrm";
+export {
+  congelarRotaCarregada,
+  recalcularItinerario,
+  type EstadoRotaViva,
+  type EntradaRecalculo,
+  type ComporDescricao,
+} from "./estado-rota-viva";
