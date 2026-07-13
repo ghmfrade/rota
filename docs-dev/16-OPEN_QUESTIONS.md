@@ -117,6 +117,15 @@ Consolidação do que **exige decisão humana**. Nada aqui foi decidido — quan
 **Recomendação técnica:** (a) — coerente com a lista de dependências, com os guardrails (`shared`/`formulario` desacoplados, lógica pura testável fora da UI) e com o precedente das TASK-021/022/023 (motor testado por mock, sem UI).
 **Decisão:** **Decidida (DEC-041, 2026-07-13).** Opção (a): a TASK-024 entrega só o motor headless de recálculo-vs-congelado + o estado de rota ao vivo, com a costura da descrição (composer da TASK-025) injetável; o fio dos gestos das TASK-017/018/019 passa a depender funcionalmente da TASK-024. O E2E de edição ao vivo fica diferido para quando os editores existirem; nesta task, "abrir → 0 chamadas OSRM" é coberto por integração com fetch-espião.
 
+## Q-023 — Como provar a garantia "abrir = 0 chamadas OSRM" (RN-052) no teste de `congelarRotaCarregada`?
+
+**Contexto:** a revisão da TASK-024 encontrou que o teste de abertura de `congelarRotaCarregada` cria um `vi.fn()` como "espião de fetch" mas **nunca o liga** à função sob teste (que é síncrona e não recebe `fetch`), tornando `expect(fetchEspiao).not.toHaveBeenCalled()` **vacuamente verdadeiro** — passa mesmo se a garantia quebrar. A [[Q-022]]/DEC-041 já enunciava que "abrir → 0 chamadas OSRM é coberto por integração com fetch-espião", mas não fixou que o espião precisa ser **ativo** (ligado ao `fetch` realmente exercido pela unidade). Levantada na revisão da TASK-024.
+**Spec relacionada:** Spec 04 §3.1 item 6; Spec 03 §3.6.2; RN-052 (padrão de teste de uma garantia, não regra de negócio nova).
+**Impacto se não decidir:** garantias de "não chama OSRM" (RN-052 na abertura; por extensão RN-080 no Comparador) podem ser "testadas" por asserções decorativas que passam mesmo quando a garantia é violada — falso senso de cobertura.
+**Opções possíveis:** (a) o teste espiona o `fetch` **efetivamente disponível** à unidade (`vi.spyOn(globalThis, "fetch")` ou `fetch` injetado e exercido) e assere **zero** chamadas — espião ativo; a garantia estrutural (função síncrona, sem `Promise`) permanece como reforço, não substituta. (b) remover a asserção do espião e confiar só na assinatura síncrona + no `toEqual` de identidade. (c) manter como está — descartada (asserção enganosa).
+**Recomendação técnica:** (a) — honra literalmente a DEC-041, vira guard real de regressão e estabelece um padrão reutilizável para toda garantia de "não chama OSRM/rede" (RN-052/RN-080). Custo mínimo, só teste.
+**Decisão:** **Decidida (DEC-042, 2026-07-13).** Opção (a): garantias de "não chama OSRM" são provadas por fetch-espião **ativo** com zero chamadas; espião decorativo (nunca ligado à unidade) é proibido. Implementação na TASK-045.
+
 ## Comparador
 
 ## Q-004 — Tolerância de "rota alterada"
