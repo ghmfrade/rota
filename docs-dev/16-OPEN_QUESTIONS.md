@@ -81,6 +81,42 @@ Consolidação do que **exige decisão humana**. Nada aqui foi decidido — quan
 **Recomendação técnica:** opção 1 (ponto→segmento), com curto-circuito por bounding box.
 **Decisão:** **Decidida (DEC-031, 2026-07-08).** Opção 1: distância mínima ponto→segmento sobre todos os segmentos dos anéis do polígono, com curto-circuito por bounding box; teto de 2 km e erro "fora de SP" inalterados. Desbloqueia a TASK-011.
 
+## Q-019 — Como identificar "qual parada" no `NoSegment`, dado que o cliente recebe só coordenadas?
+
+**Contexto:** Spec 04 §14 manda a mensagem "A parada [Cidade - Nome] não pôde ser associada a uma via." Mas (a) `solicitarRota` recebe `readonly Ponto[]` — coordenadas nuas, sem `Cidade - Nome` (que é identidade de Seção/Local, indisponível nesta camada); e (b) o envelope `NoSegment` do OSRM não garante um campo estruturado com o índice da coordenada rejeitada (o `message` é texto livre, não contratual). Assim, o cliente pode no máximo devolver um índice de coordenada (se derivável) e delegar a composição do rótulo à camada que tem identidade das paradas. Levantada na análise da TASK-022.
+**Spec relacionada:** Spec 04 §14; Spec 03 §3.5; RN-048/049.
+**Impacto se não decidir:** a mensagem final de `NoSegment` (TASK-022/044) fica indefinida entre citar o rótulo `[Cidade - Nome]` (que o cliente não tem) e uma forma degradada.
+**Opções possíveis:** 1. Cliente devolve `indiceCoordenada?` (best-effort, `undefined` se o OSRM não informar) e a UI/pendências compõe o `[Cidade - Nome]` (recomendada — respeita o desacoplamento de camadas). 2. Cliente faz *probe* por parada (chamada `nearest`/rota individual) para achar a coordenada não-ancorável — mais chamadas de rede, fora do §3.5. 3. Parsear o `message` do OSRM por índice — frágil, não contratual.
+**Recomendação técnica:** opção 1 — cliente só expõe a taxonomia + índice best-effort; a mensagem final com rótulo é da camada de UI/pendências (tasks seguintes).
+**Decisão:** **Decidida (DEC-038, 2026-07-13).** Opção 1: o cliente OSRM devolve `indiceCoordenada?` best-effort e emite a forma interina `A parada nº N…`/genérica; a composição de `[Cidade - Nome]` (Spec 04 §14) cabe à camada com identidade das paradas (pendências/UI). Implementada na TASK-022 (`falhas-osrm.ts`/`cliente-osrm.ts`).
+
+## Q-020 — Valor do timeout da requisição OSRM
+
+**Contexto:** Spec 03 §3.5 fala em "timeout" como gatilho de retry, mas nenhuma spec fixa a duração. Precisa de um número para o `AbortController`. Levantada na análise da TASK-022.
+**Spec relacionada:** Spec 03 §3.5; DEC-029 (URL base configurável).
+**Impacto se não decidir:** sem timeout próprio, a UX depende do timeout indeterminado do runtime; o retry único de §3.5 não tem gatilho previsível.
+**Opções possíveis:** 1. Timeout configurável com default via opção do cliente/env (recomendada — coerente com DEC-029, "URL base configurável"). 2. Sem timeout próprio, confiar no timeout do runtime (indeterminado; ruim para UX).
+**Recomendação técnica:** opção 1 — default configurável, marcado como parâmetro, sem inventar regra de negócio.
+**Decisão:** **Decidida (DEC-039, 2026-07-13).** Opção 1: default de **15 s**, ajustável por chamada (`timeoutMs`), espelhando a configurabilidade da URL base (DEC-029). Implementada na TASK-022 (`OSRM_TIMEOUT_PADRAO_MS = 15_000`).
+
+## Q-021 — Fronteira de escopo TASK-022 × TASK-024 quanto à pendência bloqueante de rota ausente
+
+**Contexto:** o resumo da TASK-022 cita "pendência bloqueante enquanto houver itinerário sem rota", e o `TODO` de `pendencias.ts` credita isso a "TASK-022/024". Porém não existia modelo de estado de rota em edição ao vivo: no modo carregado o `documento` é schema-válido (todo itinerário já tem `rota`), e itinerários em construção só surgem na TASK-017+/TASK-024. Logo não há caso computável de "itinerário sem rota" para alimentar `coletarPendencias` na TASK-022.
+**Spec relacionada:** Spec 03 §3.5; Spec 04 §11; RN-048/078.
+**Impacto se não decidir:** risco de a TASK-022 fabricar um modelo de itinerário-em-edição inexistente (violaria docs-dev/04 princípio 2), ou de a pendência bloqueante ficar sem dono.
+**Opções possíveis:** 1. TASK-022 entrega a taxonomia de falha + camada de mensagens (e, opcionalmente, um predicado puro reutilizável); a entrada de pendência em `coletarPendencias` fica com a task que introduz o estado de recálculo/congelado — recomendada. 2. Antecipar a pendência na TASK-022 contra dados inexistentes — arriscaria inventar modelo.
+**Recomendação técnica:** opção 1 — não fabricar modelo de itinerário-em-edição na TASK-022.
+**Decisão:** **Decidida (DEC-040, 2026-07-13).** Opção 1: a TASK-022 entrega só a taxonomia/mensagens; a entrada de pendência bloqueante é **deferida à TASK-044**, já criada e ordenada (024 → 044), garantindo que a parte deferida de RN-048/078 será implementada após o estado ao vivo da TASK-024 existir — não fica órfã.
+
+## Q-022 — Fronteira da TASK-024: motor headless de recálculo × fio dos gestos do mapa
+
+**Contexto:** a política "abrir congela / editar recalcula no soltar" (RN-052; Spec 04 §7.3) pressupõe a etapa de mapa editável (TASK-017/018/019), ainda não construída. A lista de dependências declarada da TASK-024 (TASK-006/021/023) não inclui os editores. Levantada na análise da TASK-024.
+**Spec relacionada:** Spec 03 §3.6.2, §3.7.7; Spec 04 §3.1 item 6, §7.3; RN-052/046/015.
+**Impacto se não decidir:** define se a TASK-024 entrega UI de edição (invadindo TASK-017/018/019) ou um motor headless que os editores consomem depois.
+**Opções possíveis:** (a) TASK-024 entrega **só o motor headless + o modelo de estado de rota ao vivo** (`congelada | recalculada | sem-rota`), com a garantia "abrir = 0 chamadas OSRM" e um `recalcularItinerario(gesto)` testado por integração com fetch-espião; o fio dos gestos reais é das TASK-017/018/019 (recomendada). (b) Antecipar um protótipo mínimo de edição no mapa para viabilizar o E2E — viola "uma task por vez". (c) Bloquear a TASK-024 até TASK-017/018/019.
+**Recomendação técnica:** (a) — coerente com a lista de dependências, com os guardrails (`shared`/`formulario` desacoplados, lógica pura testável fora da UI) e com o precedente das TASK-021/022/023 (motor testado por mock, sem UI).
+**Decisão:** **Decidida (DEC-041, 2026-07-13).** Opção (a): a TASK-024 entrega só o motor headless de recálculo-vs-congelado + o estado de rota ao vivo, com a costura da descrição (composer da TASK-025) injetável; o fio dos gestos das TASK-017/018/019 passa a depender funcionalmente da TASK-024. O E2E de edição ao vivo fica diferido para quando os editores existirem; nesta task, "abrir → 0 chamadas OSRM" é coberto por integração com fetch-espião.
+
 ## Comparador
 
 ## Q-004 — Tolerância de "rota alterada"
