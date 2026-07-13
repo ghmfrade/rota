@@ -152,10 +152,10 @@ export function EditorSecoes({
     if (!resultado.ok) {
       // Ponto NÃO se move: a posição do marcador vem de `secoes` (prop
       // controlada), que o chamador não alterou — o próximo render devolve o
-      // marcador à posição antiga. Decisão do responsável pelo domínio
-      // (Q-024 não se aplica aqui; ver análise da TASK-017): sem oferta
-      // automática de criar Seção nova — o usuário usa o fluxo normal de
-      // clique se quiser uma Seção separada.
+      // marcador à posição antiga. Sem oferta automática de criar Seção nova
+      // (DEC-044/Q-025): arrastar não pode descaracterizar a Seção; a recusa só
+      // informa, e o usuário usa o fluxo normal de clique se quiser uma Seção
+      // separada.
       definirMensagem(
         resultado.motivo === "350m"
           ? `${MENSAGEM_RECUSA_350M_SECAO} (Seção: ${resultado.nomeSecao})`

@@ -135,6 +135,14 @@ Consolidação do que **exige decisão humana**. Nada aqui foi decidido — quan
 **Recomendação técnica:** A — o grafo de dependências do backlog (019 depende de 017+018, não o contrário) é mais específico e mais recente que a nota solta da revisão da TASK-020; resolver o follow-up "de verdade" só faz sentido quando a etapa "de verdade" existir.
 **Decisão:** **Decidida (DEC-043, 2026-07-13).** Opção A: a TASK-017 entrega só o motor de regras de Seção (350 m, município, contribuição por Serviço/sentido) + o componente controlado `EditorSecoes`, montado num harness próprio e transitório para os testes (não a etapa real). A TASK-019 é quem monta a etapa "Seções, Locais e Itinerários" de verdade — com ela, o follow-up da TASK-020 (remover/reaproveitar `src/app/mapa-demo`, apontar o E2E de mapa para o ponto de montagem real) é resolvido em definitivo.
 
+## Q-025 — Recusa de arrasto de Seção (>350 m): "oferecer criar Seção nova" exige afordância interativa ou basta a mensagem?
+
+**Contexto:** a Spec 04 §14 (coluna "Comportamento", linha "Seção fora do limite de 350 m") diz "Recusa a inserção/arrasto; **oferece criar Seção nova**", e o resumo da TASK-017 no backlog lista "oferta de 'criar Seção nova' na recusa". Ao arrastar um ponto de Seção para além dos 350 m do cluster (RN-027), o sistema recusa e o ponto volta à posição anterior. Dúvida: a "oferta de criar Seção nova" precisa ser uma **afordância interativa** (botão/atalho que já cria a Seção no ponto recusado), ou basta a **mensagem literal** de §14 — que já instrui "Crie uma Seção separada (com outro nome) para este local"? Levantada na revisão da TASK-017 (`docs-dev/14-REVISOES/TASK-017-20260713.md`).
+**Spec relacionada:** Spec 04 §7.1, §7.3, §14; RN-027. Não altera contrato JSON.
+**Impacto se não decidir:** a ressalva da revisão da TASK-017 fica sem dono; risco de a TASK-019 (que monta a etapa real) reintroduzir uma afordância que o responsável não quer — ou, no oposto, de o requisito de §14 se perder silenciosamente.
+**Opções possíveis:** A — basta a mensagem: na recusa, o sistema apenas informa que o ponto não pode descaracterizar a Seção daquela forma; quem quiser uma Seção nova usa o fluxo normal de criação (clique no mapa). B — afordância interativa: além da mensagem, um botão "criar Seção nova aqui" que já cria a Seção no ponto recusado.
+**Decisão:** **Decidida (DEC-044, 2026-07-13).** Opção A: na recusa de arrasto basta a mensagem literal da Spec 04 §14 (que já orienta a criar uma Seção separada). Não há afordância interativa de "criar Seção nova" — o usuário que quiser uma Seção nova a cria pelo fluxo normal de clique no mapa. O "oferece criar Seção nova" de §14 é considerado satisfeito pela própria mensagem.
+
 ## Comparador
 
 ## Q-004 — Tolerância de "rota alterada"

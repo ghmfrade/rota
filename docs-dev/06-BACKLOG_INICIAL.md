@@ -144,7 +144,7 @@
 ## TASK-017 — Editor de Seções no mapa
 
 **Prioridade:** Alta · **Fase:** Formulário
-**Resumo:** Criar Seção clicando no mapa (nome digitado, município derivado somente-leitura), reutilizar Seções existentes, contribuição de geoloc por Serviço/sentido, arrasto com revalidação 350 m e oferta de "criar Seção nova" na recusa.
+**Resumo:** Criar Seção clicando no mapa (nome digitado, município derivado somente-leitura), reutilizar Seções existentes, contribuição de geoloc por Serviço/sentido, arrasto com revalidação 350 m. Na recusa do arrasto, **só a mensagem literal da Spec 04 §14** (sem afordância de "criar Seção nova" — DEC-044/Q-025): arrastar não pode descaracterizar a Seção; quem quer Seção nova usa o fluxo de clique.
 **Regras RN:** RN-025..027, RN-029. **Depende de:** TASK-010, TASK-011, TASK-020 (mapa base), TASK-024 (o gesto de criar/arrastar Seção dispara o recálculo do estado de rota ao vivo — RN-052; DEC-041).
 **Fio da pendência de rota:** o recálculo disparado por este editor pode resultar em `sem-rota`; a montagem e a passagem do `ItinerarioAoVivo` a `coletarPendencias` (TASK-044) ficam consolidadas na TASK-019 (dona do estado por itinerário) — este editor apenas alimenta o recálculo.
 **Testes esperados:** unitários dos fluxos de inserção; E2E de recusa 350 m.
@@ -162,6 +162,7 @@
 **Prioridade:** Alta · **Fase:** Formulário
 **Resumo:** Inserir Seções/Locais em ordem, reordenar pela tabela lateral sincronizada com o mapa, validações de Parada (XOR, extremos, geoloc do sentido), conjunto de Seções Ida=Volta.
 **Regras RN:** RN-030, RN-033..036, RN-038. **Depende de:** TASK-004, TASK-017, TASK-018, TASK-024 (estado de rota ao vivo por itinerário — RN-052; DEC-041), TASK-044 (pendência bloqueante "itinerário sem rota válida" já disponível em `coletarPendencias`).
+**Nota de UX herdada (DEC-044/Q-025):** ao montar a etapa real, **não** adicionar afordância de "criar Seção nova" na recusa de arrasto de Seção — só a mensagem da Spec 04 §14; o mesmo vale para a recusa pareada de Local (TASK-018).
 **Obrigação de fiação (fecha o fio da TASK-044):** como dona do estado de rota ao vivo por itinerário, esta task **monta** o `ItinerarioAoVivo` (`{ numero_n, sentido, estadoRota }`) a partir dos estados `congelada`/`recalculada`/`sem-rota` da TASK-024 e o **passa** ao segundo parâmetro de `coletarPendencias` (TASK-044), de modo que um itinerário em `sem-rota` de fato acenda a pendência bloqueante no painel. Sem esta costura, o parâmetro de `coletarPendencias` fica no default vazio (nunca dispara) — é aqui que ele deixa de ser código morto.
 **Testes esperados:** unitários; E2E (reordenar → recálculo sinalizado; recálculo que falha no OSRM → pendência bloqueante visível no painel, OSRM mockado).
 

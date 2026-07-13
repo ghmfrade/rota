@@ -236,9 +236,10 @@ export type ResultadoArrasto =
  * §7.3). O ponto sendo movido é excluído do cluster antes de testar o
  * candidato — senão o próprio ponto (já aceito antes) sempre passaria. Recusa
  * → o ponto NÃO se move (o chamador mantém a posição antiga) e a UI mostra a
- * mensagem literal da Spec 04 §14, nomeando a Seção afetada (decisão do
- * responsável pelo domínio: sem oferta automática de criar Seção nova — o
- * usuário cria pelo fluxo normal de clique, se quiser).
+ * mensagem literal da Spec 04 §14, nomeando a Seção afetada. Sem afordância de
+ * "criar Seção nova" na recusa (DEC-044/Q-025): arrastar não pode descaracterizar
+ * a Seção; quem quer uma Seção nova usa o fluxo normal de clique. Por isso
+ * `nomeSecao` serve só para compor a mensagem, não uma oferta.
  */
 export function revalidarArrasto(entrada: EntradaRevalidarArrasto): ResultadoArrasto {
   const pontosSemAlvo = coletarPontos(entrada.secao, {

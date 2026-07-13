@@ -2,9 +2,9 @@ import { expect, test } from "@playwright/test";
 
 // E2E do editor de Seções (TASK-017; Spec 04 §7.1/§7.3): arrasto que viola os
 // 350 m é recusado — o ponto NÃO se move e a mensagem literal da Spec 04 §14
-// aparece, nomeando a Seção afetada (decisão do responsável pelo domínio: sem
-// oferta automática de "criar Seção nova" — o usuário usa o fluxo normal de
-// clique se quiser uma Seção separada).
+// aparece, nomeando a Seção afetada. Sem oferta automática de "criar Seção
+// nova" na recusa (DEC-044/Q-025): arrastar não pode descaracterizar a Seção;
+// o usuário usa o fluxo normal de clique se quiser uma Seção separada.
 //
 // Harness próprio e transitório (`/editor-secoes-demo`) — a etapa real é da
 // TASK-019 (Q-024/DEC-043). Tiles interceptados: nenhum teste depende da rede
