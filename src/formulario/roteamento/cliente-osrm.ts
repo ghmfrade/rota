@@ -1,6 +1,8 @@
 import type { Ponto } from "@/shared/geo";
+import type { PontoDeRota } from "@/shared/contrato";
 import { montarUrlOsrm } from "./url-osrm";
 import { extrairRota, type RespostaOsrm } from "./extrair-rota";
+import { intercalarPontosDeRota } from "./intercalar-pontos-de-rota";
 import type { FalhaOsrm, ResultadoRoteamento } from "./falhas-osrm";
 
 // Cliente fino sobre a API pública do OSRM (docs-dev/13 — "cliente HTTP fino
@@ -25,13 +27,16 @@ export interface OpcoesClienteOsrm {
   fetchFn?: typeof fetch;
   /** Timeout por tentativa em ms (default `OSRM_TIMEOUT_PADRAO_MS`). */
   timeoutMs?: number;
+  /** Pontos de rota (Spec 03 §3.6) a intercalar na requisição — default `[]`. */
+  pontosDeRota?: readonly PontoDeRota[];
 }
 
 /**
  * Solicita ao OSRM a rota para a sequência ordenada de paradas de UM itinerário
- * (Spec 03 §3.1) e devolve um `ResultadoRoteamento` discriminado: `{ ok:true,
- * rota }` com os campos extraídos (§3.3/§3.4), ou `{ ok:false, falha }` com a
- * `FalhaOsrm` bloqueante (§3.5). Sem pontos de rota (TASK-023).
+ * (Spec 03 §3.1), intercalando os pontos de rota informados (§3.6), e devolve
+ * um `ResultadoRoteamento` discriminado: `{ ok:true, rota }` com os campos
+ * extraídos (§3.3/§3.4/§3.6), ou `{ ok:false, falha }` com a `FalhaOsrm`
+ * bloqueante (§3.5).
  *
  * Retry: **1** nova tentativa automática só em falha de rede/timeout (§3.5);
  * erros semânticos (`code != "Ok"`) não são re-tentados.
@@ -44,8 +49,10 @@ export async function solicitarRota(
     baseUrl,
     fetchFn = fetch,
     timeoutMs = OSRM_TIMEOUT_PADRAO_MS,
+    pontosDeRota = [],
   } = opcoes;
-  const url = montarUrlOsrm(paradas, baseUrl);
+  const { indicesParadas } = intercalarPontosDeRota(paradas, pontosDeRota);
+  const url = montarUrlOsrm(paradas, baseUrl, pontosDeRota);
 
   // Falha de rede/timeout é re-tentada 1×; a segunda falha vira `indisponivel`.
   // `buscarEnvelope` lança só nesse tipo de falha (rede/timeout/corpo não-JSON);
@@ -62,7 +69,7 @@ export async function solicitarRota(
     }
   }
 
-  return classificarEnvelope(corpo, paradas.length);
+  return classificarEnvelope(corpo, paradas.length, indicesParadas, pontosDeRota);
 }
 
 /**
@@ -92,14 +99,19 @@ async function buscarEnvelope(
 function classificarEnvelope(
   corpo: RespostaOsrm,
   numeroParadas: number,
+  indicesParadas: readonly number[],
+  pontosDeRota: readonly PontoDeRota[],
 ): ResultadoRoteamento {
   switch (corpo.code) {
     case "Ok":
-      return { ok: true, rota: extrairRota(corpo, numeroParadas) };
+      return {
+        ok: true,
+        rota: extrairRota(corpo, numeroParadas, { indicesParadas, pontosDeRota }),
+      };
     case "NoRoute":
       return { ok: false, falha: { tipo: "sem-rota" } };
     case "NoSegment":
-      return { ok: false, falha: falhaSemSegmento(corpo) };
+      return { ok: false, falha: falhaSemSegmento(corpo, indicesParadas) };
     default:
       return { ok: false, falha: { tipo: "codigo-inesperado", code: corpo.code } };
   }
@@ -110,11 +122,29 @@ function classificarEnvelope(
  * coordenada rejeitada da `message` do OSRM (ex.: "…for coordinate 2"). O OSRM
  * não expõe esse índice num campo estruturado; quando a mensagem não o traz,
  * `indiceCoordenada` fica `undefined` e a camada superior usa a forma genérica
- * (decisão da TASK-022, Q-019). Sem pontos de rota (TASK-023) o índice da
- * coordenada coincide com o índice da parada.
+ * (decisão da TASK-022, Q-019).
+ *
+ * Com pontos de rota (Spec 03 §3.6), o índice retornado pelo OSRM é o da
+ * **coordenada** na sequência intercalada, que não coincide mais com o índice
+ * da parada — `indicesParadas` mapeia de volta: se a coordenada rejeitada é
+ * uma parada, devolve o índice dela (0-based); se é um ponto de rota, a
+ * camada superior não tem como identificá-la como parada, então
+ * `indiceCoordenada` fica `undefined` (mensagem genérica) — inferência
+ * controlada da análise da TASK-023, para não citar "parada nº X" quando o
+ * ponto rejeitado nem é parada.
  */
-function falhaSemSegmento(corpo: RespostaOsrm): FalhaOsrm {
+function falhaSemSegmento(
+  corpo: RespostaOsrm,
+  indicesParadas: readonly number[],
+): FalhaOsrm {
   const casado = corpo.message?.match(/coordinate\s+(\d+)/i);
-  const indiceCoordenada = casado ? Number(casado[1]) : undefined;
-  return { tipo: "sem-segmento", indiceCoordenada };
+  const indiceCoordenadaBruto = casado ? Number(casado[1]) : undefined;
+  if (indiceCoordenadaBruto === undefined) {
+    return { tipo: "sem-segmento", indiceCoordenada: undefined };
+  }
+  const indiceParada = indicesParadas.indexOf(indiceCoordenadaBruto);
+  return {
+    tipo: "sem-segmento",
+    indiceCoordenada: indiceParada !== -1 ? indiceParada : undefined,
+  };
 }

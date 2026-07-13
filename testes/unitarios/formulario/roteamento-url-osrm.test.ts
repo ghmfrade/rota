@@ -5,9 +5,11 @@ import {
   OSRM_BASE_URL_PADRAO,
 } from "@/formulario/roteamento";
 import type { Ponto } from "@/shared/geo";
+import type { PontoDeRota } from "@/shared/contrato";
 
-// TASK-021 — montagem da URL de requisição ao OSRM (Spec 03 §3.2; RN-047).
-// Sem pontos de rota (TASK-023) e sem rede real (categoria 4, docs-dev/08).
+// TASK-021/023 — montagem da URL de requisição ao OSRM (Spec 03 §3.2; RN-047),
+// com e sem pontos de rota (`&waypoints=`, §3.6). Sem rede real (categoria 4,
+// docs-dev/08).
 
 const PARADA_A: Ponto = { latitude: -23.55, longitude: -46.63 };
 const PARADA_B: Ponto = { latitude: -22.9, longitude: -47.1 };
@@ -51,6 +53,24 @@ describe("montarUrlOsrm (RN-047, Spec 03 §3.2)", () => {
   test("[inválido] menos de 2 paradas lança erro (RN-034/RN-047)", () => {
     expect(() => montarUrlOsrm([PARADA_A])).toThrow(/RN-047/);
     expect(() => montarUrlOsrm([])).toThrow(/RN-047/);
+  });
+});
+
+describe("montarUrlOsrm — pontos de rota (Spec 03 §3.6, §3.6.1; RN-042/051)", () => {
+  const p1: PontoDeRota = { apos_parada_ordem: 1, latitude: -23.1, longitude: -46.7 };
+
+  test("sem pontos de rota, NÃO anexa &waypoints (compatibilidade TASK-021)", () => {
+    const url = montarUrlOsrm([PARADA_A, PARADA_B], undefined, []);
+    expect(url).not.toContain("waypoints");
+  });
+
+  test("com pontos de rota, intercala as coordenadas e anexa &waypoints com os índices das paradas", () => {
+    const url = montarUrlOsrm([PARADA_A, PARADA_B, PARADA_C], undefined, [p1]);
+    const coordenadas = url.split("/route/v1/driving/")[1].split("?")[0];
+    expect(coordenadas).toBe(
+      "-46.63,-23.55;-46.7,-23.1;-47.1,-22.9;-47.9,-22",
+    );
+    expect(url).toContain("&waypoints=0;2;3");
   });
 });
 

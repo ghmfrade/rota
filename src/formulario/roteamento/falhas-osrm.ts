@@ -20,8 +20,10 @@ import type { ResultadoRotaOsrm } from "./extrair-rota";
  *   ordem dada (§3.5 linha 2).
  * - `sem-segmento` — `code == "NoSegment"`: uma coordenada não pôde ser ancorada
  *   à malha viária (§3.5 linha 3). `indiceCoordenada` (0-based) aponta a
- *   coordenada rejeitada **quando o OSRM a informa** (best-effort); sem pontos de
- *   rota (TASK-023) ela coincide com o índice da parada.
+ *   **parada** rejeitada, quando o OSRM informa o índice (best-effort) **e**
+ *   a coordenada rejeitada é uma parada; com pontos de rota (Spec 03 §3.6), se
+ *   a coordenada rejeitada for um ponto de rota, fica `undefined` (mensagem
+ *   genérica — TASK-023).
  * - `codigo-inesperado` — qualquer outro `code != "Ok"` (§3.5 linha 4); carrega
  *   o `code` para a mensagem genérica.
  */

@@ -1,7 +1,8 @@
-// Cliente OSRM do Formulário (Spec 03 §3.1–§3.5; RN-014/041/047/048/049/050) —
-// URL, extração legs→trechos, conversão m→km e tratamento de falha (retry,
-// taxonomia bloqueante, mensagens). Pontos de rota (TASK-023) e descrição
-// textual (TASK-025) ficam fora deste módulo.
+// Cliente OSRM do Formulário (Spec 03 §3.1–§3.6; RN-014/041/042/043/047/048/
+// 049/050/051) — URL, intercalação e extração legs→trechos (com e sem pontos
+// de rota), conversão m→km e tratamento de falha (retry, taxonomia
+// bloqueante, mensagens). Descrição textual (TASK-025) fica fora deste
+// módulo.
 export {
   montarUrlOsrm,
   urlBaseOsrm,
@@ -13,7 +14,12 @@ export {
   type RotaBrutaOsrm,
   type RespostaOsrm,
   type ResultadoRotaOsrm,
+  type OpcoesExtrairRota,
 } from "./extrair-rota";
+export {
+  intercalarPontosDeRota,
+  type SequenciaIntercalada,
+} from "./intercalar-pontos-de-rota";
 // `arredondaHalfUp` foi consolidado em `shared/calculo` (TASK-043) — reexportado
 // aqui para não quebrar quem já importa de `@/formulario/roteamento`.
 export { arredondaHalfUp } from "@/shared/calculo";

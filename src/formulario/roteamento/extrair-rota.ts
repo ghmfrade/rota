@@ -1,12 +1,18 @@
 import type { z } from "zod";
 import { arredondaHalfUp } from "@/shared/calculo";
-import { esquemaGeometriaLineString, type Trecho } from "@/shared/contrato";
+import {
+  esquemaGeometriaLineString,
+  type PontoDeRota,
+  type Trecho,
+} from "@/shared/contrato";
 
-// Extração da resposta do OSRM → `rota` parcial (Spec 03 §3.3/§3.4; RN-014,
-// RN-040, RN-041, RN-050). Cobre exclusivamente o caminho SEM pontos de rota
-// (`legs.length == paradas.length - 1`, mapeamento 1:1 leg→trecho) — a
-// generalização com `waypoints`/fusão de legs é escopo da TASK-023; a
-// montagem de `descricao_itinerario` a partir de `steps[].name` é a TASK-025.
+// Extração da resposta do OSRM → `rota` parcial (Spec 03 §3.3/§3.4/§3.6;
+// RN-014, RN-040, RN-041, RN-050, RN-051). Cobre os dois caminhos de
+// mapeamento legs→trechos: sem pontos de rota (`legs.length ==
+// paradas.length - 1`, 1:1) e com pontos de rota, nos dois sub-caminhos do
+// §3.6 — preferencial (`waypoints` honrado, ainda 1:1) e fallback (fusão de
+// legs entre paradas consecutivas). A montagem de `descricao_itinerario` a
+// partir de `steps[].name` é a TASK-025.
 
 /** Recorte mínimo de um `leg` do envelope OSRM (Spec 03 §3.3) — só o que esta
  * task consome; `steps` é ignorado aqui (insumo da descrição, TASK-025). */
@@ -37,34 +43,60 @@ export interface RespostaOsrm {
 
 /**
  * Resultado parcial do roteamento de um itinerário: os campos de `rota`
- * (Spec 02 §10.2) que esta task produz. `descricao_itinerario` (TASK-025) e
- * `pontos_de_rota` (TASK-023, default `[]`) são completados por tasks
- * seguintes antes de compor o objeto `rota` congelado final (RN-015).
+ * (Spec 02 §10.2) que esta task produz. `descricao_itinerario` (TASK-025) é
+ * completada por task seguinte antes de compor o objeto `rota` congelado
+ * final (RN-015). `pontos_de_rota` é o eco do que foi enviado (default `[]`),
+ * pronto para o congelamento (Spec 03 §3.6.2 — persistência para reedição).
  */
 export interface ResultadoRotaOsrm {
   geometria: z.infer<typeof esquemaGeometriaLineString>;
   distancia_km: number;
   duracao_s: number;
   trechos: Trecho[];
+  pontos_de_rota: PontoDeRota[];
+}
+
+/** Opções de `extrairRota` para o caso com pontos de rota (Spec 03 §3.6). */
+export interface OpcoesExtrairRota {
+  /** Índices (0-based), na sequência de coordenadas enviada ao OSRM, das
+   * paradas — na mesma ordem das paradas (Spec 03 §3.6.1). Presente só
+   * quando há pontos de rota; sem eles, mapeamento 1:1 (TASK-021). */
+  indicesParadas?: readonly number[];
+  /** Pontos de rota enviados nesta requisição — ecoados no resultado para
+   * congelamento em `rota.pontos_de_rota` (RN-042, §3.6.2). */
+  pontosDeRota?: readonly PontoDeRota[];
 }
 
 /**
  * Extrai `routes[0]` da resposta do OSRM e monta `trechos[]` + totais
- * (Spec 03 §3.3/§3.4): mapeamento 1:1 `leg[i] → trecho{origem i+1, destino
- * i+2}` (RN-041), conversão m→km half-up a 2 casas e `duracao_s` inteiro
- * (RN-050), com os totais somados a partir dos trechos **já arredondados**
- * (RN-040/050) — nunca o total global do OSRM, para não haver erro de
- * fechamento entre `rota.distancia_km` e `Σ trechos`.
+ * (Spec 03 §3.3/§3.4/§3.6), preservando sempre o invariante
+ * `trechos.length == numeroParadas - 1` (RN-041). Dois caminhos, resultado
+ * idêntico (RN-051):
  *
- * `numeroParadas` é o tamanho da sequência de paradas do itinerário; sem
- * pontos de rota, o invariante de entrada é `legs.length == numeroParadas -
- * 1` (RN-041) — divergência aqui indica que a resposta não corresponde a
- * esta chamada (ou que há pontos de rota, fora do escopo desta task).
+ * - **Sem `indicesParadas` (ou pontos de rota vazios):** mapeamento 1:1
+ *   `leg[i] → trecho{origem i+1, destino i+2}` — exige
+ *   `legs.length == numeroParadas - 1`.
+ * - **Com `indicesParadas` (pontos de rota presentes):**
+ *   - **Preferencial** — se o OSRM honrou `waypoints`, `legs.length` já é
+ *     `numeroParadas - 1`: mesmo mapeamento 1:1 de cima.
+ *   - **Fallback** — se todas as coordenadas geraram leg
+ *     (`legs.length == totalCoordenadas - 1`), **funde-se** (soma de
+ *     `distance`/`duration` em metros/segundos, arredondando **uma vez** por
+ *     trecho — RN-050) os legs entre `indicesParadas[i]` e
+ *     `indicesParadas[i+1]`.
+ *
+ * Em ambos os casos, conversão m→km half-up a 2 casas e `duracao_s` inteiro
+ * (RN-050), com os totais somados a partir dos trechos **já arredondados**
+ * — nunca o total global do OSRM, para não haver erro de fechamento entre
+ * `rota.distancia_km` e `Σ trechos`.
  */
 export function extrairRota(
   resposta: RespostaOsrm,
   numeroParadas: number,
+  opcoes: OpcoesExtrairRota = {},
 ): ResultadoRotaOsrm {
+  const { indicesParadas, pontosDeRota = [] } = opcoes;
+
   const rotaBruta = resposta.routes[0];
   if (!rotaBruta) {
     throw new Error(
@@ -73,21 +105,30 @@ export function extrairRota(
   }
 
   const trechosEsperados = numeroParadas - 1;
-  if (rotaBruta.legs.length !== trechosEsperados) {
+  const legs = rotaBruta.legs;
+
+  let trechos: Trecho[];
+
+  if (legs.length === trechosEsperados) {
+    // Sem pontos de rota, ou pontos de rota com `waypoints` honrado
+    // (caminho preferencial, §3.6 regra "waypoints") — mapeamento 1:1.
+    trechos = legs.map((leg, indice) => ({
+      parada_origem_ordem: indice + 1,
+      parada_destino_ordem: indice + 2,
+      distancia_km: arredondaHalfUp(leg.distance / 1000, 2),
+      duracao_s: arredondaHalfUp(leg.duration, 0),
+    }));
+  } else if (indicesParadas && legs.length === totalCoordenadas(indicesParadas) - 1) {
+    // Fallback: todas as coordenadas geraram leg — funde-se os legs entre
+    // paradas consecutivas (Spec 03 §3.6 caminho fallback, §3.6.1 exemplo 2b).
+    trechos = fundirLegsEntreParadas(legs, indicesParadas);
+  } else {
     throw new Error(
-      `[RN-041] legs.length (${rotaBruta.legs.length}) difere de ` +
-        `paradas.length - 1 (${trechosEsperados}) — mapeamento 1:1 exige ` +
-        "requisição sem pontos de rota (Spec 03 §3.3; pontos de rota são " +
-        "escopo da TASK-023).",
+      `[RN-041] legs.length (${legs.length}) não corresponde a ` +
+        `paradas.length - 1 (${trechosEsperados}) nem à contagem esperada do ` +
+        "caminho fallback com pontos de rota (Spec 03 §3.3, §3.6).",
     );
   }
-
-  const trechos: Trecho[] = rotaBruta.legs.map((leg, indice) => ({
-    parada_origem_ordem: indice + 1,
-    parada_destino_ordem: indice + 2,
-    distancia_km: arredondaHalfUp(leg.distance / 1000, 2),
-    duracao_s: arredondaHalfUp(leg.duration, 0),
-  }));
 
   const distancia_km = arredondaHalfUp(
     trechos.reduce((soma, trecho) => soma + trecho.distancia_km, 0),
@@ -95,5 +136,49 @@ export function extrairRota(
   );
   const duracao_s = trechos.reduce((soma, trecho) => soma + trecho.duracao_s, 0);
 
-  return { geometria: rotaBruta.geometry, distancia_km, duracao_s, trechos };
+  return {
+    geometria: rotaBruta.geometry,
+    distancia_km,
+    duracao_s,
+    trechos,
+    pontos_de_rota: [...pontosDeRota],
+  };
+}
+
+/** Total de coordenadas enviadas ao OSRM (paradas + pontos de rota): como
+ * nenhum ponto de rota pode ter `apos_parada_ordem == paradas.length` (Spec
+ * 02 §10.4), a última parada é sempre a última coordenada da sequência. */
+function totalCoordenadas(indicesParadas: readonly number[]): number {
+  return indicesParadas[indicesParadas.length - 1] + 1;
+}
+
+/**
+ * Funde os legs do caminho fallback (§3.6 caminho 2b): entre a parada `i` e a
+ * parada `i+1`, soma `distance`/`duration` **brutos** (metros/segundos) de
+ * todos os legs no intervalo e arredonda **uma vez** (RN-050) — para o
+ * resultado ser idêntico ao caminho preferencial (RN-051), nunca se arredonda
+ * cada leg componente antes de somar.
+ */
+function fundirLegsEntreParadas(
+  legs: readonly LegOsrm[],
+  indicesParadas: readonly number[],
+): Trecho[] {
+  const trechos: Trecho[] = [];
+  for (let i = 0; i < indicesParadas.length - 1; i++) {
+    const inicio = indicesParadas[i];
+    const fim = indicesParadas[i + 1];
+    let distanciaBruta = 0;
+    let duracaoBruta = 0;
+    for (let legIndice = inicio; legIndice < fim; legIndice++) {
+      distanciaBruta += legs[legIndice].distance;
+      duracaoBruta += legs[legIndice].duration;
+    }
+    trechos.push({
+      parada_origem_ordem: i + 1,
+      parada_destino_ordem: i + 2,
+      distancia_km: arredondaHalfUp(distanciaBruta / 1000, 2),
+      duracao_s: arredondaHalfUp(duracaoBruta, 0),
+    });
+  }
+  return trechos;
 }
