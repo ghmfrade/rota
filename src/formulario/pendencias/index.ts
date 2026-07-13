@@ -3,4 +3,5 @@ export {
   coletarPendencias,
   type Pendencia,
   type SeveridadePendencia,
+  type ItinerarioAoVivo,
 } from "./pendencias";
