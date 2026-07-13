@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   congelarRotaCarregada,
   recalcularItinerario,
@@ -63,9 +63,22 @@ function respostaFetchMock(corpo: unknown): typeof fetch {
   }) as unknown as typeof fetch;
 }
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("congelarRotaCarregada — abrir JSON (RN-052; Spec 04 §3.1 item 6)", () => {
   test("devolve { situacao: 'congelada', rota } idêntica à gravada, sem qualquer fetch", () => {
-    const fetchEspiao = vi.fn();
+    // Espião ATIVO sobre o fetch global efetivamente disponível à unidade
+    // (DEC-042): mockImplementation garante que qualquer chamada acidental
+    // estoure alto em vez de ir à rede real, e a asserção `not.toHaveBeenCalled`
+    // vira guard de regressão de verdade — falharia se `congelarRotaCarregada`
+    // passasse a chamar o OSRM na abertura (RN-052).
+    const fetchEspiao = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(() =>
+        Promise.reject(new Error("abrir JSON não deve chamar fetch (RN-052)")),
+      );
 
     const estado = congelarRotaCarregada(ROTA_CONGELADA);
 
