@@ -372,6 +372,16 @@
 **Testes esperados:** unitários de `coletarPendencias` (itinerário sem rota → 1 bloqueante; com rota → nenhuma; um sem e um com rota → só a do primeiro; mensagem sem "tarifa"/"R$"); integração leve com o estado ao vivo da TASK-024 (rota que falhou no OSRM vira pendência); E2E opcional do painel (item clicável leva à etapa de mapa).
 **Perguntas em aberto:** nenhuma (as ambiguidades da TASK-022 — identificação da parada no `NoSegment`, timeout de 15 s ajustável, fronteira desta pendência — foram decididas pelo responsável na análise da TASK-022).
 
+## TASK-045 — Fetch-espião ativo na garantia de abertura sem OSRM
+
+**Prioridade:** Baixa · **Fase:** Rotas
+**Resumo:** Origem: ressalva (não bloqueante) da revisão da TASK-024, decidida em DEC-042 (Q-023). O teste de abertura de `congelarRotaCarregada` em `roteamento-recalculo-vivo.test.ts` cria um `vi.fn()` como espião de fetch mas **nunca o liga** à função sob teste (que é síncrona e não recebe `fetch`), tornando a asserção `not.toHaveBeenCalled()` **vacuamente verdadeira**. Esta task substitui o espião decorativo por um **espião ativo** sobre `globalThis.fetch` (`vi.spyOn`), assertando zero chamadas conforme DEC-042; a garantia estrutural (função síncrona, sem `Promise`) permanece como reforço. Só teste — nenhum código de produção muda.
+**Regras RN:** RN-052 (garantia "abrir = 0 chamadas OSRM"; nenhuma regra nova). **Depende de:** TASK-024.
+**Fora de escopo:** qualquer mudança em código de produção (`estado-rota-viva.ts` e demais); a assinatura provisória do composer (fica para a TASK-025); estender o padrão a outros testes/garantias (p.ex. RN-080 do Comparador) antes de aquelas suítes serem tocadas; qualquer alteração de comportamento observável.
+**Critérios de aceite resumidos:** o teste de abertura usa `vi.spyOn(globalThis, "fetch")` (com `mockRestore` ao final) e assere zero chamadas; a asserção passa a **falhar** se `congelarRotaCarregada` chamar `fetch`; nenhum outro teste muda de resultado; suíte completa permanece verde.
+**Testes esperados:** unitário ajustado em `roteamento-recalculo-vivo.test.ts` (abertura → espião ativo com zero chamadas); `npm test` 100% verde sem alteração de outras expectativas.
+**Perguntas em aberto:** nenhuma (Q-023 decidida em DEC-042).
+
 ---
 
 ## Ordem recomendada de execução
@@ -379,7 +389,7 @@
 ```text
 001 → 002 → 003 → 004/005 (paralelo) → 041 → 006 → 007 → 042
 → 008/009 (paralelo) → 010 → 011 → 012
-→ 013 → 014 → 015 → 016 → 020 → 021 → 043 → 022 → 023 → 024 → 044 → 017 → 018 → 019 → 025
+→ 013 → 014 → 015 → 016 → 020 → 021 → 043 → 022 → 023 → 024 → 044 → 045 → 017 → 018 → 019 → 025
 → 026 → 027 → 028 → 029 → 030 → 031 → 032
 → 033 → 034
 → 035 → 036 → 037 → 038 → 039
