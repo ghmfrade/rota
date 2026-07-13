@@ -362,6 +362,16 @@
 **Critérios de aceite resumidos:** existe exatamente um primitivo de arredondamento half-up no repositório; `validacoes-estruturais.ts` e `extrair-rota.ts` (incluindo `duracao_s`) o consomem; nenhum teste existente muda de resultado.
 **Testes esperados:** unitários do primitivo consolidado (mesmos casos já cobertos nas duas suítes atuais, incluindo os casos de borda 0,005→0,01 e o caso de fechamento de trechos); suíte completa (`npm test`) permanece 100% verde sem alteração de expectativas.
 
+## TASK-044 — Pendência bloqueante de itinerário sem rota válida no painel
+
+**Prioridade:** Alta · **Fase:** Rotas
+**Resumo:** Origem: follow-up deferido explicitamente na análise da TASK-022. A TASK-022 entregou a taxonomia de falha do OSRM (indisponível/`NoRoute`/`NoSegment`/`code != Ok`) e a camada de mensagens (Spec 04 §14, sem menção a tarifa — RN-049), mas **não** fez o wire da pendência bloqueante "itinerário sem rota válida" no painel, porque nesse ponto do projeto não existia modelo de estado de rota em edição ao vivo (no modo carregado o `documento` já é schema-válido — todo itinerário tem `rota`; não havia caso computável de "sem rota"). A TASK-024 ("Recalcular × abrir congelado") introduz esse estado ao vivo: edições de itinerário/coordenada/ponto de rota que falham no OSRM deixam o itinerário sem `rota` válida. Esta task adiciona a entrada bloqueante correspondente em `coletarPendencias` (`src/formulario/pendencias/pendencias.ts`), consumindo o estado de rota ao vivo da TASK-024 e a taxonomia/mensagens da TASK-022, com a mensagem operacional de §14 ("O itinerário de Ida do Serviço 0000-1CR está sem rota calculada. Recalcule antes de exportar.") e `etapaAlvo` na etapa de mapa/itinerário. **Não** cria o gate de exportação em si (isso é a TASK-032, RN-078) — só popula a pendência viva que o gate consolidará.
+**Regras RN:** RN-048 (indisponibilidade bloqueante — enquanto houver itinerário sem rota válida, não há matriz nem exportação), RN-078 (rota ausente é erro bloqueante de §11), RN-049 (mensagem não menciona tarifa). **Depende de:** TASK-022, TASK-024.
+**Fora de escopo:** a taxonomia de falha e o retry do cliente OSRM (já entregues na TASK-022); a mecânica de recálculo/congelamento ao vivo (TASK-024); o gate final de exportação contra pendências (TASK-032); as demais pendências de §11 (descrição ausente — TASK-025; matriz desatualizada — TASK-026; etc.); qualquer alteração no contrato JSON (a pendência é de validação efêmera de sessão — NEG-004, nunca persistida).
+**Critérios de aceite resumidos:** `coletarPendencias` emite uma pendência `severidade: "bloqueante"` por itinerário sem `rota` válida no estado ao vivo, com a mensagem de §14 e `etapaAlvo` na etapa de mapa/itinerário; a mensagem não contém "tarifa"/"R$" (RN-049); itinerários com rota válida não geram pendência; o `TODO` de `pendencias.ts` que hoje credita "rota ausente/desatualizada (TASK-022/024)" é atualizado para refletir a autoria real (TASK-044 para a viva; TASK-032 para o gate).
+**Testes esperados:** unitários de `coletarPendencias` (itinerário sem rota → 1 bloqueante; com rota → nenhuma; um sem e um com rota → só a do primeiro; mensagem sem "tarifa"/"R$"); integração leve com o estado ao vivo da TASK-024 (rota que falhou no OSRM vira pendência); E2E opcional do painel (item clicável leva à etapa de mapa).
+**Perguntas em aberto:** nenhuma (as ambiguidades da TASK-022 — identificação da parada no `NoSegment`, timeout de 15 s ajustável, fronteira desta pendência — foram decididas pelo responsável na análise da TASK-022).
+
 ---
 
 ## Ordem recomendada de execução
@@ -369,7 +379,7 @@
 ```text
 001 → 002 → 003 → 004/005 (paralelo) → 041 → 006 → 007 → 042
 → 008/009 (paralelo) → 010 → 011 → 012
-→ 013 → 014 → 015 → 016 → 020 → 021 → 043 → 022 → 023 → 024 → 017 → 018 → 019 → 025
+→ 013 → 014 → 015 → 016 → 020 → 021 → 043 → 022 → 023 → 024 → 044 → 017 → 018 → 019 → 025
 → 026 → 027 → 028 → 029 → 030 → 031 → 032
 → 033 → 034
 → 035 → 036 → 037 → 038 → 039
