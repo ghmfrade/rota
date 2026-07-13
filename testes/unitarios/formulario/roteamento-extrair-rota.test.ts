@@ -1,9 +1,5 @@
 import { describe, expect, test } from "vitest";
-import {
-  arredondaHalfUp,
-  extrairRota,
-  type RespostaOsrm,
-} from "@/formulario/roteamento";
+import { extrairRota, type RespostaOsrm } from "@/formulario/roteamento";
 
 // TASK-021 — extração legs→trechos e conversão m→km (Spec 03 §3.3/§3.4;
 // RN-014, RN-040, RN-041, RN-050). Sem pontos de rota (mapeamento 1:1,
@@ -28,25 +24,6 @@ function respostaComLegs(
     ],
   };
 }
-
-describe("arredondaHalfUp (RN-050, Spec 03 §3.4)", () => {
-  test("half-up: 0,005 arredonda para 0,01 (não trunca nem banker's rounding)", () => {
-    expect(arredondaHalfUp(0.005, 2)).toBe(0.01);
-  });
-
-  test("4 m → 0,00 km; 5 m → 0,01 km", () => {
-    expect(arredondaHalfUp(4 / 1000, 2)).toBe(0);
-    expect(arredondaHalfUp(5 / 1000, 2)).toBe(0.01);
-  });
-
-  test("caso genérico: 6543 m → 6,54 km", () => {
-    expect(arredondaHalfUp(6543 / 1000, 2)).toBe(6.54);
-  });
-
-  test("duração arredonda ao inteiro (0 casas)", () => {
-    expect(arredondaHalfUp(12.6, 0)).toBe(13);
-  });
-});
 
 describe("extrairRota — mapeamento 1:1 leg→trecho (RN-041, Spec 03 §3.3)", () => {
   test("k paradas → k-1 trechos, origem/destino consecutivos", () => {

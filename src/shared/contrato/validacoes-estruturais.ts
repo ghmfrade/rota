@@ -1,3 +1,4 @@
+import { arredondaHalfUp } from "@/shared/calculo";
 import type {
   DocumentoOperacao,
   Itinerario,
@@ -18,12 +19,6 @@ export interface ViolacaoEstrutural {
 }
 
 type Caminho = (string | number)[];
-
-// Arredondamento half-up a 2 casas — tolerância para comparar somas de
-// ponto flutuante (inferência controlada registrada na Análise da Task).
-function arredondar2(valor: number): number {
-  return Math.round((valor + Number.EPSILON) * 100) / 100;
-}
 
 function chaveParNaoDirecional(a: string, b: string): string {
   return [a, b].sort().join("|");
@@ -299,7 +294,8 @@ function validarItinerario(
   const somaDuracao = trechos.reduce((s, t) => s + t.duracao_s, 0);
   if (
     Math.abs(
-      arredondar2(somaDistancia) - arredondar2(itinerario.rota.distancia_km),
+      arredondaHalfUp(somaDistancia, 2) -
+        arredondaHalfUp(itinerario.rota.distancia_km, 2),
     ) > 1e-9
   ) {
     violacoes.push({

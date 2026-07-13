@@ -9,12 +9,14 @@ export {
 } from "./url-osrm";
 export {
   extrairRota,
-  arredondaHalfUp,
   type LegOsrm,
   type RotaBrutaOsrm,
   type RespostaOsrm,
   type ResultadoRotaOsrm,
 } from "./extrair-rota";
+// `arredondaHalfUp` foi consolidado em `shared/calculo` (TASK-043) — reexportado
+// aqui para não quebrar quem já importa de `@/formulario/roteamento`.
+export { arredondaHalfUp } from "@/shared/calculo";
 export {
   solicitarRota,
   type OpcoesClienteOsrm,

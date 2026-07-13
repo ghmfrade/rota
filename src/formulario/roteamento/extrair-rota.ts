@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import { arredondaHalfUp } from "@/shared/calculo";
 import { esquemaGeometriaLineString, type Trecho } from "@/shared/contrato";
 
 // Extração da resposta do OSRM → `rota` parcial (Spec 03 §3.3/§3.4; RN-014,
@@ -42,16 +43,6 @@ export interface ResultadoRotaOsrm {
 }
 
 /**
- * Arredondamento half-up (0,005 → 0,01 — Spec 03 §3.4) a `casas` decimais.
- * `Number.EPSILON` neutraliza o erro de ponto flutuante binário na soma antes
- * do arredondamento (ex.: 1,005 representado como 1,00499999999999989...).
- */
-export function arredondaHalfUp(valor: number, casas: number): number {
-  const fator = 10 ** casas;
-  return Math.round((valor + Number.EPSILON) * fator) / fator;
-}
-
-/**
  * Extrai `routes[0]` da resposta do OSRM e monta `trechos[]` + totais
  * (Spec 03 §3.3/§3.4): mapeamento 1:1 `leg[i] → trecho{origem i+1, destino
  * i+2}` (RN-041), conversão m→km half-up a 2 casas e `duracao_s` inteiro
@@ -89,7 +80,7 @@ export function extrairRota(
     parada_origem_ordem: indice + 1,
     parada_destino_ordem: indice + 2,
     distancia_km: arredondaHalfUp(leg.distance / 1000, 2),
-    duracao_s: Math.round(leg.duration),
+    duracao_s: arredondaHalfUp(leg.duration, 0),
   }));
 
   const distancia_km = arredondaHalfUp(
