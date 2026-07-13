@@ -27,6 +27,12 @@ export interface RotaBrutaOsrm {
 export interface RespostaOsrm {
   code: string;
   routes: RotaBrutaOsrm[];
+  /**
+   * Texto livre do OSRM em respostas de erro (não é campo do contrato Spec 02 —
+   * é a forma do envelope OSRM). Único lugar onde o serviço eventualmente indica
+   * a coordenada rejeitada num `NoSegment`; lido best-effort pela TASK-022.
+   */
+  message?: string;
 }
 
 /**

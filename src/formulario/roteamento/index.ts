@@ -1,7 +1,7 @@
-// Cliente OSRM do Formulário (Spec 03 §3.1–§3.4; RN-014/041/047/050) — URL,
-// extração legs→trechos e conversão m→km. Pontos de rota (TASK-023),
-// tratamento de falha (TASK-022) e descrição textual (TASK-025) ficam fora
-// deste módulo.
+// Cliente OSRM do Formulário (Spec 03 §3.1–§3.5; RN-014/041/047/048/049/050) —
+// URL, extração legs→trechos, conversão m→km e tratamento de falha (retry,
+// taxonomia bloqueante, mensagens). Pontos de rota (TASK-023) e descrição
+// textual (TASK-025) ficam fora deste módulo.
 export {
   montarUrlOsrm,
   urlBaseOsrm,
@@ -19,5 +19,11 @@ export {
 export { arredondaHalfUp } from "@/shared/calculo";
 export {
   solicitarRota,
+  OSRM_TIMEOUT_PADRAO_MS,
   type OpcoesClienteOsrm,
 } from "./cliente-osrm";
+export {
+  mensagemDeFalha,
+  type FalhaOsrm,
+  type ResultadoRoteamento,
+} from "./falhas-osrm";
