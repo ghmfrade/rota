@@ -18,6 +18,7 @@ import {
 import { EditorLocais, nomeExibicaoLocal } from "@/formulario/locais";
 import { PainelDescricaoItinerario } from "@/formulario/descricao";
 import { congelarRotaCarregada, mensagemDeFalha } from "@/formulario/roteamento";
+import { matrizDistanciasDoServico } from "@/formulario/matrizes";
 import {
   identidadeDaSessao,
   secoesDaSessao,
@@ -239,6 +240,13 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     return base;
   }
 
+  /**
+   * Grava a rota/paradas recalculadas do itinerário e, no MESMO commit,
+   * reconcilia `matriz_distancias` do Serviço (TASK-026; RN-054..057, Spec 04
+   * §9.1/§11 — recálculo automático "ao concluir a edição do itinerário").
+   * Reconciliar aqui, e não como um commit separado, evita a janela em que o
+   * documento teria uma rota nova com a matriz antiga.
+   */
   function documentoComItinerarioAtualizado(
     base: DocumentoOperacao,
     servicoUuid: string,
@@ -251,7 +259,11 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
       const itinerarios = s.itinerarios.map((it) =>
         it.sentido === sentido ? { ...it, paradas: paradasParaContrato(paradas), rota } : it,
       );
-      return { ...s, itinerarios };
+      const servicoAtualizado = { ...s, itinerarios };
+      return {
+        ...servicoAtualizado,
+        matriz_distancias: matrizDistanciasDoServico(servicoAtualizado),
+      };
     });
     return { ...base, autos: { ...base.autos, servicos } };
   }

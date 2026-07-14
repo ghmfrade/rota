@@ -1,6 +1,7 @@
 import type { SessaoFormulario } from "@/formulario/sessao";
 import type { IdEtapa } from "@/formulario/layout/etapas";
 import type { EstadoRotaViva } from "@/formulario/roteamento";
+import { matrizDistanciasDesatualizada } from "@/formulario/matrizes";
 import type { DescricaoItinerario, Itinerario } from "@/shared/contrato";
 
 // Painel de pendências vivo (Spec 04 §4/§11): a lista, derivada da sessão de
@@ -127,12 +128,35 @@ export function coletarPendencias(
     }
   }
 
+  // Bloqueante de §11: "matriz de distâncias desatualizada" (RN-054..057/078,
+  // TASK-026, Spec 04 §9.1/§11). Só se aplica a Serviços COMPLETOS do
+  // documento carregado — um `ServicoEmConstrucao` (modo novo/em construção)
+  // ainda não tem `matriz_distancias` (DEC-035; matriz só nasce nas etapas
+  // seguintes), então não há "desatualização" a checar nele. Recomputa a
+  // partir das rotas atuais do próprio Serviço (`matrizDistanciasDesatualizada`,
+  // intra-Serviço — RN-054) e compara com o array gravado; a reconciliação
+  // automática ao concluir a edição do itinerário (TASK-019/026) normalmente
+  // já mantém os dois em sincronia — esta pendência cobre o resíduo.
+  if (sessao.modo === "carregado") {
+    for (const servico of sessao.documento.autos.servicos) {
+      if (matrizDistanciasDesatualizada(servico)) {
+        pendencias.push({
+          id: `matriz-desatualizada-${servico.numero_n}`,
+          severidade: "bloqueante",
+          mensagem:
+            "O itinerário mudou depois do último cálculo. A matriz de distâncias será recalculada.",
+          etapaAlvo: "matrizes",
+        });
+      }
+    }
+  }
+
   // TODO — demais pendências de §11, cada uma com a sua task (fora do escopo
   // desta implementação; não inventar aqui — docs-dev/04 princípio 2):
   //   bloqueantes: rota desatualizada/pendente de recálculo (TASK-032, gate),
-  //   matriz desatualizada (TASK-026), horários fora de ordem (TASK-029),
-  //   Seção/Local incompletos e 350 m/tipificação em revalidação
-  //   (TASK-015/017/018), itinerário sem viagem (TASK-028);
+  //   horários fora de ordem (TASK-029), Seção/Local incompletos e 350 m/
+  //   tipificação em revalidação (TASK-015/017/018), itinerário sem viagem
+  //   (TASK-028);
   //   alertas: Serviço sem par habilitado na matriz (TASK-027), tabela de
   //   feriados vazia (TASK-030).
 

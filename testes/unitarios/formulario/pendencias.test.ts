@@ -299,3 +299,53 @@ describe("ETAPAS (Spec 04 §4)", () => {
     }
   });
 });
+
+// TASK-026 — pendência bloqueante "matriz de distâncias desatualizada"
+// (Spec 04 §9.1/§11; RN-054..057/078). Cada teste monta sua PRÓPRIA sessão a
+// partir de `documentoExemploMinimo()` (cópia profunda nova por chamada —
+// `testes/fixtures/index.ts`) para mutar a matriz sem contaminar os demais
+// testes deste arquivo, que reusam a constante `sessaoCarregado` do topo.
+
+describe("coletarPendencias — matriz de distâncias desatualizada (TASK-026; RN-054..057/078)", () => {
+  test("Serviço com matriz consistente com as rotas → nenhuma pendência de matriz", () => {
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento: documentoExemploMinimo(),
+      alertasImportacao: [],
+    };
+
+    const pendencias = coletarPendencias(sessao);
+
+    expect(pendencias.some((p) => p.id.startsWith("matriz-desatualizada-"))).toBe(false);
+  });
+
+  test("Serviço com matriz divergente das rotas → 1 pendência bloqueante com a mensagem de §11", () => {
+    const documento = documentoExemploMinimo();
+    documento.autos.servicos[0].matriz_distancias[0].valor_adotado_de_distancia += 1;
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    const pendencias = coletarPendencias(sessao);
+
+    const pendenciaMatriz = pendencias.find((p) => p.id.startsWith("matriz-desatualizada-"));
+    expect(pendenciaMatriz).toBeDefined();
+    expect(pendenciaMatriz?.severidade).toBe("bloqueante");
+    expect(pendenciaMatriz?.mensagem).toBe(
+      "O itinerário mudou depois do último cálculo. A matriz de distâncias será recalculada.",
+    );
+    expect(pendenciaMatriz?.etapaAlvo).toBe<IdEtapa>("matrizes");
+  });
+
+  test("Serviço com par ausente na matriz gravada (itinerário mudou) → pendência bloqueante", () => {
+    const documento = documentoExemploMinimo();
+    documento.autos.servicos[0].matriz_distancias.pop();
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    expect(
+      coletarPendencias(sessao).some((p) => p.id === `matriz-desatualizada-${documento.autos.servicos[0].numero_n}`),
+    ).toBe(true);
+  });
+
+  test("[inválido] modo 'novo' nunca emite pendência de matriz (Serviço em construção não tem matriz — DEC-035)", () => {
+    expect(coletarPendencias(sessaoNovo).some((p) => p.id.startsWith("matriz-desatualizada-"))).toBe(false);
+  });
+});
