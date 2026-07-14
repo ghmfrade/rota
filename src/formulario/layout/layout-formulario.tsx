@@ -5,6 +5,7 @@ import { identidadeDaSessao, type SessaoFormulario } from "@/formulario/sessao";
 import { coletarPendencias } from "@/formulario/pendencias";
 import { EtapaIdentificacao } from "@/formulario/identificacao";
 import { EtapaServicos } from "@/formulario/servicos";
+import { EtapaItinerarios, itinerariosAoVivoDaSessao } from "@/formulario/itinerarios";
 import { ETAPAS, rotuloEtapa, type IdEtapa } from "./etapas";
 import { PainelPendencias } from "./painel-pendencias";
 
@@ -62,8 +63,12 @@ export function LayoutFormulario({
   const [etapaAtual, definirEtapa] = useState<IdEtapa>("identificacao");
 
   // Pendências recomputadas a cada render a partir da sessão (NEG-004: nada
-  // persiste). Hoje só o alerta "documento criado do zero" pode aparecer.
-  const pendencias = coletarPendencias(sessao);
+  // persiste). `itinerariosAoVivoDaSessao` (TASK-019, obrigação de fiação da
+  // TASK-044) monta o estado de rota ao vivo de TODO itinerário do documento,
+  // não só o que a etapa "Seções, Locais e Itinerários" tem em foco — assim a
+  // pendência bloqueante de rota/descrição aparece mesmo antes de o usuário
+  // revisitar aquele Serviço/sentido nesta sessão.
+  const pendencias = coletarPendencias(sessao, itinerariosAoVivoDaSessao(sessao));
   const cabecalho = dadosCabecalho(sessao);
 
   return (
@@ -138,6 +143,8 @@ export function LayoutFormulario({
           />
         ) : etapaAtual === "servicos" ? (
           <EtapaServicos sessao={sessao} aoAtualizarSessao={aoAtualizarSessao} />
+        ) : etapaAtual === "secoes-locais-itinerarios" ? (
+          <EtapaItinerarios sessao={sessao} aoAtualizarSessao={aoAtualizarSessao} />
         ) : (
           <p>
             Etapa em construção — o conteúdo será implementado nas próximas

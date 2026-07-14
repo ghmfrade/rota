@@ -1,6 +1,8 @@
-import type { Autos, DocumentoOperacao, Servico } from "@/shared/contrato";
+import type { Autos, DocumentoOperacao, Local, Secao, Servico } from "@/shared/contrato";
 import type { TipoDeAutos } from "@/shared/tipificacao";
 import type { AlertaTecnico } from "@/formulario/importacao";
+import type { EstadoRotaViva } from "@/formulario/roteamento";
+import type { ParadaEmEdicao } from "@/formulario/itinerarios/motor-montagem";
 
 // Identidade do Autos escolhida na etapa Identificação de um documento criado do
 // zero (Spec 04 §5; TASK-015). É estritamente um subconjunto dos campos de
@@ -44,6 +46,10 @@ export interface ServicoEmConstrucao {
   caracteristica_veiculo: Servico["caracteristica_veiculo"];
   carater: Servico["carater"];
   direcionalidade: Direcionalidade;
+  // Locais do Serviço (Spec 02 §7; RN-031) montados na etapa de mapa
+  // (TASK-018/019) — não compartilhados entre Serviços, ao contrário da
+  // Seção. Ausência ≡ lista vazia (mesmo padrão de `servicosEmConstrucao`).
+  locais?: Local[];
 }
 
 // Estado de topo do Formulário depois da tela inicial (TASK-014): ou o usuário
@@ -64,6 +70,24 @@ export interface ServicoEmConstrucao {
 // convivem com os `Servico` já completos do `documento`; no modo novo são a
 // única lista de Serviços. Opcional para compatibilidade — ausência ≡ lista
 // vazia (ver `servicosEmConstrucaoDaSessao`).
+// Estado ao vivo do itinerário em edição (TASK-019; dona do estado por
+// itinerário — DEC-041/046/047). Ambos os mapas são chaveados por
+// `chaveItinerario(servicoUuid, sentido)` (`itinerarios/estado-itinerarios.ts`)
+// e existem nos dois modos, porque são efêmeros de SESSÃO (NEG-004/RN-096) —
+// nunca gravados no JSON:
+// - `paradasEmEdicao`: a sequência de paradas (Seções/Locais) sendo montada —
+//   fonte de verdade da tabela lateral enquanto o usuário edita. Para um
+//   Serviço completo (modo carregado), semeada de `itinerario.paradas` no
+//   primeiro toque da etapa; só é regravada no documento quando o recálculo
+//   tem SUCESSO (RN-048/052: falha de OSRM não pode apagar a última rota
+//   válida do arquivo, só acender a pendência ao vivo).
+// - `estadosRotaViva`: o `EstadoRotaViva` (TASK-024) resultante da última
+//   tentativa — `congelada` (abertura, RN-015), `recalculada` ou `sem-rota`
+//   (RN-048). É o insumo de `ItinerarioAoVivo` para `coletarPendencias`
+//   (TASK-044, obrigação de fiação desta task).
+export type ParadasEmEdicaoPorItinerario = Record<string, ParadaEmEdicao[]>;
+export type EstadosRotaVivaPorItinerario = Record<string, EstadoRotaViva>;
+
 export type SessaoFormulario =
   | {
       modo: "carregado";
@@ -74,11 +98,20 @@ export type SessaoFormulario =
       // na Revisão pela TASK-032).
       alertasImportacao: AlertaTecnico[];
       servicosEmConstrucao?: ServicoEmConstrucao[];
+      paradasEmEdicao?: ParadasEmEdicaoPorItinerario;
+      estadosRotaViva?: EstadosRotaVivaPorItinerario;
     }
   | {
       modo: "novo";
       identidade?: IdentidadeAutos;
       servicosEmConstrucao?: ServicoEmConstrucao[];
+      // Seções do Autos em construção (Spec 02 §5) — não há `documento.autos`
+      // ainda no modo novo; espelha o precedente de `servicosEmConstrucao`
+      // (DEC-035). Seção é compartilhada pelo Autos inteiro, não por Serviço
+      // (RN-025), por isso vive na raiz da sessão, não em `ServicoEmConstrucao`.
+      secoesEmConstrucao?: Secao[];
+      paradasEmEdicao?: ParadasEmEdicaoPorItinerario;
+      estadosRotaViva?: EstadosRotaVivaPorItinerario;
     };
 
 /** Lista de Serviços em construção da sessão (DEC-035); ausência ≡ vazia. */
@@ -86,6 +119,28 @@ export function servicosEmConstrucaoDaSessao(
   sessao: SessaoFormulario,
 ): ServicoEmConstrucao[] {
   return sessao.servicosEmConstrucao ?? [];
+}
+
+/** Seções disponíveis para reuso (Spec 04 §7.1), qualquer que seja o modo:
+ * `documento.autos.secoes` no carregado, `secoesEmConstrucao` no novo
+ * (ausência ≡ vazia — TASK-019). */
+export function secoesDaSessao(sessao: SessaoFormulario): Secao[] {
+  if (sessao.modo === "carregado") return sessao.documento.autos.secoes;
+  return sessao.secoesEmConstrucao ?? [];
+}
+
+/** Paradas em edição por itinerário (TASK-019); ausência ≡ mapa vazio. */
+export function paradasEmEdicaoDaSessao(
+  sessao: SessaoFormulario,
+): ParadasEmEdicaoPorItinerario {
+  return sessao.paradasEmEdicao ?? {};
+}
+
+/** Estados de rota ao vivo por itinerário (TASK-019/024); ausência ≡ mapa vazio. */
+export function estadosRotaVivaDaSessao(
+  sessao: SessaoFormulario,
+): EstadosRotaVivaPorItinerario {
+  return sessao.estadosRotaViva ?? {};
 }
 
 // Identidade corrente da sessão (Spec 04 §5), qualquer que seja o modo: vem de
