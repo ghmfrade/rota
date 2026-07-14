@@ -12,6 +12,7 @@ import {
   resolverParadasRota,
   validarMontagem,
   type ParadaEmEdicao,
+  type ViolacaoMontagem,
 } from "@/formulario/itinerarios";
 import type { Local, Secao } from "@/shared/contrato";
 
@@ -136,28 +137,32 @@ describe("validarMontagem — RN-034/035/036", () => {
     expect(validarMontagem(paradas, [SECAO_A, SECAO_B], [], SERVICO_UUID, "ida")).toEqual([]);
   });
 
-  test("[inválido] menos de 2 paradas viola RN-034", () => {
+  test("[inválido] menos de 2 paradas viola RN-034 com mensagem exibível ao usuário (TASK-047)", () => {
     const violacoes = validarMontagem([paradaDeSecao(SECAO_A.uuid)], [SECAO_A], [], SERVICO_UUID, "ida");
-    expect(violacoes.some((v) => v.codigo === "RN-034")).toBe(true);
+    const violacao = violacoes.find((v) => v.codigo === "RN-034");
+    expect(violacao?.mensagem).toContain("ao menos 2 paradas");
   });
 
-  test("[inválido] Local no início viola RN-035 (extremos sempre Seção)", () => {
+  test("[inválido] Local no início viola RN-035 (extremos sempre Seção) com mensagem exibível (TASK-047)", () => {
     const paradas = [paradaDeLocal(LOCAL_X.uuid), paradaDeSecao(SECAO_A.uuid)];
     const violacoes = validarMontagem(paradas, [SECAO_A], [LOCAL_X], SERVICO_UUID, "ida");
-    expect(violacoes.some((v) => v.codigo === "RN-035")).toBe(true);
+    const violacao = violacoes.find((v) => v.codigo === "RN-035");
+    expect(violacao?.mensagem).toContain("primeira parada");
   });
 
-  test("[inválido] Local no final viola RN-035 (extremos sempre Seção)", () => {
+  test("[inválido] Local no final viola RN-035 (extremos sempre Seção) com mensagem exibível (TASK-047)", () => {
     const paradas = [paradaDeSecao(SECAO_A.uuid), paradaDeLocal(LOCAL_X.uuid)];
     const violacoes = validarMontagem(paradas, [SECAO_A], [LOCAL_X], SERVICO_UUID, "ida");
-    expect(violacoes.some((v) => v.codigo === "RN-035")).toBe(true);
+    const violacao = violacoes.find((v) => v.codigo === "RN-035");
+    expect(violacao?.mensagem).toContain("última parada");
   });
 
-  test("[inválido] Seção sem geolocalização do sentido para este Serviço viola RN-036", () => {
+  test("[inválido] Seção sem geolocalização do sentido para este Serviço viola RN-036 com mensagem exibível (TASK-047)", () => {
     // SECAO_B não tem geolocalizacao_volta.
     const paradas = [paradaDeSecao(SECAO_A.uuid), paradaDeSecao(SECAO_B.uuid)];
     const violacoes = validarMontagem(paradas, [SECAO_A, SECAO_B], [], SERVICO_UUID, "volta");
-    expect(violacoes.some((v) => v.codigo === "RN-036")).toBe(true);
+    const violacao = violacoes.find((v) => v.codigo === "RN-036");
+    expect(violacao?.mensagem).toContain("geolocalização de Volta");
   });
 
   test("[inválido] Seção sem NENHUMA entrada para o Serviço corrente viola RN-036", () => {
@@ -177,6 +182,24 @@ describe("validarMontagem — RN-034/035/036", () => {
     const paradas = [paradaDeSecao(SECAO_A.uuid), paradaDeLocal(localSoIda.uuid), paradaDeSecao(SECAO_B.uuid)];
     const violacoes = validarMontagem(paradas, [SECAO_A, SECAO_B], [localSoIda], SERVICO_UUID, "volta");
     expect(violacoes.some((v) => v.codigo === "RN-036")).toBe(true);
+  });
+
+  test("[inválido] nenhuma mensagem de violação menciona tarifa/R$ (RN-049; TASK-047 as expõe na UI)", () => {
+    const localSoIda: Local = { ...LOCAL_X, geolocalizacao_volta: undefined };
+    const combinacoes: ViolacaoMontagem[] = [
+      ...validarMontagem([paradaDeLocal(LOCAL_X.uuid)], [], [LOCAL_X], SERVICO_UUID, "ida"),
+      ...validarMontagem(
+        [paradaDeSecao(SECAO_A.uuid), paradaDeLocal(localSoIda.uuid), paradaDeSecao(SECAO_B.uuid)],
+        [SECAO_A, SECAO_B],
+        [localSoIda],
+        SERVICO_UUID,
+        "volta",
+      ),
+    ];
+    expect(combinacoes.length).toBeGreaterThan(0);
+    for (const violacao of combinacoes) {
+      expect(violacao.mensagem).not.toMatch(/tarifa|R\$/i);
+    }
   });
 });
 

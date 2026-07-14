@@ -218,3 +218,119 @@ test.describe("Etapa Seções, Locais e Itinerários — criar Seção via mapa 
     await expect(page.getByTestId("descricao-texto")).toContainText("Via 3");
   });
 });
+
+test.describe("Etapa Seções, Locais e Itinerários — feedback de montagem inválida (TASK-047)", () => {
+  test("remover paradas até restar 1 acende o aviso de RN-034, sem chamar o OSRM de novo nem apagar a última rota válida", async ({
+    page,
+  }) => {
+    let chamadasOsrm = 0;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamadasOsrm += 1;
+      return rota.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          code: "Ok",
+          routes: [
+            {
+              geometry: { type: "LineString", coordinates: [[-46.3919, -23.9631], [-46.3339, -23.9608]] },
+              legs: [{ distance: 8000, duration: 1080, steps: [{ name: "Via Remanescente" }] }],
+            },
+          ],
+        }),
+      });
+    });
+
+    await abrirEtapaVolta(page);
+
+    // Volta tem 3 paradas, todas Seções (Praia Grande, São Vicente, Santos).
+    // Remover a primeira deixa 2 paradas — montagem ainda válida, recalcula
+    // com sucesso (fixa a última rota válida do documento).
+    await page.getByTestId("parada-remover").first().click();
+    await expect(page.getByTestId("tabela-paradas").getByTestId("parada-item")).toHaveCount(2);
+    await expect(page.getByTestId("descricao-texto")).toContainText("Via Remanescente");
+    expect(chamadasOsrm).toBe(1);
+
+    // Remover a última parada restante deixa só 1 — RN-034 (mínimo 2). O
+    // motor recusa ANTES de chamar o OSRM (não é falha de rota, é montagem em
+    // andamento — resolverParadasRota nunca chega a resolver as paradas).
+    await page.getByTestId("parada-remover").first().click();
+
+    await expect(page.getByTestId("tabela-paradas").getByTestId("parada-item")).toHaveCount(1);
+    await expect(page.getByTestId("avisos-montagem-invalida")).toBeVisible();
+    await expect(page.getByTestId("aviso-montagem-invalida")).toContainText(
+      "O itinerário precisa de ao menos 2 paradas",
+    );
+    // Nenhuma menção a tarifa/R$ na mensagem exibida (RN-049).
+    await expect(page.getByTestId("aviso-montagem-invalida")).not.toContainText(/tarifa|R\$/i);
+    expect(chamadasOsrm).toBe(1); // nenhuma chamada nova para a tentativa inválida
+
+    // Sem pendência de "sem rota" — a última rota VÁLIDA (com 2 paradas)
+    // continua sendo a exibida; a tentativa inválida não a apaga (RN-048).
+    await expect(page.getByTestId("mensagem-sem-rota")).toHaveCount(0);
+    await expect(page.getByTestId("descricao-texto")).toContainText("Via Remanescente");
+  });
+
+  test("criar um Local via mapa no final do itinerário acende o aviso de RN-035; completar a montagem some com o aviso", async ({
+    page,
+  }) => {
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      // Criar o Local (RN-035, extremo inválido) não chama o OSRM; o mock só
+      // serve para o gesto seguinte, que move o Local para o meio e volta a
+      // ser uma montagem válida (dispara o recálculo de verdade).
+      return rota.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          code: "Ok",
+          routes: [
+            {
+              geometry: { type: "LineString", coordinates: [[-46.402, -24.0081], [-46.3339, -23.9608]] },
+              legs: [
+                { distance: 6100, duration: 750, steps: [{ name: "Via 1" }] },
+                { distance: 8000, duration: 1080, steps: [{ name: "Via 2" }] },
+                { distance: 1000, duration: 120, steps: [{ name: "Via 3" }] },
+              ],
+            },
+          ],
+        }),
+      });
+    });
+
+    await abrirEtapaVolta(page);
+
+    // O editor de Locais não tem nenhum Local pré-existente para servir de
+    // sinal de prontidão do mapa (ao contrário do editor de Seções, que já tem
+    // 3 marcadores) — usa o mapa irmão de Seções, carregado no mesmo ciclo,
+    // como sinal de que o bundle do MapLibre já está pronto.
+    const mapaSecoes = page.getByTestId("editor-secoes").getByTestId("mapa-base");
+    await mapaSecoes.locator(".maplibregl-marker").first().waitFor();
+
+    const mapaLocais = page.getByTestId("editor-locais").getByTestId("mapa-base");
+    await expect(mapaLocais).toBeVisible();
+    await mapaLocais.scrollIntoViewIfNeeded();
+    const caixa = await mapaLocais.boundingBox();
+    if (!caixa) throw new Error("mapa sem bounding box");
+    await mapaLocais.click({ position: { x: caixa.width / 2, y: caixa.height / 2 } });
+
+    await page.getByTestId("nome-local-input").fill("Novo Local E2E");
+    await page.getByTestId("confirmar-criar-local").click();
+
+    // O novo Local entra ao final da tabela (RN-035: último precisa ser Seção).
+    await expect(page.getByTestId("tabela-paradas").getByTestId("parada-item")).toHaveCount(4);
+    await expect(page.getByTestId("avisos-montagem-invalida")).toBeVisible();
+    await expect(page.getByTestId("aviso-montagem-invalida")).toContainText(
+      "A última parada do itinerário deve ser uma Seção, nunca um Local",
+    );
+
+    // Move o Local (última posição) para uma posição do meio, restaurando o
+    // extremo como Seção — a montagem volta a ser válida e o aviso some.
+    await page.getByTestId("parada-mover-cima").last().click();
+
+    await expect(page.getByTestId("avisos-montagem-invalida")).toHaveCount(0);
+    await expect(page.getByTestId("tabela-paradas").getByTestId("parada-rotulo")).toHaveText([
+      "Praia Grande - Rodoviária Praia Grande",
+      "São Vicente - Terminal São Vicente",
+      "Jaú - Novo Local E2E",
+      "Santos - Terminal Santos",
+    ]);
+  });
+});

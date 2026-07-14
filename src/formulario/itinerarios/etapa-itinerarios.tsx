@@ -42,6 +42,7 @@ import {
   removerParadasDeLocal,
   reordenarParada,
   type ParadaEmEdicao,
+  type ViolacaoMontagem,
 } from "./motor-montagem";
 
 // Etapa real "Seções, Locais e Itinerários" (TASK-019; Spec 04 §7.1–§7.4). É a
@@ -89,6 +90,13 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
   const [servicoSelecionado, definirServicoSelecionado] = useState<string | null>(null);
   const [sentidoSelecionado, definirSentidoSelecionado] = useState<Sentido | null>(null);
   const [recalculando, definirRecalculando] = useState(false);
+  // Violações da ÚLTIMA tentativa de montagem por itinerário (TASK-047; RN-034/
+  // 035/036) — feedback efêmero de por que o recálculo não ocorreu; nunca vai
+  // para a sessão/documento (não é pendência de §11, que só cobre itinerário
+  // completo — Spec 04 §11).
+  const [violacoesMontagemMapa, definirViolacoesMontagemMapa] = useState<
+    Record<string, ViolacaoMontagem[]>
+  >({});
 
   // "Latest ref" da sessão (padrão para ler o estado mais recente de dentro de
   // uma continuação assíncrona — o `await dispararRecalculo` abaixo atravessa
@@ -174,6 +182,10 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     [linhaAtual, sentidoSelecionado, paradasEmEdicaoMapa, sessao],
   );
   const estadoAtual = linhaAtual && sentidoSelecionado ? estadoDe(linhaAtual.servicoUuid, sentidoSelecionado) : undefined;
+  const violacoesMontagemAtual: ViolacaoMontagem[] =
+    linhaAtual && sentidoSelecionado
+      ? (violacoesMontagemMapa[chaveItinerario(linhaAtual.servicoUuid, sentidoSelecionado)] ?? [])
+      : [];
   // Pontos de rota persistidos a reaplicar no recálculo (Spec 03 §3.6.2) — o
   // último `rota` conhecido (congelada do arquivo ou da última recomputação
   // desta sessão). A EDIÇÃO de pontos de rota é a TASK-023 (fora de escopo);
@@ -281,7 +293,19 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     );
     definirRecalculando(false);
 
-    if (!resultado.ok) return; // itinerário ainda em montagem (RN-034/035/036) — sem pendência prematura
+    if (!resultado.ok) {
+      // Itinerário ainda em montagem (RN-034/035/036) — sem pendência
+      // prematura (§11), mas o motivo da recusa é exibido (TASK-047) em vez de
+      // descartado silenciosamente.
+      definirViolacoesMontagemMapa((mapa) => ({ ...mapa, [chave]: resultado.violacoes }));
+      return;
+    }
+    definirViolacoesMontagemMapa((mapa) => {
+      if (!(chave in mapa)) return mapa;
+      const resto = { ...mapa };
+      delete resto[chave];
+      return resto;
+    });
 
     // Mescla sobre a sessão MAIS RECENTE (`sessaoRef`), não a fechada por este
     // closure — o `await` acima atravessa um ciclo de render; entre o disparo
@@ -445,6 +469,16 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
           )}
 
           {recalculando && <p data-testid="recalculando-rota">Recalculando rota…</p>}
+
+          {violacoesMontagemAtual.length > 0 && (
+            <ul role="alert" data-testid="avisos-montagem-invalida">
+              {violacoesMontagemAtual.map((violacao, indice) => (
+                <li key={`${violacao.codigo}-${indice}`} data-testid="aviso-montagem-invalida">
+                  {violacao.mensagem}
+                </li>
+              ))}
+            </ul>
+          )}
 
           <ol data-testid="tabela-paradas">
             {paradasAtual.map((parada, indice) => {
