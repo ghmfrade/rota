@@ -7,6 +7,7 @@ import { EtapaIdentificacao } from "@/formulario/identificacao";
 import { EtapaServicos } from "@/formulario/servicos";
 import { EtapaItinerarios, itinerariosAoVivoDaSessao } from "@/formulario/itinerarios";
 import { EtapaMatrizes } from "@/formulario/matrizes";
+import { EtapaViagens } from "@/formulario/viagens";
 import { ETAPAS, rotuloEtapa, type IdEtapa } from "./etapas";
 import { PainelPendencias } from "./painel-pendencias";
 
@@ -146,6 +147,8 @@ export function LayoutFormulario({
           <EtapaServicos sessao={sessao} aoAtualizarSessao={aoAtualizarSessao} />
         ) : etapaAtual === "secoes-locais-itinerarios" ? (
           <EtapaItinerarios sessao={sessao} aoAtualizarSessao={aoAtualizarSessao} />
+        ) : etapaAtual === "viagens-horarios" ? (
+          <EtapaViagens sessao={sessao} aoAtualizarSessao={aoAtualizarSessao} />
         ) : etapaAtual === "matrizes" ? (
           <EtapaMatrizes sessao={sessao} aoAtualizarSessao={aoAtualizarSessao} />
         ) : (
