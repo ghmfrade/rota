@@ -161,7 +161,8 @@
 
 **Prioridade:** Alta · **Fase:** Formulário
 **Resumo:** Inserir Seções/Locais em ordem, reordenar pela tabela lateral sincronizada com o mapa, validações de Parada (XOR, extremos, geoloc do sentido), conjunto de Seções Ida=Volta.
-**Regras RN:** RN-030, RN-033..036, RN-038. **Depende de:** TASK-004, TASK-017, TASK-018, TASK-024 (estado de rota ao vivo por itinerário — RN-052; DEC-041), TASK-044 (pendência bloqueante "itinerário sem rota válida" já disponível em `coletarPendencias`).
+**Regras RN:** RN-030, RN-033..036, RN-038. **Depende de:** TASK-004, TASK-017, TASK-018, TASK-024 (estado de rota ao vivo por itinerário — RN-052; DEC-041), TASK-025 (composer real de `descricao_itinerario` injetado no recálculo bem-sucedido — Q-027/DEC-046), TASK-044 (pendência bloqueante "itinerário sem rota válida" já disponível em `coletarPendencias`).
+**Ordem de execução (DEC-046):** a TASK-025 roda **antes** desta task; a etapa real injeta o `ComporDescricao` real (sem placeholder provisório).
 **Nota de UX herdada (DEC-044/Q-025):** ao montar a etapa real, **não** adicionar afordância de "criar Seção nova" na recusa de arrasto de Seção — só a mensagem da Spec 04 §14; o mesmo vale para a recusa pareada de Local (TASK-018).
 **Obrigação de fiação (fecha o fio da TASK-044):** como dona do estado de rota ao vivo por itinerário, esta task **monta** o `ItinerarioAoVivo` (`{ numero_n, sentido, estadoRota }`) a partir dos estados `congelada`/`recalculada`/`sem-rota` da TASK-024 e o **passa** ao segundo parâmetro de `coletarPendencias` (TASK-044), de modo que um itinerário em `sem-rota` de fato acenda a pendência bloqueante no painel. Sem esta costura, o parâmetro de `coletarPendencias` fica no default vazio (nunca dispara) — é aqui que ele deixa de ser código morto.
 **Testes esperados:** unitários; E2E (reordenar → recálculo sinalizado; recálculo que falha no OSRM → pendência bloqueante visível no painel, OSRM mockado).
@@ -210,6 +211,7 @@
 **Prioridade:** Alta · **Fase:** Rotas
 **Resumo:** Compositor `DESCRICAO(itinerario)`: marcos = Seções (`Cidade - Nome`), vias de `steps[].name` por intervalo entre Seções, limpeza (§3.7.5), casos de borda (sem steps, Seções adjacentes); painel de UX com recalcular/copiar/ver itens; pendência bloqueante se ausente com rota presente.
 **Regras RN:** RN-044..046, RN-053, RN-078. **Depende de:** TASK-021, TASK-024.
+**Ordem de execução (DEC-046):** roda **antes** da TASK-019, que injeta o composer real no recálculo bem-sucedido. Entrega, no padrão de componente controlado + harness (DEC-043/045): o compositor (§3.7), a exposição de `steps[].name` em `extrairRota` (hoje descartado) e o painel de descrição controlado que a TASK-019 monta na etapa real.
 **Testes esperados:** unitários (algoritmo + limpeza); contrato (`itens` bem-formados); E2E do painel.
 
 ---
