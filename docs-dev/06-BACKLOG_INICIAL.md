@@ -388,6 +388,26 @@
 **Testes esperados:** unitário ajustado em `roteamento-recalculo-vivo.test.ts` (abertura → espião ativo com zero chamadas); `npm test` 100% verde sem alteração de outras expectativas.
 **Perguntas em aberto:** nenhuma (Q-023 decidida em DEC-042).
 
+## TASK-046 — Reconciliação de horários/offsets quando o itinerário muda
+
+**Prioridade:** Alta · **Fase:** Horários
+**Resumo:** Origem: revisão da TASK-019 (item 1) + DEC-048 (Q-029). Quando o itinerário muda **depois** de existirem Viagens com `horarios_paradas`, reconciliar os offsets conforme DEC-048: **(a)** reordenar/inserir/remover parada ⇒ recomputar cada Viagem pela sugestão inicial (Spec 03 §8.1, acúmulo de `trecho.duracao_s`), fixando `horario_saida` e descartando âncoras manuais; **(b)** mudança que preserva ordem/conjunto (mover coordenada, ponto de rota) ⇒ preservar os `offset_horario` gravados, recomputar só via reset (§8.3). Detecta o caso comparando a sequência de identidade/`ordem` das paradas antes×depois; aplica-se ao write-back de `documentoComItinerarioAtualizado` que a TASK-019 já faz.
+**Regras RN:** RN-063 (um offset por Parada, monotônico), RN-064 (sugestão inicial), RN-066 (reset), RN-015. **Depende de:** TASK-019, TASK-028.
+**Fora de escopo:** reconciliação de `matriz_distancias` (já é escopo da TASK-026); a grade de horários e a criação de Viagem por célula (TASK-028); âncoras/redistribuição/reset em si (TASK-029); qualquer mudança de contrato JSON.
+**Critérios de aceite resumidos:** reordenar paradas de itinerário com Viagens ⇒ offsets recomputados por §8.1 com `horario_saida` intacto e âncoras descartadas; mover coordenada/ponto de rota sem mudar a ordem ⇒ offsets gravados inalterados; inserir/remover parada ⇒ contagem de `horarios_paradas` reconciliada (um por Parada); documento resultante satisfaz RN-063; nada inválido exportável.
+**Testes esperados:** unitários (reorder ⇒ re-sugestão mantendo saída; coordenada muda mas ordem igual ⇒ offsets preservados; inserir/remover parada ⇒ contagem reconciliada), OSRM mockado.
+**Perguntas em aberto:** nenhuma (Q-029 decidida em DEC-048).
+
+## TASK-047 — Feedback ao usuário do motivo de o recálculo/rota não ocorrer
+
+**Prioridade:** Média · **Fase:** Rotas/Formulário
+**Resumo:** Origem: revisão da TASK-019 (item 2). Hoje `aplicarNovasParadas` faz `if (!resultado.ok) return`, descartando **silenciosamente** as `ViolacaoMontagem` (RN-034 <2 paradas, RN-035 extremos Seção, RN-036 geoloc do sentido) — a tabela mostra a montagem inválida em WIP, mas o documento mantém a última ordem válida e o usuário não vê **por que** a rota não recalculou. Esta task superficializa o motivo na etapa "Seções, Locais e Itinerários": exibe as `ViolacaoMontagem` da tentativa atual e/ou sinaliza a divergência tabela×documento. Para falha do OSRM, reusa a taxonomia/mensagens de §14 (Spec 04) da TASK-022. Não altera a lógica de write-back nem o contrato.
+**Regras RN:** RN-034/035/036 (violações de montagem exibidas), RN-048/049 (mensagem de falha de rota sem tarifa). **Depende de:** TASK-019, TASK-022.
+**Fora de escopo:** mudar quando/como o recálculo ocorre; o gate de exportação (TASK-032); a pendência bloqueante de rota ausente (TASK-044); qualquer mudança de contrato JSON.
+**Critérios de aceite resumidos:** montar sequência inválida (<2 paradas / Local no extremo / sem geoloc do sentido) mostra na etapa o motivo específico da recusa; nenhuma alteração no documento exportado; mensagens não mencionam tarifa/R$.
+**Testes esperados:** unitários (cada `ViolacaoMontagem` vira mensagem); E2E (montagem inválida acende o aviso; exportação continua barrada onde já era).
+**Perguntas em aberto:** nenhuma.
+
 ---
 
 ## Ordem recomendada de execução
@@ -395,8 +415,8 @@
 ```text
 001 → 002 → 003 → 004/005 (paralelo) → 041 → 006 → 007 → 042
 → 008/009 (paralelo) → 010 → 011 → 012
-→ 013 → 014 → 015 → 016 → 020 → 021 → 043 → 022 → 023 → 024 → 044 → 045 → 017 → 018 → 019 → 025
-→ 026 → 027 → 028 → 029 → 030 → 031 → 032
+→ 013 → 014 → 015 → 016 → 020 → 021 → 043 → 022 → 023 → 024 → 044 → 045 → 017 → 018 → 019 → 025 → 047
+→ 026 → 027 → 028 → 046 → 029 → 030 → 031 → 032
 → 033 → 034
 → 035 → 036 → 037 → 038 → 039
 → (decisão humana) 040
