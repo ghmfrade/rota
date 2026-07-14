@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import { esquemaRota, type DescricaoItinerario, type PontoDeRota } from "@/shared/contrato";
-import type { Ponto } from "@/shared/geo";
+import type { ParadaRota } from "./compor-descricao";
 import { solicitarRota, type OpcoesClienteOsrm } from "./cliente-osrm";
 import type { ResultadoRotaOsrm } from "./extrair-rota";
 import type { FalhaOsrm } from "./falhas-osrm";
@@ -33,17 +33,16 @@ export type EstadoRotaViva =
 
 /**
  * Composer da descrição textual do itinerário (`rota.descricao_itinerario`,
- * Spec 02 §10.5) — o algoritmo pleno (Spec 03 §3.7, RN-044/045/053) é a
- * TASK-025, injetado aqui para esta task não antecipá-lo (DEC-041).
- *
- * Assinatura provisória: recebe as paradas roteadas e o `ResultadoRotaOsrm` já
- * extraído. `extrairRota` (TASK-021) hoje descarta `steps[].name` do OSRM —
- * insumo que a TASK-025 provavelmente precisará expor; ajustar essa
- * assinatura pertence àquela task, não a esta.
+ * Spec 02 §10.5) — o algoritmo pleno é `comporDescricao` (`compor-descricao.ts`,
+ * TASK-025, Spec 03 §3.7, RN-044/045/046/053), injetado aqui para o motor
+ * headless da TASK-024 não antecipá-lo (DEC-041). Assinatura revisada pela
+ * TASK-025 (follow-up gravado na revisão da TASK-024): recebe as paradas com
+ * o marco de Seção (`ParadaRota`, quando houver) e os nomes de via crus por
+ * trecho — os insumos reais de `comporDescricao`.
  */
 export type ComporDescricao = (
-  paradas: readonly Ponto[],
-  resultado: ResultadoRotaOsrm,
+  paradas: readonly ParadaRota[],
+  nomesViasPorTrecho: ResultadoRotaOsrm["nomesViasPorTrecho"],
 ) => DescricaoItinerario;
 
 /**
@@ -56,13 +55,15 @@ export function congelarRotaCarregada(rota: Rota): EstadoRotaViva {
 }
 
 /**
- * Entrada de `recalcularItinerario`: paradas já resolvidas em coordenadas
- * (mesma forma que `solicitarRota` consome) e os pontos de rota a reaplicar
- * (Spec 03 §3.6.2 — os persistidos no arquivo, reproduzindo o traçado forçado
- * na reedição sem retrabalho manual).
+ * Entrada de `recalcularItinerario`: paradas já resolvidas em coordenadas,
+ * com o marco de Seção quando houver (`ParadaRota` — mesma forma que
+ * `solicitarRota` consome, por `extends Ponto`, mais o insumo de
+ * `comporDescricao`), e os pontos de rota a reaplicar (Spec 03 §3.6.2 — os
+ * persistidos no arquivo, reproduzindo o traçado forçado na reedição sem
+ * retrabalho manual).
  */
 export interface EntradaRecalculo {
-  paradas: readonly Ponto[];
+  paradas: readonly ParadaRota[];
   /** Pontos de rota persistidos a reaplicar (default `[]` — itinerário sem
    * traçado forçado). */
   pontosDeRota?: readonly PontoDeRota[];
@@ -87,7 +88,7 @@ export async function recalcularItinerario(
     return { situacao: "sem-rota", falha: resultado.falha };
   }
 
-  const descricao_itinerario = comporDescricao(paradas, resultado.rota);
+  const descricao_itinerario = comporDescricao(paradas, resultado.rota.nomesViasPorTrecho);
   const rota: Rota = {
     geometria: resultado.rota.geometria,
     distancia_km: resultado.rota.distancia_km,

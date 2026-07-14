@@ -198,6 +198,79 @@ describe("coletarPendencias — itinerário sem rota válida (TASK-044; RN-048/0
   });
 });
 
+// TASK-025 — pendência bloqueante "descrição ausente/inválida havendo rota"
+// (Spec 04 §7.4/§11/§14; RN-044/046/078).
+
+describe("coletarPendencias — descrição textual ausente/inválida (TASK-025; RN-044/046/078)", () => {
+  test("rota presente (congelada) com descrição vazia → 1 pendência bloqueante com a mensagem de §14", () => {
+    const rotaSemDescricao = {
+      ...ROTA_VALIDA,
+      descricao_itinerario: { texto: "", itens: [] },
+    };
+    const itinerarios: ItinerarioAoVivo[] = [
+      {
+        numeroN: "0000-1CR",
+        sentido: "ida",
+        estadoRota: { situacao: "congelada", rota: rotaSemDescricao },
+      },
+    ];
+
+    const pendencias = coletarPendencias(sessaoCarregado, itinerarios);
+
+    expect(pendencias).toHaveLength(1);
+    const [pendencia] = pendencias;
+    expect(pendencia.severidade).toBe("bloqueante");
+    expect(pendencia.mensagem).toBe(
+      "O itinerário de Ida do Serviço 0000-1CR está sem a descrição textual por vias. Recalcule a descrição antes de exportar.",
+    );
+    expect(pendencia.etapaAlvo).toBe<IdEtapa>("secoes-locais-itinerarios");
+  });
+
+  test("[inválido] descrição com menos de 2 itens 'secao' também é inválida (RN-044)", () => {
+    const rotaDescricaoIncompleta = {
+      ...ROTA_VALIDA,
+      descricao_itinerario: {
+        texto: "Cidade A - Seção A.",
+        itens: [
+          { tipo: "secao" as const, secao_uuid: "11111111-1111-4111-8111-111111111111", rotulo: "Cidade A - Seção A" },
+        ],
+      },
+    };
+    const itinerarios: ItinerarioAoVivo[] = [
+      {
+        numeroN: "0000-1CR",
+        sentido: "volta",
+        estadoRota: { situacao: "recalculada", rota: rotaDescricaoIncompleta },
+      },
+    ];
+
+    const pendencias = coletarPendencias(sessaoCarregado, itinerarios);
+
+    expect(pendencias).toHaveLength(1);
+    expect(pendencias[0].id).toBe("descricao-ausente-0000-1CR-volta");
+  });
+
+  test("rota presente com descrição válida (ROTA_VALIDA) → nenhuma pendência", () => {
+    const itinerarios: ItinerarioAoVivo[] = [
+      { numeroN: "0000-1CR", sentido: "ida", estadoRota: ESTADO_CONGELADA },
+      { numeroN: "0000-1CR", sentido: "volta", estadoRota: ESTADO_RECALCULADA },
+    ];
+
+    expect(coletarPendencias(sessaoCarregado, itinerarios)).toHaveLength(0);
+  });
+
+  test("'sem-rota' emite só a pendência de rota — não soma a de descrição para o mesmo itinerário", () => {
+    const itinerarios: ItinerarioAoVivo[] = [
+      { numeroN: "0000-1CR", sentido: "ida", estadoRota: ESTADO_SEM_ROTA },
+    ];
+
+    const pendencias = coletarPendencias(sessaoCarregado, itinerarios);
+
+    expect(pendencias).toHaveLength(1);
+    expect(pendencias[0].id).toBe("rota-ausente-0000-1CR-ida");
+  });
+});
+
 describe("ETAPAS (Spec 04 §4)", () => {
   test("são exatamente as 7 etapas, na ordem da spec", () => {
     expect(ETAPAS.map((e) => e.id)).toEqual([

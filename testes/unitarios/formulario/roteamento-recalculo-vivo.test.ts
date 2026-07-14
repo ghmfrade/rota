@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
+  comporDescricao,
   congelarRotaCarregada,
   recalcularItinerario,
   type ComporDescricao,
   type EstadoRotaViva,
+  type ParadaRota,
 } from "@/formulario/roteamento";
 import { esquemaRota, type DescricaoItinerario } from "@/shared/contrato";
 import type { Ponto } from "@/shared/geo";
@@ -202,5 +204,51 @@ describe("recalcularItinerario — falha do OSRM (RN-048; Spec 03 §3.5/§3.7.8)
 
     expect(estado.situacao).toBe("sem-rota");
     expect("rota" in estado).toBe(false);
+  });
+});
+
+// TASK-025 — costura do composer REAL (não mock) no recálculo bem-sucedido
+// (DEC-046): prova que `recalcularItinerario` + `comporDescricao` produzem uma
+// `rota` schema-válida de ponta a ponta, sem placeholder.
+describe("recalcularItinerario — composer real injetado (TASK-025; DEC-046)", () => {
+  test("produz descricao_itinerario a partir dos steps do envelope OSRM (mockado)", async () => {
+    const SECAO_A_UUID = "11111111-1111-4111-8111-111111111111";
+    const SECAO_B_UUID = "22222222-2222-4222-8222-222222222222";
+    const paradaA: ParadaRota = {
+      ...PARADA_A,
+      secao: { uuid: SECAO_A_UUID, rotulo: "Cidade A - Seção A" },
+    };
+    const paradaB: ParadaRota = {
+      ...PARADA_B,
+      secao: { uuid: SECAO_B_UUID, rotulo: "Cidade B - Seção B" },
+    };
+    const envelopeComSteps = {
+      code: "Ok",
+      routes: [
+        {
+          geometry: ROTA_CONGELADA.geometria,
+          legs: [{ distance: 1000, duration: 60, steps: [{ name: "Rua Treta" }] }],
+        },
+      ],
+    };
+    const fetchFn = respostaFetchMock(envelopeComSteps);
+
+    const estado = await recalcularItinerario(
+      { paradas: [paradaA, paradaB] },
+      comporDescricao,
+      { fetchFn },
+    );
+
+    expect(estado.situacao).toBe("recalculada");
+    if (estado.situacao !== "recalculada") throw new Error("esperava recalculada");
+    expect(esquemaRota.safeParse(estado.rota).success).toBe(true);
+    expect(estado.rota.descricao_itinerario).toEqual({
+      texto: "Cidade A - Seção A, Rua Treta, Cidade B - Seção B.",
+      itens: [
+        { tipo: "secao", secao_uuid: SECAO_A_UUID, rotulo: "Cidade A - Seção A" },
+        { tipo: "via", nome: "Rua Treta" },
+        { tipo: "secao", secao_uuid: SECAO_B_UUID, rotulo: "Cidade B - Seção B" },
+      ],
+    });
   });
 });

@@ -174,3 +174,68 @@ describe("extrairRota — pontos_de_rota ecoados no resultado (Spec 03 §3.6.2)"
     expect(resultado.pontos_de_rota).toEqual([]);
   });
 });
+
+// TASK-025 — exposição de `steps[].name`, insumo cru da descrição textual
+// (Spec 03 §3.7.4). `nomesViasPorTrecho[i]` é paralelo a `trechos[i]`; a
+// limpeza (§3.7.5) é do compositor (`compor-descricao.ts`), não desta função.
+function respostaComLegsEsteps(
+  legs: { distance: number; duration: number; steps?: { name?: string }[] }[],
+): RespostaOsrm {
+  return {
+    code: "Ok",
+    routes: [
+      {
+        geometry: {
+          type: "LineString",
+          coordinates: [
+            [-46.63, -23.55],
+            [-47.1, -22.9],
+          ],
+        },
+        legs,
+      },
+    ],
+  };
+}
+
+describe("extrairRota — nomesViasPorTrecho (RN-047/053, Spec 03 §3.7.4)", () => {
+  test("caminho 1:1 — nomesViasPorTrecho[i] são os step.name do leg i, na ordem", () => {
+    const resposta = respostaComLegsEsteps([
+      { distance: 1000, duration: 60, steps: [{ name: "Rua A" }, { name: "" }, { name: "Rua B" }] },
+      { distance: 2000, duration: 120, steps: [{ name: "Avenida C" }] },
+    ]);
+
+    const resultado = extrairRota(resposta, 3);
+
+    expect(resultado.nomesViasPorTrecho).toEqual([
+      ["Rua A", "", "Rua B"],
+      ["Avenida C"],
+    ]);
+  });
+
+  test("[inválido] leg sem steps (RN-053, compatibilidade) → entrada vazia, sem lançar erro", () => {
+    const resposta = respostaComLegsEsteps([{ distance: 1000, duration: 60 }]);
+    const resultado = extrairRota(resposta, 2);
+    expect(resultado.nomesViasPorTrecho).toEqual([[]]);
+  });
+
+  test("caminho fallback — concatena os step.name de todos os legs fundidos no trecho", () => {
+    const resposta = respostaComLegsEsteps([
+      { distance: 128, duration: 12.6, steps: [{ name: "Rua A" }] },
+      { distance: 128, duration: 12.6, steps: [{ name: "Rua A" }] },
+      { distance: 128, duration: 12.6, steps: [{ name: "Rua B" }] },
+      { distance: 128, duration: 12.6, steps: [] },
+      { distance: 999, duration: 40, steps: [{ name: "Rodovia X" }] },
+      { distance: 1001, duration: 60, steps: [{ name: "Rodovia X" }] },
+    ]);
+
+    const resultado = extrairRota(resposta, 3, {
+      indicesParadas: INDICES_PARADAS_EXEMPLO,
+    });
+
+    expect(resultado.nomesViasPorTrecho).toEqual([
+      ["Rua A", "Rua A", "Rua B"],
+      ["Rodovia X", "Rodovia X"],
+    ]);
+  });
+});

@@ -1,7 +1,7 @@
 import type { SessaoFormulario } from "@/formulario/sessao";
 import type { IdEtapa } from "@/formulario/layout/etapas";
 import type { EstadoRotaViva } from "@/formulario/roteamento";
-import type { Itinerario } from "@/shared/contrato";
+import type { DescricaoItinerario, Itinerario } from "@/shared/contrato";
 
 // Painel de pendências vivo (Spec 04 §4/§11): a lista, derivada da sessão de
 // edição, de erros bloqueantes × alertas. Aqui está a coleta pura e testável;
@@ -39,6 +39,19 @@ const ROTULO_SENTIDO: Record<Itinerario["sentido"], string> = {
   ida: "Ida",
   volta: "Volta",
 };
+
+/**
+ * Mínimo estrutural de `descricao_itinerario` válida (RN-044, Spec 02 §10.5):
+ * `texto` não vazio e ao menos dois itens `tipo:"secao"`. Checagem propositalmente
+ * enxuta (não repete toda a validação estrutural de `validacoes-estruturais.ts`,
+ * que exige o próprio itinerário para checar ordem/extremos) — suficiente para
+ * decidir a pendência "descrição ausente/inválida" de §7.4/§11.
+ */
+function descricaoValida(descricao: DescricaoItinerario): boolean {
+  if (descricao.texto.trim().length === 0) return false;
+  const itensSecao = descricao.itens.filter((item) => item.tipo === "secao");
+  return itensSecao.length >= 2;
+}
 
 export interface Pendencia {
   /** Identificador estável da pendência (para key de lista e testes). */
@@ -86,31 +99,40 @@ export function coletarPendencias(
     });
   }
 
-  // Bloqueante de §11/§14: "itinerário sem rota válida" (RN-048/078). Origem:
-  // taxonomia de falha e mensagens da TASK-022 (Spec 04 §14; RN-049), estado
-  // ao vivo `sem-rota` da TASK-024 (DEC-041). Autoria desta pendência: a
-  // entrada viva é a TASK-044 (DEC-040); o gate de exportação que a consolida
-  // é a TASK-032.
+  // Bloqueantes de §11/§14 por itinerário: "sem rota válida" (RN-048/078,
+  // TASK-044/DEC-040) e "descrição ausente/inválida havendo rota" (RN-044/046/
+  // 078, TASK-025, Spec 04 §7.4/§11/§14). Autoria desta segunda pendência:
+  // a entrada viva é desta task; o gate de exportação que a consolida é a
+  // TASK-032 (mesmo recorte já usado para a pendência de rota).
   for (const itinerario of itinerariosAoVivo) {
-    if (itinerario.estadoRota.situacao !== "sem-rota") {
+    const rotuloSentido = ROTULO_SENTIDO[itinerario.sentido];
+
+    if (itinerario.estadoRota.situacao === "sem-rota") {
+      pendencias.push({
+        id: `rota-ausente-${itinerario.numeroN}-${itinerario.sentido}`,
+        severidade: "bloqueante",
+        mensagem: `O itinerário de ${rotuloSentido} do Serviço ${itinerario.numeroN} está sem rota calculada. Recalcule antes de exportar.`,
+        etapaAlvo: "secoes-locais-itinerarios",
+      });
       continue;
     }
-    const rotuloSentido = ROTULO_SENTIDO[itinerario.sentido];
-    pendencias.push({
-      id: `rota-ausente-${itinerario.numeroN}-${itinerario.sentido}`,
-      severidade: "bloqueante",
-      mensagem: `O itinerário de ${rotuloSentido} do Serviço ${itinerario.numeroN} está sem rota calculada. Recalcule antes de exportar.`,
-      etapaAlvo: "secoes-locais-itinerarios",
-    });
+
+    if (!descricaoValida(itinerario.estadoRota.rota.descricao_itinerario)) {
+      pendencias.push({
+        id: `descricao-ausente-${itinerario.numeroN}-${itinerario.sentido}`,
+        severidade: "bloqueante",
+        mensagem: `O itinerário de ${rotuloSentido} do Serviço ${itinerario.numeroN} está sem a descrição textual por vias. Recalcule a descrição antes de exportar.`,
+        etapaAlvo: "secoes-locais-itinerarios",
+      });
+    }
   }
 
   // TODO — demais pendências de §11, cada uma com a sua task (fora do escopo
   // desta implementação; não inventar aqui — docs-dev/04 princípio 2):
   //   bloqueantes: rota desatualizada/pendente de recálculo (TASK-032, gate),
-  //   descrição ausente com rota presente (TASK-025), matriz desatualizada
-  //   (TASK-026), horários fora de ordem (TASK-029), Seção/Local incompletos e
-  //   350 m/tipificação em revalidação (TASK-015/017/018), itinerário sem
-  //   viagem (TASK-028);
+  //   matriz desatualizada (TASK-026), horários fora de ordem (TASK-029),
+  //   Seção/Local incompletos e 350 m/tipificação em revalidação
+  //   (TASK-015/017/018), itinerário sem viagem (TASK-028);
   //   alertas: Serviço sem par habilitado na matriz (TASK-027), tabela de
   //   feriados vazia (TASK-030).
 

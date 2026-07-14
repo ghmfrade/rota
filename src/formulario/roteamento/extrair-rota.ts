@@ -12,15 +12,26 @@ import {
 // paradas.length - 1`, 1:1) e com pontos de rota, nos dois sub-caminhos do
 // §3.6 — preferencial (`waypoints` honrado, ainda 1:1) e fallback (fusão de
 // legs entre paradas consecutivas). A montagem de `descricao_itinerario` a
-// partir de `steps[].name` é a TASK-025.
+// partir dos `steps[].name` aqui expostos é o compositor de `compor-descricao.ts`
+// (TASK-025, Spec 03 §3.7).
 
-/** Recorte mínimo de um `leg` do envelope OSRM (Spec 03 §3.3) — só o que esta
- * task consome; `steps` é ignorado aqui (insumo da descrição, TASK-025). */
+/** Recorte mínimo de um `step` do envelope OSRM (Spec 03 §3.3) — só `name`,
+ * insumo cru da descrição textual (Spec 03 §3.7.4); a limpeza (§3.7.5) é do
+ * compositor, não desta extração. */
+export interface StepOsrm {
+  name?: string;
+}
+
+/** Recorte mínimo de um `leg` do envelope OSRM (Spec 03 §3.3). */
 export interface LegOsrm {
   /** Metros (fronteira de entrada única em metros — RN-014). */
   distance: number;
   /** Segundos. */
   duration: number;
+  /** Manobras do leg — pedidas via `steps=true` (RN-047) exclusivamente para
+   * os nomes de via (Spec 03 §3.7.4); ausente quando a instância OSRM não os
+   * retorna (RN-053, compatibilidade). */
+  steps?: readonly StepOsrm[];
 }
 
 /** Recorte mínimo de `routes[0]` do envelope OSRM. */
@@ -43,10 +54,13 @@ export interface RespostaOsrm {
 
 /**
  * Resultado parcial do roteamento de um itinerário: os campos de `rota`
- * (Spec 02 §10.2) que esta task produz. `descricao_itinerario` (TASK-025) é
- * completada por task seguinte antes de compor o objeto `rota` congelado
- * final (RN-015). `pontos_de_rota` é o eco do que foi enviado (default `[]`),
- * pronto para o congelamento (Spec 03 §3.6.2 — persistência para reedição).
+ * (Spec 02 §10.2) exceto `descricao_itinerario`, que é composta à parte por
+ * `comporDescricao` (`compor-descricao.ts`, TASK-025) antes de fechar o
+ * objeto `rota` congelado final (RN-015). `pontos_de_rota` é o eco do que foi
+ * enviado (default `[]`), pronto para o congelamento (Spec 03 §3.6.2 —
+ * persistência para reedição). `nomesViasPorTrecho` é o insumo cru (não
+ * limpo — §3.7.5 é responsabilidade do compositor) dos nomes de via
+ * percorridos em cada trecho, na mesma ordem/índice de `trechos`.
  */
 export interface ResultadoRotaOsrm {
   geometria: z.infer<typeof esquemaGeometriaLineString>;
@@ -54,6 +68,11 @@ export interface ResultadoRotaOsrm {
   duracao_s: number;
   trechos: Trecho[];
   pontos_de_rota: PontoDeRota[];
+  /** `nomesViasPorTrecho[i]` é a sequência crua de `step.name` (Spec 03
+   * §3.7.4) de todos os legs que compõem `trechos[i]` — paralelo a `trechos`,
+   * mesmo índice. Não é campo do contrato (Spec 02); insumo intermediário
+   * para `comporDescricao`. */
+  nomesViasPorTrecho: (string | undefined)[][];
 }
 
 /** Opções de `extrairRota` para o caso com pontos de rota (Spec 03 §3.6). */
@@ -108,6 +127,7 @@ export function extrairRota(
   const legs = rotaBruta.legs;
 
   let trechos: Trecho[];
+  let nomesViasPorTrecho: (string | undefined)[][];
 
   if (legs.length === trechosEsperados) {
     // Sem pontos de rota, ou pontos de rota com `waypoints` honrado
@@ -118,10 +138,12 @@ export function extrairRota(
       distancia_km: arredondaHalfUp(leg.distance / 1000, 2),
       duracao_s: arredondaHalfUp(leg.duration, 0),
     }));
+    nomesViasPorTrecho = legs.map((leg) => (leg.steps ?? []).map((step) => step.name));
   } else if (indicesParadas && legs.length === totalCoordenadas(indicesParadas) - 1) {
     // Fallback: todas as coordenadas geraram leg — funde-se os legs entre
     // paradas consecutivas (Spec 03 §3.6 caminho fallback, §3.6.1 exemplo 2b).
     trechos = fundirLegsEntreParadas(legs, indicesParadas);
+    nomesViasPorTrecho = coletarNomesViasPorTrecho(legs, indicesParadas);
   } else {
     throw new Error(
       `[RN-041] legs.length (${legs.length}) não corresponde a ` +
@@ -142,6 +164,7 @@ export function extrairRota(
     duracao_s,
     trechos,
     pontos_de_rota: [...pontosDeRota],
+    nomesViasPorTrecho,
   };
 }
 
@@ -150,6 +173,32 @@ export function extrairRota(
  * 02 §10.4), a última parada é sempre a última coordenada da sequência. */
 function totalCoordenadas(indicesParadas: readonly number[]): number {
   return indicesParadas[indicesParadas.length - 1] + 1;
+}
+
+/**
+ * Coleta, para o caminho fallback (§3.6 caminho 2b), a sequência crua de
+ * `step.name` (Spec 03 §3.7.4) de todos os legs fundidos entre duas paradas
+ * consecutivas — paralelo a `fundirLegsEntreParadas`, mesmo particionamento
+ * por `indicesParadas`. Nomes ficam **na ordem de travessia**, sem limpeza
+ * (§3.7.5 é do compositor).
+ */
+function coletarNomesViasPorTrecho(
+  legs: readonly LegOsrm[],
+  indicesParadas: readonly number[],
+): (string | undefined)[][] {
+  const nomesViasPorTrecho: (string | undefined)[][] = [];
+  for (let i = 0; i < indicesParadas.length - 1; i++) {
+    const inicio = indicesParadas[i];
+    const fim = indicesParadas[i + 1];
+    const nomes: (string | undefined)[] = [];
+    for (let legIndice = inicio; legIndice < fim; legIndice++) {
+      for (const step of legs[legIndice].steps ?? []) {
+        nomes.push(step.name);
+      }
+    }
+    nomesViasPorTrecho.push(nomes);
+  }
+  return nomesViasPorTrecho;
 }
 
 /**
