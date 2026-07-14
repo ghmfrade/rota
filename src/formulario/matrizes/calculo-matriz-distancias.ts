@@ -62,8 +62,9 @@ function valorAdotado(
 
 /** Seções distintas atendidas por ao menos um itinerário do Serviço (RN-054),
  * na ordem de primeira aparição — determina a ordem determinística dos pares
- * de saída. */
-function secoesAtendidas(itinerarios: readonly Itinerario[]): string[] {
+ * de saída. Exportada para que outras matrizes do mesmo Serviço (seccionamento,
+ * TASK-027) usem a MESMA ordenação de linhas/colunas. */
+export function secoesAtendidas(itinerarios: readonly Itinerario[]): string[] {
   const vistas = new Set<string>();
   const ordem: string[] = [];
   for (const itinerario of itinerarios) {
@@ -133,8 +134,9 @@ export function matrizDistanciasDoServico(servico: Servico): ParDistancia[] {
   return calcularMatrizDistancias(servico.itinerarios);
 }
 
-/** Chave não-direcional de um par de Seções (`{a,b} == {b,a}` — RN-054/059). */
-function chaveParNaoDirecional(secaoAUuid: string, secaoBUuid: string): string {
+/** Chave não-direcional de um par de Seções (`{a,b} == {b,a}` — RN-054/059).
+ * Exportada para reuso pelas operações de `matriz_seccionamento` (TASK-027). */
+export function chaveParNaoDirecional(secaoAUuid: string, secaoBUuid: string): string {
   return [secaoAUuid, secaoBUuid].sort().join("|");
 }
 
