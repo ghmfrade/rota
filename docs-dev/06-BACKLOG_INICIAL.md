@@ -408,6 +408,16 @@
 **Testes esperados:** unitários (cada `ViolacaoMontagem` vira mensagem); E2E (montagem inválida acende o aviso; exportação continua barrada onde já era).
 **Perguntas em aberto:** nenhuma.
 
+## TASK-048 — Display read-only da matriz de distâncias na etapa Matrizes
+
+**Prioridade:** Alta · **Fase:** Distâncias
+**Resumo:** Origem: lacuna de backlog identificada na análise da TASK-027 — a matriz de distâncias é **calculada e congelada** pela TASK-026 (`matriz_distancias`, RN-054..057) e **impressa no PDF** pela TASK-034, mas nenhuma task renderiza sua **exibição em tela** na etapa Matrizes do Formulário (Spec 04 §9.1). Esta task acopla à etapa Matrizes — cujo shell (seletor de Serviço + grade triangular inferior com "X" na diagonal e cabeçalhos `Cidade - Nome da Seção`) é entregue pela TASK-027 — a apresentação **somente-leitura** da matriz de distâncias do Serviço selecionado: uma célula por par com o `valor_adotado_de_distancia` em km, e **detalhe Ida/Volta expansível** (hover/clique) com `distancia_trecho_ida`/`distancia_trecho_volta` quando o Serviço é bidirecional (Spec 04 §9.1). Lê exclusivamente o `matriz_distancias` já congelado no documento — **não** chama OSRM nem recalcula (RN transversal de leitura do congelado; Spec 03 §12). Valores só em km, **sem R$** (RN-013/076).
+**Regras RN:** RN-054 (uma entrada por par não-ordenado de Seções distintas — determina as células), RN-056 (`valor_adotado_de_distancia` exibido; detalhe Ida/Volta), RN-076 (formato triangular: "X" na diagonal, `Cidade - Nome`, km, sem R$), RN-013 (proibição de R$). **Depende de:** TASK-026 (cálculo/dados), TASK-027 (shell da etapa Matrizes: seletor de Serviço e grade triangular reaproveitada).
+**Fora de escopo:** o cálculo/reconciliação de `matriz_distancias` e a pendência "matriz desatualizada" (já são da TASK-026); toda a matriz de **seccionamento** e seus botões de sugestão/edição (TASK-027); a impressão das matrizes no PDF (TASK-034); as matrizes comparativas do Comparador (TASK-037); qualquer chamada ao OSRM ou recálculo (a matriz é lida congelada); qualquer alteração no contrato JSON.
+**Critérios de aceite resumidos:** a etapa Matrizes exibe, por Serviço selecionado, a matriz de distâncias como triangular inferior somente-leitura; diagonal com "X"; cabeçalhos no padrão `Cidade - Nome da Seção`; cada célula habitada mostra `valor_adotado_de_distancia` em km; Serviço bidirecional oferece detalhe expansível com Ida e Volta; Serviço unidirecional não oferece o detalhe (só o valor único); nenhum "R$"/valor monetário no DOM; nenhuma requisição de rede disparada ao abrir/navegar a etapa.
+**Testes esperados:** unitários da derivação de linhas/células a partir de `matriz_distancias` (ordem de Seções; par presente vs. célula vazia; bidirecional expõe Ida/Volta, unidirecional só o único valor); E2E (matriz read-only renderiza "X" na diagonal e km nas células; expandir célula bidirecional mostra Ida/Volta; ausência de "R$"; sem chamada de rede — sem mock de OSRM porque a etapa não deve tocá-lo).
+**Perguntas em aberto:** nenhuma (Spec 04 §9.1 fecha o formato; dados e cálculo já existem — TASK-026).
+
 ---
 
 ## Ordem recomendada de execução
@@ -416,7 +426,7 @@
 001 → 002 → 003 → 004/005 (paralelo) → 041 → 006 → 007 → 042
 → 008/009 (paralelo) → 010 → 011 → 012
 → 013 → 014 → 015 → 016 → 020 → 021 → 043 → 022 → 023 → 024 → 044 → 045 → 017 → 018 → 019 → 025 → 047
-→ 026 → 027 → 028 → 046 → 029 → 030 → 031 → 032
+→ 026 → 027 → 048 → 028 → 046 → 029 → 030 → 031 → 032
 → 033 → 034
 → 035 → 036 → 037 → 038 → 039
 → (decisão humana) 040
