@@ -6,6 +6,11 @@ export {
   chaveParNaoDirecional,
 } from "./calculo-matriz-distancias";
 export {
+  celulaDistancia,
+  formatarKm,
+  type CelulaDistancia,
+} from "./apresentacao-matriz-distancias";
+export {
   sugerirMenorDistancia,
   sugerirDistanciaDoServico,
 } from "./sugestoes-seccionamento";

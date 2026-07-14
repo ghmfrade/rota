@@ -138,3 +138,47 @@ test.describe("Etapa Matrizes — matriz de seccionamento (Spec 04 §9.2)", () =
     expect(chamouOsrm).toBe(false);
   });
 });
+
+test.describe("Etapa Matrizes — matriz de distâncias read-only (Spec 04 §9.1)", () => {
+  test("triangular inferior: X na diagonal, km nas células, sem R$, sem chamar OSRM", async ({
+    page,
+  }) => {
+    let chamouOsrm = false;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamouOsrm = true;
+      return rota.abort();
+    });
+
+    // Fixture original (par São Vicente/Praia Grande presente) — a matriz de
+    // distâncias é lida como congelada, independentemente do seccionamento.
+    await abrirEtapaMatrizes(page, structuredClone(multiServico));
+
+    const secao = page.getByTestId("matriz-distancias");
+    await expect(secao).toBeVisible();
+
+    // 3 Seções → diagonal com 3 "X".
+    await expect(secao.getByTestId("celula-distancia-diagonal")).toHaveCount(3);
+    for (const celula of await secao.getByTestId("celula-distancia-diagonal").all()) {
+      await expect(celula).toHaveText("X");
+    }
+
+    // 3 pares na triangular inferior de 3 Seções (AB, BC, AC).
+    await expect(secao.getByTestId("celula-distancia")).toHaveCount(3);
+    await expect(secao).toContainText("8,00 km");
+    await expect(secao).toContainText("6,00 km");
+    await expect(secao).toContainText("14,00 km");
+
+    await expect(page.locator("body")).not.toContainText("R$");
+    expect(chamouOsrm).toBe(false);
+  });
+
+  test("Serviço bidirecional: expandir a célula mostra Ida e Volta", async ({ page }) => {
+    await abrirEtapaMatrizes(page, structuredClone(multiServico));
+
+    const detalhe = page.getByTestId("matriz-distancias").getByTestId("detalhe-ida-volta").first();
+    await detalhe.locator("summary").click();
+
+    await expect(detalhe).toContainText("Ida");
+    await expect(detalhe).toContainText("Volta");
+  });
+});

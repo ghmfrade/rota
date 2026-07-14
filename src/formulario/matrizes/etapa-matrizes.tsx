@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ParSecao, Secao, Servico } from "@/shared/contrato";
 import { nomeExibicaoSecao } from "@/formulario/secoes";
 import { secoesDaSessao, type SessaoFormulario } from "@/formulario/sessao";
+import { celulaDistancia, formatarKm } from "./apresentacao-matriz-distancias";
 import { secoesAtendidas } from "./calculo-matriz-distancias";
 import {
   aplicarSugestaoEmLote,
@@ -21,9 +22,10 @@ import { sugerirDistanciaDoServico, sugerirMenorDistancia } from "./sugestoes-se
 // então não há o que editar até a etapa Itinerários promovê-lo a `Servico`
 // completo. Limite conhecido (ver "Pontos de atenção" da entrega).
 //
-// Entrega desta task: só a matriz de SECCIONAMENTO (§9.2) e o shell (seletor
-// de Serviço + grade triangular reutilizável). O display somente-leitura da
-// matriz de DISTÂNCIAS (§9.1) é a TASK-048, que acopla ao mesmo shell.
+// TASK-027 entregou o shell (seletor de Serviço + grade triangular reutilizável)
+// e a matriz de SECCIONAMENTO editável (§9.2). A TASK-048 acopla ao mesmo shell o
+// display somente-leitura da matriz de DISTÂNCIAS (§9.1): lê o `matriz_distancias`
+// já congelado (RN-054/056; Spec 03 §12), nunca chama OSRM nem recalcula.
 
 function encontrarPar(
   matrizSeccionamento: readonly ParSecao[],
@@ -149,6 +151,77 @@ export function EtapaMatrizes({ sessao, aoAtualizarSessao }: PropsEtapaMatrizes)
           ))}
         </select>
       </label>
+
+      {servicoAtual && (
+        <section data-testid="matriz-distancias">
+          <h3>Matriz de distâncias</h3>
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Origem/Destino</th>
+                {secoesDaMatriz.map((secao) => (
+                  <th scope="col" key={secao.uuid}>
+                    {nomeExibicaoSecao(secao)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {secoesDaMatriz.map((secaoLinha, indiceLinha) => (
+                <tr key={secaoLinha.uuid}>
+                  <th scope="row">{nomeExibicaoSecao(secaoLinha)}</th>
+                  {secoesDaMatriz.map((secaoColuna, indiceColuna) => {
+                    if (indiceColuna > indiceLinha) {
+                      // Metade superior da triangular inferior (Spec 04 §9):
+                      // não exibida.
+                      return <td key={secaoColuna.uuid} aria-hidden="true" />;
+                    }
+                    if (indiceColuna === indiceLinha) {
+                      return (
+                        <td key={secaoColuna.uuid} data-testid="celula-distancia-diagonal">
+                          X
+                        </td>
+                      );
+                    }
+                    const celula = celulaDistancia(
+                      servicoAtual.matriz_distancias,
+                      secaoLinha.uuid,
+                      secaoColuna.uuid,
+                    );
+                    return (
+                      <td key={secaoColuna.uuid} data-testid="celula-distancia">
+                        {celula &&
+                          (celula.bidirecional ? (
+                            // Detalhe Ida/Volta expansível (Spec 04 §9.1):
+                            // inferência controlada de UX — a spec pede
+                            // "expansível (hover/clique)" sem prescrever o
+                            // widget; usamos <details> nativo (acessível, sem
+                            // estado extra).
+                            <details data-testid="detalhe-ida-volta">
+                              <summary>{formatarKm(celula.valorAdotado)}</summary>
+                              <dl>
+                                <div>
+                                  <dt>Ida</dt>
+                                  <dd>{formatarKm(celula.ida as number)}</dd>
+                                </div>
+                                <div>
+                                  <dt>Volta</dt>
+                                  <dd>{formatarKm(celula.volta as number)}</dd>
+                                </div>
+                              </dl>
+                            </details>
+                          ) : (
+                            formatarKm(celula.valorAdotado)
+                          ))}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       {servicoAtual && (
         <section data-testid="matriz-seccionamento">
