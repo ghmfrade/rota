@@ -60,6 +60,7 @@ Só depois da revisão de aderência avança-se para a próxima task.
 4. As regras `RN-xxx` da task em `01-RULE_INDEX.md`.
 5. `02-DOMAIN_MODEL.md` (entidades afetadas) e `11-NEGATIVE_REQUIREMENTS.md`.
 6. `13-ARCHITECTURE_GUARDRAILS.md` se a task tocar arquitetura/dependências.
+7. `18-DESIGN_SYSTEM.md` se a task tocar UI (componentes, telas, estilo) — vinculante (DEC-050).
 
 ## 5. Como criar tasks
 
@@ -128,3 +129,4 @@ Na dúvida: `11-NEGATIVE_REQUIREMENTS.md` e `13-ARCHITECTURE_GUARDRAILS.md`.
 | `15-MVP_PLAN.md` | Ondas de entrega MVP 0 → MVP 5. |
 | `16-OPEN_QUESTIONS.md` | Perguntas em aberto (`Q-xxx`), sem decisão inventada. |
 | `17-SPEC_AUDIT.md` | Auditoria das specs: cobertura, conflitos, prontidão. |
+| `18-DESIGN_SYSTEM.md` | Padrão visual vinculante (tokens, componentes `shared/ui`, ícones-carimbo, layout) — DEC-050. |

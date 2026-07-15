@@ -61,6 +61,8 @@ Use em **toda** entrega (IA ou humana), antes do merge. Itens não aplicáveis �
 - [ ] Locais fora da grade principal, da descrição textual e do corpo do PDF (só anexo)? (RN-031, RN-044, RN-076)
 - [ ] Aviso de fronteira com o SEI presente nos PDFs? (RN-077)
 - [ ] Exportação bloqueada com pendências bloqueantes? (RN-078)
+- [ ] UI aderente ao design system (`18-DESIGN_SYSTEM.md`): componentes de `shared/ui`, tokens do `@theme`, sem `style=` inline fora das exceções? (DEC-050)
+- [ ] `data-testid` e `aria-*` existentes preservados (E2E passam sem alterar seletores)? (DEC-050)
 
 ## Testes
 

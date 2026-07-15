@@ -19,11 +19,13 @@ Spec original (`docs/specs/01..05`) > `docs-dev/01-RULE_INDEX.md` > demais deriv
 
 ## Stack fixada (DEC-028/029/030 em `docs-dev/10-DECISION_LOG.md`)
 
-Next.js/React + TypeScript · zod em modo strict (RN-010) · @react-pdf (PDF client-side) · Vitest (unitários) + Playwright (E2E) — testes **nunca** dependem do OSRM real, mock sempre · MapLibre GL (Spec 01 §8) · OSRM demo público `router.project-osrm.org`, perfil `driving`, com URL base configurável (DEC-029). Nenhuma dependência que exija servidor próprio (ORM, fila, auth SDK) até a Spec 06.
+Next.js/React + TypeScript · zod em modo strict (RN-010) · @react-pdf (PDF client-side) · Vitest (unitários) + Playwright (E2E) — testes **nunca** dependem do OSRM real, mock sempre · MapLibre GL (Spec 01 §8) · OSRM demo público `router.project-osrm.org`, perfil `driving`, com URL base configurável (DEC-029) · Tailwind CSS 4 para estilo (DEC-050), tokens via `@theme`. Nenhuma dependência que exija servidor próprio (ORM, fila, auth SDK) até a Spec 06.
+
+O padrão visual é governado por `docs-dev/18-DESIGN_SYSTEM.md` (vinculante para tasks de UI — DEC-050): componentes de `src/shared/ui/`, tokens, ícones-carimbo SVG próprios, sem `style=` inline; `data-testid`/`aria-*` existentes são intocáveis.
 
 ## Layout de módulos (`docs-dev/13-ARCHITECTURE_GUARDRAILS.md`)
 
-- `shared/` — schema do contrato JSON, validadores, primitivas geo, contagens.
+- `shared/` — schema do contrato JSON, validadores, primitivas geo, contagens, componentes de UI (`shared/ui/`).
 - `formulario/` e `comparador/` — só dependem de `shared/` e só se comunicam por arquivo JSON. Sem imports cruzados; Comparador nunca chama OSRM nem escreve.
 - `data/` — estáticos: `autos_empresas.json` e `municipios.json` (DEC-030), gerados por `scripts/gerar_dados_estaticos.py` a partir dos CSVs de origem. Regenerar quando os CSVs mudarem.
 
@@ -37,6 +39,7 @@ Next.js/React + TypeScript · zod em modo strict (RN-010) · @react-pdf (PDF cli
 4. As RN da task em `docs-dev/01-RULE_INDEX.md` (e vizinhas do grupo).
 5. `docs-dev/02-DOMAIN_MODEL.md` (entidades afetadas) e `docs-dev/11-NEGATIVE_REQUIREMENTS.md`.
 6. `docs-dev/13-ARCHITECTURE_GUARDRAILS.md` se tocar arquitetura/dependências.
+7. `docs-dev/18-DESIGN_SYSTEM.md` se tocar UI (vinculante — DEC-050).
 
 Modo supervisionado é o padrão: parar após a "Análise da Task" e aguardar aprovação humana do plano.
 

@@ -1,7 +1,7 @@
 # 06 — BACKLOG_INICIAL: Backlog Priorizado
 
 **Formato por task:** prioridade, fase, resumo, regras RN, dependências, critérios de aceite resumidos, testes esperados. Cada item vira uma task completa com `05-TASK_TEMPLATE.md` antes de ser implementado.
-**Fases:** 1 Fundação · 2 Contrato JSON · 3 Validações de domínio · 4 Formulário · 5 Mapa e roteamento · 6 Distâncias e seccionamento · 7 Viagens e horários · 8 PDF operacional · 9 Comparador · 10 PDF comparativo · 11 Ingestor futuro · 12 Qualidade e testes.
+**Fases:** 1 Fundação · 2 Contrato JSON · 3 Validações de domínio · 4 Formulário · 5 Mapa e roteamento · 6 Distâncias e seccionamento · 7 Viagens e horários · 8 PDF operacional · 9 Comparador · 10 PDF comparativo · 11 Ingestor futuro · 12 Qualidade e testes · 13 Redesign visual (DEC-050).
 **Alinhamento com MVPs:** ver `15-MVP_PLAN.md` (Fases 1–3 ≈ MVP 0; 4 e 7 ≈ MVP 1; 5–6 ≈ MVP 2; 8 ≈ MVP 3; 9–10 ≈ MVP 4; 11 ≈ MVP 5).
 
 ---
@@ -421,6 +421,84 @@
 
 ---
 
+## Fase 13 — Redesign visual (DEC-050 / Q-031 / `18-DESIGN_SYSTEM.md`)
+
+**Regra transversal do bloco (vale como "Fora de escopo" herdado por todas as tasks 049–056):** nenhuma mudança de comportamento, validação, fluxo, mensagem da Spec 04 §14 ou contrato JSON; `data-testid` e `aria-*` existentes intocáveis (E2E passam sem alterar seletores); etapas placeholder (Revisão, Exportação) e Comparador ficam fora — nascem sob o doc 18 nas suas próprias tasks. Execução em lote autônoma autorizada (DEC-050 item f).
+
+## TASK-049 — Fundação do design system: Tailwind CSS 4 + tokens
+
+**Prioridade:** Alta · **Fase:** Redesign visual
+**Resumo:** Instalar/configurar Tailwind CSS 4 (build, compatível com export estático), definir os tokens do doc 18 §2 via `@theme` em `src/app/globals.css` (paleta azul/cinza, semânticas, raios, sombras 1–3, transições), reset/base tipográfica e utilitário `sr-only` real (hoje referenciado em `etapa-viagens.tsx`/`identificacao.tsx` e não definido). Nenhuma tela muda de estrutura ou comportamento.
+**Specs fonte / decisões:** Spec 04 §2 (princípios de UX); DEC-050 (b); doc 18 §1–§2. **Regras RN:** RN-095/096 (nada de servidor — Tailwind roda em build). **Depende de:** —
+**Fora de escopo:** componentes de `shared/ui` (TASK-050); qualquer restilização de tela (TASK-051+); mudanças em `data/`, contrato ou comportamento.
+**Critérios de aceite resumidos:** `npm run build` (export estático) e `npm run dev` funcionam com Tailwind ativo; tokens do doc 18 §2 disponíveis como utilitários; `sr-only` aplica visually-hidden de verdade; suíte inteira permanece verde sem alterar expectativas.
+**Testes esperados:** build/typecheck/lint verdes; `npm test` e E2E inalterados (nenhum seletor tocado).
+
+## TASK-050 — Componentes base `shared/ui` + ícones-carimbo
+
+**Prioridade:** Alta · **Fase:** Redesign visual
+**Resumo:** Criar `src/shared/ui/` com os componentes do doc 18 §3 — `Botao` (primario/secundario/perigo/fantasma), `Campo`, `Select`, `Painel` (com variante colapsável `<details>/<summary>`), `Selo`, `Tabela`, `Tooltip` (segue o cursor via `onMouseMove`, atraso ~300 ms, fade; rótulo acessível permanece no elemento) e `Carimbo` (estados repouso/hover/ativo) — e o catálogo de SVGs próprios do doc 18 §4 em `src/shared/ui/carimbos/` (ID, ônibus, mapinha, relógio, grade, lista-check, download, pasta, folha nova). Componentes repassam props nativas (inclusive `data-testid`).
+**Specs fonte / decisões:** Spec 04 §4/§11 (estruturas que os componentes servirão); DEC-050 (c)(d); doc 18 §3–§4. **Regras RN:** RN-076 (componentes exibem nomenclatura/formatos oficiais quando aplicável); RN-095. **Depende de:** TASK-049.
+**Fora de escopo:** montar os componentes nas telas (TASK-051+); ícones de biblioteca externa; qualquer lógica de negócio dentro de `shared/ui`.
+**Critérios de aceite resumidos:** todos os componentes do doc 18 §3 existem com as variantes/estados especificados; `Tooltip` segue o mouse e respeita `prefers-reduced-motion`; `Carimbo` alterna repouso/hover/ativo; nenhum componente contém hex/px fora dos tokens; nenhum import fora de `shared/`.
+**Testes esperados:** unitários por componente (renderização das variantes, repasse de props/`data-testid`, estados do `Carimbo`, atraso/fade do `Tooltip` com timers falsos).
+
+## TASK-051 — Shell full-screen + sidebar de carimbos
+
+**Prioridade:** Alta · **Fase:** Redesign visual
+**Resumo:** Refazer a casca do formulário (`layout-formulario.tsx`, `app/layout.tsx`, `app/page.tsx`) no padrão do doc 18 §5: `100dvh`, sidebar lateral fixa com os carimbos das 7 etapas (tooltip com o nome no hover, ativo destacado — o "stepper lateral" da Spec 04 §4), cabeçalho persistente compacto (Autos/Empresa/Tipo/selo de status via `Selo`), área de conteúdo com scroll próprio e `max-width`, painel de pendências colapsável com contagem em selo e flutuante quando aberto. A navegação continua `<nav>` + `<ol>/<li>/<button>` com `aria-current="step"` e os mesmos `data-testid`.
+**Specs fonte / decisões:** Spec 04 §4 (layout geral, stepper lateral, elementos persistentes), §11 (pendências: bloqueante × alerta); DEC-050 (c); doc 18 §5. **Regras RN:** RN-078 (estrutura do painel de pendências preservada); RN-076. **Depende de:** TASK-050.
+**Fora de escopo:** conteúdo interno das etapas (TASK-053+); tela inicial (TASK-052); resumo operacional além do reposicionamento visual.
+**Critérios de aceite resumidos:** app ocupa a viewport inteira sem scroll horizontal do body; sidebar navega livremente entre as 7 etapas; tooltip aparece no hover e acompanha o cursor; etapa ativa destacada (`aria-current` intacto); pendências continuam distinguindo bloqueante × alerta com clique navegável; E2E existentes passam sem alterar seletores.
+**Testes esperados:** E2E existentes verdes; unitário/E2E leve do shell (navegação pela sidebar, tooltip, colapso do painel).
+
+## TASK-052 — Tela inicial redesenhada (full-screen, cartões com carimbo)
+
+**Prioridade:** Alta · **Fase:** Redesign visual
+**Resumo:** Restilizar `app/page.tsx` + `tela-inicial/tela-inicial.tsx` no doc 18 §5: hero centrado (título/descrição), dois cartões de ação (`Painel` + `Carimbo` pasta/folha) — "Carregar JSON existente" destacado como recomendado (Spec 04 §3) e "Criar Autos do zero" com o diálogo de confirmação/avisos obrigatórios estilizado. Mensagens e fluxo intactos.
+**Specs fonte / decisões:** Spec 04 §3 (tela inicial, avisos obrigatórios, recomendação do caminho "carregar"); DEC-050; doc 18 §5. **Regras RN:** RN-004/016/017 (comportamentos da tela preservados — não reimplementar). **Depende de:** TASK-050.
+**Fora de escopo:** qualquer mudança nos fluxos de import/criação, mensagens ou validações (TASK-013 já entregue); shell do formulário (TASK-051).
+**Critérios de aceite resumidos:** tela inicial full-screen com os dois cartões e carimbos; caminho "carregar" visualmente recomendado; `alertdialog` e avisos textuais idênticos aos atuais; E2E da tela inicial passam sem alterar seletores.
+**Testes esperados:** E2E existentes verdes; conferência visual.
+
+## TASK-053 — Etapa Identificação com `shared/ui`
+
+**Prioridade:** Média · **Fase:** Redesign visual
+**Resumo:** Restilizar `identificacao/identificacao.tsx` com `Campo`/`Select`/`Painel`/`Selo`/`Botao`: seleções de Autos/empresa/tipo, selo de status, aviso de reconversão (DEC-034) no padrão visual de alerta. Comportamento (encadeamento das seleções, não-editáveis, reconversão) intacto.
+**Specs fonte / decisões:** Spec 04 §5; DEC-050; doc 18. **Regras RN:** RN-016/023 (comportamento preservado). **Depende de:** TASK-051.
+**Fora de escopo:** demais etapas; qualquer regra de identificação.
+**Critérios de aceite resumidos:** etapa usa exclusivamente componentes `shared/ui` (zero elemento cru estilizado, zero `style=`); E2E verdes sem alterar seletores.
+**Testes esperados:** E2E existentes; varredura de `style=`/hex no diff.
+
+## TASK-054 — Etapa Serviços com `shared/ui`
+
+**Prioridade:** Média · **Fase:** Redesign visual
+**Resumo:** Restilizar `servicos/servicos.tsx` (maior componente de CRUD): lista/tabela de Serviços via `Tabela`, ações (criar/editar/remover/duplicar) via `Botao`, formulários via `Campo`/`Select`, avisos no padrão semântico. Comportamento (numeração, tipificação, duplicação com UUIDs novas, cascata) intacto.
+**Specs fonte / decisões:** Spec 04 §6; DEC-050; doc 18. **Regras RN:** RN-006/007/018/019..021/024 (comportamento preservado). **Depende de:** TASK-051.
+**Fora de escopo:** demais etapas; qualquer regra de Serviço.
+**Critérios de aceite resumidos:** idem TASK-053, para a etapa Serviços.
+**Testes esperados:** unitários existentes + E2E verdes sem alterar seletores.
+
+## TASK-055 — Etapa Seções, Locais e Itinerários + editores + integração visual do mapa
+
+**Prioridade:** Média · **Fase:** Redesign visual
+**Resumo:** Restilizar `itinerarios/etapa-itinerarios.tsx`, `secoes/editor-secoes.tsx`, `locais/editor-locais.tsx`, `descricao/painel-descricao-itinerario.tsx` e a moldura do mapa (`shared/mapa/mapa.tsx` — só apresentação): mapa em destaque com moldura/sombra do doc 18 §5, tabela lateral de paradas via `Tabela`, controles via `shared/ui`, rótulos `Cidade - Nome da Seção` (RN-076). A exceção de `style=` para dimensões dinâmicas do mapa (doc 18 §6.1) aplica-se aqui.
+**Specs fonte / decisões:** Spec 04 §7 (mapa em destaque + tabela lateral, padrão de nome §7.1); DEC-050; doc 18 §5–§6. **Regras RN:** RN-076; comportamento de RN-025..036/041..052 preservado (não reimplementar). **Depende de:** TASK-051.
+**Fora de escopo:** demais etapas; qualquer regra de mapa/rota/OSRM; os harnesses `*-demo` (transitórios — DEC-043).
+**Critérios de aceite resumidos:** etapa e editores usam `shared/ui`; mapa emoldurado; E2E de mapa/editores verdes sem alterar seletores; zero chamada de rede nova.
+**Testes esperados:** E2E existentes (editor-secoes-350m etc.) verdes; conferência visual.
+
+## TASK-056 — Etapas Viagens e Matrizes + resumo operacional + varredura final de consistência
+
+**Prioridade:** Média · **Fase:** Redesign visual
+**Resumo:** Restilizar `viagens/etapa-viagens.tsx` (grades de horários e feriados via `Tabela`, células/inputs no padrão, offsets continuam ocultos — RN-067), `matrizes/etapa-matrizes.tsx` (triangular inferior, "X" na diagonal, km sem R$ — RN-076) e `resumo/resumo-operacional.tsx` (painel colapsável com selos, rótulo "semana padrão (sem feriados)" — RN-069). Encerrar com **varredura de consistência do bloco**: grep de `style=` (só exceções documentadas), grep de hex/px fora de tokens, elementos crus estilizados fora de `shared/ui`, `sr-only` aplicado, e páginas `*-demo` minimamente funcionais.
+**Specs fonte / decisões:** Spec 04 §8 (grade), §9 (matrizes), §10 (resumo); DEC-050; doc 18 §6. **Regras RN:** RN-067, RN-069, RN-076 (comportamento/formatos preservados). **Depende de:** TASK-053, TASK-054, TASK-055.
+**Fora de escopo:** etapas Revisão/Exportação (placeholders — ficam para suas tasks); qualquer regra de horários/matrizes.
+**Critérios de aceite resumidos:** etapas restiladas com `shared/ui`; nenhum offset visível; nenhum "R$" no DOM; varredura sem achados fora das exceções; suíte completa (unit + E2E + build) verde.
+**Testes esperados:** suíte completa; varredura documentada no fechamento da task.
+
+---
+
 ## Ordem recomendada de execução
 
 ```text
@@ -431,6 +509,12 @@
 → 033 → 034
 → 035 → 036 → 037 → 038 → 039
 → (decisão humana) 040
+```
+
+**Bloco de redesign visual (DEC-050 — independente das tasks de negócio pendentes; em execução):**
+
+```text
+049 → 050 → 051 → 052 → 053 → 054 → 055 → 056
 ```
 
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.

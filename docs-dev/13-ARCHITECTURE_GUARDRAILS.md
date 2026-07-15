@@ -13,7 +13,8 @@
 - **Mapa client-side** (OSM/MapLibre); imagem do mapa no PDF por captura do canvas.
 - **Listas estáticas servidas junto do app**: Autos, empresas, tipos; base de municípios (`municipios_sp.geojson` + `pop_municipios.csv`); futura tabela de tarifa da portaria (versão futura — hoje sem R$).
 - **Ingestor futuro separado**, único lugar onde existirá **PostgreSQL** (Spec 06 pendente).
-- Organização sugerida de módulos: `shared/` (schema do contrato, validadores, primitivas geo, contagens), `formulario/`, `comparador/` — `formulario/` e `comparador/` só se comunicam via arquivo JSON, e só dependem de `shared/`.
+- Organização sugerida de módulos: `shared/` (schema do contrato, validadores, primitivas geo, contagens, **componentes de UI em `shared/ui/`**), `formulario/`, `comparador/` — `formulario/` e `comparador/` só se comunicam via arquivo JSON, e só dependem de `shared/`.
+- **UI padronizada (DEC-050):** toda interface consome os componentes de `src/shared/ui/` e os tokens do design system (`docs-dev/18-DESIGN_SYSTEM.md`) — sem estilo ad-hoc, sem `style=` inline (exceção: dimensões dinâmicas de runtime, ex.: mapa), sem elemento cru estilizado localmente.
 
 ## Separação das ferramentas
 
@@ -65,4 +66,5 @@ O único contrato entre as ferramentas é o **JSON de operação** (Spec 02). Ne
 - Roteamento: cliente HTTP fino próprio sobre a API pública do OSRM (sem SDK pesado), com URL base configurável (dev → demo; prod → instância própria).
 - Validação de schema: biblioteca declarativa com modo *strict* (rejeitar campos extras) — necessária para RN-010.
 - PDF: geração client-side (ex.: pdfmake/@react-pdf) — decisão em Q-003.
+- Estilo: **Tailwind CSS 4** (DEC-050), tokens via `@theme` em `globals.css`, processado em build — nenhum runtime de CSS-in-JS. Ícones: SVGs próprios em `shared/ui/carimbos/`, sem biblioteca externa.
 - Nenhuma dependência que exija servidor próprio (ORMs, filas, auth SDKs) até a Spec 06.
