@@ -248,6 +248,7 @@
 **Prioridade:** Alta · **Fase:** Horários
 **Resumo:** Editar passante vira âncora e reinterpolação proporcional entre âncoras (tail apeado; degenerado uniforme); bloqueio de fora-de-ordem na célula; reset por Viagem e em lote.
 **Regras RN:** RN-063, RN-065, RN-066. **Depende de:** TASK-028.
+**Atenção (herdado da revisão da TASK-028):** `atualizarHorarioSaida` (`src/formulario/viagens/acoes-grade.ts`) hoje re-deriva **todos** os offsets pela sugestão inicial ao reeditar a partida — correto enquanto não há âncoras, mas **apagaria âncoras manuais** quando esta task existir. Revisitar essa função para preservar âncoras ao mudar `horario_saida`. Ver parecer `docs-dev/14-REVISOES/TASK-028-20260714.md`.
 **Testes esperados:** unitários (exemplo literal 0/30/60→fixa 50→25; monotonicidade; idempotência do reset).
 
 ## TASK-030 — Tabela de feriados e cópias
