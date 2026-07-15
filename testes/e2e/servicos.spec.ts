@@ -53,6 +53,11 @@ test.describe("Serviços — modo novo (criar do zero)", () => {
     await expect(page.getByTestId("servico-direcionalidade")).toHaveText("Ida");
     // Serviço em construção: marcado como sem itinerário ainda (DEC-035).
     await expect(page.getByTestId("servico-em-construcao")).toBeVisible();
+    // Contadores de viagens semanais (Spec 04 §6, último marcador; TASK-057):
+    // sem itinerário ainda, viagensSemana(undefined) = 0 (DEC-035).
+    await expect(page.getByTestId("servico-viagens-semana")).toHaveText(
+      "Ida 0 · Volta 0 · Total 0",
+    );
   });
 
   test("editar Serviço: trocar a característica regenera o sufixo do numero_n (DEC-037)", async ({
@@ -128,6 +133,15 @@ test.describe("Serviços — modo carregado (Serviços completos do JSON)", () =
     await expect(
       page.getByTestId("servico-direcionalidade").first(),
     ).toHaveText("Ida e Volta");
+    // Contadores de viagens semanais (Spec 04 §6, último marcador; TASK-057):
+    // cada Serviço da fixture tem 1 Viagem de Ida e 1 de Volta, nenhuma
+    // feriado — reusa `contarServico()` de `shared/contagens` (RN-072).
+    await expect(
+      page.getByTestId("servico-viagens-semana").first(),
+    ).toHaveText("Ida 1 · Volta 1 · Total 2");
+    await expect(page.getByTestId("rotulo-semana-padrao").first()).toHaveText(
+      "semana padrão (sem feriados)",
+    );
   });
 
   test("editar um Serviço completo: direcionalidade é somente-leitura; caráter muda", async ({
@@ -144,6 +158,17 @@ test.describe("Serviços — modo carregado (Serviços completos do JSON)", () =
     await expect(page.getByTestId("servico-carater").first()).toHaveText(
       "semidireta",
     );
+  });
+
+  test("a sexta coluna (viagens semanais) não força rolagem horizontal no body (doc 18 §1.5)", async ({
+    page,
+  }) => {
+    await carregarMultiServico(page);
+
+    const bodyOverflowX = await page.evaluate(
+      () => document.body.scrollWidth <= document.body.clientWidth + 1,
+    );
+    expect(bodyOverflowX).toBe(true);
   });
 
   test("duplicar e remover Serviço completo via UI (RN-007/RN-018)", async ({

@@ -20,6 +20,7 @@ import {
   type SessaoFormulario,
 } from "@/formulario/sessao";
 import { Botao, Campo, Painel, Select, Tabela } from "@/shared/ui";
+import { contarServico, viagensSemana } from "@/shared/contagens";
 import { duplicarServico } from "./duplicar";
 import { podeRemoverServico, removerServico } from "./remover";
 import { regenerarSufixoNumeroN, sugerirNumeroN } from "./numero-n";
@@ -57,7 +58,22 @@ interface LinhaServico {
   carater: Carater;
   direcionalidade: Direcionalidade;
   completo: boolean;
+  viagens: ViagensSemanaisServico;
 }
+
+// Contadores de viagens semanais por Serviço (Spec 04 §6, último marcador;
+// TASK-057) — leitura derivada de `shared/contagens` (RN-072), nunca
+// recalculada aqui. Serviço em construção (DEC-035) não tem `Servico` do
+// documento para contar: usa `viagensSemana(undefined)`, que já devolve 0
+// (nenhuma regra nova).
+interface ViagensSemanaisServico {
+  ida: number;
+  volta: number;
+  total: number;
+}
+
+// RN-069/NEG-018 — rótulo obrigatório em qualquer exibição de contagem.
+const ROTULO_SEMANA_PADRAO = "semana padrão (sem feriados)";
 
 // Direcionalidade derivada de um Serviço completo (Spec 02 §10): pelos sentidos
 // dos itinerários presentes. Não há campo de direcionalidade no contrato (DEC-036).
@@ -115,19 +131,32 @@ export function EtapaServicos({
 
   const completos: LinhaServico[] =
     sessao.modo === "carregado"
-      ? sessao.documento.autos.servicos.map((s) => ({
-          uuid: s.uuid,
-          numero_n: s.numero_n,
-          caracteristica_veiculo: s.caracteristica_veiculo,
-          carater: s.carater,
-          direcionalidade: direcionalidadeDeServico(s),
-          completo: true,
-        }))
+      ? sessao.documento.autos.servicos.map((s) => {
+          const c = contarServico(s);
+          return {
+            uuid: s.uuid,
+            numero_n: s.numero_n,
+            caracteristica_veiculo: s.caracteristica_veiculo,
+            carater: s.carater,
+            direcionalidade: direcionalidadeDeServico(s),
+            completo: true,
+            viagens: {
+              ida: c.ida.viagensSemana,
+              volta: c.volta.viagensSemana,
+              total: c.totalViagensSemana,
+            },
+          };
+        })
       : [];
 
   const linhasEmConstrucao: LinhaServico[] = emConstrucao.map((s) => ({
     ...s,
     completo: false,
+    viagens: {
+      ida: viagensSemana(undefined),
+      volta: viagensSemana(undefined),
+      total: viagensSemana(undefined) + viagensSemana(undefined),
+    },
   }));
 
   const linhas = [...completos, ...linhasEmConstrucao];
@@ -320,6 +349,15 @@ export function EtapaServicos({
                 <th scope="col">Característica do veículo</th>
                 <th scope="col">Caráter</th>
                 <th scope="col">Direcionalidade</th>
+                <th scope="col">
+                  Viagens semanais
+                  <span
+                    data-testid="rotulo-semana-padrao"
+                    className="block text-xs text-cinza-500"
+                  >
+                    {ROTULO_SEMANA_PADRAO}
+                  </span>
+                </th>
                 <th scope="col">Ações</th>
               </tr>
             </thead>
@@ -353,6 +391,12 @@ export function EtapaServicos({
                         (sem itinerário ainda)
                       </span>
                     )}
+                  </td>
+                  <td>
+                    <span data-testid="servico-viagens-semana">
+                      Ida {linha.viagens.ida} · Volta {linha.viagens.volta} ·
+                      Total {linha.viagens.total}
+                    </span>
                   </td>
                   <td>
                     <div className="flex flex-wrap gap-2">
