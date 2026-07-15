@@ -209,6 +209,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                               <input
                                 type="time"
                                 aria-label={`Criar viagem — ${dia}`}
+                                value=""
                                 onChange={(evento) => aoConfirmarCriacao(dia, evento.target.value)}
                               />
                             </td>
