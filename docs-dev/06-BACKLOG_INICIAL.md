@@ -499,6 +499,18 @@
 
 ---
 
+## TASK-057 — Contadores de viagens semanais por Serviço na etapa Serviços (Spec 04 §6)
+
+**Prioridade:** Média · **Fase:** Formulário (comportamento — **fora** do bloco de redesign)
+**Resumo:** A etapa Serviços passa a exibir, por Serviço, os contadores de viagens semanais exigidos pelo último marcador da Spec 04 §6 ("Exibir por Serviço: … contadores (viagens semanais, ver §10)") — hoje ausentes da etapa e presentes só no resumo operacional da §10. Coluna nova na `Tabela` de `servicos/servicos.tsx`, alimentada por `contarServico()` de `shared/contagens` (módulo puro já existente, RN-072), **sem reimplementar** a contagem e **sem remover** a exibição do resumo. Rótulo "semana padrão (sem feriados)" obrigatório na etapa (RN-069/NEG-018), como já ocorre no resumo.
+**Specs fonte / decisões:** Spec 04 §6 (último marcador), §10 (de onde vem a contagem); DEC-051 (opção A da Q-032); DEC-035 (Serviço em construção); doc 18 §6 (a coluna nova nasce no padrão visual). **Regras RN:** RN-069 (semana padrão, sem feriados — semântica preservada), RN-072 (cálculo vive no módulo puro), RN-006 (`numero_n` só display). **Depende de:** TASK-031 (`shared/contagens` + resumo), TASK-054 (a `Tabela` da etapa). Q-032 **decidida** (DEC-051) — a task **não** nasce bloqueada.
+**Fora de escopo:** alterar `shared/contagens/` (a contagem já existe e não muda — reusar, nunca reimplementar); alterar `resumo/resumo-operacional.tsx` (a §10 continua como está); as demais colunas/ações da etapa Serviços; opções de deslocamento e pares O-D (a §6 pede **viagens semanais**, só isso); qualquer regra de viagem/feriado; aparência do bloco de redesign (itens da TASK-056).
+**Critérios de aceite resumidos:** cada linha de Serviço **completo** exibe as viagens semanais vindas de `contarServico()` (Ida, Volta e total — grandeza idêntica à do resumo para o mesmo documento); Serviço **em construção** (sem itinerários, DEC-035) exibe `0`, que é o que `viagensSemana(undefined)` já retorna — nenhuma regra nova; rótulo "semana padrão (sem feriados)" visível na etapa; `data-testid`/`aria-*` existentes intocados e E2E atuais verdes sem alterar seletor; coluna nova com `scope="col"`; suíte completa (unit + E2E + build) verde.
+**Testes esperados:** unitários da etapa com fixture de documento multi-Serviço (contagem exibida = `contarServico()` do mesmo Serviço; feriado não altera o número — RN-069, dois JSONs que só diferem na grade de feriados); E2E da etapa cobrindo Serviço completo (contador > 0) e em construção (`0`); nenhum teste de `shared/contagens` alterado.
+**Riscos:** (a) `LinhaServico` unifica Serviço completo e em construção (`servicos.tsx:52-60`), mas `contarServico()` exige um `Servico` do documento — o caminho em construção não tem entidade para contar, e é aí que mora o erro provável; (b) tentação de "aproveitar" e trazer também pares O-D/opções de deslocamento do resumo — a §6 pede só viagens semanais; (c) a `Tabela` ganha uma sexta coluna: conferir que a rolagem própria do wrapper (doc 18 §1.5) continua absorvendo a largura, sem scroll horizontal no `body`.
+
+---
+
 ## Ordem recomendada de execução
 
 ```text
@@ -515,6 +527,12 @@
 
 ```text
 049 → 050 → 051 → 052 → 053 → 054 → 055 → 056
+```
+
+**Comportamento derivado do bloco (DEC-051 — não é redesign; depende da TASK-031 e da TASK-054, ambas entregues):**
+
+```text
+057
 ```
 
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.
