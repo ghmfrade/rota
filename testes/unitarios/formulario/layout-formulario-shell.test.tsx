@@ -1,0 +1,79 @@
+// @vitest-environment jsdom
+import { describe, expect, it, vi } from "vitest";
+
+import { LayoutFormulario } from "@/formulario/layout/layout-formulario";
+import { ETAPAS } from "@/formulario/layout/etapas";
+import type { SessaoFormulario } from "@/formulario/sessao";
+import { renderizar, act } from "../shared-ui/_ajuda-render";
+
+// TASK-051 — casca full-screen do Formulário (Spec 04 §4; doc 18 §5). Cobre só
+// a parte estrutural do shell (sidebar de carimbos + troca de etapa + selo de
+// status condicional): o resto do comportamento (pendências, cabeçalho por
+// identidade, etapas em si) já é coberto por `pendencias.test.ts` e pelos E2E
+// (`testes/e2e/formulario-layout.spec.ts`). Nenhum teste aqui toca rede/OSRM.
+
+describe("LayoutFormulario — sidebar de etapas (stepper)", () => {
+  it("renderiza os 7 botões de etapa com rótulo sr-only; aria-current só na ativa", () => {
+    const sessao: SessaoFormulario = { modo: "novo" };
+    const { container, desmontar } = renderizar(
+      <LayoutFormulario sessao={sessao} aoAtualizarSessao={vi.fn()} />,
+    );
+
+    const botoes = container.querySelectorAll('[data-testid="etapa-botao"]');
+    expect(botoes).toHaveLength(7);
+
+    botoes.forEach((botao, indice) => {
+      const etapa = ETAPAS[indice];
+      expect(botao.getAttribute("data-etapa")).toBe(etapa.id);
+      expect(botao.querySelector(".sr-only")?.textContent).toBe(etapa.rotulo);
+
+      if (etapa.id === "identificacao") {
+        // Etapa inicial do shell (Spec 04 §4) — a única ativa no primeiro render.
+        expect(botao.getAttribute("aria-current")).toBe("step");
+      } else {
+        expect(botao.hasAttribute("aria-current")).toBe(false);
+      }
+    });
+
+    desmontar();
+  });
+
+  it("clicar um botão de etapa troca data-etapa-atual da seção de conteúdo", () => {
+    const sessao: SessaoFormulario = { modo: "novo" };
+    const { container, desmontar } = renderizar(
+      <LayoutFormulario sessao={sessao} aoAtualizarSessao={vi.fn()} />,
+    );
+
+    const conteudo = container.querySelector('[data-testid="conteudo-etapa"]')!;
+    expect(conteudo.getAttribute("data-etapa-atual")).toBe("identificacao");
+
+    const botaoServicos = container.querySelector(
+      '[data-testid="etapa-botao"][data-etapa="servicos"]',
+    ) as HTMLButtonElement;
+
+    act(() => {
+      botaoServicos.click();
+    });
+
+    expect(conteudo.getAttribute("data-etapa-atual")).toBe("servicos");
+    expect(botaoServicos.getAttribute("aria-current")).toBe("step");
+
+    desmontar();
+  });
+});
+
+describe("LayoutFormulario — cabeçalho no modo novo", () => {
+  it('no modo "novo" (identidade indefinida) não há selo-status', () => {
+    const sessao: SessaoFormulario = { modo: "novo" };
+    const { container, desmontar } = renderizar(
+      <LayoutFormulario sessao={sessao} aoAtualizarSessao={vi.fn()} />,
+    );
+
+    expect(container.querySelector('[data-testid="selo-status"]')).toBeNull();
+    expect(
+      container.querySelector('[data-testid="cabecalho-codigo"]')?.textContent,
+    ).toContain("a definir");
+
+    desmontar();
+  });
+});

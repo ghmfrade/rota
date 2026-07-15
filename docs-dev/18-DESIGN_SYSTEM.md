@@ -81,7 +81,7 @@ Nomenclatura oficial das specs nos rótulos (nunca traduzir/renomear conceitos �
 ## 5. Padrões de layout
 
 - **Shell do formulário:** `100dvh` em grid — **sidebar fixa à esquerda** (largura ~72px, fundo `azul-900`, coluna de `Carimbo`s das 7 etapas, item ativo destacado, tooltip com o nome da etapa no hover) + coluna de conteúdo (cabeçalho persistente compacto no topo; área de etapa com scroll próprio e `max-width` ~72rem centralizada, fundo `cinza-50`). A sidebar implementa o "stepper lateral" da Spec 04 §4: continua um `<nav>` com `<ol>/<li>/<button>`, `aria-current="step"`, navegação livre.
-- **Painel de pendências e resumo operacional:** colapsáveis no shell (Spec 04 §4), com contagem visível quando fechados (selo `erro`/`alerta`); abertos, flutuam sobre o conteúdo com `sombra-3`.
+- **Painel de pendências e resumo operacional:** colapsáveis no shell (Spec 04 §4), com contagem visível quando fechados (selo `erro`/`alerta`); abertos, apresentam-se como cartão elevado (`sombra-2`) **no fluxo do conteúdo, nunca sobrepondo elementos interativos** — overlay que intercepta cliques quebra o formulário (comportamento prevalece, §1.2). `sombra-3` fica reservada a flutuantes efêmeros (tooltip, diálogo).
 - **Tela inicial:** full-screen, hero centrado (título + descrição), dois cartões de ação lado a lado (`Painel` + `Carimbo` de pasta/folha), com o caminho "Carregar JSON existente" visualmente destacado como recomendado (Spec 04 §3).
 - **Mapa:** em destaque na etapa de itinerários (Spec 04 §7), moldura `radius-painel` + `sombra-2`; a tabela lateral de paradas acompanha na mesma linha visual.
 
