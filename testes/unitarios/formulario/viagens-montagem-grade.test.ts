@@ -4,6 +4,7 @@ import {
   horarioAbsolutoNaParada,
   linhasSecoes,
   montarBlocosDiasComuns,
+  montarBlocosFeriados,
 } from "@/formulario/viagens";
 
 // TASK-028 — montagem da grade de dias comuns (Spec 04 §8.1): linhas só de
@@ -127,6 +128,27 @@ describe("montarBlocosDiasComuns (Spec 04 §8.1/§8.2)", () => {
 
     expect(blocos).toHaveLength(2); // só a comum conta
     expect(blocos[0].segunda).toEqual({ estado: "existente", viagem: comum });
+    expect(blocos[1].segunda).toEqual({ estado: "criavel" });
+  });
+});
+
+describe("montarBlocosFeriados (Spec 04 §8.1/§8.4; RN-068)", () => {
+  test("grade de feriados vazia: bloco único, célula 'criavel' em todos os dias (RN-071)", () => {
+    const blocos = montarBlocosFeriados([]);
+    expect(blocos).toHaveLength(1);
+    for (const dia of DIAS_SEMANA) {
+      expect(blocos[0][dia]).toEqual({ estado: "criavel" });
+    }
+  });
+
+  test("monta só as Viagens de feriado, ignorando as comuns (grades independentes — RN-068)", () => {
+    const comum = viagem("a1", "segunda", "08:00:00", false);
+    const feriado = viagem("a2", "segunda", "09:00:00", true);
+
+    const blocos = montarBlocosFeriados([comum, feriado]);
+
+    expect(blocos).toHaveLength(2); // só a de feriado conta
+    expect(blocos[0].segunda).toEqual({ estado: "existente", viagem: feriado });
     expect(blocos[1].segunda).toEqual({ estado: "criavel" });
   });
 });

@@ -9,11 +9,19 @@ export {
 export {
   linhasSecoes,
   montarBlocosDiasComuns,
+  montarBlocosFeriados,
   horarioAbsolutoNaParada,
   type DiaSemana,
   type EstadoCelulaGrade,
   type BlocoGrade,
 } from "./montagem-grade";
+export {
+  copiarViagemParaDias,
+  clonarDiasComunsParaFeriado,
+  apagarViagem,
+  apagarBloco,
+  type ModoCopiaFeriado,
+} from "./copias-grade";
 export {
   criarViagemNaCelula,
   atualizarHorarioSaida,

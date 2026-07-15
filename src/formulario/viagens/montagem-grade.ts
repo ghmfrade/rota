@@ -28,18 +28,35 @@ export function linhasSecoes(paradas: readonly Parada[]): Parada[] {
 }
 
 /**
- * Monta os blocos da grade de dias comuns (Spec 04 §8.1): agrupa as Viagens
- * com `viagem_feriado=false` por `dia_semana`, ordena cada dia por
+ * Monta os blocos da grade de dias comuns (Spec 04 §8.1): as Viagens com
+ * `viagem_feriado=false`. Ver `montarBlocosPorFeriado`.
+ */
+export function montarBlocosDiasComuns(viagens: readonly Viagem[]): BlocoGrade[] {
+  return montarBlocosPorFeriado(viagens, false);
+}
+
+/**
+ * Monta os blocos da grade de feriados (Spec 04 §8.1/§8.4; RN-068): as Viagens
+ * com `viagem_feriado=true`. Grade independente da comum — pode ter mais, menos
+ * ou nenhuma viagem (RN-071). Mesma montagem por posição ordinal.
+ */
+export function montarBlocosFeriados(viagens: readonly Viagem[]): BlocoGrade[] {
+  return montarBlocosPorFeriado(viagens, true);
+}
+
+/**
+ * Núcleo de montagem da grade (Spec 04 §8.1): agrupa as Viagens do escopo
+ * (`viagem_feriado === feriado`) por `dia_semana`, ordena cada dia por
  * `horario_saida` (RN-062 tolera reforço — desempate por `uuid` para
  * determinismo) e alinha pela posição ordinal (a n-ésima partida do dia).
  * Cada dia ganha exatamente UMA célula "criável", logo após sua última
  * Viagem. O total de blocos é o maior número de Viagens entre os dias + 1,
  * para que o(s) dia(s) mais cheio(s) também tenham sua célula criável.
  */
-export function montarBlocosDiasComuns(viagens: readonly Viagem[]): BlocoGrade[] {
+function montarBlocosPorFeriado(viagens: readonly Viagem[], feriado: boolean): BlocoGrade[] {
   const porDia = new Map<DiaSemana, Viagem[]>(DIAS_SEMANA.map((dia) => [dia, []]));
   for (const viagem of viagens) {
-    if (viagem.viagem_feriado) continue;
+    if (viagem.viagem_feriado !== feriado) continue;
     porDia.get(viagem.dia_semana)?.push(viagem);
   }
   for (const lista of porDia.values()) {
