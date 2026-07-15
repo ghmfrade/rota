@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Local } from "@/shared/contrato";
 import type { Ponto } from "@/shared/geo";
 import { Mapa, type Coordenada, type MarcadorMapa } from "@/shared/mapa";
+import { Botao, Campo, Painel } from "@/shared/ui";
 import {
   criarLocalNoPonto,
   excluirSentidoDoLocal,
@@ -153,14 +154,17 @@ export function EditorLocais({
   }
 
   return (
-    <div data-testid="editor-locais">
+    <div data-testid="editor-locais" className="flex flex-col gap-4">
       {mensagem ? (
-        <p role="alert" data-testid="mensagem-recusa-local">
+        <p role="alert" data-testid="mensagem-recusa-local" className="text-sm text-erro">
           {mensagem}
         </p>
       ) : null}
 
-      <div style={{ width: "100%", height: "60vh" }}>
+      <div
+        className="overflow-hidden rounded-painel shadow-sombra-2"
+        style={{ width: "100%", height: "60vh" }}
+      >
         <Mapa
           marcadores={[...marcadoresLocais, ...marcadorPendente]}
           aoClicar={lidarCliqueNoMapa}
@@ -168,45 +172,51 @@ export function EditorLocais({
       </div>
 
       {pontoPendente ? (
-        <div data-testid="form-criar-local">
-          <label>
-            Nome do Local
-            <input
+        <Painel>
+          <div data-testid="form-criar-local" className="flex flex-col gap-4">
+            <Campo
+              rotulo="Nome do Local"
               data-testid="nome-local-input"
               value={nomeNovoLocal}
               onChange={(evento) => definirNomeNovoLocal(evento.target.value)}
             />
-          </label>
-          <button
-            type="button"
-            data-testid="confirmar-criar-local"
-            disabled={!nomeNovoLocal.trim()}
-            onClick={confirmarCriacao}
-          >
-            Criar Local
-          </button>
-          <button type="button" onClick={cancelarCriacao}>
-            Cancelar
-          </button>
-        </div>
+            <div className="flex gap-2">
+              <Botao
+                variante="primario"
+                data-testid="confirmar-criar-local"
+                disabled={!nomeNovoLocal.trim()}
+                onClick={confirmarCriacao}
+              >
+                Criar Local
+              </Botao>
+              <Botao variante="fantasma" onClick={cancelarCriacao}>
+                Cancelar
+              </Botao>
+            </div>
+          </div>
+        </Painel>
       ) : null}
 
-      <ul data-testid="lista-locais">
+      <ul data-testid="lista-locais" className="flex flex-col gap-2">
         {locaisDoSentido.map((local) => {
           const bidirecionalAtual = Boolean(
             local.geolocalizacao_ida && local.geolocalizacao_volta,
           );
           return (
-            <li key={local.uuid} data-testid={`local-${local.uuid}`}>
+            <li
+              key={local.uuid}
+              data-testid={`local-${local.uuid}`}
+              className="flex items-center gap-2 text-sm text-cinza-700"
+            >
               {nomeExibicaoLocal(local)}
               {bidirecionalAtual ? (
-                <button
-                  type="button"
+                <Botao
+                  variante="secundario"
                   data-testid={`excluir-sentido-${local.uuid}`}
                   onClick={() => lidarExcluirSentido(local)}
                 >
                   Excluir ponto deste sentido
-                </button>
+                </Botao>
               ) : null}
             </li>
           );

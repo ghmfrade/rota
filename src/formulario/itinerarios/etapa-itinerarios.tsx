@@ -18,6 +18,7 @@ import {
 import { EditorLocais, nomeExibicaoLocal } from "@/formulario/locais";
 import { PainelDescricaoItinerario } from "@/formulario/descricao";
 import { congelarRotaCarregada, mensagemDeFalha } from "@/formulario/roteamento";
+import { Botao, Painel, Select, Tabela } from "@/shared/ui";
 import { matrizDistanciasDoServico } from "@/formulario/matrizes";
 import {
   identidadeDaSessao,
@@ -411,79 +412,97 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
 
   if (!identidade) {
     return (
-      <p data-testid="itinerarios-sem-identidade">
-        Selecione primeiro o Autos na etapa Identificação.
-      </p>
+      <Painel tom="informativo">
+        <p data-testid="itinerarios-sem-identidade">
+          Selecione primeiro o Autos na etapa Identificação.
+        </p>
+      </Painel>
     );
   }
 
   if (linhas.length === 0) {
     return (
-      <p data-testid="itinerarios-sem-servico">
-        Cadastre ao menos um Serviço na etapa Serviços antes de montar os itinerários.
-      </p>
+      <Painel tom="informativo">
+        <p data-testid="itinerarios-sem-servico">
+          Cadastre ao menos um Serviço na etapa Serviços antes de montar os itinerários.
+        </p>
+      </Painel>
     );
   }
 
   if (erroRecursos) {
-    return <p role="alert">Falha ao carregar municípios: {erroRecursos}</p>;
+    return (
+      <p role="alert" className="text-sm text-erro">
+        Falha ao carregar municípios: {erroRecursos}
+      </p>
+    );
   }
 
   if (!recursosMunicipio) {
-    return <p data-testid="itinerarios-carregando">Carregando municípios…</p>;
+    return (
+      <p data-testid="itinerarios-carregando" className="text-sm text-cinza-500">
+        Carregando municípios…
+      </p>
+    );
   }
 
   return (
-    <div data-testid="etapa-itinerarios">
-      <label>
-        Serviço
-        <select
-          data-testid="select-servico-itinerario"
-          value={servicoSelecionado ?? ""}
-          onChange={(evento) => {
-            definirServicoSelecionado(evento.target.value || null);
-            definirSentidoSelecionado(null);
-          }}
-        >
-          <option value="">— selecione —</option>
-          {linhas.map((l) => (
-            <option key={l.servicoUuid} value={l.servicoUuid}>
-              {l.numeroN}
-            </option>
-          ))}
-        </select>
-      </label>
+    <div data-testid="etapa-itinerarios" className="flex flex-col gap-6">
+      <Select
+        rotulo="Serviço"
+        data-testid="select-servico-itinerario"
+        value={servicoSelecionado ?? ""}
+        onChange={(evento) => {
+          definirServicoSelecionado(evento.target.value || null);
+          definirSentidoSelecionado(null);
+        }}
+      >
+        <option value="">— selecione —</option>
+        {linhas.map((l) => (
+          <option key={l.servicoUuid} value={l.servicoUuid}>
+            {l.numeroN}
+          </option>
+        ))}
+      </Select>
 
       {linhaAtual && (
-        <div data-testid="seletor-sentido">
+        <div data-testid="seletor-sentido" className="flex gap-2">
           {linhaAtual.sentidos.map((sentido) => (
-            <button
+            <Botao
               key={sentido}
-              type="button"
+              variante={sentido === sentidoSelecionado ? "primario" : "secundario"}
               data-testid="botao-sentido"
               data-sentido={sentido}
               aria-current={sentido === sentidoSelecionado ? "true" : undefined}
               onClick={() => definirSentidoSelecionado(sentido)}
             >
               {ROTULO_SENTIDO[sentido]}
-            </button>
+            </Botao>
           ))}
         </div>
       )}
 
       {linhaAtual && sentidoSelecionado && (
-        <>
+        <div className="flex flex-col gap-6">
           {bidirecional && !conjuntoConsistente && (
-            <p role="alert" data-testid="aviso-secoes-divergentes">
+            <p role="alert" data-testid="aviso-secoes-divergentes" className="text-sm text-erro">
               Ida e Volta referenciam conjuntos diferentes de Seções (Spec 02 §2). A
               exportação será bloqueada até as duas convergirem.
             </p>
           )}
 
-          {recalculando && <p data-testid="recalculando-rota">Recalculando rota…</p>}
+          {recalculando && (
+            <p data-testid="recalculando-rota" className="text-sm text-cinza-500">
+              Recalculando rota…
+            </p>
+          )}
 
           {violacoesMontagemAtual.length > 0 && (
-            <ul role="alert" data-testid="avisos-montagem-invalida">
+            <ul
+              role="alert"
+              data-testid="avisos-montagem-invalida"
+              className="list-disc pl-5 text-sm text-erro"
+            >
               {violacoesMontagemAtual.map((violacao, indice) => (
                 <li key={`${violacao.codigo}-${indice}`} data-testid="aviso-montagem-invalida">
                   {violacao.mensagem}
@@ -492,48 +511,62 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
             </ul>
           )}
 
-          <ol data-testid="tabela-paradas">
-            {paradasAtual.map((parada, indice) => {
-              const rotulo =
-                parada.tipo === "secao"
-                  ? (() => {
-                      const secao = secoes.find((s) => s.uuid === parada.secaoUuid);
-                      return secao ? nomeExibicaoSecao(secao) : parada.secaoUuid;
-                    })()
-                  : (() => {
-                      const local = linhaAtual.locais.find((l) => l.uuid === parada.localUuid);
-                      return local ? nomeExibicaoLocal(local) : parada.localUuid;
-                    })();
-              return (
-                <li key={`${parada.tipo}-${indice}`} data-testid="parada-item">
-                  <span data-testid="parada-rotulo">{rotulo}</span>{" "}
-                  <button
-                    type="button"
-                    data-testid="parada-mover-cima"
-                    disabled={indice === 0}
-                    onClick={() => moverParada(indice, indice - 1)}
-                  >
-                    ↑
-                  </button>{" "}
-                  <button
-                    type="button"
-                    data-testid="parada-mover-baixo"
-                    disabled={indice === paradasAtual.length - 1}
-                    onClick={() => moverParada(indice, indice + 1)}
-                  >
-                    ↓
-                  </button>{" "}
-                  <button
-                    type="button"
-                    data-testid="parada-remover"
-                    onClick={() => removerParadaNaTabela(indice)}
-                  >
-                    Remover
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
+          <Tabela data-testid="tabela-paradas">
+            <thead>
+              <tr>
+                <th scope="col">Parada</th>
+                <th scope="col">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paradasAtual.map((parada, indice) => {
+                const rotulo =
+                  parada.tipo === "secao"
+                    ? (() => {
+                        const secao = secoes.find((s) => s.uuid === parada.secaoUuid);
+                        return secao ? nomeExibicaoSecao(secao) : parada.secaoUuid;
+                      })()
+                    : (() => {
+                        const local = linhaAtual.locais.find((l) => l.uuid === parada.localUuid);
+                        return local ? nomeExibicaoLocal(local) : parada.localUuid;
+                      })();
+                return (
+                  <tr key={`${parada.tipo}-${indice}`} data-testid="parada-item">
+                    <td>
+                      <span data-testid="parada-rotulo">{rotulo}</span>
+                    </td>
+                    <td>
+                      <div className="flex flex-wrap gap-2">
+                        <Botao
+                          variante="secundario"
+                          data-testid="parada-mover-cima"
+                          disabled={indice === 0}
+                          onClick={() => moverParada(indice, indice - 1)}
+                        >
+                          ↑
+                        </Botao>
+                        <Botao
+                          variante="secundario"
+                          data-testid="parada-mover-baixo"
+                          disabled={indice === paradasAtual.length - 1}
+                          onClick={() => moverParada(indice, indice + 1)}
+                        >
+                          ↓
+                        </Botao>
+                        <Botao
+                          variante="secundario"
+                          data-testid="parada-remover"
+                          onClick={() => removerParadaNaTabela(indice)}
+                        >
+                          Remover
+                        </Botao>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </Tabela>
 
           <EditorSecoes
             secoes={secoes}
@@ -564,11 +597,11 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
           )}
 
           {estadoAtual && estadoAtual.situacao === "sem-rota" && (
-            <p role="alert" data-testid="mensagem-sem-rota">
+            <p role="alert" data-testid="mensagem-sem-rota" className="text-sm text-erro">
               {mensagemDeFalha(estadoAtual.falha)}
             </p>
           )}
-        </>
+        </div>
       )}
     </div>
   );
