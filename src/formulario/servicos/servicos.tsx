@@ -19,6 +19,7 @@ import {
   type ServicoEmConstrucao,
   type SessaoFormulario,
 } from "@/formulario/sessao";
+import { Botao, Campo, Painel, Select, Tabela } from "@/shared/ui";
 import { duplicarServico } from "./duplicar";
 import { podeRemoverServico, removerServico } from "./remover";
 import { regenerarSufixoNumeroN, sugerirNumeroN } from "./numero-n";
@@ -100,10 +101,12 @@ export function EtapaServicos({
   // filtrar a tipificação — a etapa Identificação vem primeiro (Spec 04 §5).
   if (!identidade) {
     return (
-      <p data-testid="servicos-sem-identidade">
-        Selecione primeiro o Autos na etapa Identificação para cadastrar os
-        Serviços.
-      </p>
+      <Painel tom="informativo">
+        <p data-testid="servicos-sem-identidade">
+          Selecione primeiro o Autos na etapa Identificação para cadastrar os
+          Serviços.
+        </p>
+      </Painel>
     );
   }
 
@@ -296,77 +299,111 @@ export function EtapaServicos({
 
   return (
     <div data-testid="etapa-servicos">
-      <button type="button" data-testid="servico-criar" onClick={abrirCriar}>
+      <Botao
+        variante="primario"
+        data-testid="servico-criar"
+        onClick={abrirCriar}
+      >
         Criar Serviço
-      </button>
+      </Botao>
 
       {linhas.length === 0 ? (
-        <p data-testid="servicos-vazio">Nenhum Serviço cadastrado ainda.</p>
+        <Painel className="mt-4">
+          <p data-testid="servicos-vazio">Nenhum Serviço cadastrado ainda.</p>
+        </Painel>
       ) : (
-        <ul data-testid="lista-servicos">
-          {linhas.map((linha) => (
-            <li key={linha.uuid} data-testid="servico-item" data-uuid={linha.uuid}>
-              <span data-testid="servico-numero-n">{linha.numero_n}</span>
-              {" · "}
-              <span data-testid="servico-caracteristica">
-                {linha.caracteristica_veiculo}
-              </span>
-              {" · "}
-              <span data-testid="servico-carater">{linha.carater}</span>
-              {" · "}
-              <span data-testid="servico-direcionalidade">
-                {ROTULO_DIRECIONALIDADE[linha.direcionalidade]}
-              </span>
-              {!linha.completo && (
-                <span data-testid="servico-em-construcao">
-                  {" "}
-                  (sem itinerário ainda)
-                </span>
-              )}{" "}
-              <button
-                type="button"
-                data-testid="servico-editar"
-                onClick={() => abrirEditar(linha)}
-              >
-                Editar
-              </button>{" "}
-              <button
-                type="button"
-                data-testid="servico-duplicar"
-                onClick={() => duplicar(linha)}
-              >
-                Duplicar
-              </button>{" "}
-              {confirmandoRemocao === linha.uuid ? (
-                <>
-                  <button
-                    type="button"
-                    data-testid="servico-remover-confirmar"
-                    onClick={() => remover(linha)}
-                  >
-                    Confirmar remoção
-                  </button>{" "}
-                  <button
-                    type="button"
-                    data-testid="servico-remover-cancelar"
-                    onClick={() => definirConfirmandoRemocao(null)}
-                  >
-                    Cancelar
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  data-testid="servico-remover"
-                  disabled={!podeRemover(linha)}
-                  onClick={() => definirConfirmandoRemocao(linha.uuid)}
+        <div className="mt-4">
+          <Tabela data-testid="lista-servicos">
+            <thead>
+              <tr>
+                <th>numero_n</th>
+                <th>Característica do veículo</th>
+                <th>Caráter</th>
+                <th>Direcionalidade</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {linhas.map((linha) => (
+                <tr
+                  key={linha.uuid}
+                  data-testid="servico-item"
+                  data-uuid={linha.uuid}
                 >
-                  Remover
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
+                  <td>
+                    <span data-testid="servico-numero-n">
+                      {linha.numero_n}
+                    </span>
+                  </td>
+                  <td>
+                    <span data-testid="servico-caracteristica">
+                      {linha.caracteristica_veiculo}
+                    </span>
+                  </td>
+                  <td>
+                    <span data-testid="servico-carater">{linha.carater}</span>
+                  </td>
+                  <td>
+                    <span data-testid="servico-direcionalidade">
+                      {ROTULO_DIRECIONALIDADE[linha.direcionalidade]}
+                    </span>
+                    {!linha.completo && (
+                      <span data-testid="servico-em-construcao">
+                        {" "}
+                        (sem itinerário ainda)
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    <div className="flex flex-wrap gap-2">
+                      <Botao
+                        variante="secundario"
+                        data-testid="servico-editar"
+                        onClick={() => abrirEditar(linha)}
+                      >
+                        Editar
+                      </Botao>
+                      <Botao
+                        variante="secundario"
+                        data-testid="servico-duplicar"
+                        onClick={() => duplicar(linha)}
+                      >
+                        Duplicar
+                      </Botao>
+                      {confirmandoRemocao === linha.uuid ? (
+                        <>
+                          <Botao
+                            variante="perigo"
+                            data-testid="servico-remover-confirmar"
+                            onClick={() => remover(linha)}
+                          >
+                            Confirmar remoção
+                          </Botao>
+                          <Botao
+                            variante="fantasma"
+                            data-testid="servico-remover-cancelar"
+                            onClick={() => definirConfirmandoRemocao(null)}
+                          >
+                            Cancelar
+                          </Botao>
+                        </>
+                      ) : (
+                        <Botao
+                          variante="secundario"
+                          data-testid="servico-remover"
+                          disabled={!podeRemover(linha)}
+                          onClick={() => definirConfirmandoRemocao(linha.uuid)}
+                        >
+                          Remover
+                        </Botao>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Tabela>
+        </div>
       )}
 
       {form && (
@@ -404,25 +441,24 @@ function FormularioServico({
     form.alvo === "novo" || !form.alvo.completo;
 
   return (
-    <form
-      data-testid="form-servico"
-      onSubmit={(e) => {
-        e.preventDefault();
-        aoSalvar();
-      }}
-    >
-      <label>
-        Número (numero_n)
-        <input
+    <Painel className="mt-4">
+      <form
+        data-testid="form-servico"
+        className="flex flex-col gap-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          aoSalvar();
+        }}
+      >
+        <Campo
+          rotulo="Número (numero_n)"
           data-testid="form-numero-n"
           value={form.numero_n}
           onChange={(e) => aoMudar({ ...form, numero_n: e.target.value })}
         />
-      </label>
 
-      <label>
-        Característica do veículo
-        <select
+        <Select
+          rotulo="Característica do veículo"
           data-testid="form-caracteristica"
           value={form.caracteristica_veiculo}
           onChange={(e) =>
@@ -434,12 +470,10 @@ function FormularioServico({
               {c}
             </option>
           ))}
-        </select>
-      </label>
+        </Select>
 
-      <label>
-        Caráter
-        <select
+        <Select
+          rotulo="Caráter"
           data-testid="form-carater"
           value={form.carater}
           onChange={(e) =>
@@ -451,12 +485,10 @@ function FormularioServico({
               {c}
             </option>
           ))}
-        </select>
-      </label>
+        </Select>
 
-      <label>
-        Direcionalidade
-        <select
+        <Select
+          rotulo="Direcionalidade"
           data-testid="form-direcionalidade"
           value={form.direcionalidade}
           disabled={!direcionalidadeEditavel}
@@ -472,15 +504,22 @@ function FormularioServico({
               {ROTULO_DIRECIONALIDADE[d]}
             </option>
           ))}
-        </select>
-      </label>
+        </Select>
 
-      <button type="submit" data-testid="form-salvar">
-        Salvar
-      </button>{" "}
-      <button type="button" data-testid="form-cancelar" onClick={aoCancelar}>
-        Cancelar
-      </button>
-    </form>
+        <div className="flex gap-2">
+          <Botao variante="primario" type="submit" data-testid="form-salvar">
+            Salvar
+          </Botao>
+          <Botao
+            variante="secundario"
+            type="button"
+            data-testid="form-cancelar"
+            onClick={aoCancelar}
+          >
+            Cancelar
+          </Botao>
+        </div>
+      </form>
+    </Painel>
   );
 }
