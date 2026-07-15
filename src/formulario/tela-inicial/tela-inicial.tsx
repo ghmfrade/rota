@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import type { ReactNode } from "react";
 import { carregarListasAutosEmpresas } from "@/shared/dados-estaticos";
 import type { ListasAutosEmpresas } from "@/shared/dados-estaticos";
 import { importarDocumento } from "@/formulario/importacao";
@@ -10,7 +9,14 @@ import type {
   ResultadoImportacao,
 } from "@/formulario/importacao";
 import type { DocumentoOperacao } from "@/shared/contrato";
-import { Botao, CarimboCarregar, CarimboCriar, Painel, Selo } from "@/shared/ui";
+import {
+  Botao,
+  CarimboCarregar,
+  CarimboCriar,
+  MolduraCarimbo,
+  Painel,
+  Selo,
+} from "@/shared/ui";
 
 // Tela Inicial do Formulário (Spec 04 §3, TASK-013): as duas ações de entrada
 // — carregar um JSON de operação existente ou criar um Autos do zero a partir
@@ -51,28 +57,6 @@ type EstadoEntrada =
       resultado: Extract<ResultadoImportacao, { ok: false }>;
     }
   | { tipo: "erro_listas"; mensagem: string };
-
-// Moldura circular decorativa do ícone de cada cartão — local a este arquivo
-// porque é `aria-hidden` (não interativa), diferente do `Carimbo` de
-// shared/ui (botão focável usado no stepper). Repetida nos dois cartões, só
-// variando o tom.
-type TomMoldura = "azul" | "cinza";
-
-const CLASSES_MOLDURA_ICONE: Record<TomMoldura, string> = {
-  azul: "border-azul-600 bg-azul-50 text-azul-600",
-  cinza: "border-cinza-500 bg-cinza-100 text-cinza-500",
-};
-
-function MolduraIcone({ tom, children }: { tom: TomMoldura; children: ReactNode }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`inline-flex size-12 shrink-0 items-center justify-center rounded-full border-2 ${CLASSES_MOLDURA_ICONE[tom]}`}
-    >
-      {children}
-    </span>
-  );
-}
 
 export function TelaInicial({ aoCarregar, aoCriarDoZero }: PropsTelaInicial) {
   const [entrada, definirEntrada] = useState<EstadoEntrada>({ tipo: "nenhuma" });
@@ -119,12 +103,13 @@ export function TelaInicial({ aoCarregar, aoCriarDoZero }: PropsTelaInicial) {
       <div className="flex flex-wrap justify-center gap-8">
         <Painel
           data-testid="acao-carregar"
-          className="flex w-full max-w-sm flex-col gap-3 border-azul-600 ring-2 ring-azul-600"
+          tom="destacado"
+          className="flex w-full max-w-sm flex-col gap-3"
         >
           <div className="flex items-center gap-3">
-            <MolduraIcone tom="azul">
+            <MolduraCarimbo tom="destaque">
               <CarimboCarregar className="size-6" />
-            </MolduraIcone>
+            </MolduraCarimbo>
             <div className="flex flex-wrap items-center gap-2">
               <strong className="text-base text-cinza-900">
                 Carregar JSON existente
@@ -151,9 +136,9 @@ export function TelaInicial({ aoCarregar, aoCriarDoZero }: PropsTelaInicial) {
           className="flex w-full max-w-sm flex-col gap-3"
         >
           <div className="flex items-center gap-3">
-            <MolduraIcone tom="cinza">
+            <MolduraCarimbo tom="repouso">
               <CarimboCriar className="size-6" />
-            </MolduraIcone>
+            </MolduraCarimbo>
             <strong className="text-base text-cinza-900">Criar Autos do zero</strong>
           </div>
           <p className="text-sm text-cinza-700">
@@ -182,7 +167,8 @@ export function TelaInicial({ aoCarregar, aoCriarDoZero }: PropsTelaInicial) {
         <Painel
           role="alertdialog"
           data-testid="aviso-criar-zero"
-          className="w-full max-w-lg shadow-sombra-3"
+          elevacao="flutuante"
+          className="w-full max-w-lg"
         >
           <p className="text-sm text-cinza-700">
             Este documento não parte de um JSON anterior. Sem ele, não haverá

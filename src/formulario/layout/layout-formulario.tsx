@@ -41,9 +41,11 @@ interface PropsLayoutFormulario {
   aoAtualizarSessao: (sessao: SessaoFormulario) => void;
 }
 
-// Classe compartilhada pelos dois avisos de modo (carregado/novo) logo abaixo
-// do cabeçalho — mutuamente exclusivos, mesma superfície visual (doc 18 §5).
-const CLASSES_PAINEL_MODO = "mx-6 mt-4 border-azul-300 bg-azul-50 text-sm text-azul-900";
+// Posição/espaçamento compartilhados pelos dois avisos de modo (carregado/novo)
+// logo abaixo do cabeçalho — mutuamente exclusivos, mesma superfície visual
+// (doc 18 §5). A superfície azul em si vem de `tom="informativo"` do Painel:
+// aqui ficam só classes que não disputam com as do componente.
+const CLASSES_PAINEL_MODO = "mx-6 mt-4 text-sm";
 
 interface DadosCabecalho {
   codigo: string;
@@ -152,6 +154,7 @@ export function LayoutFormulario({
         {sessao.modo === "carregado" && (
           <Painel
             data-testid="mensagem-sucesso-carregar"
+            tom="informativo"
             className={CLASSES_PAINEL_MODO}
           >
             <p>
@@ -171,6 +174,7 @@ export function LayoutFormulario({
         {sessao.modo === "novo" && (
           <Painel
             data-testid="mensagem-novo-documento"
+            tom="informativo"
             className={CLASSES_PAINEL_MODO}
           >
             Novo documento iniciado. Prossiga selecionando o Autos, a empresa e o

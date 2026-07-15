@@ -1,11 +1,26 @@
 "use client";
 
 // Painel base do design system (docs-dev/18-DESIGN_SYSTEM.md §3). Superfície
-// branca reutilizada por telas e etapas para agrupar conteúdo; a variante
+// reutilizada por telas e etapas para agrupar conteúdo; a variante
 // `colapsavel` preserva o padrão nativo `<details>/<summary>` já usado no
 // app (ex.: painel de pendências).
+//
+// As variações de superfície são props (`tom`, `elevacao`) — nunca classes
+// sobrepostas por `className`. Motivo: utilitários Tailwind conflitantes de
+// mesma especificidade resolvem-se pela ordem de emissão no CSS, não pela
+// ordem na string de classes; um `className="border-azul-600"` por cima do
+// `border-cinza-200` daqui perde em silêncio (a cor sai cinza, sem erro nem
+// teste vermelho). Com as variantes, cada propriedade é emitida uma vez só,
+// escolhida aqui dentro. `className` segue livre para posição/espaçamento
+// (`mx-6`, `mt-4`, `text-sm`), que não disputam com nada deste componente.
 
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
+
+/** Superfície do painel (doc 18 §2/§3). */
+export type TomPainel = "padrao" | "informativo" | "destacado";
+
+/** Profundidade do painel (doc 18 §2 — sombra-3 só para flutuantes). */
+export type ElevacaoPainel = "padrao" | "flutuante";
 
 export interface PainelProps extends ComponentPropsWithoutRef<"section"> {
   /** Título exibido no cabeçalho (ou no `<summary>`, se `colapsavel`). */
@@ -16,22 +31,49 @@ export interface PainelProps extends ComponentPropsWithoutRef<"section"> {
   aberto?: boolean;
   /** Estado inicial do `<details>` (uso não controlado). */
   defaultOpen?: boolean;
+  /**
+   * `padrao` — superfície branca com borda `cinza-200`.
+   * `informativo` — aviso azul suave (borda `azul-300`, fundo `azul-50`).
+   * `destacado` — caminho recomendado (borda + anel `azul-600`), Spec 04 §3.
+   */
+  tom?: TomPainel;
+  /** `flutuante` usa `sombra-3`, reservada a diálogos/tooltips (doc 18 §2). */
+  elevacao?: ElevacaoPainel;
   children?: ReactNode;
 }
 
-const CLASSES_SUPERFICIE =
-  "rounded-painel border border-cinza-200 bg-white shadow-sombra-2 p-4";
+const CLASSES_BASE = "rounded-painel border p-4";
+
+const CLASSES_POR_TOM: Record<TomPainel, string> = {
+  padrao: "border-cinza-200 bg-white",
+  informativo: "border-azul-300 bg-azul-50 text-azul-900",
+  destacado: "border-azul-600 bg-white ring-2 ring-azul-600",
+};
+
+const CLASSES_POR_ELEVACAO: Record<ElevacaoPainel, string> = {
+  padrao: "shadow-sombra-2",
+  flutuante: "shadow-sombra-3",
+};
 
 export function Painel({
   titulo,
   colapsavel = false,
   aberto,
   defaultOpen,
+  tom = "padrao",
+  elevacao = "padrao",
   className,
   children,
   ...props
 }: PainelProps) {
-  const classes = [CLASSES_SUPERFICIE, className].filter(Boolean).join(" ");
+  const classes = [
+    CLASSES_BASE,
+    CLASSES_POR_TOM[tom],
+    CLASSES_POR_ELEVACAO[elevacao],
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   if (colapsavel) {
     return (
