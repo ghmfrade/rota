@@ -13,6 +13,7 @@ import {
   type IdentidadeAutos,
   type SessaoFormulario,
 } from "@/formulario/sessao";
+import { Painel, Select, Selo } from "@/shared/ui";
 import {
   aplicarTrocaDeTipoNoDocumento,
   aplicarTrocaDeTipoEmConstrucao,
@@ -152,41 +153,43 @@ function SeletorDeAutos({
 }) {
   if (erroListas) {
     return (
-      <p role="alert" data-testid="erro-listas-identificacao">
+      <p role="alert" data-testid="erro-listas-identificacao" className="text-sm text-erro">
         Não foi possível carregar as listas estáticas de Autos/empresas:{" "}
         {erroListas}
       </p>
     );
   }
   if (!listas) {
-    return <p data-testid="carregando-listas">Carregando listas de Autos…</p>;
+    return (
+      <p data-testid="carregando-listas" className="text-sm text-cinza-500">
+        Carregando listas de Autos…
+      </p>
+    );
   }
   return (
-    <div>
-      <p>
+    <Painel>
+      <p className="mb-3 text-sm text-cinza-700">
         Selecione o Autos nas listas estáticas. Ele já existe e cadastra o
         código, a empresa e o tipo — este documento apenas passa a operá-lo.
       </p>
-      <label>
-        Autos
-        <select
-          data-testid="seletor-autos"
-          defaultValue=""
-          onChange={(evento) => {
-            if (evento.target.value) aoSelecionar(evento.target.value);
-          }}
-        >
-          <option value="" disabled>
-            — selecione —
+      <Select
+        rotulo="Autos"
+        data-testid="seletor-autos"
+        defaultValue=""
+        onChange={(evento) => {
+          if (evento.target.value) aoSelecionar(evento.target.value);
+        }}
+      >
+        <option value="" disabled>
+          — selecione —
+        </option>
+        {listas.autos.map((autos) => (
+          <option key={autos.codigo} value={autos.codigo}>
+            {autos.codigo} — {autos.denominacao_linha}
           </option>
-          {listas.autos.map((autos) => (
-            <option key={autos.codigo} value={autos.codigo}>
-              {autos.codigo} — {autos.denominacao_linha}
-            </option>
-          ))}
-        </select>
-      </label>
-    </div>
+        ))}
+      </Select>
+    </Painel>
   );
 }
 
@@ -214,69 +217,84 @@ function IdentidadeEditavel({
       : undefined;
 
   return (
-    <dl>
-      <dt>Código do Autos</dt>
-      <dd>
-        {/* Não editável após criado o documento (Spec 04 §5) — texto, sem input. */}
-        <span data-testid="campo-codigo">{identidade.codigo}</span>
-      </dd>
-
-      <dt>Empresa</dt>
-      <dd>
-        <span data-testid="campo-empresa">{identidade.empresa}</span>
-      </dd>
-
-      <dt>Tipo</dt>
-      <dd>
-        <label>
-          <span className="sr-only">Tipo do Autos</span>
-          <select
-            data-testid="select-tipo"
-            value={identidade.tipo}
-            onChange={(evento) =>
-              aoTrocarTipo(evento.target.value as TipoDeAutos)
-            }
-          >
-            {TIPOS_DE_AUTOS.map((tipo) => (
-              <option key={tipo} value={tipo}>
-                {tipo}
-              </option>
-            ))}
-          </select>
-        </label>
-      </dd>
-
-      <dt>Status</dt>
-      <dd>
-        {/* Só exibição — muda pela exportação (§12), nunca aqui. */}
-        <span data-testid="selo-status-identificacao">{identidade.status}</span>
-      </dd>
-
-      {data && (
-        <>
-          <dt>Data</dt>
-          <dd>
-            <span data-testid="campo-data">{data}</span>
+    <Painel>
+      <dl className="grid gap-4">
+        <div>
+          <dt className="text-xs text-cinza-500">Código do Autos</dt>
+          <dd className="text-sm text-cinza-700">
+            {/* Não editável após criado o documento (Spec 04 §5) — texto, sem input. */}
+            <span data-testid="campo-codigo">{identidade.codigo}</span>
           </dd>
-        </>
-      )}
+        </div>
+
+        <div>
+          <dt className="text-xs text-cinza-500">Empresa</dt>
+          <dd className="text-sm text-cinza-700">
+            <span data-testid="campo-empresa">{identidade.empresa}</span>
+          </dd>
+        </div>
+
+        <div>
+          <dt className="sr-only">Tipo</dt>
+          <dd>
+            <Select
+              rotulo="Tipo do Autos"
+              data-testid="select-tipo"
+              value={identidade.tipo}
+              onChange={(evento) =>
+                aoTrocarTipo(evento.target.value as TipoDeAutos)
+              }
+            >
+              {TIPOS_DE_AUTOS.map((tipo) => (
+                <option key={tipo} value={tipo}>
+                  {tipo}
+                </option>
+              ))}
+            </Select>
+          </dd>
+        </div>
+
+        <div>
+          <dt className="text-xs text-cinza-500">Status</dt>
+          <dd>
+            {/* Só exibição — muda pela exportação (§12), nunca aqui. */}
+            <Selo tom="azul" data-testid="selo-status-identificacao">
+              {identidade.status}
+            </Selo>
+          </dd>
+        </div>
+
+        {data && (
+          <div>
+            <dt className="text-xs text-cinza-500">Data</dt>
+            <dd className="text-sm text-cinza-700">
+              <span data-testid="campo-data">{data}</span>
+            </dd>
+          </div>
+        )}
+      </dl>
 
       {reconversao.length > 0 && (
-        <div role="status" data-testid="aviso-reconversao">
-          <p>
+        <Painel
+          tom="informativo"
+          role="status"
+          data-testid="aviso-reconversao"
+          className="mt-4"
+        >
+          <p className="text-sm">
             O tipo foi alterado. Os Serviços abaixo tinham característica
             incompatível com o novo tipo e foram reconvertidos para a forma
             convencional (padrão):
           </p>
-          <ul>
+          <ul className="mt-2 list-disc pl-5 text-sm">
             {reconversao.map((alteracao) => (
               <li key={alteracao.numero_n} data-testid="item-reconversao">
                 {alteracao.numero_n}: {alteracao.de} → {alteracao.para}
               </li>
             ))}
           </ul>
-        </div>
+        </Painel>
       )}
-    </dl>
+    </Painel>
   );
 }
