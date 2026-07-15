@@ -5,7 +5,8 @@
 
 const REGEX_HORA_MINUTO = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-function paraSegundos(horarioHms: string): number {
+/** Converte "HH:MM:SS" (horário de relógio ou offset) em total de segundos. */
+export function horarioParaSegundos(horarioHms: string): number {
   const [horas, minutos, segundos] = horarioHms.split(":").map(Number);
   return horas * 3600 + minutos * 60 + segundos;
 }
@@ -44,6 +45,6 @@ export function horarioParaHoraMinuto(horarioHms: string): string {
  * offset cru).
  */
 export function somarHorarios(horarioSaida: string, offset: string): string {
-  const totalSegundos = (paraSegundos(horarioSaida) + paraSegundos(offset)) % 86400;
+  const totalSegundos = (horarioParaSegundos(horarioSaida) + horarioParaSegundos(offset)) % 86400;
   return formatarHms(totalSegundos);
 }

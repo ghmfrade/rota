@@ -88,6 +88,16 @@ export interface ServicoEmConstrucao {
 export type ParadasEmEdicaoPorItinerario = Record<string, ParadaEmEdicao[]>;
 export type EstadosRotaVivaPorItinerario = Record<string, EstadoRotaViva>;
 
+// Âncoras manuais de horário por Viagem (TASK-029; Spec 03 §8.2). Cada Viagem
+// mapeia a lista de `parada.ordem` cujo offset o usuário fixou à mão — insumo
+// da redistribuição proporcional (RN-065). A primeira parada é âncora implícita
+// (offset 0) e NÃO entra nesta lista. É estado EFÊMERO da sessão do Formulário
+// (DEC-049): sobrevive à navegação entre etapas, é descartado ao recarregar/
+// importar outro JSON; nunca gravado no contrato (RN-010; NEG-011), pois o JSON
+// só guarda `offset_horario` (Spec 02 §11.1), sem marcador de âncora. Chaveado
+// por `viagem.uuid` (globalmente único); ausência ≡ sem âncoras manuais.
+export type AncorasHorarioPorViagem = Record<string, number[]>;
+
 export type SessaoFormulario =
   | {
       modo: "carregado";
@@ -100,6 +110,7 @@ export type SessaoFormulario =
       servicosEmConstrucao?: ServicoEmConstrucao[];
       paradasEmEdicao?: ParadasEmEdicaoPorItinerario;
       estadosRotaViva?: EstadosRotaVivaPorItinerario;
+      ancorasHorario?: AncorasHorarioPorViagem;
     }
   | {
       modo: "novo";
@@ -112,6 +123,7 @@ export type SessaoFormulario =
       secoesEmConstrucao?: Secao[];
       paradasEmEdicao?: ParadasEmEdicaoPorItinerario;
       estadosRotaViva?: EstadosRotaVivaPorItinerario;
+      ancorasHorario?: AncorasHorarioPorViagem;
     };
 
 /** Lista de Serviços em construção da sessão (DEC-035); ausência ≡ vazia. */
@@ -141,6 +153,13 @@ export function estadosRotaVivaDaSessao(
   sessao: SessaoFormulario,
 ): EstadosRotaVivaPorItinerario {
   return sessao.estadosRotaViva ?? {};
+}
+
+/** Âncoras manuais de horário por Viagem (TASK-029; DEC-049); ausência ≡ mapa vazio. */
+export function ancorasHorarioDaSessao(
+  sessao: SessaoFormulario,
+): AncorasHorarioPorViagem {
+  return sessao.ancorasHorario ?? {};
 }
 
 // Identidade corrente da sessão (Spec 04 §5), qualquer que seja o modo: vem de

@@ -3,6 +3,7 @@ export {
   formatarHms,
   horaMinutoParaHorarioRelogio,
   horarioParaHoraMinuto,
+  horarioParaSegundos,
   somarHorarios,
 } from "./horario-relogio";
 export {
@@ -13,5 +14,17 @@ export {
   type EstadoCelulaGrade,
   type BlocoGrade,
 } from "./montagem-grade";
-export { criarViagemNaCelula, atualizarHorarioSaida } from "./acoes-grade";
+export {
+  criarViagemNaCelula,
+  atualizarHorarioSaida,
+  editarHorarioPassante,
+  resetarOffsetsViagem,
+  resetarOffsetsEmLote,
+  type ResultadoEdicaoPassante,
+} from "./acoes-grade";
+export {
+  baselineSegundos,
+  recomputarOffsetsComAncoras,
+  offsetForaDeOrdem,
+} from "./redistribuicao-offsets";
 export { EtapaViagens } from "./etapa-viagens";

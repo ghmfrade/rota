@@ -41,26 +41,34 @@ describe("criarViagemNaCelula (RN-061/064/067)", () => {
   });
 });
 
-describe("atualizarHorarioSaida (inferência controlada — reeditar a partida)", () => {
-  test("atualiza horario_saida e re-deriva offsets, preservando uuid/dia_semana/viagem_feriado", () => {
+describe("atualizarHorarioSaida (reeditar a partida — TASK-029: preserva offsets/âncoras)", () => {
+  test("muda só horario_saida e PRESERVA horarios_paradas (offsets/âncoras), com uuid/dia_semana/viagem_feriado intactos", () => {
     const itinerario = itinerarioDaFixture();
-    const original = itinerario.viagens[0];
+    // Viagem com uma âncora manual (offset da 2ª parada editado à mão): a
+    // reedição da partida NÃO pode re-derivar e apagar essa âncora (RN-065).
+    const original = {
+      ...itinerario.viagens[0],
+      horarios_paradas: itinerario.viagens[0].horarios_paradas.map((h, i) =>
+        i === 1 ? { ...h, offset_horario: "00:07:00" } : h,
+      ),
+    };
 
-    const atualizada = atualizarHorarioSaida(original, itinerario, "09:30");
+    const atualizada = atualizarHorarioSaida(original, "09:30");
 
     expect(atualizada).not.toBeNull();
     expect(atualizada!.uuid).toBe(original.uuid);
     expect(atualizada!.dia_semana).toBe(original.dia_semana);
     expect(atualizada!.viagem_feriado).toBe(original.viagem_feriado);
     expect(atualizada!.horario_saida).toBe("09:30:00");
-    expect(atualizada!.horarios_paradas[0].offset_horario).toBe("00:00:00");
+    // offsets preservados — inclusive a âncora manual (não re-derivada)
+    expect(atualizada!.horarios_paradas).toEqual(original.horarios_paradas);
   });
 
   test("[inválido] horário malformado não altera a Viagem original", () => {
     const itinerario = itinerarioDaFixture();
     const original = itinerario.viagens[0];
 
-    const resultado = atualizarHorarioSaida(original, itinerario, "abc");
+    const resultado = atualizarHorarioSaida(original, "abc");
 
     expect(resultado).toBeNull();
     expect(original.horario_saida).toBe("08:00:00"); // Viagem original intocada

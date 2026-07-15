@@ -1,11 +1,12 @@
 import { expect, test } from "@playwright/test";
 import multiServico from "../fixtures/carregar-multi-servico.json";
 
-// E2E da etapa "Viagens e horários" — grade de dias comuns (TASK-028; Spec 04
-// §8). Usa o Serviço 0001-1SU do fixture `carregar-multi-servico` (sentido
+// E2E da etapa "Viagens e horários" — grade de dias comuns (TASK-028/029; Spec
+// 04 §8). Usa o Serviço 0001-1SU do fixture `carregar-multi-servico` (sentido
 // Ida: Santos → São Vicente → Praia Grande, trechos de 1080s/720s, 1 Viagem
-// gravada na segunda às 08:00). A etapa só lê `rota.trechos` já congelada
-// para a sugestão inicial (RN-064) — nenhuma chamada ao OSRM é esperada.
+// gravada na segunda às 08:00, offsets 0/40/60 min). A etapa só lê `rota.trechos`
+// já congelada para a sugestão inicial (RN-064) — nenhuma chamada ao OSRM é
+// esperada. Baseline do itinerário (Spec 03 §8.1): 0 / 18 / 30 min.
 
 async function abrirEtapaViagens(page: import("@playwright/test").Page, documento: unknown) {
   await page.goto("/");
@@ -40,12 +41,14 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     // Viagem gravada, então a grade tem 2 blocos (existente + criável) = 6 linhas.
     await expect(page.getByTestId("linha-grade")).toHaveCount(6);
 
-    // segunda: Viagem existente — 1ª Seção editável com 08:00, demais Seções somam o offset gravado.
+    // segunda: Viagem existente — 1ª Seção editável com 08:00, demais Seções
+    // (agora inputs editáveis — TASK-029) somam o offset gravado.
     await expect(
       page.getByLabel("Horário de partida — segunda, viagem 1"),
     ).toHaveValue("08:00");
-    await expect(page.getByTestId("celula-passante").filter({ hasText: "08:40" })).toBeVisible();
-    await expect(page.getByTestId("celula-passante").filter({ hasText: "09:00" })).toBeVisible();
+    const linhas = page.getByTestId("linha-grade");
+    await expect(linhas.nth(1).getByTestId("celula-passante").locator("input")).toHaveValue("08:40");
+    await expect(linhas.nth(2).getByTestId("celula-passante").locator("input")).toHaveValue("09:00");
 
     // terça (sem Viagem): 1ª Seção mostra a célula criável.
     await expect(page.getByLabel("Criar viagem — terca")).toBeVisible();
@@ -64,26 +67,69 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     await expect(page.getByLabel("Horário de partida — terca, viagem 1")).toHaveValue("09:00");
 
     // Sugestão inicial (Spec 03 §8.1): acumula 1080s (18min) e depois 720s (12min).
+    // terça é a 2ª coluna com Viagem na linha (segunda é a 1ª) → nth(1).
     const linhas = page.getByTestId("linha-grade");
-    await expect(linhas.nth(1).getByTestId("celula-passante").nth(1)).toHaveText("09:18");
-    await expect(linhas.nth(2).getByTestId("celula-passante").nth(1)).toHaveText("09:30");
+    await expect(
+      linhas.nth(1).getByTestId("celula-passante").nth(1).locator("input"),
+    ).toHaveValue("09:18");
+    await expect(
+      linhas.nth(2).getByTestId("celula-passante").nth(1).locator("input"),
+    ).toHaveValue("09:30");
 
     // Uma nova célula criável surge para a próxima partida de terça.
     await expect(page.getByLabel("Criar viagem — terca")).toBeVisible();
   });
 
-  test("reeditar a partida de uma Viagem existente atualiza horario_saida e re-deriva os offsets", async ({
+  test("reeditar a partida desloca todos os horários pelo mesmo delta, preservando os offsets (TASK-029)", async ({
     page,
   }) => {
     await abrirEtapaViagens(page, structuredClone(multiServico));
 
+    // Offsets gravados são 0/40/60 min. Mover a partida 08:00 → 10:00 desloca
+    // tudo +2h, SEM re-derivar pela sugestão inicial (offsets preservados).
     const partida = page.getByLabel("Horário de partida — segunda, viagem 1");
     await partida.fill("10:00");
 
     await expect(partida).toHaveValue("10:00");
     const linhas = page.getByTestId("linha-grade");
-    await expect(linhas.nth(1).getByTestId("celula-passante").first()).toHaveText("10:18");
-    await expect(linhas.nth(2).getByTestId("celula-passante").first()).toHaveText("10:30");
+    await expect(linhas.nth(1).getByTestId("celula-passante").locator("input")).toHaveValue("10:40");
+    await expect(linhas.nth(2).getByTestId("celula-passante").locator("input")).toHaveValue("11:00");
+  });
+
+  test("editar horário passante ancora e redistribui; reset volta à sugestão inicial (RN-065/066)", async ({
+    page,
+  }) => {
+    let chamouOsrm = false;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamouOsrm = true;
+      return rota.abort();
+    });
+
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const linhas = page.getByTestId("linha-grade");
+    const passanteVicente = linhas.nth(1).getByTestId("celula-passante").locator("input"); // ord2
+    const passantePraia = linhas.nth(2).getByTestId("celula-passante").locator("input"); // ord3
+
+    // Fixar a última Seção (Praia Grande) em 08:50 → âncora; a intermediária
+    // (São Vicente) é reinterpolada proporcionalmente ao baseline (0/18/30):
+    // off(ord2) = 50 · 18/30 = 30 min → 08:30.
+    await passantePraia.fill("08:50");
+    await expect(passantePraia).toHaveValue("08:50");
+    await expect(passanteVicente).toHaveValue("08:30");
+
+    // Bloqueio de fora-de-ordem: São Vicente > âncora de Praia (08:50) é recusado
+    // — a célula entra em erro e não confirma (reverte ao valor anterior).
+    await passanteVicente.fill("08:55");
+    await expect(linhas.nth(1).getByTestId("erro-passante")).toBeVisible();
+    await expect(passanteVicente).toHaveValue("08:30");
+
+    // Restaurar sugestão (por Viagem): volta ao baseline 08:00/08:18/08:30.
+    await linhas.nth(0).getByTestId("restaurar-viagem").click();
+    await expect(passanteVicente).toHaveValue("08:18");
+    await expect(passantePraia).toHaveValue("08:30");
+    await expect(linhas.nth(1).getByTestId("erro-passante")).toHaveCount(0);
+
+    expect(chamouOsrm).toBe(false);
   });
 
   test("sem R$ na etapa", async ({ page }) => {
