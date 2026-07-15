@@ -11,6 +11,6 @@ export default defineConfig({
     // Unitários puros rodam em node; testes de componente (tasks futuras)
     // podem optar por jsdom com `// @vitest-environment jsdom` no arquivo.
     environment: "node",
-    include: ["testes/unitarios/**/*.test.ts"],
+    include: ["testes/unitarios/**/*.test.{ts,tsx}"],
   },
 });
