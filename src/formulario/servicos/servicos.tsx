@@ -316,11 +316,11 @@ export function EtapaServicos({
           <Tabela data-testid="lista-servicos">
             <thead>
               <tr>
-                <th>numero_n</th>
-                <th>Característica do veículo</th>
-                <th>Caráter</th>
-                <th>Direcionalidade</th>
-                <th>Ações</th>
+                <th scope="col">numero_n</th>
+                <th scope="col">Característica do veículo</th>
+                <th scope="col">Caráter</th>
+                <th scope="col">Direcionalidade</th>
+                <th scope="col">Ações</th>
               </tr>
             </thead>
             <tbody>
