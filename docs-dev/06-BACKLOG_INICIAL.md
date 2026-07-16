@@ -700,7 +700,7 @@ Hoje `EditorSecoes` e `EditorLocais` renderizam **cada um seu próprio `<Mapa>`*
 
 ## Perguntas em aberto
 
-- **Design de interação (não bloqueante, decidir na `/analisar-task`):** como o usuário indica, no mapa único, se um clique cria Seção, Local ou ponto de rota (Spec 04 §7 exige os três no mesmo mapa; a ferramenta/modo é design sob doc 18). Vira Q-xxx só se o dono quiser fixar a interação em spec-derivado.
+- **Design de interação — decidido (DEC-054 / Q-035, 2026-07-16):** no mapa único, **clique esquerdo cria Seção, clique direito cria Local**; marcadores circulares diferenciados por tipo; tabela lateral à direita. O **gesto de ponto de rota** (motor pronto na TASK-023) e a **sincronização seleção tabela↔mapa** ficam **fora desta task** → **TASK-063** e **TASK-064**, respectivamente.
 
 ---
 
@@ -872,6 +872,165 @@ A Q-034 registrou que "nenhum E2E exercita o fluxo 'novo' de Serviços → Itine
 
 ---
 
+## TASK-063 — Gesto de ponto de rota no mapa único (forçar traçado pela interface)
+
+## Objetivo
+
+O usuário passa a **criar e mover pontos de rota diretamente no mapa** da etapa de itinerários: clicar sobre a **linha da rota** calculada cria um **vértice pequeno arrastável** (Spec 03 §3.6 / Spec 04 §7.3); soltar recalcula a rota reaplicando os pontos. Fecha a única parte do "mapa único" (DEC-054) que a TASK-060 deixou de fora, ligando o **motor já pronto da TASK-023** à interface.
+
+## Contexto
+
+A TASK-023 entregou **só a camada de cálculo/dados** de pontos de rota — `intercalar-pontos-de-rota.ts`, `&waypoints=` na URL, extração nos dois caminhos e persistência em `rota.pontos_de_rota` — e **deliberadamente deixou de fora a interação de mapa** (ver `docs-dev/14-REVISOES/TASK-023-20260713.md`: "a interação de mapa (clique/arraste para criar o vértice — Spec 04) … foram deliberadamente deixados de fora"). A etapa hoje apenas **reaplica** pontos persistidos no recálculo ([`etapa-itinerarios.tsx`](../../src/formulario/itinerarios/etapa-itinerarios.tsx)), sem UI para criá-los. A TASK-060 unificou os mapas e fixou o gesto de Seção/Local (DEC-054), mas o modo "ponto de rota" ficou dependente desta task. O mapa único e o desenho da rota (TASK-059) já existem.
+
+## Fora de escopo
+
+- Qualquer mudança no **contrato JSON**/schema — `pontos_de_rota` já existe (Spec 02 §10.3/§10.4); esta task só o alimenta pela UI.
+- Reescrever o motor de intercalação/roteamento (TASK-023 — reusar como está).
+- Seção/Local/reuso/350 m — inalterados (TASK-060).
+- Sincronização seleção tabela↔mapa (TASK-064).
+
+## Specs fonte
+
+- Spec 03 §3.6 (pontos de rota: clique na linha cria vértice; ordem `apos_parada_ordem`; §3.6.1 exemplo literal)
+- Spec 04 §7.3 (ponto de rota "visual distinto — vértice pequeno sobre a linha, sem rótulo, sem entrada na tabela de paradas; aparece em sub-lista própria"; recalcular ao soltar)
+
+## Regras envolvidas
+
+- RN-042 (ponto de rota: propósito único, sem identidade), RN-043 (forçar traçado altera distâncias), RN-051 (mapeamento legs→trechos com pontos de rota) — motor pronto (TASK-023)
+- RN-046/RN-052 (rota congelada/recalculada ao editar)
+- RN-041 (invariante de trechos)
+
+## Entidades afetadas
+
+- ponto de rota, Rota (a UI cria/move; o modelo não muda)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Clicar sobre a linha da rota cria um ponto de rota (vértice pequeno, sem rótulo — Spec 04 §7.3), visualmente distinto de Seção/Local.
+- [ ] Arrastar o vértice e soltar recalcula a rota (RN-052), reaplicando os pontos via o motor da TASK-023.
+- [ ] O ponto de rota **não** entra na tabela de paradas; aparece em **sub-lista própria** (Spec 04 §7.3).
+- [ ] Remover um ponto de rota recalcula a rota.
+- [ ] Invariante `trechos = paradas − 1` preservado (RN-041); zero campo novo no JSON.
+
+## Casos válidos
+
+- Rota com 2 Seções → clicar na linha entre elas cria 1 ponto de rota; a geometria/trechos refletem o desvio (RN-043); a sub-lista mostra o ponto.
+
+## Casos inválidos
+
+- Clique fora da linha da rota → não cria ponto de rota (só o gesto de Seção/Local do mapa vale, DEC-054).
+- Falha do OSRM ao recalcular → mensagem da Spec 03 §3.5 (§14), sem apagar a última rota válida (RN-048).
+
+## Testes esperados
+
+- Unitários: nenhum novo de motor (reusa TASK-023); helper de "clique-na-linha → `apos_parada_ordem`" se criado.
+- Integração: criar/mover/remover ponto de rota dispara recálculo com o motor real (OSRM mockado); sub-lista renderizada; ausência na tabela de paradas.
+- E2E: criar um ponto de rota no mapa único e ver a rota recalcular (OSRM/tiles mockados).
+- Snapshot/contrato JSON: `pontos_de_rota` bem-formado (sem `uuid`, `apos_parada_ordem ∈ [1, paradas−1]`).
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (gesto de clique-na-linha + vértices arrastáveis + sub-lista)
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (fio do recálculo com pontos de rota vindos do gesto — hoje só reaplica os persistidos)
+- Possível helper em `src/formulario/roteamento/` ou `src/shared/mapa/` para detectar o clique sobre a linha.
+
+## Riscos
+
+- Detecção geométrica de "clique sobre a linha" e o índice `apos_parada_ordem` correto (a que par de paradas o ponto pertence) — ponto de atenção principal.
+- Interação com o gesto de Seção/Local do mapa (DEC-054): distinguir clique-na-linha de clique-no-mapa-vazio.
+
+## Perguntas em aberto
+
+- Nenhuma (motor decidido na TASK-023; gesto habilitado por DEC-054).
+
+---
+
+## TASK-064 — Sincronização de seleção entre a tabela lateral e o mapa (etapa de itinerários)
+
+## Objetivo
+
+Selecionar uma parada na **tabela lateral destaca o marcador no mapa**, e selecionar um marcador no mapa **destaca a linha na tabela** — a sincronização bidirecional que a Spec 04 §7 pede ("selecionar na tabela destaca no mapa e vice-versa"), deixada fora da TASK-060 por ser substancial.
+
+## Contexto
+
+A TASK-060 unificou os mapas e pôs a tabela lateral ao lado (DEC-054 / doc 18 §87), mas **sem** o vínculo de seleção — o critério de aceite da TASK-060 pedia só a tabela lateral, não a sincronização, e a própria task marcou o sync como "avaliar; se for grande, vira task própria". A `/analisar-task` da TASK-060 confirmou que é grande (estado de seleção bidirecional + realce de marcador) e deferiu para cá (DEC-054).
+
+## Fora de escopo
+
+- Qualquer regra de OSRM/350 m/montagem/descrição — comportamento preservado; a task só adiciona realce/seleção de UI.
+- Contrato JSON/schema — seleção é estado de UI efêmero, nunca persistido (RN-096).
+- Criação/edição de paradas ou pontos de rota (TASK-060/063).
+
+## Specs fonte
+
+- Spec 04 §7 ("tabela lateral … sincronizada com o mapa (selecionar na tabela destaca no mapa e vice-versa)")
+- doc 18 §87 (mapa em destaque + tabela lateral)
+
+## Regras envolvidas
+
+- RN-076 (rótulo `Cidade - Nome da Seção` na tabela — preservado)
+- RN-025..036 (Seção/Local/parada — só realce, sem mudança de modelo)
+
+## Entidades afetadas
+
+- Seção, Local, Parada (realce de UI; sem mudança de modelo)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Clicar numa linha da tabela lateral destaca o marcador correspondente no mapa (cor/realce/`aria-current`).
+- [ ] Clicar num marcador no mapa destaca a linha correspondente na tabela.
+- [ ] A seleção é estado de UI efêmero — não altera o JSON nem dispara recálculo.
+- [ ] E2E existentes verdes sem alterar seletores; testids novos só para o realce/seleção, se houver.
+
+## Casos válidos
+
+- Tabela com 3 paradas → clicar na 2ª realça o 2º marcador; clicar no 1º marcador realça a 1ª linha.
+
+## Casos inválidos
+
+- Selecionar uma parada cujo marcador não existe no sentido atual (ex.: Local unidirecional) → sem realce no mapa, sem erro.
+
+## Testes esperados
+
+- Unitários: nenhum novo de regra.
+- Integração: seleção na tabela propaga ao mapa e vice-versa; nenhuma chamada de OSRM disparada pela seleção.
+- E2E: selecionar na tabela e ver o marcador destacado (tiles mockados).
+- Snapshot/contrato JSON: N/A (nada persistido).
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/itinerarios/editor-mapa-itinerario.tsx` e `etapa-itinerarios.tsx` (estado de seleção compartilhado tabela↔mapa)
+- Possível prop de realce em `src/shared/mapa/mapa.tsx` (marcador destacado)
+
+## Riscos
+
+- Estado de seleção bidirecional sem loops de atualização; realce de marcador na primitiva do mapa.
+- Não regredir os E2E da TASK-060 (seletores preservados).
+
+## Perguntas em aberto
+
+- Nenhuma (habilitada por DEC-054).
+
+---
+
 ## Ordem recomendada de execução
 
 ```text
@@ -905,8 +1064,10 @@ A Q-034 registrou que "nenhum E2E exercita o fluxo 'novo' de Serviços → Itine
 **Correções da etapa de itinerários (mapa/rota — Spec 04 §7; descobertas na revisão da TASK-055):**
 
 ```text
-059 → 060
+059 → 060 → 063 → 064
 ```
+
+- TASK-063 (gesto de ponto de rota) e TASK-064 (sync tabela↔mapa) foram deferidas da TASK-060 por DEC-054 — dependem da TASK-060 (mapa único) e podem seguir em qualquer ordem entre si.
 
 **Fluxo criar-do-zero — promoção `ServicoEmConstrucao → Servico` (DEC-053 / Q-034; TASK-062 depende da TASK-061):**
 
