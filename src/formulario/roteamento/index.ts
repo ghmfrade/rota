@@ -49,3 +49,8 @@ export {
   type EntradaRecalculo,
   type ComporDescricao,
 } from "./estado-rota-viva";
+export {
+  inserirPontoDeRota,
+  moverPontoDeRota,
+  removerPontoDeRota,
+} from "./posicionar-ponto-de-rota";

@@ -8,4 +8,5 @@ export * from "./config";
 export * from "./estilo";
 export * from "./geometria";
 export * from "./captura";
+export * from "./ancoragem";
 export * from "./mapa";

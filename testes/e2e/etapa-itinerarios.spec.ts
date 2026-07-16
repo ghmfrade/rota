@@ -221,6 +221,101 @@ test.describe("Etapa Seções, Locais e Itinerários — criar Seção via mapa 
   });
 });
 
+test.describe("Etapa Seções, Locais e Itinerários — gesto de ponto de rota (TASK-063)", () => {
+  test("clicar SOBRE a linha da rota cria um ponto de rota (não uma Seção) e recalcula", async ({
+    page,
+  }) => {
+    let ultimaUrlOsrm: string | null = null;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      ultimaUrlOsrm = rota.request().url();
+      return rota.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          code: "Ok",
+          routes: [
+            {
+              geometry: {
+                type: "LineString",
+                coordinates: [
+                  [-46.402, -24.0081],
+                  [-46.396, -23.98],
+                  [-46.3915, -23.9629],
+                  [-46.3342, -23.9611],
+                ],
+              },
+              legs: [
+                { distance: 3000, duration: 400, steps: [{ name: "Via forçada" }] },
+                { distance: 3500, duration: 460, steps: [{ name: "Via forçada" }] },
+                { distance: 8000, duration: 1080, steps: [{ name: "Via 2" }] },
+              ],
+            },
+          ],
+        }),
+      });
+    });
+
+    await abrirEtapaVolta(page);
+
+    const mapa = page.getByTestId("mapa-base");
+    await expect(mapa).toBeVisible();
+    const marcadores = mapa.locator(".maplibregl-marker");
+    // 3 marcadores de Seção (Praia Grande, São Vicente, Santos — nesta ordem
+    // de travessia, Spec 02 §10.1) plotados antes de qualquer clique.
+    await expect(marcadores).toHaveCount(3);
+    await mapa.scrollIntoViewIfNeeded();
+
+    // O primeiro segmento da rota congelada (Praia Grande→São Vicente) liga
+    // EXATAMENTE as coordenadas dos dois marcadores (fixture sem vias
+    // intermediárias) — o ponto médio entre os dois cai sobre a linha
+    // desenhada, em pixels de tela, qualquer que seja a projeção do mapa.
+    const caixaA = await marcadores.nth(0).boundingBox();
+    const caixaB = await marcadores.nth(1).boundingBox();
+    if (!caixaA || !caixaB) throw new Error("marcador sem bounding box");
+    const centroA = { x: caixaA.x + caixaA.width / 2, y: caixaA.y + caixaA.height / 2 };
+    const centroB = { x: caixaB.x + caixaB.width / 2, y: caixaB.y + caixaB.height / 2 };
+    const meio = { x: (centroA.x + centroB.x) / 2, y: (centroA.y + centroB.y) / 2 };
+
+    await page.mouse.click(meio.x, meio.y);
+
+    // Criou ponto de rota, NÃO Seção (DEC-055: esquerdo sobre a linha é
+    // ponto de rota; o formulário de Seção não aparece).
+    await expect(page.getByTestId("form-criar-secao")).toHaveCount(0);
+    await expect(page.getByTestId("sub-lista-pontos-de-rota").getByTestId("ponto-rota-item")).toHaveCount(1);
+
+    // A tabela de paradas continua com as MESMAS 3 paradas (RN-042: ponto de
+    // rota não é Parada, não entra na tabela — Spec 04 §7.3).
+    await expect(page.getByTestId("tabela-paradas").getByTestId("parada-item")).toHaveCount(3);
+
+    // O recálculo (RN-052) foi disparado com o ponto de rota intercalado: 3
+    // paradas + 1 ponto de rota = 4 coordenadas na URL do OSRM, com
+    // `waypoints=` (RN-051 — pass-through do ponto de rota).
+    expect(ultimaUrlOsrm).not.toBeNull();
+    const url = ultimaUrlOsrm as unknown as string;
+    expect(url).toContain("waypoints=");
+    const coordenadas = url.match(/\/driving\/([^?]+)/)?.[1] ?? "";
+    expect(coordenadas.split(";").length).toBe(4);
+  });
+
+  test("[inválido] clicar FORA da linha da rota continua criando Seção (DEC-055, sem mudança até a TASK-065)", async ({
+    page,
+  }) => {
+    await abrirEtapaVolta(page);
+
+    const mapa = page.getByTestId("mapa-base");
+    await mapa.locator(".maplibregl-marker").first().waitFor();
+    await mapa.scrollIntoViewIfNeeded();
+    const caixa = await mapa.boundingBox();
+    if (!caixa) throw new Error("mapa sem bounding box");
+
+    // Canto do canvas, longe da rota (que corre entre Praia Grande e Santos,
+    // na região central inferior do Estado no zoom default).
+    await mapa.click({ position: { x: 5, y: 5 } });
+
+    await expect(page.getByTestId("form-criar-secao")).toBeVisible();
+    await expect(page.getByTestId("sub-lista-pontos-de-rota").getByTestId("ponto-rota-item")).toHaveCount(0);
+  });
+});
+
 test.describe("Etapa Seções, Locais e Itinerários — feedback de montagem inválida (TASK-047)", () => {
   test("remover paradas até restar 1 acende o aviso de RN-034, sem chamar o OSRM de novo nem apagar a última rota válida", async ({
     page,

@@ -43,6 +43,13 @@ export interface MarcadorMapa {
    * demais consumidores mantêm o pino sem alteração (extensão opt-in).
    */
   forma?: "pino" | "circulo";
+  /**
+   * Tamanho do marcador `"circulo"` (default `"normal"`). `"pequeno"` é o
+   * vértice de ponto de rota (Spec 04 §7.3: "vértice pequeno sobre a linha,
+   * sem rótulo") — visualmente distinto de Seção/Local sem inventar uma
+   * terceira `forma`.
+   */
+  tamanho?: "normal" | "pequeno";
   aoArrastar?: (posicao: Coordenada) => void;
 }
 
@@ -53,8 +60,21 @@ export interface MapaProps {
   urlTiles?: string;
   marcadores?: readonly MarcadorMapa[];
   linhas?: readonly LinhaMapa[];
-  /** Chamado ao clicar no mapa (botão esquerdo), com a coordenada clicada. */
+  /**
+   * Chamado ao clicar no mapa (botão esquerdo) FORA da linha da rota, com a
+   * coordenada clicada. Se `aoClicarNaLinha` estiver presente e o clique
+   * acertar a camada de linhas, este callback NÃO é chamado — os dois se
+   * excluem por construção (DEC-055: cada botão tem um significado só).
+   */
   aoClicar?: (posicao: Coordenada) => void;
+  /**
+   * Chamado ao clicar com o botão ESQUERDO SOBRE a linha da rota desenhada
+   * (`linhas`), com a coordenada clicada (não a coordenada da linha — a do
+   * cursor). No mapa único de itinerários cria um ponto de rota (TASK-063;
+   * Spec 04 §7.3 item 6; DEC-055). Sem esta prop, todo clique esquerdo cai em
+   * `aoClicar`, como antes da TASK-063.
+   */
+  aoClicarNaLinha?: (posicao: Coordenada) => void;
   /**
    * Chamado ao clicar com o botão DIREITO (`contextmenu`), com a coordenada.
    * No mapa único de itinerários o clique direito cria um Local (DEC-054); nos
@@ -78,9 +98,12 @@ const ID_CAMADA_LINHAS = "linhas-mapa-camada";
 // borda, sombra) vem da classe `.marcador-mapa-circulo` (globals.css); só a cor
 // é data-driven, aplicada imperativamente — não é um `style=` de componente
 // React (doc 18), e sim o elemento imperativo que o MapLibre recebe.
-function criarElementoCirculo(cor?: string): HTMLElement {
+function criarElementoCirculo(cor?: string, tamanho?: "normal" | "pequeno"): HTMLElement {
   const elemento = document.createElement("div");
-  elemento.className = "marcador-mapa-circulo";
+  elemento.className =
+    tamanho === "pequeno"
+      ? "marcador-mapa-circulo marcador-mapa-circulo--pequeno"
+      : "marcador-mapa-circulo";
   if (cor) elemento.style.backgroundColor = cor;
   return elemento;
 }
@@ -93,6 +116,7 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
     marcadores = [],
     linhas = [],
     aoClicar,
+    aoClicarNaLinha,
     aoClicarDireito,
     className,
     style,
@@ -108,6 +132,8 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
   // versão mais recente sem reassinar os listeners.
   const aoClicarRef = useRef(aoClicar);
   aoClicarRef.current = aoClicar;
+  const aoClicarNaLinhaRef = useRef(aoClicarNaLinha);
+  aoClicarNaLinhaRef.current = aoClicarNaLinha;
   const aoClicarDireitoRef = useRef(aoClicarDireito);
   aoClicarDireitoRef.current = aoClicarDireito;
   const marcadoresRefProp = useRef(marcadores);
@@ -155,11 +181,29 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
       });
       mapaRef.current = mapa;
 
+      // Clique esquerdo: se acertar a camada de linhas (rota desenhada) e o
+      // consumidor tiver `aoClicarNaLinha`, o gesto é ponto de rota (TASK-063;
+      // DEC-055); senão, o clique cai em `aoClicar` como antes. A tolerância
+      // de alguns pixels ao redor do ponto compensa a linha fina (largura em
+      // `LARGURA_LINHA_PADRAO`) sem exigir precisão de 1 pixel do usuário.
+      const TOLERANCIA_PX = 6;
       mapa.on("click", (evento) => {
-        aoClicarRef.current?.({
-          lng: evento.lngLat.lng,
-          lat: evento.lngLat.lat,
-        });
+        const posicao = { lng: evento.lngLat.lng, lat: evento.lngLat.lat };
+        if (aoClicarNaLinhaRef.current && mapa.getLayer(ID_CAMADA_LINHAS)) {
+          const { x, y } = evento.point;
+          const acertos = mapa.queryRenderedFeatures(
+            [
+              [x - TOLERANCIA_PX, y - TOLERANCIA_PX],
+              [x + TOLERANCIA_PX, y + TOLERANCIA_PX],
+            ],
+            { layers: [ID_CAMADA_LINHAS] },
+          );
+          if (acertos.length > 0) {
+            aoClicarNaLinhaRef.current(posicao);
+            return;
+          }
+        }
+        aoClicarRef.current?.(posicao);
       });
 
       // Clique direito (contextmenu): o MapLibre já suprime o menu nativo do
@@ -241,7 +285,7 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
       const marcador =
         spec.forma === "circulo"
           ? new maplibregl.Marker({
-              element: criarElementoCirculo(spec.cor),
+              element: criarElementoCirculo(spec.cor, spec.tamanho),
               draggable: spec.arrastavel ?? false,
             })
           : new maplibregl.Marker({

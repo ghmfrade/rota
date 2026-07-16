@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Local, Secao } from "@/shared/contrato";
+import type { Local, PontoDeRota, Secao } from "@/shared/contrato";
 import type { Ponto } from "@/shared/geo";
 import { Mapa, type Coordenada, type LinhaMapa, type MarcadorMapa } from "@/shared/mapa";
 import { Botao, Campo, Painel, Select } from "@/shared/ui";
@@ -32,17 +32,22 @@ import {
 // UI.
 //
 // Interação decidida em DEC-054 (Q-035): **clique esquerdo cria Seção, clique
-// direito cria Local**; marcadores circulares com cores distintas por tipo. O
-// gesto de ponto de rota (TASK-063) e a sincronização seleção tabela↔mapa
-// (TASK-064) ficam fora desta task. Os componentes `EditorSecoes`/`EditorLocais`
-// permanecem para suas demo pages (E2E dos 350 m).
+// direito cria Local**; marcadores circulares com cores distintas por tipo.
+// A TASK-063 (DEC-055) inverte a exclusividade do esquerdo apenas SOBRE A
+// LINHA da rota, onde passa a criar um ponto de rota em vez de Seção (fora da
+// linha, o esquerdo continua criando Seção — a inversão completa dos botões é
+// a TASK-065). A sincronização seleção tabela↔mapa (TASK-064) fica fora desta
+// task. Os componentes `EditorSecoes`/`EditorLocais` permanecem para suas demo
+// pages (E2E dos 350 m).
 
 // Cores dos marcadores (tokens do doc 18): Seção azul-700, Local sucesso,
-// ponto pendente alerta — inferência controlada (a spec só fixa o visual do
-// ponto de rota; a distinção Seção×Local é design sob DEC-050).
+// ponto pendente alerta, ponto de rota cinza-700 — inferência controlada (a
+// spec só fixa o visual do ponto de rota como "vértice pequeno, sem rótulo";
+// a distinção Seção×Local×ponto-de-rota é design sob DEC-050).
 const COR_MARCADOR_SECAO = "#1d4ed8";
 const COR_MARCADOR_LOCAL = "#16a34a";
 const COR_MARCADOR_PENDENTE = "#d97706";
+const COR_MARCADOR_PONTO_DE_ROTA = "#334155";
 
 const paraCoordenada = (p: Ponto): Coordenada => ({ lng: p.longitude, lat: p.latitude });
 const paraPonto = (c: Coordenada): Ponto => ({ latitude: c.lat, longitude: c.lng });
@@ -75,6 +80,21 @@ export interface PropsEditorMapaItinerario {
   /** Rota ativa do itinerário (`estadoAtual.rota.geometria` convertida — Spec
    * 04 §7.3, RN-046/052), desenhada sobre o mapa; ausente quando `sem-rota`. */
   linhaRota?: LinhaMapa;
+  /** Pontos de rota persistidos do itinerário corrente (Spec 02 §10.4) —
+   * exibidos como vértices arrastáveis sobre a linha e na sub-lista própria
+   * (Spec 04 §7.3: "não entra na tabela de paradas"). */
+  pontosDeRota?: readonly PontoDeRota[];
+  /** Clique esquerdo SOBRE a linha da rota (TASK-063; Spec 04 §7.3 item 6;
+   * DEC-055): o host ancora a coordenada ao trecho correto e insere o novo
+   * ponto de rota. Ausente enquanto não há `linhaRota` (sem rota, sem linha
+   * para clicar). */
+  aoCriarPontoDeRota?: (posicao: Coordenada) => void;
+  /** Arrastar e soltar um vértice de ponto de rota (índice no array
+   * `pontosDeRota`), disparando o recálculo (RN-052). */
+  aoMoverPontoDeRota?: (indice: number, posicao: Coordenada) => void;
+  /** Remover o ponto de rota do índice, disparando o recálculo (Spec 04
+   * §7.3 item 5). */
+  aoRemoverPontoDeRota?: (indice: number) => void;
 }
 
 export function EditorMapaItinerario({
@@ -90,6 +110,10 @@ export function EditorMapaItinerario({
   aoAtualizarLocal,
   aoExcluirSentido,
   linhaRota,
+  pontosDeRota = [],
+  aoCriarPontoDeRota,
+  aoMoverPontoDeRota,
+  aoRemoverPontoDeRota,
 }: PropsEditorMapaItinerario) {
   const [mensagemSecao, definirMensagemSecao] = useState<string | null>(null);
   const [mensagemLocal, definirMensagemLocal] = useState<string | null>(null);
@@ -140,6 +164,20 @@ export function EditorMapaItinerario({
         },
       ]
     : [];
+
+  // Vértices de ponto de rota (TASK-063; Spec 04 §7.3 — "vértice pequeno
+  // sobre a linha, sem rótulo"): identificados pelo índice no array
+  // `pontosDeRota` (RN-042 — ponto de rota não tem `uuid`, não é entidade
+  // comparável; a posição no array É a identidade dentro do gesto).
+  const marcadoresPontosDeRota: MarcadorMapa[] = pontosDeRota.map((ponto, indice) => ({
+    id: `ponto-rota-${indice}`,
+    posicao: { lng: ponto.longitude, lat: ponto.latitude },
+    forma: "circulo",
+    tamanho: "pequeno",
+    cor: COR_MARCADOR_PONTO_DE_ROTA,
+    arrastavel: true,
+    aoArrastar: (posicao: Coordenada) => aoMoverPontoDeRota?.(indice, posicao),
+  }));
 
   function iniciarCriacao(tipo: "secao" | "local", posicao: Coordenada) {
     definirMensagemSecao(null);
@@ -281,7 +319,8 @@ export function EditorMapaItinerario({
     <div data-testid="editor-mapa-itinerario" className="flex flex-col gap-4">
       <p data-testid="dica-gestos-mapa" className="text-sm text-cinza-500">
         Clique no mapa para criar uma <strong>Seção</strong>; clique com o botão direito
-        para criar um <strong>Local</strong>.
+        para criar um <strong>Local</strong>. Clique sobre a linha da rota para criar um{" "}
+        <strong>ponto de rota</strong> e forçar o traçado.
       </p>
 
       {mensagemSecao ? (
@@ -297,9 +336,15 @@ export function EditorMapaItinerario({
 
       <div className="h-[60vh] w-full overflow-hidden rounded-painel shadow-sombra-2">
         <Mapa
-          marcadores={[...marcadoresSecoes, ...marcadoresLocais, ...marcadorPendente]}
+          marcadores={[
+            ...marcadoresSecoes,
+            ...marcadoresLocais,
+            ...marcadorPendente,
+            ...marcadoresPontosDeRota,
+          ]}
           linhas={linhaRota ? [linhaRota] : []}
           aoClicar={(posicao) => iniciarCriacao("secao", posicao)}
+          aoClicarNaLinha={aoCriarPontoDeRota}
           aoClicarDireito={(posicao) => iniciarCriacao("local", posicao)}
         />
       </div>
@@ -436,6 +481,28 @@ export function EditorMapaItinerario({
             </li>
           );
         })}
+      </ul>
+
+      {/* Sub-lista PRÓPRIA dos pontos de rota (Spec 04 §7.3: "não entra na
+          tabela de paradas; aparece em sub-lista própria") — sem nome, sem
+          município, identificados só pela posição (RN-042, sem `uuid`). */}
+      <ul data-testid="sub-lista-pontos-de-rota" className="flex flex-col gap-2">
+        {pontosDeRota.map((ponto, indice) => (
+          <li
+            key={indice}
+            data-testid="ponto-rota-item"
+            className="flex items-center gap-2 text-sm text-cinza-700"
+          >
+            Ponto de rota {indice + 1} ({ponto.latitude.toFixed(5)}, {ponto.longitude.toFixed(5)})
+            <Botao
+              variante="secundario"
+              data-testid="remover-ponto-rota"
+              onClick={() => aoRemoverPontoDeRota?.(indice)}
+            >
+              Remover
+            </Botao>
+          </li>
+        ))}
       </ul>
     </div>
   );

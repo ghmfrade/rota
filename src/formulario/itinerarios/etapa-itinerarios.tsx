@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { z } from "zod";
-import type { DocumentoOperacao, Local, Secao } from "@/shared/contrato";
+import type { DocumentoOperacao, Local, PontoDeRota, Secao } from "@/shared/contrato";
 import { esquemaRota } from "@/shared/contrato";
 import {
   carregarBaseMunicipios,
   carregarGeojsonMunicipios,
 } from "@/shared/dados-estaticos";
 import { indiceDeNomes } from "@/shared/geo";
-import { linhaDaGeometria, type LinhaMapa } from "@/shared/mapa";
+import { ancorarPontoNaRota, linhaDaGeometria, type Coordenada, type LinhaMapa } from "@/shared/mapa";
 import {
   nomeExibicaoSecao,
   type RecursosMunicipio,
@@ -18,7 +18,13 @@ import {
 import { nomeExibicaoLocal } from "@/formulario/locais";
 import { EditorMapaItinerario } from "./editor-mapa-itinerario";
 import { PainelDescricaoItinerario } from "@/formulario/descricao";
-import { congelarRotaCarregada, mensagemDeFalha } from "@/formulario/roteamento";
+import {
+  congelarRotaCarregada,
+  inserirPontoDeRota,
+  mensagemDeFalha,
+  moverPontoDeRota,
+  removerPontoDeRota,
+} from "@/formulario/roteamento";
 import { Botao, Painel, Select, Tabela } from "@/shared/ui";
 import { matrizDistanciasDoServico } from "@/formulario/matrizes";
 import {
@@ -44,6 +50,7 @@ import {
   removerParada,
   removerParadasDeLocal,
   reordenarParada,
+  resolverParadasRota,
   type ParadaEmEdicao,
   type ViolacaoMontagem,
 } from "./motor-montagem";
@@ -294,6 +301,11 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
       secoesParaResolver?: Secao[];
       locaisParaResolver?: Local[];
       aoComitarBase?: (base: SessaoFormulario) => SessaoFormulario;
+      /** Pontos de rota a reaplicar neste recálculo (Spec 03 §3.6.2). Default:
+       * os do último estado conhecido — a maioria dos gestos (Seção/Local/
+       * reordenar) não toca pontos de rota; só os handlers de ponto de rota
+       * (TASK-063) passam a lista já atualizada. */
+      pontosDeRota?: readonly PontoDeRota[];
     } = {},
   ) {
     if (!linhaAtual || !sentidoSelecionado || !recursosMunicipio) return;
@@ -310,7 +322,7 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
       opcoes.locaisParaResolver ?? linhaAtual.locais,
       linhaAtual.servicoUuid,
       sentidoSelecionado,
-      pontosDeRotaAtual,
+      opcoes.pontosDeRota ?? pontosDeRotaAtual,
     );
     definirRecalculando(false);
 
@@ -418,6 +430,52 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     });
   }
 
+  // Gesto de ponto de rota (TASK-063; Spec 03 §3.6, §3.6.1; Spec 04 §7.3 item
+  // 6; DEC-055): clicar SOBRE a linha da rota ancora o clique ao trecho
+  // correto (`apos_parada_ordem`) e insere o ponto na posição do array que
+  // preserva a ordem de travessia. Sem `linhaRotaAtual` (itinerário ainda sem
+  // rota calculada) ou sem as paradas resolvidas (itinerário em montagem,
+  // RN-034/035/036) o clique não tem trecho para ancorar — é descartado sem
+  // criar nada (não é regra nova: só não há o que fazer).
+  function aoCriarPontoDeRota(posicao: Coordenada) {
+    if (!linhaAtual || !sentidoSelecionado || !linhaRotaAtual) return;
+    const resolucao = resolverParadasRota(
+      paradasAtual,
+      secoes,
+      linhaAtual.locais,
+      linhaAtual.servicoUuid,
+      sentidoSelecionado,
+    );
+    if (!resolucao.ok) return;
+
+    const paradasCoordenadas: Coordenada[] = resolucao.paradas.map((p) => ({
+      lng: p.longitude,
+      lat: p.latitude,
+    }));
+    const ancoragem = ancorarPontoNaRota(posicao, linhaRotaAtual.pontos, paradasCoordenadas);
+    if (!ancoragem) return;
+
+    const novosPontos = inserirPontoDeRota(pontosDeRotaAtual, linhaRotaAtual.pontos, {
+      latitude: posicao.lat,
+      longitude: posicao.lng,
+      aposParadaOrdem: ancoragem.aposParadaOrdem,
+    });
+    void aplicarNovasParadas(paradasAtual, { pontosDeRota: novosPontos });
+  }
+
+  function aoMoverPontoDeRota(indice: number, posicao: Coordenada) {
+    const novosPontos = moverPontoDeRota(pontosDeRotaAtual, indice, {
+      latitude: posicao.lat,
+      longitude: posicao.lng,
+    });
+    void aplicarNovasParadas(paradasAtual, { pontosDeRota: novosPontos });
+  }
+
+  function aoRemoverPontoDeRota(indice: number) {
+    const novosPontos = removerPontoDeRota(pontosDeRotaAtual, indice);
+    void aplicarNovasParadas(paradasAtual, { pontosDeRota: novosPontos });
+  }
+
   if (!identidade) {
     return (
       <Painel tom="informativo">
@@ -508,6 +566,10 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
               aoAtualizarLocal={aoAtualizarLocal}
               aoExcluirSentido={aoExcluirSentidoDeLocal}
               linhaRota={linhaRotaAtual}
+              pontosDeRota={pontosDeRotaAtual}
+              aoCriarPontoDeRota={aoCriarPontoDeRota}
+              aoMoverPontoDeRota={aoMoverPontoDeRota}
+              aoRemoverPontoDeRota={aoRemoverPontoDeRota}
             />
 
             <div data-testid="coluna-paradas" className="flex flex-col gap-4">

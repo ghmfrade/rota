@@ -64,6 +64,15 @@
   cursor: pointer;
 }
 
+/* Vértice de ponto de rota (TASK-063; Spec 04 §7.3 — "vértice pequeno sobre
+   a linha, sem rótulo"): mesmo marcador circular, menor, sem sombra elevada. */
+.marcador-mapa-circulo--pequeno {
+  width: 9px;
+  height: 9px;
+  border-width: 1.5px;
+  box-shadow: var(--shadow-sombra-1);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

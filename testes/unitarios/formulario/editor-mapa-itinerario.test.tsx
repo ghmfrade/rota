@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
-import type { Local, Secao } from "@/shared/contrato";
+import type { Local, PontoDeRota, Secao } from "@/shared/contrato";
 import type { FeatureMunicipio } from "@/shared/dados-estaticos";
 import { indiceDeNomes } from "@/shared/geo";
 import type { Coordenada, LinhaMapa, MarcadorMapa } from "@/shared/mapa";
@@ -19,6 +19,7 @@ interface PropsMapaCapturadas {
   marcadores?: readonly MarcadorMapa[];
   linhas?: readonly LinhaMapa[];
   aoClicar?: (p: Coordenada) => void;
+  aoClicarNaLinha?: (p: Coordenada) => void;
   aoClicarDireito?: (p: Coordenada) => void;
 }
 
@@ -95,6 +96,9 @@ function montar(props?: Partial<Parameters<typeof EditorMapaItinerario>[0]>) {
   const aoCriarLocal = vi.fn();
   const aoAtualizarLocal = vi.fn();
   const aoExcluirSentido = vi.fn();
+  const aoCriarPontoDeRota = vi.fn();
+  const aoMoverPontoDeRota = vi.fn();
+  const aoRemoverPontoDeRota = vi.fn();
   const utils = renderizar(
     <EditorMapaItinerario
       secoes={[SECAO_DUPLA]}
@@ -108,10 +112,23 @@ function montar(props?: Partial<Parameters<typeof EditorMapaItinerario>[0]>) {
       aoCriarLocal={aoCriarLocal}
       aoAtualizarLocal={aoAtualizarLocal}
       aoExcluirSentido={aoExcluirSentido}
+      aoCriarPontoDeRota={aoCriarPontoDeRota}
+      aoMoverPontoDeRota={aoMoverPontoDeRota}
+      aoRemoverPontoDeRota={aoRemoverPontoDeRota}
       {...props}
     />,
   );
-  return { ...utils, aoCriarSecao, aoAtualizarSecao, aoCriarLocal, aoAtualizarLocal, aoExcluirSentido };
+  return {
+    ...utils,
+    aoCriarSecao,
+    aoAtualizarSecao,
+    aoCriarLocal,
+    aoAtualizarLocal,
+    aoExcluirSentido,
+    aoCriarPontoDeRota,
+    aoMoverPontoDeRota,
+    aoRemoverPontoDeRota,
+  };
 }
 
 function digitar(input: HTMLInputElement, valor: string) {
@@ -231,6 +248,92 @@ describe("EditorMapaItinerario — casos inválidos (comportamento preservado)",
 
     expect(aoAtualizarLocal).not.toHaveBeenCalled();
     expect(container.querySelector('[data-testid="mensagem-recusa-local"]')).not.toBeNull();
+    desmontar();
+  });
+});
+
+// TASK-063 (DEC-055) — clique esquerdo SOBRE a linha da rota cria ponto de
+// rota, não Seção; o `<Mapa>` dublê expõe `aoClicarNaLinha` separado de
+// `aoClicar`, exercitando exatamente a exclusão mútua que `mapa.tsx`
+// implementa de verdade (hit-test na camada de linhas) — aqui testamos só o
+// ROTEAMENTO do gesto no editor, não o hit-test do MapLibre em si.
+const PONTOS_DE_ROTA: PontoDeRota[] = [
+  { apos_parada_ordem: 1, latitude: -23.1, longitude: -46.1 },
+  { apos_parada_ordem: 2, latitude: -23.3, longitude: -46.3 },
+];
+
+describe("EditorMapaItinerario — gesto de ponto de rota (TASK-063; Spec 04 §7.3, DEC-055)", () => {
+  it("clique sobre a linha chama aoCriarPontoDeRota, e NÃO abre o formulário de Seção", () => {
+    const { container, aoCriarPontoDeRota, desmontar } = montar();
+    act(() => capturado.props?.aoClicarNaLinha?.(P0_COORD));
+
+    expect(aoCriarPontoDeRota).toHaveBeenCalledWith(P0_COORD);
+    expect(container.querySelector('[data-testid="form-criar-secao"]')).toBeNull();
+    desmontar();
+  });
+
+  it("clique fora da linha continua criando Seção (DEC-055: sem mudança até a TASK-065)", () => {
+    const { container, aoCriarPontoDeRota, desmontar } = montar();
+    act(() => capturado.props?.aoClicar?.(P0_COORD));
+
+    expect(aoCriarPontoDeRota).not.toHaveBeenCalled();
+    expect(container.querySelector('[data-testid="form-criar-secao"]')).not.toBeNull();
+    desmontar();
+  });
+
+  it("vértices de ponto de rota são circulares, pequenos, sem rótulo e distintos de Seção/Local", () => {
+    const { desmontar } = montar({ pontosDeRota: PONTOS_DE_ROTA });
+    const marcadores = capturado.props?.marcadores ?? [];
+    const vertice0 = marcadores.find((m) => m.id === "ponto-rota-0");
+    const vertice1 = marcadores.find((m) => m.id === "ponto-rota-1");
+
+    expect(vertice0?.forma).toBe("circulo");
+    expect(vertice0?.tamanho).toBe("pequeno");
+    expect(vertice0?.cor).not.toBe(COR_SECAO);
+    expect(vertice0?.cor).not.toBe(COR_LOCAL);
+    expect(vertice0?.arrastavel).toBe(true);
+    expect(vertice1?.posicao).toEqual({ lng: -46.3, lat: -23.3 });
+    desmontar();
+  });
+
+  it("arrastar um vértice chama aoMoverPontoDeRota com o índice correto", () => {
+    const { desmontar, aoMoverPontoDeRota } = montar({ pontosDeRota: PONTOS_DE_ROTA });
+    const vertice1 = (capturado.props?.marcadores ?? []).find((m) => m.id === "ponto-rota-1");
+    const novaPosicao: Coordenada = { lng: -46.35, lat: -23.35 };
+
+    act(() => vertice1?.aoArrastar?.(novaPosicao));
+
+    expect(aoMoverPontoDeRota).toHaveBeenCalledWith(1, novaPosicao);
+    desmontar();
+  });
+
+  it("a sub-lista de pontos de rota exibe os pontos e NÃO entram na tabela de paradas (Spec 04 §7.3)", () => {
+    const { container, desmontar } = montar({ pontosDeRota: PONTOS_DE_ROTA });
+    const subLista = container.querySelector('[data-testid="sub-lista-pontos-de-rota"]');
+    const itens = subLista?.querySelectorAll('[data-testid="ponto-rota-item"]');
+
+    expect(itens).toHaveLength(2);
+    // Não há tabela de paradas neste componente (é responsabilidade da etapa,
+    // `tabela-paradas`); confirmamos apenas que a sub-lista é uma superfície
+    // própria, sem nome nem município (só a coordenada).
+    expect(container.querySelector('[data-testid="tabela-paradas"]')).toBeNull();
+    desmontar();
+  });
+
+  it("remover um ponto de rota pela sub-lista chama aoRemoverPontoDeRota com o índice", () => {
+    const { container, aoRemoverPontoDeRota, desmontar } = montar({ pontosDeRota: PONTOS_DE_ROTA });
+    const botoesRemover = container.querySelectorAll('[data-testid="remover-ponto-rota"]');
+
+    clicar(botoesRemover[1]);
+
+    expect(aoRemoverPontoDeRota).toHaveBeenCalledWith(1);
+    desmontar();
+  });
+
+  it("[inválido] sem pontosDeRota, a sub-lista fica vazia", () => {
+    const { container, desmontar } = montar();
+    const itens = container.querySelectorAll('[data-testid="ponto-rota-item"]');
+    expect(itens).toHaveLength(0);
     desmontar();
   });
 });
