@@ -511,22 +511,196 @@
 
 ---
 
-## TASK-058 — Ressalvas pendentes das revisões do bloco (TASK-053, TASK-055 e TASK-057)
+## TASK-058 — Ressalvas pendentes das revisões do bloco (TASK-053 e TASK-057)
 
 **Prioridade:** Média · **Fase:** Cleanup pós-redesign (fecha as ressalvas ainda abertas dos pareceres)
-**Resumo:** Recolhe as ressalvas que ficaram abertas nas revisões da TASK-053, TASK-055 e TASK-057 e não coube a nenhuma outra task fechar (as ressalvas de aparência de TASK-053/054 já estão na varredura da TASK-056; as condições de merge da TASK-057 vieram no parecer **após** o commit e nunca foram atendidas; a ressalva de layout da TASK-055 não tinha dono). Itens, todos pontuais e enumerados:
+**Resumo:** Recolhe as ressalvas que ficaram abertas nas revisões da TASK-053 e da TASK-057 e não coube a nenhuma outra task fechar (as ressalvas de aparência de TASK-053/054 já estão na varredura da TASK-056; as condições de merge da TASK-057 vieram no parecer **após** o commit e nunca foram atendidas). Itens, todos pontuais e enumerados:
 1. **[TASK-057 P1 — condição de merge] Fixture com UUID fora do schema** (`testes/unitarios/formulario/servicos-contadores.test.tsx:19`): `viagemFeriado()` gera `uuid: \`${base.uuid}-feriado\``, que não passa no `uuidV4` do contrato (RN-001/RN-010) — o documento montado não sobreviveria a `esquemaDocumentoOperacao`. Trocar por um UUIDv4 literal válido.
 2. **[TASK-057 P2 — condição de merge] `data-testid="rotulo-semana-padrao"` duplicado** (`src/formulario/servicos/servicos.tsx:355` e `src/formulario/resumo/resumo-operacional.tsx:34`): `testes/e2e/resumo-operacional.spec.ts:22` usa o testid **sem `.first()`**, então o dia em que as duas telas co-renderizarem esse E2E quebra por strict-mode. Renomear **só o novo** (o de `servicos.tsx`, ex.: `servicos-rotulo-semana-padrao`) e atualizar `testes/e2e/servicos.spec.ts:142`; o testid do resumo é preexistente e **intocável**.
 3. **[TASK-057 P3 — follow-up] Literal `ROTULO_SEMANA_PADRAO` duplicado** (`servicos.tsx:76` e `resumo-operacional.tsx:21`): o texto exigido literalmente pela RN-069/NEG-018 vive em dois lugares — uma edição futura diverge em silêncio. Fonte única em `shared/` (ex.: `shared/contagens` ou `shared/ui`), consumida por servicos e resumo. Toca o resumo, que é arquivo da TASK-056 — daí a dependência abaixo.
 4. **[TASK-057 P4 — estilo] `viagensSemana(undefined) + viagensSemana(undefined)`** (`servicos.tsx:155-159`) soma duas chamadas constantes para dizer `0` — ofuscação. Simplificar para a constante `0` (a semântica "Serviço em construção → 0", DEC-035, permanece; nenhuma regra muda). Opcional.
 5. **[TASK-053 P3 — consistência] Estados de erro/carregamento da Identificação sem superfície** (`identificacao.tsx:156,164`): `erroListas` e `!listas` renderizam `<p>` solto enquanto o estado carregado é `Painel` — a etapa "muda de moldura". Envolver em `Painel` (escolha de aparência, DEC-050). O `data-testid="erro-listas-identificacao"` é intocável.
 6. **[Derivado — DEC-051/DEC-052] Atualizar `docs-dev/01-RULE_INDEX.md`:** na Origem da RN-069 (`:510`), acrescentar **Spec 04 §6** (a DEC-051 antecipou este ajuste de derivado). *(A Spec 04 §5 → "Tipo do Autos" da DEC-052 é edição de `docs/specs/**`, read-only — **não** entra aqui; é ação do dono da spec.)*
-7. **[TASK-055 ressalva 1 — layout] Tabela de paradas "na mesma linha visual" do mapa** (`src/formulario/itinerarios/etapa-itinerarios.tsx:492-589`): hoje `Tabela` (paradas), `EditorSecoes` e `EditorLocais` ficam empilhados em coluna (`flex flex-col gap-6`), enquanto a Spec 04 §7 e o doc 18 §87 pedem a tabela de paradas **lateral** ao mapa. Escopo **só do nível de apresentação (CSS)**: dispor a tabela de paradas ao lado da área de mapa (grid/flex de duas colunas, responsivo — empilha no estreito), sem tocar comportamento, seletores nem chamadas de rota. **Caveat estrutural a resolver na análise da task:** os dois mapas separados (`EditorSecoes` + `EditorLocais`) tornam ambíguo o "ao lado de qual mapa"; se um arranjo lateral fiel a §7 exigir unificar os mapas ou sincronizar seleção tabela↔mapa (nível 2, **fora daqui**), **não inventar** — abrir Q-xxx e parar no que é puramente CSS. O `data-testid="tabela-paradas"` e demais seletores são intocáveis.
-**Specs fonte / decisões:** revisões `docs-dev/14-REVISOES/TASK-053-20260715.md`, `TASK-055-20260715.md` e `TASK-057-20260715.md`; DEC-050 (aparência), DEC-051 (Origem da RN-069), DEC-052 (rótulo "Tipo do Autos" **permanece** — item 6 do "Fora de escopo"); Spec 04 §7 e doc 18 §87 (tabela lateral — item 7); doc 18 §6. **Regras RN:** RN-069/NEG-018 (literal exato preservado), RN-001/RN-010 (UUIDv4 válido), RN-072/RN-006 (contagem intacta — nada de lógica muda), RN-025..036/041..052 (comportamento de itinerário/parada preservado — item 7 é só CSS). **Depende de:** TASK-056 (o item 3 unifica o literal tocando `resumo-operacional.tsx`, arquivo da TASK-056 — rodar depois evita conflito) e TASK-057 (fecha o parecer dela).
-**Fora de escopo:** **reverter o rótulo "Tipo do Autos" da Identificação** (DEC-052 — permanece; não tocar); alterar `src/shared/contagens/` ou qualquer lógica/regra de contagem, viagem ou feriado; editar `docs/specs/**` (o alinhamento da Spec 04 §5 e o restante são ações do dono da spec); as ressalvas de aparência já roteadas para a varredura da TASK-056 (marca "(sem itinerário ainda)", superfície da `Tabela`, aviso aninhado); **a visão plena da Spec 04 §7 além do CSS do item 7 — unificar os dois mapas num único mapa interativo e sincronizar seleção tabela↔mapa (nível 2), que é reescrita de comportamento e vira task/Q-xxx própria**; qualquer mudança de comportamento, mensagem ou contrato JSON.
-**Critérios de aceite resumidos:** (1) fixture usa UUIDv4 válido e o documento montado passaria em `esquemaDocumentoOperacao`; (2) `grep` do testid do rótulo no lado servicos retorna nome único, distinto do resumo, e `resumo-operacional.spec.ts` volta a ser seguro sem `.first()`; (3) o literal "semana padrão (sem feriados)" tem **uma** declaração em `shared/`, consumida por servicos e resumo (`grep` acha uma só); (4) estados de erro/carregamento da Identificação em `Painel`, consistentes com o carregado, `data-testid` intocado; (5) Origem da RN-069 no RULE_INDEX cita Spec 04 §6; (6) rótulo "Tipo do Autos" **inalterado**; (7) tabela de paradas disposta lateral ao mapa em tela larga (empilhando no estreito) sem alterar seletor algum — ou, se o arranjo fiel exigir nível 2, Q-xxx aberta e o item entregue só até onde é CSS; `data-testid`/`aria-*` existentes preservados exceto a renomeação deliberada do item 2; suíte completa (unit + E2E + build) verde, nenhum outro seletor alterado.
-**Testes esperados:** unitários e E2E existentes verdes (as E2E de `etapa-itinerarios` devem passar **sem alteração** após o item 7 — é só layout); ajuste do único E2E que referencia o testid renomeado (item 2); nenhum teste de `shared/contagens` alterado; nenhum teste novo de regra (não há regra nova).
-**Riscos:** (a) renomear testid e esquecer um consumidor — `grep` do nome antigo antes/depois; (b) o item 3 toca `resumo-operacional.tsx` (TASK-056) — respeitar a dependência para não conflitar com a restilização; (c) mover os estados de erro para `Painel` sem alterar `data-testid="erro-listas-identificacao"`; (d) item 7: ceder à tentação de "resolver §7 direito" mexendo em comportamento — parar no CSS e escalar via Q-xxx se o lateral fiel exigir mais.
+**Specs fonte / decisões:** revisões `docs-dev/14-REVISOES/TASK-053-20260715.md` e `TASK-057-20260715.md`; DEC-050 (aparência), DEC-051 (Origem da RN-069), DEC-052 (rótulo "Tipo do Autos" **permanece** — item 6 do "Fora de escopo"); doc 18 §6. **Regras RN:** RN-069/NEG-018 (literal exato preservado), RN-001/RN-010 (UUIDv4 válido), RN-072/RN-006 (contagem intacta — nada de lógica muda). **Depende de:** TASK-056 (o item 3 unifica o literal tocando `resumo-operacional.tsx`, arquivo da TASK-056 — rodar depois evita conflito) e TASK-057 (fecha o parecer dela).
+**Fora de escopo:** **reverter o rótulo "Tipo do Autos" da Identificação** (DEC-052 — permanece; não tocar); alterar `src/shared/contagens/` ou qualquer lógica/regra de contagem, viagem ou feriado; editar `docs/specs/**` (o alinhamento da Spec 04 §5 e o restante são ações do dono da spec); as ressalvas de aparência já roteadas para a varredura da TASK-056 (marca "(sem itinerário ainda)", superfície da `Tabela`, aviso aninhado); a ressalva de layout da TASK-055 (tabela lateral / mapa único — tem task própria); qualquer mudança de comportamento, mensagem ou contrato JSON.
+**Critérios de aceite resumidos:** (1) fixture usa UUIDv4 válido e o documento montado passaria em `esquemaDocumentoOperacao`; (2) `grep` do testid do rótulo no lado servicos retorna nome único, distinto do resumo, e `resumo-operacional.spec.ts` volta a ser seguro sem `.first()`; (3) o literal "semana padrão (sem feriados)" tem **uma** declaração em `shared/`, consumida por servicos e resumo (`grep` acha uma só); (4) estados de erro/carregamento da Identificação em `Painel`, consistentes com o carregado, `data-testid` intocado; (5) Origem da RN-069 no RULE_INDEX cita Spec 04 §6; (6) rótulo "Tipo do Autos" **inalterado**; `data-testid`/`aria-*` existentes preservados exceto a renomeação deliberada do item 2; suíte completa (unit + E2E + build) verde, nenhum outro seletor alterado.
+**Testes esperados:** unitários e E2E existentes verdes; ajuste do único E2E que referencia o testid renomeado (item 2); nenhum teste de `shared/contagens` alterado; nenhum teste novo de regra (não há regra nova).
+**Riscos:** (a) renomear testid e esquecer um consumidor — `grep` do nome antigo antes/depois; (b) o item 3 toca `resumo-operacional.tsx` (TASK-056) — respeitar a dependência para não conflitar com a restilização; (c) mover os estados de erro para `Painel` sem alterar `data-testid="erro-listas-identificacao"`.
+
+---
+
+## TASK-059 — Desenhar a rota ativa no mapa da etapa de itinerários
+
+## Objetivo
+
+Ao final, a rota roteirizada ativa de um itinerário (a `Rota.geometria`, GeoJSON LineString) aparece **desenhada** no mapa da etapa "Seções, Locais e Itinerários". Hoje não aparece: os editores passam apenas `marcadores` ao `<Mapa>`, nunca a linha da rota — a rota calculada existe no estado ao vivo mas nunca chega à tela.
+
+## Contexto
+
+`EditorSecoes` e `EditorLocais` renderizam um `<Mapa>` passando só `marcadores` ([`editor-secoes.tsx:184`](../../src/formulario/secoes/editor-secoes.tsx#L184), [`editor-locais.tsx:168`](../../src/formulario/locais/editor-locais.tsx#L168)). O `<Mapa>` já sabe desenhar `linhas: LinhaMapa[]` (LineString) — demonstrado em [`src/app/mapa-demo/page.tsx:24`](../../src/app/mapa-demo/page.tsx#L24). A geometria da rota ativa está em `estadoAtual.rota.geometria` do `EstadoRotaViva` (TASK-024; `situacao` `congelada`/`recalculada`), disponível na etapa. A Spec 04 §7.3 diz que, a cada parada, "a rota é recalculada **e desenhada**". Defeito descoberto na revisão da TASK-055. Task pequena e de baixo risco; o conversor `geometria → LinhaMapa` que ela cria é reaproveitado pela TASK-060.
+
+## Fora de escopo
+
+- Unificar os dois mapas num só (é a TASK-060) — aqui a rota é passada aos dois editores como estão hoje.
+- Sincronização seleção tabela↔mapa; layout lateral da tabela (TASK-060).
+- Renderizar os **pontos de rota** como vértices próprios sobre a linha (Spec 04 §7.3 "vértice pequeno sobre a linha") — só a LineString da rota entra aqui; vértices de ponto de rota ficam para a TASK-060 se não forem triviais.
+- Promoção do `ServicoEmConstrucao` no fluxo "novo" (task própria — Defect B).
+- Qualquer chamada nova ao OSRM: abrir JSON **não** recalcula (RN-052), só desenha a rota congelada.
+
+## Specs fonte
+
+- Spec 04 §7.3
+- Spec 02 §10.2 (Rota; `geometria` GeoJSON LineString, coords `[longitude, latitude]`)
+
+## Regras envolvidas
+
+- RN-046 (descrição/rota derivada, congelada, recalculada com a rota)
+- RN-052 (abrir JSON não chama OSRM; a rota congelada é desenhada sem recalcular)
+- RN-015 (dados congelados não são recalculados por leitores)
+- RN-042 (ponto de rota sem identidade — não confundir a LineString com marcadores/paradas)
+
+## Entidades afetadas
+
+- Rota, Itinerário, Parada (só leitura da geometria)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Com `estadoAtual` em `congelada` ou `recalculada`, o `<Mapa>` da etapa recebe `linhas` com a geometria da rota ativa e a linha é desenhada.
+- [ ] Abrir um JSON existente desenha a rota **congelada** sem disparar o OSRM (RN-052).
+- [ ] Em `sem-rota`, nenhuma linha é desenhada; a mensagem de falha existente (`data-testid="mensagem-sem-rota"`) permanece.
+- [ ] Conversão `geometria.coordinates` (`[lon,lat]`) → `LinhaMapa` correta (ordem das coordenadas preservada).
+- [ ] Nenhum `data-testid`/`aria-*` alterado; E2E existentes verdes.
+
+## Casos válidos
+
+- Itinerário aberto de JSON com rota congelada → linha aparece no mapa sem chamada de rede.
+- Reordenar parada → recálculo com sucesso → a linha atualiza para a nova geometria.
+
+## Casos inválidos
+
+- Estado `sem-rota` (falha OSRM mockada) → nenhuma linha; pendência/mensagem existente intacta.
+- Abrir JSON → asserção de que o OSRM **não** foi chamado (mock sem chamadas).
+
+## Testes esperados
+
+- Unitários: conversor `geometria → LinhaMapa` (coords, vazio, ida/volta).
+- Integração: `EditorSecoes`/`EditorLocais` repassam `linhas` ao `<Mapa>` quando recebem uma rota; não repassam quando não há rota.
+- E2E: os specs de itinerários/editores seguem verdes sem alterar seletores (mock do OSRM).
+- Snapshot/contrato JSON: N/A (não toca contrato).
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/secoes/editor-secoes.tsx`, `src/formulario/locais/editor-locais.tsx` (aceitar a rota e repassá-la a `linhas`)
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (passar `estadoAtual.rota.geometria` aos editores)
+- Conversor `geometria → LinhaMapa` (novo helper em `src/shared/mapa/` ou `src/formulario/roteamento/`)
+
+## Riscos
+
+- Enquanto os mapas são dois, a rota é passada aos dois (redundante) — consolidado na TASK-060; aceitável como interino.
+- Não disparar recálculo ao desenhar (RN-052/RN-015): a linha vem do estado já congelado, nunca de uma nova chamada.
+
+## Perguntas em aberto
+
+- Nenhuma.
+
+---
+
+## TASK-060 — Unificar os dois mapas da etapa de itinerários num único mapa interativo + tabela lateral
+
+## Objetivo
+
+A etapa "Seções, Locais e Itinerários" passa a ter **um único mapa interativo** (Spec 04 §7) no lugar dos dois mapas separados de `EditorSecoes` e `EditorLocais`, com a **tabela lateral de paradas na mesma linha visual** do mapa (doc 18 §87) como consequência do layout. Seções, Locais e pontos de rota são lançados no mesmo mapa.
+
+## Contexto
+
+Hoje `EditorSecoes` e `EditorLocais` renderizam **cada um seu próprio `<Mapa>`** (dois mapas empilhados verticalmente), divergindo da Spec 04 §7 — "O cadastro de Seções, Locais, pontos de rota e a montagem do itinerário … acontecem **num mesmo mapa interativo**". A divergência entrou pelo fatiamento fino TASK-017 (motor+`EditorSecoes`) / TASK-018 (motor+`EditorLocais`) / TASK-019 (montou os dois), passou sem flag na revisão da TASK-019 e foi identificada na revisão da TASK-055 (`docs-dev/14-REVISOES/TASK-055-20260715.md`). A rota já é desenhada pela TASK-059. Padrão visual: DEC-050 / doc 18 §87 (mapa em destaque + tabela lateral). Substitui a ressalva 1 da TASK-055, retirada da TASK-058.
+
+## Fora de escopo
+
+- **Sincronização seleção tabela↔mapa** (clicar na parada destaca no mapa e vice-versa — Spec 04 §7): avaliar na `/analisar-task`; se for grande, vira task própria e fica fora daqui.
+- Promoção do `ServicoEmConstrucao` no fluxo "novo" (Defect B — task separada).
+- Qualquer regra de OSRM, 350 m, reuso, montagem de parada, descrição — **comportamento preservado**; a task só reorganiza a superfície de UI (RN-025..036, RN-041..052 inalteradas).
+- Alterar `data-testid`/`aria-*` existentes (E2E devem passar sem trocar seletores; testids **novos** só para o seletor de ferramenta, se houver).
+
+## Specs fonte
+
+- Spec 04 §7 (mapa único + tabela lateral), §7.1 (inserção/reuso de Seção), §7.2 (Locais), §7.3 (itinerário e mapa)
+- doc 18 §87 (mapa em destaque, moldura, tabela lateral na mesma linha visual)
+
+## Regras envolvidas
+
+- RN-025..036 (Seção/Local/parada — preservadas)
+- RN-041..052 (rota/ponto de rota/OSRM — preservadas)
+- RN-076 (rótulo `Cidade - Nome da Seção` na tabela — preservado)
+
+## Entidades afetadas
+
+- Seção, Local, Parada, ponto de rota, Rota (reorganização de UI; sem mudança de modelo)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] A etapa renderiza **um** `<Mapa>` (não dois); marcadores de Seção e de Local coexistem nele.
+- [ ] O clique no mapa permite escolher o que se cria (Seção / Local / ponto de rota) — afordância de ferramenta/modo conforme doc 18 (design a definir na `/analisar-task`).
+- [ ] Todos os fluxos preservados: criação de Seção/Local, reuso de Seção, arrasto sob 350 m (recusa → mensagem Spec 04 §14), exclusão de sentido de Local, montagem/reordenação de paradas, recálculo ao vivo.
+- [ ] Tabela de paradas **lateral** ao mapa em tela larga (empilha no estreito), via componente `Tabela`.
+- [ ] Rota desenhada (TASK-059) aparece no mapa único; zero chamada de rede nova.
+- [ ] E2E existentes (`editor-secoes-350m`, `editor-locais-350m`, `etapa-itinerarios`, `descricao-itinerario`) verdes **sem alterar seletores**.
+
+## Casos válidos
+
+- Criar Seção e depois Local no mesmo mapa, alternando a ferramenta → ambos os marcadores e a rota aparecem; paradas entram na tabela lateral.
+- Reordenar/remover parada pela tabela lateral → recálculo, como hoje.
+
+## Casos inválidos
+
+- Arrasto além de 350 m (Seção ou Local) → recusa com a mensagem da Spec 04 §14, agora no mapa único (comportamento idêntico ao atual).
+- Montagem inválida (< 2 paradas, extremo não-Seção) → avisos existentes (RN-034/035) inalterados.
+
+## Testes esperados
+
+- Unitários: nenhum novo de regra (comportamento não muda); ajustes se helpers de marcador forem consolidados.
+- Integração: o novo componente de mapa único monta marcadores de Seção+Local e repassa `aoClicar` conforme a ferramenta ativa.
+- E2E: adaptar os specs dos editores ao mapa único **preservando os `data-testid`**; cobrir a troca de ferramenta se receber testid novo.
+- Snapshot/contrato JSON: N/A.
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- Novo `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (mapa único que absorve `EditorSecoes` + `EditorLocais`)
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (layout de duas colunas tabela | mapa; usa o novo componente)
+- `src/formulario/secoes/editor-secoes.tsx`, `src/formulario/locais/editor-locais.tsx` (aposentados/absorvidos ou reduzidos a lógica sem `<Mapa>` próprio)
+
+## Riscos
+
+- **Refator grande e de alto risco** na parte mais complexa do app (roteamento ao vivo, 350 m pareado, reuso de Seção, montagem de paradas de dois tipos num só mapa). A `/analisar-task` deve avaliar quebrar em subtasks (ex.: consolidar marcadores; unificar clique/ferramenta; layout lateral) se o plano passar de ~10 passos.
+- O seletor de ferramenta (Seção/Local/ponto de rota no mesmo clique) é decisão de **UX sob DEC-050/doc 18** — a Spec 04 §7 diz que os três são lançados no mesmo mapa, mas não detalha a interface. Resolver na análise; se o dono do domínio quiser **fixar** a interação, abrir Q-xxx antes de implementar.
+- Não alterar `data-testid` existentes — os E2E dos editores dependem deles.
+
+## Dependências
+
+- TASK-059 (rota desenhada — o mapa único herda o desenho da rota).
+- TASK-055 (etapa/editores já no design system).
+
+## Perguntas em aberto
+
+- **Design de interação (não bloqueante, decidir na `/analisar-task`):** como o usuário indica, no mapa único, se um clique cria Seção, Local ou ponto de rota (Spec 04 §7 exige os três no mesmo mapa; a ferramenta/modo é design sob doc 18). Vira Q-xxx só se o dono quiser fixar a interação em spec-derivado.
 
 ---
 
@@ -554,10 +728,16 @@
 057
 ```
 
-**Cleanup das ressalvas do bloco (condições de merge da TASK-057 + achados de TASK-053 + layout lateral da TASK-055; DEC-052 — depende da TASK-056 e da TASK-057):**
+**Cleanup das ressalvas do bloco (condições de merge da TASK-057 + achados de TASK-053; DEC-052 — depende da TASK-056 e da TASK-057):**
 
 ```text
 058
+```
+
+**Correções da etapa de itinerários (mapa/rota — Spec 04 §7; descobertas na revisão da TASK-055):**
+
+```text
+059 → 060
 ```
 
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.
