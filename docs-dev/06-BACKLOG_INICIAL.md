@@ -704,6 +704,174 @@ Hoje `EditorSecoes` e `EditorLocais` renderizam **cada um seu próprio `<Mapa>`*
 
 ---
 
+## TASK-061 — Promover `ServicoEmConstrucao` a `Servico` completo ao concluir o itinerário no fluxo "novo"
+
+## Objetivo
+
+No fluxo **"novo"** (documento criado do zero), ao concluir a edição do itinerário de um Serviço, o `ServicoEmConstrucao` correspondente passa a ser **promovido a `Servico` completo** — com `itinerarios[]` (paradas + rota + `matriz_distancias`) e `viagens` a preencher depois — e passa a viver na lista de Serviços do documento. Ao final, o fluxo criar-do-zero deixa de travar após os itinerários: as etapas Viagens e Matrizes voltam a enxergar o Serviço.
+
+## Contexto
+
+Hoje, no modo "novo", um Serviço recém-criado vive em `servicosEmConstrucao` (`ServicoEmConstrucao`, DEC-035), que não tem `itinerarios` ([`sessao.ts:41-53`](../../src/formulario/sessao.ts#L41-L53)). O itinerário montado na etapa de mapa fica só em estado efêmero (`paradasEmEdicao`/`estadosRotaViva`); a função que grava itinerário+matriz num Serviço (`documentoComItinerarioAtualizado`) exige um `DocumentoOperacao` e só roda no modo "carregado" ([`etapa-itinerarios.tsx:251-270`](../../src/formulario/itinerarios/etapa-itinerarios.tsx#L251-L270)). Viagens ([`etapa-viagens.tsx:80`](../../src/formulario/viagens/etapa-viagens.tsx#L80)) e Matrizes ([`etapa-matrizes.tsx:60`](../../src/formulario/matrizes/etapa-matrizes.tsx#L60)) leem serviços só no modo "carregado" e recebem `[]` no "novo". Resultado: o Serviço nunca vira `Servico` completo e as etapas seguintes ficam vazias. A DEC-035 já previa a promoção ("promovido a `Servico` completo quando as etapas seguintes preencherem o resto"); a **DEC-053 (opção A da Q-034)** fixou que o ponto de promoção é a conclusão do itinerário, concentrando o modo dual num único lugar. Descoberto em teste manual do usuário (2026-07-16), a partir da revisão da TASK-055.
+
+## Fora de escopo
+
+- O **E2E** do fluxo criar-do-zero ponta a ponta — é a **TASK-062** (esta task entrega os testes unitários/integração da promoção; o E2E completo é separado).
+- Desenho da rota no mapa (TASK-059) e unificação dos mapas (TASK-060) — independentes.
+- Qualquer mudança no **contrato JSON** (schema) ou em `shared/contrato`: a promoção é transição de estado de sessão efêmero, não persistência (RN-096/NEG-004).
+- Reimplementar contagens/matriz: reutiliza `matrizDistanciasDoServico`/`shared/contagens` como estão.
+- Alterar o CRUD da etapa Serviços ou a criação de itinerários por direcionalidade (DEC-036) — já existem.
+
+## Specs fonte
+
+- Spec 04 §6 (criar Serviço)
+- Spec 04 §7 (montagem do itinerário)
+- Spec 04 §8 ("Após criar/alterar o itinerário … a etapa seguinte é a grade de horários")
+- Spec 02 §6 (`Servico`: `itinerarios` ≥ 1, `matriz_distancias`)
+
+## Regras envolvidas
+
+- RN-001/002/004 (UUIDs preservadas na promoção — a `uuid` do `ServicoEmConstrucao` é herdada pelo `Servico`)
+- RN-018 (documento válido exige ≥ 1 Serviço)
+- RN-054..057 (matriz reconciliada ao concluir a edição do itinerário)
+- RN-096 / NEG-004 (nada gravado no JSON antes da exportação; sessão é efêmera)
+
+## Entidades afetadas
+
+- Serviço, Itinerário, Parada, Rota, matriz de distâncias (promoção `ServicoEmConstrucao → Servico`)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] No modo "novo", concluir a edição do itinerário de um `ServicoEmConstrucao` o promove a `Servico` completo (com `itinerarios[]` contendo paradas+rota e `matriz_distancias` reconciliada), removido de `servicosEmConstrucao`.
+- [ ] A `uuid` do `ServicoEmConstrucao` é preservada no `Servico` promovido (RN-001/002/004).
+- [ ] Após a promoção, as etapas Viagens e Matrizes enxergam o Serviço (não mais `[]`) no modo "novo".
+- [ ] A matriz do Serviço promovido é reconciliada no mesmo commit da rota (RN-054..057), como já ocorre no modo "carregado".
+- [ ] Nada é gravado no JSON antes da exportação; a promoção só altera estado de sessão (RN-096/NEG-004).
+- [ ] Nenhum `data-testid`/`aria-*` alterado; E2E existentes verdes.
+
+## Casos válidos
+
+- Modo "novo": Serviço criado (direcionalidade "ida") → itinerário montado → ao concluir, vira `Servico` com 1 itinerário, matriz reconciliada; Viagens/Matrizes passam a listá-lo.
+- Direcionalidade "ambos": os dois sentidos concluídos resultam em `Servico` com 2 itinerários.
+
+## Casos inválidos
+
+- Itinerário sem rota válida (OSRM mockado em `sem-rota`): a promoção **não** ocorre com rota inválida; o Serviço permanece em construção e a pendência ao vivo existente é mantida (RN-048) — sem gravar Serviço incompleto.
+- Concluir sem paradas suficientes: a promoção não produz um `Servico` que viole o schema (`itinerarios` min(1)).
+
+## Testes esperados
+
+- Unitários: função de promoção `ServicoEmConstrucao (+ itinerário/rota/matriz) → Servico` (uuid preservada; matriz reconciliada; ida / ambos; caso sem-rota não promove).
+- Integração: após concluir itinerário no modo "novo", `servicosDaSessao`/leitura de Viagens e Matrizes retorna o Serviço; assert de que o OSRM foi chamado só o esperado (mock).
+- E2E: N/A nesta task (é a TASK-062); specs existentes seguem verdes.
+- Snapshot/contrato JSON: N/A (não toca contrato); pode-se validar que o `Servico` promovido passa no schema `zod` strict.
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/sessao.ts` (modelo de sessão do modo "novo" — hoje sem `documento`; acomodar os `Servico` completos promovidos; possível helper `servicosDaSessao` unificado)
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (gatilho de promoção ao concluir o itinerário; hoje `documentoComItinerarioAtualizado` só roda no "carregado")
+- `src/formulario/viagens/etapa-viagens.tsx`, `src/formulario/matrizes/etapa-matrizes.tsx` (ler Serviços pelo caminho unificado)
+
+## Riscos
+
+- **Modelo de sessão:** o modo "novo" hoje não carrega `DocumentoOperacao`; decidir na `/analisar-task` onde o `Servico` promovido passa a viver (novo campo de sessão vs. montar documento parcial). Se implicar mudança do modelo além do previsto na DEC-053, vira **DEC própria** antes de codar.
+- Regressão no modo "carregado": a promoção não pode alterar o caminho já existente do documento carregado.
+- Preservação de UUID (RN-004) é a regra crítica nº 1 — round-trip provado por teste.
+
+## Perguntas em aberto
+
+- Nenhuma bloqueante. Decidido por **DEC-053** (opção A da Q-034). O gatilho/forma da promoção e o lar do `Servico` no modo "novo" fecham na `/analisar-task`; se mexerem no modelo de sessão além do previsto, viram DEC própria.
+
+---
+
+## TASK-062 — E2E do fluxo "criar do zero" ponta a ponta (Identificação → Exportação)
+
+## Objetivo
+
+Ao final existe um teste **E2E (Playwright)** que exercita o fluxo **"novo"** completo — Identificação → Serviços → Seções/Locais → Itinerários → Viagens → Matrizes → Resumo → Exportação —, com o OSRM mockado, cobrindo a lacuna que deixou a trava da Q-034 passar despercebida (nenhum E2E cobre criar-do-zero; só o fluxo de JSON aberto).
+
+## Contexto
+
+A Q-034 registrou que "nenhum E2E exercita o fluxo 'novo' de Serviços → Itinerários → Viagens (só o fluxo de JSON aberto é coberto)" — foi por isso que a trava só apareceu em teste manual. Depois da **TASK-061** (promoção `ServicoEmConstrucao → Servico`), o fluxo passa a funcionar ponta a ponta; falta a rede de segurança que impeça a regressão. Testes **nunca** dependem do OSRM real — mock sempre (stack fixada, DEC-029).
+
+## Fora de escopo
+
+- Implementar/alterar a promoção — é a **TASK-061** (esta task só testa o fluxo já corrigido; depende dela).
+- Cobrir o Comparador ou o fluxo de importação de JSON (já coberto por E2E existentes).
+- Testar variações exaustivas de PDF/exportação além de disparar a exportação e validar o JSON resultante.
+
+## Specs fonte
+
+- Spec 04 §5 (Identificação), §6 (Serviços), §7 (itinerário), §8 (grade de horários), §9 (matrizes), §10 (resumo), §12 (exportação)
+- Spec 02 §6 (`Servico` completo no JSON exportado)
+
+## Regras envolvidas
+
+- RN-018 (documento exportado tem ≥ 1 Serviço completo)
+- RN-004 (UUIDs preservadas — round-trip: reimportar o JSON exportado mantém as UUIDs)
+- RN-096 (exportar JSON é o "salvar")
+
+## Entidades afetadas
+
+- Documento de operação inteiro (Autos, Serviço, Seção, Local, Itinerário, Viagem, matriz) — via UI, ponta a ponta
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Um E2E cria um documento do zero pela UI (identidade → 1 Serviço → itinerário com paradas → horários → matriz) com o OSRM mockado.
+- [ ] Após concluir o itinerário, as etapas Viagens e Matrizes exibem o Serviço (regressão-guarda da TASK-061).
+- [ ] A exportação produz um JSON que **passa no schema** `zod` strict (Serviço completo, RN-018).
+- [ ] Round-trip: reimportar o JSON exportado preserva as UUIDs geradas (RN-004).
+- [ ] O teste não faz nenhuma chamada de rede real ao OSRM (mock verificado).
+
+## Casos válidos
+
+- Fluxo "novo" com 1 Serviço, direcionalidade "ida", itinerário de 2+ paradas, ao menos 1 Viagem → exporta JSON válido.
+
+## Casos inválidos
+
+- (guarda opcional) Tentar exportar antes de completar ≥ 1 Serviço → a UI bloqueia/sinaliza pendência (RN-018), sem gerar JSON inválido.
+
+## Testes esperados
+
+- Unitários: N/A (é uma task de E2E).
+- Integração: N/A.
+- E2E: o novo spec Playwright do fluxo criar-do-zero, com OSRM mockado; asserções de Viagens/Matrizes populadas e de JSON exportado válido + round-trip de UUID.
+- Snapshot/contrato JSON: validação do JSON exportado contra o schema.
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `e2e/` (novo spec, ex.: `e2e/fluxo-novo.spec.ts`) + helper de mock do OSRM já existente
+- Possíveis `data-testid` adicionais **apenas** se o fluxo não for selecionável hoje (mínimos; sem alterar os existentes)
+
+## Riscos
+
+- Depende da TASK-061: sem a promoção, o E2E falha por design (Viagens/Matrizes vazias) — sequenciar depois dela.
+- Flakiness de E2E: garantir mock determinístico do OSRM (sem rede real — DEC-029).
+
+## Perguntas em aberto
+
+- Nenhuma.
+
+---
+
 ## Ordem recomendada de execução
 
 ```text
@@ -738,6 +906,12 @@ Hoje `EditorSecoes` e `EditorLocais` renderizam **cada um seu próprio `<Mapa>`*
 
 ```text
 059 → 060
+```
+
+**Fluxo criar-do-zero — promoção `ServicoEmConstrucao → Servico` (DEC-053 / Q-034; TASK-062 depende da TASK-061):**
+
+```text
+061 → 062
 ```
 
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.
