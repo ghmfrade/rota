@@ -8,7 +8,7 @@
 | RN-001 | Spec 01 §6; 02 §12 | UUID (4 entidades) | F/C/I | schema (zod) + criação de entidade | U + CONTRATO | Alta |
 | RN-002 | Spec 01 §6; 02 §12 | Criação de entidade | F | factory de entidades (`crypto.randomUUID`) | U | Alta |
 | RN-003 | Spec 02 §12 | Edição | F | reducers/stores de edição | U (regressão) | Alta |
-| RN-004 | Spec 01 §6; 02 §12; 04 §3.1 | Import/export | F | importador de JSON | U + INT (import→export idempotente) | **Alta** |
+| RN-004 | Spec 01 §6; 02 §12; 04 §3.1; DEC-053 | Import/export; promoção Serviço (novo) | F | importador de JSON; promoção `ServicoEmConstrucao → Servico` preserva UUID (TASK-061) | U + INT (import→export idempotente; round-trip de UUID pós-promoção) | **Alta** |
 | RN-005 | Spec 02 §12/§14 | Documento | F/C/I | validador estrutural | U + CONTRATO | Alta |
 | RN-006 | Spec 01 §6; 02 §6/§12; DEC-037 | Serviço | F/C/I | diff/persistência nunca usam `numero_n`; sufixo regenerado na troca de característica | U (diff por uuid; regeneração de sufixo) | Alta |
 | RN-007 | Spec 02 §12; 04 §6/§8.3-4 | Cópias | F | ações duplicar/copiar | U | Alta |
@@ -22,7 +22,7 @@
 | RN-015 | Spec 02 §8/§10.2; 03 §12 | Dados congelados | C/I | leitores sem dependência de OSRM/cálculo | INT (comparador offline) | Alta |
 | RN-016 | Spec 01 §8; 04 §3.2/§5 | Identificação | F | loader de listas estáticas | U + INT | Média |
 | RN-017 | Spec 01 §8; 04 §3.1/§14 | Import | F | validação de carregamento | U + INT | Alta |
-| RN-018 | Spec 02 §14; 04 §6 | Autos/Seções | F/C/I | validador estrutural + remoção em cascata | U | Média |
+| RN-018 | Spec 02 §14; 04 §6; DEC-053 | Autos/Seções; Serviço completo (novo) | F/C/I | validador estrutural + remoção em cascata; promoção `ServicoEmConstrucao → Servico` produz o ≥1 Serviço completo no fluxo novo (TASK-061) | U | Média |
 | RN-019..022 | Spec 01 §7; 03 §10 | Tipificação | F/C/I | módulo de tipificação (tabela por tipo) | U (tabela completa, casos inválidos) | Alta |
 | RN-023 | Spec 03 §10.4; 04 §5; DEC-034; DEC-037 | Troca de tipo | F | reconversão ao padrão + aviso + regeneração do sufixo `numero_n` | U + E2E | Média |
 | RN-024 | Spec 02 §6 | Serviço.carater | F/C | schema enum | CONTRATO | Média |
