@@ -27,3 +27,7 @@ export {
   type ResultadoDispararRecalculo,
 } from "./estado-itinerarios";
 export { EtapaItinerarios } from "./etapa-itinerarios";
+export {
+  EditorMapaItinerario,
+  type PropsEditorMapaItinerario,
+} from "./editor-mapa-itinerario";

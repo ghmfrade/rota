@@ -184,20 +184,22 @@ test.describe("Etapa Seções, Locais e Itinerários — criar Seção via mapa 
 
     await abrirEtapaVolta(page);
 
-    const mapaSecoes = page.getByTestId("editor-secoes").getByTestId("mapa-base");
-    await expect(mapaSecoes).toBeVisible();
+    // Mapa ÚNICO da etapa (TASK-060): Seção e Local no mesmo canvas. Clique
+    // esquerdo cria Seção (DEC-054).
+    const mapa = page.getByTestId("mapa-base");
+    await expect(mapa).toBeVisible();
     // Espera o mapa terminar a carga (evento "load" do MapLibre) e plotar os 3
     // marcadores das Seções já existentes — sinal mais forte de prontidão do
     // que só o container estar visível; sem ele, o clique pode ocorrer antes
     // do listener `mapa.on("click", ...)` produzir efeito perceptível.
-    await mapaSecoes.locator(".maplibregl-marker").first().waitFor();
-    await mapaSecoes.scrollIntoViewIfNeeded();
-    const caixa = await mapaSecoes.boundingBox();
+    await mapa.locator(".maplibregl-marker").first().waitFor();
+    await mapa.scrollIntoViewIfNeeded();
+    const caixa = await mapa.boundingBox();
     if (!caixa) throw new Error("mapa sem bounding box");
     // Clica no centro exato do canvas (via locator, que rola o elemento para a
     // viewport antes do clique) — no zoom default (Estado inteiro,
     // CENTRO_PADRAO_SP), cai dentro do município de Jaú no geojson real.
-    await mapaSecoes.click({ position: { x: caixa.width / 2, y: caixa.height / 2 } });
+    await mapa.click({ position: { x: caixa.width / 2, y: caixa.height / 2 } });
 
     await page.getByTestId("nome-secao-input").fill("Nova Seção E2E");
     await page.getByTestId("confirmar-criar-secao").click();
@@ -297,19 +299,19 @@ test.describe("Etapa Seções, Locais e Itinerários — feedback de montagem in
 
     await abrirEtapaVolta(page);
 
-    // O editor de Locais não tem nenhum Local pré-existente para servir de
-    // sinal de prontidão do mapa (ao contrário do editor de Seções, que já tem
-    // 3 marcadores) — usa o mapa irmão de Seções, carregado no mesmo ciclo,
-    // como sinal de que o bundle do MapLibre já está pronto.
-    const mapaSecoes = page.getByTestId("editor-secoes").getByTestId("mapa-base");
-    await mapaSecoes.locator(".maplibregl-marker").first().waitFor();
-
-    const mapaLocais = page.getByTestId("editor-locais").getByTestId("mapa-base");
-    await expect(mapaLocais).toBeVisible();
-    await mapaLocais.scrollIntoViewIfNeeded();
-    const caixa = await mapaLocais.boundingBox();
+    // Mapa único (TASK-060): as 3 Seções já plotadas servem de sinal de que o
+    // bundle do MapLibre está pronto. Criar Local é CLIQUE DIREITO no mesmo
+    // canvas (DEC-054).
+    const mapa = page.getByTestId("mapa-base");
+    await mapa.locator(".maplibregl-marker").first().waitFor();
+    await expect(mapa).toBeVisible();
+    await mapa.scrollIntoViewIfNeeded();
+    const caixa = await mapa.boundingBox();
     if (!caixa) throw new Error("mapa sem bounding box");
-    await mapaLocais.click({ position: { x: caixa.width / 2, y: caixa.height / 2 } });
+    await mapa.click({
+      button: "right",
+      position: { x: caixa.width / 2, y: caixa.height / 2 },
+    });
 
     await page.getByTestId("nome-local-input").fill("Novo Local E2E");
     await page.getByTestId("confirmar-criar-local").click();
