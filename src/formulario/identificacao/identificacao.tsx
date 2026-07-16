@@ -277,6 +277,7 @@ function IdentidadeEditavel({
       {reconversao.length > 0 && (
         <Painel
           tom="informativo"
+          elevacao="plana"
           role="status"
           data-testid="aviso-reconversao"
           className="mt-4"

@@ -19,7 +19,7 @@ import {
   type ServicoEmConstrucao,
   type SessaoFormulario,
 } from "@/formulario/sessao";
-import { Botao, Campo, Painel, Select, Tabela } from "@/shared/ui";
+import { Botao, Campo, Painel, Select, Selo, Tabela } from "@/shared/ui";
 import { contarServico, viagensSemana } from "@/shared/contagens";
 import { duplicarServico } from "./duplicar";
 import { podeRemoverServico, removerServico } from "./remover";
@@ -372,6 +372,11 @@ export function EtapaServicos({
                     <span data-testid="servico-numero-n">
                       {linha.numero_n}
                     </span>
+                    {!linha.completo && (
+                      <Selo tom="neutro" className="ml-2" data-testid="servico-em-construcao">
+                        sem itinerário ainda
+                      </Selo>
+                    )}
                   </td>
                   <td>
                     <span data-testid="servico-caracteristica">
@@ -385,12 +390,6 @@ export function EtapaServicos({
                     <span data-testid="servico-direcionalidade">
                       {ROTULO_DIRECIONALIDADE[linha.direcionalidade]}
                     </span>
-                    {!linha.completo && (
-                      <span data-testid="servico-em-construcao">
-                        {" "}
-                        (sem itinerário ainda)
-                      </span>
-                    )}
                   </td>
                   <td>
                     <span data-testid="servico-viagens-semana">

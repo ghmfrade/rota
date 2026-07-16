@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { DIAS_SEMANA, type Itinerario, type Parada, type Secao, type Servico } from "@/shared/contrato";
+import { Botao, Campo, Painel, Select, Tabela } from "@/shared/ui";
 import { nomeExibicaoSecao } from "@/formulario/secoes";
 import {
   ancorasHorarioDaSessao,
@@ -278,10 +279,12 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
 
   if (servicos.length === 0) {
     return (
-      <p data-testid="viagens-sem-servico">
-        Conclua ao menos um Serviço com itinerário e rota calculada na etapa
-        Seções, Locais e Itinerários antes de editar viagens e horários.
-      </p>
+      <Painel>
+        <p data-testid="viagens-sem-servico">
+          Conclua ao menos um Serviço com itinerário e rota calculada na etapa
+          Seções, Locais e Itinerários antes de editar viagens e horários.
+        </p>
+      </Painel>
     );
   }
 
@@ -304,14 +307,14 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
             <th scope="row">
               {nomeSecao}
               {ehPrimeiraSecao && blocoTemViagem && (
-                <button
-                  type="button"
+                <Botao
+                  variante="perigo"
                   data-testid="apagar-bloco"
                   aria-label={`Apagar bloco ${indiceBloco + 1}`}
                   onClick={() => aoApagarBloco(indiceBloco, feriado)}
                 >
                   Apagar bloco
-                </button>
+                </Botao>
               )}
             </th>
             {DIAS_SEMANA.map((dia) => {
@@ -325,31 +328,30 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                   const viagemUuid = celula.viagem.uuid;
                   return (
                     <td key={dia} data-testid="celula-partida">
-                      <input
-                        type="time"
-                        aria-label={`Horário de partida — ${dia}, viagem ${indiceBloco + 1}`}
-                        value={horarioMostrar}
-                        onChange={(evento) => aoConfirmarPartida(viagemUuid, evento.target.value)}
-                      />
-                      <button
-                        type="button"
-                        data-testid="restaurar-viagem"
-                        aria-label={`Restaurar sugestão — ${dia}, viagem ${indiceBloco + 1}`}
-                        onClick={() => aoResetarViagem(viagemUuid)}
-                      >
-                        Restaurar
-                      </button>
-                      <button
-                        type="button"
-                        data-testid="apagar-viagem"
-                        aria-label={`Apagar viagem — ${dia}, viagem ${indiceBloco + 1}`}
-                        onClick={() => aoApagarViagem(viagemUuid)}
-                      >
-                        Apagar
-                      </button>
-                      <label>
-                        <span className="sr-only">Copiar para o dia</span>
-                        <select
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Campo
+                          type="time"
+                          aria-label={`Horário de partida — ${dia}, viagem ${indiceBloco + 1}`}
+                          value={horarioMostrar}
+                          onChange={(evento) => aoConfirmarPartida(viagemUuid, evento.target.value)}
+                        />
+                        <Botao
+                          variante="secundario"
+                          data-testid="restaurar-viagem"
+                          aria-label={`Restaurar sugestão — ${dia}, viagem ${indiceBloco + 1}`}
+                          onClick={() => aoResetarViagem(viagemUuid)}
+                        >
+                          Restaurar
+                        </Botao>
+                        <Botao
+                          variante="perigo"
+                          data-testid="apagar-viagem"
+                          aria-label={`Apagar viagem — ${dia}, viagem ${indiceBloco + 1}`}
+                          onClick={() => aoApagarViagem(viagemUuid)}
+                        >
+                          Apagar
+                        </Botao>
+                        <Select
                           data-testid="select-copia-dia"
                           aria-label={`Copiar para o dia — ${dia}, viagem ${indiceBloco + 1}`}
                           value={diaCopiaPorViagem[viagemUuid] ?? celula.viagem.dia_semana}
@@ -365,16 +367,16 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                               {ROTULO_DIA[d]}
                             </option>
                           ))}
-                        </select>
-                      </label>
-                      <button
-                        type="button"
-                        data-testid="copiar-viagem"
-                        aria-label={`Copiar viagem para outro dia — ${dia}, viagem ${indiceBloco + 1}`}
-                        onClick={() => aoCopiarViagem(viagemUuid)}
-                      >
-                        Copiar
-                      </button>
+                        </Select>
+                        <Botao
+                          variante="secundario"
+                          data-testid="copiar-viagem"
+                          aria-label={`Copiar viagem para outro dia — ${dia}, viagem ${indiceBloco + 1}`}
+                          onClick={() => aoCopiarViagem(viagemUuid)}
+                        >
+                          Copiar
+                        </Botao>
+                      </div>
                     </td>
                   );
                 }
@@ -382,7 +384,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                 const erro = errosCelula[chave];
                 return (
                   <td key={dia} data-testid="celula-passante">
-                    <input
+                    <Campo
                       type="time"
                       aria-label={`Horário de passagem — ${nomeSecao}, ${dia}, viagem ${indiceBloco + 1}`}
                       aria-invalid={erro ? true : undefined}
@@ -392,7 +394,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                       }
                     />
                     {erro && (
-                      <span role="alert" data-testid="erro-passante">
+                      <span role="alert" data-testid="erro-passante" className="text-xs text-erro">
                         {erro}
                       </span>
                     )}
@@ -403,7 +405,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
               if (celula.estado === "criavel" && ehPrimeiraSecao) {
                 return (
                   <td key={dia} data-testid="celula-criavel">
-                    <input
+                    <Campo
                       type="time"
                       aria-label={`Criar viagem — ${dia}`}
                       value=""
@@ -442,9 +444,9 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
 
   return (
     <div data-testid="etapa-viagens">
-      <label>
-        Serviço
-        <select
+      <div className="flex flex-wrap gap-4">
+        <Select
+          rotulo="Serviço"
           data-testid="select-servico-viagens"
           value={servicoSelecionadoUuid ?? ""}
           onChange={(evento) => {
@@ -458,13 +460,11 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
               {s.numero_n}
             </option>
           ))}
-        </select>
-      </label>
+        </Select>
 
-      {servicoAtual && (
-        <label>
-          Sentido
-          <select
+        {servicoAtual && (
+          <Select
+            rotulo="Sentido"
             data-testid="select-sentido-viagens"
             value={sentidoSelecionado ?? ""}
             onChange={(evento) =>
@@ -479,58 +479,65 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                 {it.sentido === "ida" ? "Ida" : "Volta"}
               </option>
             ))}
-          </select>
-        </label>
-      )}
+          </Select>
+        )}
+      </div>
 
       {itinerarioAtual && (
         <>
-          <section data-testid="grade-dias-comuns">
-            <h3>Dias comuns</h3>
-            <button type="button" data-testid="restaurar-lote" onClick={aoResetarLote}>
+          <section data-testid="grade-dias-comuns" className="mt-4">
+            <h3 className="text-lg font-semibold text-cinza-900">Dias comuns</h3>
+            <Botao
+              variante="secundario"
+              className="mt-2"
+              data-testid="restaurar-lote"
+              onClick={aoResetarLote}
+            >
               Restaurar sugestão (toda a grade)
-            </button>
-            <table>
+            </Botao>
+            <Tabela className="mt-2">
               {cabecalhoGrade()}
               <tbody>{corpoGrade(blocosComuns, false)}</tbody>
-            </table>
+            </Tabela>
           </section>
 
-          <section data-testid="grade-feriados">
-            <h3>Feriados</h3>
-            <p data-testid="legenda-feriados">
+          <section data-testid="grade-feriados" className="mt-6">
+            <h3 className="text-lg font-semibold text-cinza-900">Feriados</h3>
+            <p data-testid="legenda-feriados" className="text-sm text-cinza-500">
               Feriados não entram nas contagens — semana padrão (sem feriados).
             </p>
-            {temFeriado ? (
-              <>
-                <button
-                  type="button"
-                  data-testid="copiar-dias-comuns-sobrescrever"
+            <div className="mt-2 flex flex-wrap gap-2">
+              {temFeriado ? (
+                <>
+                  <Botao
+                    variante="secundario"
+                    data-testid="copiar-dias-comuns-sobrescrever"
+                    onClick={() => aoCopiarDiasComuns("sobrescrever")}
+                  >
+                    Copiar dias comuns (sobrescrever)
+                  </Botao>
+                  <Botao
+                    variante="secundario"
+                    data-testid="copiar-dias-comuns-mesclar"
+                    onClick={() => aoCopiarDiasComuns("mesclar")}
+                  >
+                    Copiar dias comuns (mesclar)
+                  </Botao>
+                </>
+              ) : (
+                <Botao
+                  variante="secundario"
+                  data-testid="copiar-dias-comuns"
                   onClick={() => aoCopiarDiasComuns("sobrescrever")}
                 >
-                  Copiar dias comuns (sobrescrever)
-                </button>
-                <button
-                  type="button"
-                  data-testid="copiar-dias-comuns-mesclar"
-                  onClick={() => aoCopiarDiasComuns("mesclar")}
-                >
-                  Copiar dias comuns (mesclar)
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                data-testid="copiar-dias-comuns"
-                onClick={() => aoCopiarDiasComuns("sobrescrever")}
-              >
-                Copiar dias comuns
-              </button>
-            )}
-            <table>
+                  Copiar dias comuns
+                </Botao>
+              )}
+            </div>
+            <Tabela className="mt-2">
               {cabecalhoGrade()}
               <tbody>{corpoGrade(blocosFeriados, true)}</tbody>
-            </table>
+            </Tabela>
           </section>
         </>
       )}
