@@ -4,6 +4,7 @@ import {
   contarAutos,
   contarAutosPorFaixa,
   FAIXAS_HORARIO,
+  ROTULO_SEMANA_PADRAO,
   type ContagensAutos,
   type ContagensAutosPorFaixa,
 } from "@/shared/contagens";
@@ -19,7 +20,6 @@ import { Selo, Tabela } from "@/shared/ui";
 // RN-069/NEG-018 — todas as contagens usam a semana padrão (sem feriado); o
 // rótulo abaixo é obrigatório em qualquer lugar que exiba estes números
 // (tela e PDF — Spec 04 §11 item 9/§13.3).
-const ROTULO_SEMANA_PADRAO = "semana padrão (sem feriados)";
 
 export interface PropsPainelResumoOperacional {
   autos: Autos;

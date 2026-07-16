@@ -16,7 +16,11 @@ import { renderizar } from "../shared-ui/_ajuda-render";
 // RN-069.
 
 function viagemFeriado(base: Viagem): Viagem {
-  return { ...base, uuid: `${base.uuid}-feriado`, viagem_feriado: true };
+  return {
+    ...base,
+    uuid: "dddddddd-0000-4000-8000-dddddddddddd",
+    viagem_feriado: true,
+  };
 }
 
 describe("EtapaServicos — coluna de viagens semanais (Spec 04 §6)", () => {
@@ -130,12 +134,12 @@ describe("EtapaServicos — coluna de viagens semanais (Spec 04 §6)", () => {
     );
 
     const rotulo = container.querySelector(
-      '[data-testid="rotulo-semana-padrao"]',
+      '[data-testid="servicos-rotulo-semana-padrao"]',
     );
     expect(rotulo?.textContent).toBe("semana padrão (sem feriados)");
 
     const cabecalho = container.querySelector(
-      'thead th[scope="col"]:has([data-testid="rotulo-semana-padrao"])',
+      'thead th[scope="col"]:has([data-testid="servicos-rotulo-semana-padrao"])',
     );
     expect(cabecalho).not.toBeNull();
 

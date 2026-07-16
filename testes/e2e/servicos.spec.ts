@@ -139,9 +139,9 @@ test.describe("Serviços — modo carregado (Serviços completos do JSON)", () =
     await expect(
       page.getByTestId("servico-viagens-semana").first(),
     ).toHaveText("Ida 1 · Volta 1 · Total 2");
-    await expect(page.getByTestId("rotulo-semana-padrao").first()).toHaveText(
-      "semana padrão (sem feriados)",
-    );
+    await expect(
+      page.getByTestId("servicos-rotulo-semana-padrao"),
+    ).toHaveText("semana padrão (sem feriados)");
   });
 
   test("editar um Serviço completo: direcionalidade é somente-leitura; caráter muda", async ({

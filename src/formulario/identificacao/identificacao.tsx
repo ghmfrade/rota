@@ -153,17 +153,21 @@ function SeletorDeAutos({
 }) {
   if (erroListas) {
     return (
-      <p role="alert" data-testid="erro-listas-identificacao" className="text-sm text-erro">
-        Não foi possível carregar as listas estáticas de Autos/empresas:{" "}
-        {erroListas}
-      </p>
+      <Painel>
+        <p role="alert" data-testid="erro-listas-identificacao" className="text-sm text-erro">
+          Não foi possível carregar as listas estáticas de Autos/empresas:{" "}
+          {erroListas}
+        </p>
+      </Painel>
     );
   }
   if (!listas) {
     return (
-      <p data-testid="carregando-listas" className="text-sm text-cinza-500">
-        Carregando listas de Autos…
-      </p>
+      <Painel>
+        <p data-testid="carregando-listas" className="text-sm text-cinza-500">
+          Carregando listas de Autos…
+        </p>
+      </Painel>
     );
   }
   return (
