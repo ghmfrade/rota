@@ -1031,6 +1031,668 @@ A TASK-060 unificou os mapas e pôs a tabela lateral ao lado (DEC-054 / doc 18 �
 
 ---
 
+## TASK-065 — Inverter os gestos do mapa único: esquerdo cria ponto de rota, direito abre menu Seção/Local
+
+## Objetivo
+
+O mapa único da etapa de itinerários passa a ter **um significado por botão** (DEC-055): clique **esquerdo sobre a linha da rota** cria ponto de rota; clique esquerdo **fora** da linha não cria nada (o mapa faz pan); clique **direito** abre um **menu flutuante** no ponto clicado com a escolha entre **Seção** e **Local**, que segue para o formulário de criação já existente.
+
+## Contexto
+
+A DEC-054 atribuiu Seção ao botão esquerdo quando o gesto de ponto de rota ainda estava deferido, e por isso não previu a colisão: a **linha da rota corre sobre as vias**, então uma Seção intermediária cai quase sempre em cima da linha, onde a Spec 04 §7.3 item 6 manda criar ponto de rota. A DEC-055 (Q-036) resolveu dando a cada botão um significado só. A TASK-063 entrega antes o **ancorador geométrico** e a detecção de clique sobre a linha em `shared/mapa`; esta task consome os dois e inverte o roteamento dos gestos. O `EditorMapaItinerario` (TASK-060) e os motores de Seção/Local/350 m são reusados intactos.
+
+## Fora de escopo
+
+- **Inserção posicional** da parada (clique direito sobre a linha inserindo entre as paradas do trecho) — é a TASK-067; aqui o clique direito **sempre acrescenta ao fim**, como hoje, independentemente de acertar a linha.
+- Re-ancoragem de pontos de rota quando as paradas mudam — TASK-066 (Q-037).
+- O gesto de ponto de rota em si (criar/mover/remover, sub-lista) — TASK-063, já entregue quando esta começar.
+- Regra dos 350 m, reuso de Seção, derivação de município — inalterados (TASK-060).
+- Sincronização seleção tabela↔mapa — TASK-064.
+- Qualquer mudança no contrato JSON.
+
+## Specs fonte
+
+- Spec 04 §7 (mapa único; "o usuário lança Seções, Locais e pontos de rota enquanto desenha a rota")
+- Spec 04 §7.1/§7.2 (criação de Seção e de Local — formulário e derivação de município, inalterados)
+- Spec 04 §7.3 item 6 (clique sobre a linha da rota cria vértice arrastável)
+- Spec 03 §3.6 (ponto de rota ancorado entre duas paradas consecutivas)
+- `docs-dev/18-DESIGN_SYSTEM.md` §5 (flutuante efêmero usa `sombra-3`; nunca sobrepor interativo de forma bloqueante) e §6 (componentes vêm de `shared/ui`; `data-testid`/`aria-*` existentes intocáveis) — vinculante por DEC-050
+
+## Regras envolvidas
+
+- RN-042 (ponto de rota sem identidade; o gesto do esquerdo só o cria sobre a linha)
+- RN-052 (editar recalcula no "soltar" de cada gesto)
+- RN-097 (`shared/` é reusável por Formulário e Comparador — a extensão do `<Mapa>` e o menu novo nascem aditivos, sem acoplar o Comparador)
+- RN-025/RN-031 (Seção pertence ao Autos, Local ao Serviço — a escolha do menu decide qual entidade nasce; nenhuma conversão implícita entre elas, NEG-012)
+
+## Entidades afetadas
+
+- Seção, Local, ponto de rota (só o gesto de criação muda; os modelos não)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Clique esquerdo **sobre a linha** da rota cria ponto de rota (comportamento da TASK-063, agora sem concorrer com a criação de Seção).
+- [ ] Clique esquerdo **fora** da linha **não cria nada** e não abre formulário nenhum; o mapa continua panning normalmente.
+- [ ] Clique direito (sobre a linha ou fora) abre um **menu flutuante no ponto clicado** com exatamente duas opções: Seção e Local.
+- [ ] Escolhida a opção, abre o formulário de criação já existente do tipo correspondente, com o ponto clicado como geolocalização — motores de 350 m/município inalterados.
+- [ ] O menu fecha ao escolher, ao cancelar e ao clicar fora; é acessível por teclado (foco, `Esc` fecha) e não bloqueia o mapa (doc 18 §5).
+- [ ] Os `data-testid` existentes (`form-criar-secao`, `form-criar-local`, `nome-secao-input`, `nome-local-input`, `confirmar-criar-secao`, `confirmar-criar-local`, `tabela-paradas`, `editor-mapa-itinerario`) permanecem **inalterados** (doc 18 §6.5).
+- [ ] A dica de gestos visível na etapa descreve o novo desenho.
+
+## Casos válidos
+
+- Itinerário com rota desenhada: clique direito num ponto qualquer → menu → "Seção" → formulário → nome → Seção criada **no fim** da lista de paradas, rota recalculada.
+- Mesmo fluxo escolhendo "Local" → Local criado no fim, rota recalculada.
+- Itinerário **sem** paradas (mapa vazio, sem linha): clique direito funciona normalmente — é o caminho de montagem do zero.
+
+## Casos inválidos
+
+- Clique esquerdo fora da linha → nenhum formulário, nenhuma entidade, nenhuma chamada OSRM.
+- Clique esquerdo com **nenhuma rota desenhada** (menos de 2 paradas, ou estado `sem-rota`) → não há linha para acertar; nada acontece.
+- Menu aberto e clique fora → fecha sem criar nada.
+- Ponto fora de SP no formulário → mensagem existente (`MENSAGEM_FORA_DE_SP`), sem criar — comportamento herdado, não reimplementado.
+
+## Testes esperados
+
+- Unitários: o componente de menu flutuante (abre/fecha, `Esc`, clique fora, foco, duas opções).
+- Integração (jsdom, `<Mapa>` dublado como em `editor-mapa-itinerario.test.tsx`): clique esquerdo fora da linha **não** cria Seção (**inválido** — é a inversão do que o teste afirma hoje); clique esquerdo sobre a linha cria ponto de rota; clique direito abre o menu e cada opção leva ao formulário certo; recusa de 350 m/fora de SP segue igual.
+- E2E: `testes/e2e/etapa-itinerarios.spec.ts` atualizado — criar Seção e Local passa a ser clique direito + escolha (OSRM/tiles mockados, DEC-029).
+- Snapshot/contrato JSON: N/A (nenhum campo muda) — a suíte de contrato existente deve seguir verde.
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- Criar `src/shared/ui/menu-flutuante.tsx` (+ export no índice de `shared/ui`)
+- Alterar `src/shared/mapa/mapa.tsx` (callback de clique-na-linha para o botão direito, simétrico ao do esquerdo entregue pela TASK-063)
+- Alterar `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (roteamento dos gestos, menu, dica)
+- Alterar `testes/unitarios/formulario/editor-mapa-itinerario.test.tsx` e `testes/e2e/etapa-itinerarios.spec.ts`
+- Possível ajuste em `docs-dev/18-DESIGN_SYSTEM.md` §3 (registrar o componente novo)
+
+## Dependências
+
+- **TASK-063** (entrega o ancorador geométrico e a detecção de clique sobre a linha em `shared/mapa`).
+- TASK-060 (mapa único) — já entregue.
+
+## Riscos
+
+- **Regressão de gesto entregue:** inverte comportamento aprovado na TASK-060; os testes que afirmam "esquerdo → Seção" mudam de asserção **por decisão registrada** (DEC-055), não por conveniência — a revisão de aderência deve conferir a DEC, não o texto da DEC-054.
+- **Descoberta do gesto:** clique direito é gesto de menor descoberta; a dica visível na etapa é mitigação obrigatória (já era ressalva da Q-035).
+- **Menu flutuante × doc 18 §5:** não pode sobrepor elemento interativo de forma bloqueante; usar `sombra-3` (flutuante efêmero).
+- `shared/mapa` é usado pelo Comparador e pelas demo pages: a extensão precisa ser aditiva (callback ausente ≡ comportamento atual).
+
+## Perguntas em aberto
+
+- Nenhuma (desenho fixado pela DEC-055).
+
+---
+
+## TASK-066 — Re-ancorar os pontos de rota quando o conjunto ou a ordem das paradas muda
+
+> **Desbloqueada pela DEC-056 (2026-07-16)** — a Q-037 foi decidida na opção A (re-ancorar onde é determinístico, descartar só na reordenação). Os critérios de aceite abaixo são os da regra decidida.
+
+## Objetivo
+
+Fechar a lacuna entre a Spec 03 §3.6.2 ("reedição fiel" — reaplicar os pontos de rota ao recalcular por alterar paradas) e a Spec 02 §10.4/RN-042 (`apos_parada_ordem` ∈ `[1, paradas.length − 1]`, índice posicional sobre a lista que acabou de mudar), aplicando a regra da **DEC-056** — e, no mesmo movimento, transformar o `throw` interno de `intercalar-pontos-de-rota.ts` na falha bloqueante bem-comportada que a RN-048 exige.
+
+## Contexto
+
+Levantada pela `/investigar-conflito` durante a análise da TASK-063. Hoje `etapa-itinerarios.tsx` reaplica `estadoAtual.rota.pontos_de_rota` **cru** no recálculo. Removida uma parada, os pontos do último trecho violam o intervalo e `intercalar-pontos-de-rota.ts` **lança** — sem `catch` em `solicitarRota` (que só embrulha o `fetch`) nem em `dispararRecalculo`, virando **rejeição não tratada** em vez do estado `sem-rota` da RN-048. Inserida uma parada no meio ou reordenada a sequência, os valores continuam no intervalo válido mas passam a designar **outro par de paradas**: o documento fica válido e o traçado forçado sai errado, **em silêncio**. O bug é alcançável **hoje** (importar JSON com `pontos_de_rota` + remover parada na tabela); a TASK-063 o torna rotineiro, e a TASK-067 (inserção posicional) depende desta regra para saber o que fazer com os pontos de um trecho partido em dois.
+
+## Fora de escopo
+
+- Qualquer mudança no contrato JSON — `apos_parada_ordem` já existe; a re-ancoragem só altera o **valor** calculado antes da requisição OSRM (Spec 02 §10.4 e §14 permanecem intocados).
+- Inserção posicional de parada pelo clique na linha — TASK-067 (esta task entrega a regra que aquela consome).
+- Gesto de ponto de rota — TASK-063; inversão de gestos — TASK-065.
+- Reconciliação de horários na mudança de itinerário — já é da TASK-046 (DEC-048); não misturar.
+- Mudar a política de comparação de pontos de rota no Comparador (Spec 05 §15.3, "pelo efeito") — leitores não recalculam (NEG-019).
+
+## Specs fonte
+
+- Spec 03 §3.6.2 (reedição fiel — reaplicação ao recalcular por alterar paradas)
+- Spec 03 §3.6 regra 1 e §3.6.1 (ancoragem entre paradas consecutivas; travessia = `(apos_parada_ordem, índice no array)`)
+- Spec 03 §3.5 (política de indisponibilidade/erro — categorias de falha)
+- Spec 02 §10.4 e §14 (intervalo `[1, paradas.length − 1]`; validação estrutural)
+
+## Regras envolvidas
+
+- RN-042 (ancoragem e intervalo — o invariante que a re-ancoragem preserva)
+- RN-048 (indisponibilidade/erro é bloqueante, sem degradação silenciosa — o `throw` deve virar `sem-rota`)
+- RN-052 (editar recalcula)
+- RN-041 (invariante de trechos, preservado em qualquer caminho)
+- RN-043 (forçar traçado altera distâncias — reatribuir ao par errado corrompe `distancia_km`, matriz e tarifa)
+
+## Entidades afetadas
+
+- ponto de rota, Rota, Parada (a regra reindexa; nenhum modelo muda)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Parada **acrescentada ao fim** → nenhum `apos_parada_ordem` muda; traçado forçado idêntico.
+- [ ] Parada **removida** → os dois trechos adjacentes fundem-se; os pontos de ambos preservam a sequência e assumem a ordem do trecho fundido; nenhum valor fora de `[1, paradas.length − 1]`.
+- [ ] Parada **inserida no meio** → pontos antes dela mantêm a ordem; os depois recebem +1.
+- [ ] **Reordenação** → os pontos daquele itinerário são descartados, com aviso não bloqueante (precedente DEC-048).
+- [ ] Nenhum gesto da etapa produz **rejeição não tratada**: violação de intervalo residual vira estado `sem-rota` (RN-048), sem apagar a última rota válida.
+- [ ] `trechos.length == paradas.length − 1` em todos os caminhos (RN-041).
+
+## Casos válidos
+
+- 3 paradas (A, B, C) com `p1,p2,p3` em `apos_parada_ordem: 1` e `p4` em `2` (exemplo literal da Spec 03 §3.6.1); remover B → trechos A→B e B→C fundem-se em A→C; os quatro pontos ficam em `apos_parada_ordem: 1`, na ordem `p1,p2,p3,p4`.
+- Mesma base; acrescentar D ao fim → nada muda nos pontos.
+
+## Casos inválidos
+
+- JSON importado com `apos_parada_ordem` fora do intervalo (arquivo corrompido) → falha bloqueante da RN-048 com mensagem da Spec 03 §3.5, **sem** derrubar a etapa e **sem** apagar a última rota válida.
+- `apos_parada_ordem == paradas.length` após a re-ancoragem → nunca deve ocorrer; se ocorrer, é bug e o teste falha (RN-042).
+
+## Testes esperados
+
+- Unitários: a função pura de re-ancoragem, caso a caso (fim/remoção/inserção/reordenação), incluindo vários pontos no mesmo trecho (§3.6.1) e os **inválidos** acima.
+- Integração: remover parada na tabela lateral de um itinerário com pontos de rota **não** produz rejeição não tratada e recalcula com os pontos re-ancorados (OSRM mockado); reordenar dispara o aviso de descarte.
+- E2E: opcional — o caminho crítico já fica coberto na integração.
+- Snapshot/contrato JSON: `pontos_de_rota` resultante válido por `esquemaRota` e por `validacoes-estruturais` (§14) em todos os caminhos.
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- Criar `src/formulario/roteamento/reancorar-pontos-de-rota.ts` (+ export no índice)
+- Alterar `src/formulario/roteamento/cliente-osrm.ts` e/ou `src/formulario/itinerarios/estado-itinerarios.ts` (`catch` defensivo → `FalhaOsrm`, RN-048)
+- Alterar `src/formulario/itinerarios/etapa-itinerarios.tsx` (re-ancorar antes de reaplicar)
+- Testes correspondentes em `testes/unitarios/formulario/`
+
+## Dependências
+
+- **DEC-056** (regra de re-ancoragem) — decidida; a task está liberada.
+- TASK-063 (o gesto que torna o caminho rotineiro) — recomendável antes, não estritamente necessário.
+
+## Riscos
+
+- **Bug vivo até esta task entrar:** o caminho da rejeição não tratada já é alcançável hoje por importação + remoção de parada. É o argumento para priorizá-la logo após a TASK-063.
+- Escolher a categoria de falha errada para a violação de intervalo (não é falha de rede nem semântica do OSRM — a taxonomia da TASK-022 pode precisar de um caso novo).
+- Interação com a TASK-046 (horários): as duas reagem à mudança do conjunto de paradas; não duplicar a detecção — reusar a comparação de sequência que a DEC-048 já prevê.
+
+## Perguntas em aberto
+
+- Nenhuma (regra fixada pela DEC-056).
+
+---
+
+## TASK-067 — Inserção posicional: clique direito sobre a linha insere a parada entre as paradas do trecho
+
+## Objetivo
+
+Fechar a última parte da DEC-055: clicar com o botão direito **sobre a linha da rota** e escolher Seção ou Local insere a parada **entre as duas paradas que delimitam aquele trecho**, na posição correspondente ao ponto clicado — atendendo a Spec 04 §7.3 item 2 ("insere Seções e Locais **em ordem**"), hoje não atendida.
+
+## Contexto
+
+Hoje toda parada criada pelo mapa vai para o **fim** da lista, obrigando o usuário a subi-la com as setinhas da tabela lateral. A DEC-055 decidiu a inserção posicional. O motor já suporta: `inserirParada` (`motor-montagem.ts`) **já aceita índice de inserção** (default: fim) — falta o chamador calcular o índice, que sai do **mesmo ancorador geométrico** entregue pela TASK-063 para o `apos_parada_ordem`. A TASK-065 entrega o gesto do botão direito (menu Seção/Local) acrescentando sempre ao fim; esta task troca o fim pelo índice quando o clique acerta a linha. Depende da TASK-066 porque inserir uma parada no meio **parte um trecho em dois** e os pontos de rota daquele trecho precisam ser repartidos conforme a **DEC-056**.
+
+## Fora de escopo
+
+- A regra de re-ancoragem em si (DEC-056) — TASK-066; esta apenas a consome.
+- O menu flutuante e o roteamento dos gestos — TASK-065.
+- Reordenar/remover parada pela tabela lateral — já existe (TASK-019).
+- Reconciliação de horários — TASK-046 (DEC-048), que já cobre "inserir Seção ou Local" como mudança de conjunto.
+- Qualquer mudança no contrato JSON.
+
+## Specs fonte
+
+- Spec 04 §7.3 item 2 (insere Seções e Locais **em ordem**, clicando no mapa)
+- Spec 04 §7.3 item 3 (tabela lateral na ordem da travessia; reordenar = recalcular)
+- Spec 04 §7.3 item 5 (recalcular sempre que o itinerário muda)
+- Spec 03 §3.6 (pontos de rota do trecho partido — regra na DEC-056, via TASK-066)
+
+## Regras envolvidas
+
+- RN-041 (invariante de trechos: `paradas + 1` ⇒ `trechos + 1`, automático)
+- RN-052 (inserir recalcula)
+- RN-042 (pontos de rota do trecho partido re-ancorados, nunca virando parada — NEG-011)
+- RN-030 (conjunto de Seções consistente entre Ida e Volta — inserir só num sentido acende o aviso não bloqueante existente, DEC-047)
+- RN-034/035/036 (montagem válida — resolução de paradas inalterada)
+
+## Entidades afetadas
+
+- Parada, Seção, Local, ponto de rota
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Clique direito **sobre a linha** entre as paradas 2 e 3 + escolher Seção → a Seção entra como parada de `ordem` 3, empurrando as seguintes.
+- [ ] O mesmo vale para Local.
+- [ ] Clique direito **fora** da linha → continua acrescentando ao **fim** (DEC-055).
+- [ ] A rota é recalculada após a inserção (RN-052) e `trechos == paradas − 1` (RN-041).
+- [ ] Pontos de rota do trecho partido são repartidos conforme a DEC-056 — nenhum vira parada, nenhum sai do intervalo válido.
+- [ ] A tabela lateral reflete a nova ordem imediatamente.
+
+## Casos válidos
+
+- Itinerário A(1) → B(2) → C(3); clique direito sobre a linha no meio de B→C, escolher "Local" → paradas viram A(1), B(2), Novo(3), C(4); `trechos` passa de 2 para 3.
+- Mesmo itinerário com `p4` em `apos_parada_ordem: 2` (trecho B→C); a parada nova cai **depois** de `p4` → `p4` continua em `2`; se cair **antes**, `p4` passa a `3` (DEC-056).
+
+## Casos inválidos
+
+- Clique direito sobre a linha com **rota ausente** (`sem-rota`) → não há linha; cai no caminho "fora da linha" (acrescenta ao fim).
+- Ponto fora de SP → recusa existente, sem inserir.
+- Violação dos 350 m no reuso de Seção → recusa existente, sem inserir.
+- Falha do OSRM no recálculo pós-inserção → `sem-rota` (RN-048), sem apagar a última rota válida.
+
+## Testes esperados
+
+- Unitários: cálculo do índice de inserção a partir da posição ao longo do traçado (primeiro trecho, último trecho, exatamente sobre uma parada — **inválido**/borda).
+- Integração: inserção no meio recalcula e reordena a tabela (OSRM mockado); pontos de rota do trecho partido repartidos corretamente; clique fora da linha ainda acrescenta ao fim.
+- E2E: inserir uma Seção no meio de um itinerário pelo mapa e ver a tabela e a rota refletirem (OSRM/tiles mockados).
+- Snapshot/contrato JSON: `paradas`/`trechos`/`pontos_de_rota` válidos após a inserção (§14).
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- Alterar `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (passar o índice do ancorador ao host)
+- Alterar `src/formulario/itinerarios/etapa-itinerarios.tsx` (`inserirParada(paradas, parada, indice)`)
+- Testes correspondentes
+
+## Dependências
+
+- **TASK-066** (regra de re-ancoragem da DEC-056) — precisa estar entregue antes.
+- **TASK-065** (gesto do botão direito e menu).
+- TASK-063 (ancorador geométrico).
+
+## Riscos
+
+- Clique exatamente **sobre** uma parada existente: índice ambíguo (antes ou depois dela) — definir borda determinística e testá-la.
+- Rota com laço/retorno passando duas vezes pelo mesmo lugar: a posição ao longo do traçado pode ser ambígua (mesma limitação conhecida da TASK-063).
+- Inserir só num sentido de Serviço bidirecional diverge o conjunto de Seções (RN-030) — o aviso não bloqueante existente (DEC-047) já cobre; não inventar bloqueio novo.
+
+## Perguntas em aberto
+
+- Nenhuma (regra fixada pela DEC-056; gesto fixado pela DEC-055).
+
+---
+
+## TASK-068 — Identidade visual do vértice de ponto de rota (ciano, tamanho intermediário)
+
+## Objetivo
+
+O vértice de ponto de rota ganha **cor própria (ciano) com mais destaque** e **tamanho intermediário** — maior que os 9 px de hoje, sempre menor que o marcador de Seção/Local (16 px) —, substituindo o cinza `#334155` que a TASK-063 escolheu por inferência controlada. A hierarquia visual "parada > ponto de rota" fica explícita e o token entra na paleta oficial.
+
+## Contexto
+
+A Spec 04 §7.3 fixa "visual distinto — vértice pequeno sobre a linha, sem rótulo" e nada mais sobre aparência; a TASK-063 preencheu a lacuna com cinza `#334155` (que é o token de **texto padrão** do doc 18, não uma cor de marcador) e 9 px, marcando ambos como **inferência controlada** em [`editor-mapa-itinerario.tsx`](../../src/formulario/itinerarios/editor-mapa-itinerario.tsx). O responsável pelo domínio decidiu o visual definitivo na conversa da `/revisar-aderencia` da TASK-063 (**DEC-057**): ciano, com mais destaque, e tamanho entre o vértice atual e o marcador de parada. A paleta do doc 18 §2 **não tem família ciano** — o token é novo. O cinza atual some sobre o traçado da rota, que é justamente onde o vértice vive.
+
+## Fora de escopo
+
+- **Affordance de hover** sobre a linha (cursor + fantasma) — é a **TASK-069**.
+- **Clique para remover** o vértice — é a **TASK-070**.
+- Qualquer mudança no **contrato JSON**, no ancorador geométrico ou no motor de roteamento.
+- Cor/forma/tamanho dos marcadores de **Seção e Local** — inalterados (DEC-054).
+- Rótulo, popup ou entrada na tabela de paradas para o ponto de rota — proibido por Spec 04 §7.3.
+
+## Specs fonte
+
+- Spec 04 §7.3 (regra "Ponto de rota não é Seção, Local nem Parada — visual distinto, vértice pequeno sobre a linha, sem rótulo, sem nome, sem município")
+- Spec 03 §3.6 (ponto de rota: definição e propósito único)
+
+## Regras envolvidas
+
+- RN-042 (ponto de rota sem identidade — sem rótulo, sem nome, sem município)
+- RN-076 (padrão de exibição — o vértice **não** recebe rótulo `Cidade - Nome`, ao contrário da Seção)
+
+## Entidades afetadas
+
+- ponto de rota (só aparência; nem o modelo nem o contrato mudam)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] O vértice de ponto de rota é **ciano**, com token novo registrado em `docs-dev/18-DESIGN_SYSTEM.md` §2 (Cores) — não um hex solto no componente.
+- [ ] O vértice é **maior que 9 px** e **estritamente menor** que o marcador de Seção/Local (16 px) — hierarquia verificada por teste, não por inspeção visual.
+- [ ] A cor do vértice continua **distinta** da de Seção (azul) e da de Local (verde), e não colide com `erro` (vermelho) nem `alerta` (âmbar).
+- [ ] O vértice segue **sem rótulo, sem nome, sem município e fora da tabela de paradas** (Spec 04 §7.3, RN-042) — inalterado.
+- [ ] Nenhum `data-testid`/`aria-*` alterado; E2E existentes verdes (DEC-050).
+- [ ] Zero alteração no contrato JSON, no ancorador ou no motor de roteamento.
+
+## Casos válidos
+
+- Itinerário com rota calculada e 2 pontos de rota: os vértices aparecem ciano, arrastáveis, menores que os 3 marcadores de Seção e maiores que o vértice de 9 px anterior.
+
+## Casos inválidos
+
+- Vértice com rótulo/popup/nome: proibido (Spec 04 §7.3) — o teste que garante a ausência de rótulo continua verde.
+- Vértice do tamanho do marcador de parada (ou maior): viola "vértice **pequeno**" (§7.3) e a hierarquia da DEC-057.
+
+## Testes esperados
+
+- Unitários: o marcador do ponto de rota tem `forma: "circulo"`, o `tamanho` decidido, e cor `!==` das de Seção/Local (estender `editor-mapa-itinerario.test.tsx`, que já asserta essas três coisas).
+- Integração: N/A (sem mudança de comportamento).
+- E2E: N/A — os specs existentes seguem verdes sem tocar seletores.
+- Snapshot/contrato JSON: N/A (não toca contrato).
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `docs-dev/18-DESIGN_SYSTEM.md` (§2 Cores — token ciano novo; especificação do vértice) — **vinculante, entra junto com o código** (DEC-050)
+- `src/app/globals.css` (`@theme` do token; `.marcador-mapa-circulo--pequeno`)
+- `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (`COR_MARCADOR_PONTO_DE_ROTA`)
+- `testes/unitarios/formulario/editor-mapa-itinerario.test.tsx`
+
+## Riscos
+
+- Ciano claro sobre a linha da rota (azul) pode ter contraste insuficiente — escolher tom que se destaque **do traçado**, não só do fundo do mapa.
+- Aumentar o vértice o aproxima do marcador de parada: manter a diferença de tamanho legível, sob pena de reintroduzir a confusão que a DEC-057 quer eliminar.
+
+## Perguntas em aberto
+
+- Nenhuma (visual fixado pela DEC-057; o tom exato do ciano é escolha de design sob DEC-050/doc 18).
+
+---
+
+## TASK-069 — Affordance de hover sobre a linha da rota (cursor + vértice fantasma na posição do clique)
+
+## Objetivo
+
+Passar o mouse sobre a linha da rota passa a **mudar o cursor** (deixando de indicar pan) e a **mostrar sobre o traçado um vértice "fantasma"** na posição exata em que o clique criaria o ponto de rota. O gesto da Spec 04 §7.3 item 6 deixa de ser descoberto por tentativa e erro.
+
+## Contexto
+
+A Spec 04 §7.3 item 6 manda que clicar sobre a linha crie um vértice, e a TASK-063 entregou o gesto — mas **nada na tela diz que a linha é clicável**: o cursor continua o de pan, e o usuário só descobre o recurso pela frase de ajuda em `dica-gestos-mapa`. O responsável decidiu a affordance na conversa da `/revisar-aderencia` da TASK-063 (**DEC-057**). O caro já está pronto: `projetarNaLinha` ([`src/shared/mapa/ancoragem.ts`](../../src/shared/mapa/ancoragem.ts), TASK-063) devolve a projeção de um ponto qualquer sobre o traçado, e o `Mapa` já faz hit-test na camada `ID_CAMADA_LINHAS` com tolerância de 6 px ([`mapa.tsx`](../../src/shared/mapa/mapa.tsx)). Falta o `mousemove`, o cursor e o marcador de pré-visualização.
+
+## Fora de escopo
+
+- **Cor/tamanho** do vértice real — é a **TASK-068** (o fantasma reusa o token de lá; por isso 068 vem antes).
+- **Clique para remover** o vértice — é a **TASK-070**.
+- Criar/mover/remover ponto de rota — comportamento da TASK-063, **inalterado**: esta task só antecipa visualmente onde o clique cairia.
+- Affordance do **clique direito** (menu Seção/Local) — é a TASK-065.
+- Qualquer mudança no contrato JSON, no ancorador (`projetarNaLinha` é reusado como está) ou no motor de roteamento.
+- Chamar OSRM no hover — **proibido**: passar o mouse não é editar (RN-052); nenhuma requisição sai de um `mousemove`.
+
+## Specs fonte
+
+- Spec 04 §7.3 item 6 (clicar sobre a linha da rota cria um vértice arrastável)
+- Spec 04 §7.3 (regra "vértice pequeno sobre a linha, sem rótulo")
+- Spec 03 §3.6 (ponto de rota ancorado ao trecho que molda)
+
+## Regras envolvidas
+
+- RN-052 (rota recalculada **ao editar** — hover **não** é edição: zero chamada ao OSRM)
+- RN-042 (o fantasma não é ponto de rota: não existe no modelo, não é persistido, não tem `apos_parada_ordem` gravado)
+- RN-096 / NEG-004 (pré-visualização é estado de UI efêmero, nunca gravado)
+
+## Entidades afetadas
+
+- ponto de rota (pré-visualização de UI; o modelo não muda)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Com o mouse **sobre a linha** da rota, o cursor muda (deixa de ser o de pan) e um **vértice fantasma** aparece sobre o traçado, na projeção do cursor.
+- [ ] Com o mouse **fora da linha**, o cursor volta ao normal e o fantasma **some** — sem resíduo ao sair do mapa (`mouseleave`).
+- [ ] O fantasma é **visualmente distinto** do vértice real (ex.: translucidez) — não confunde "vai criar" com "já existe".
+- [ ] **Nenhuma chamada ao OSRM** é disparada por hover (RN-052) — assert explícito no teste com OSRM mockado.
+- [ ] O fantasma **nunca** é persistido nem entra em `pontos_de_rota` (RN-042/RN-096).
+- [ ] Sem `linhaRota` (itinerário em `sem-rota`), não há linha, logo não há hover nem fantasma — sem erro.
+- [ ] Consumidores do `Mapa` **sem** o callback novo (Comparador, demo pages) ficam inalterados — a prop é opt-in, como `aoClicarNaLinha`.
+- [ ] Nenhum `data-testid`/`aria-*` alterado; E2E existentes verdes.
+
+## Casos válidos
+
+- Rota com 3 paradas: mouse no meio do primeiro trecho → cursor muda, fantasma aparece sobre a linha; mover ao longo do traçado desliza o fantasma; clicar cria o ponto ali (comportamento da TASK-063, preservado).
+
+## Casos inválidos
+
+- Mouse a 50 px da linha → nenhum fantasma, cursor normal.
+- Mouse sai do mapa com o fantasma aceso → o fantasma some (`mouseleave`), sem marcador órfão.
+- Itinerário em `sem-rota` (OSRM mockado em falha) → sem linha desenhada, hover não produz nada e não chama OSRM.
+
+## Testes esperados
+
+- Unitários: a projeção do cursor sobre o traçado reusa `projetarNaLinha` (já testado na TASK-063 — não reimplementar nem reduplicar); o editor rende o marcador fantasma na posição projetada e o remove ao sair.
+- Integração: hover não dispara recálculo (contador de chamadas do OSRM mockado permanece em zero).
+- E2E: mover o mouse sobre a linha mostra o fantasma; afastar some (OSRM/tiles mockados).
+- Snapshot/contrato JSON: N/A.
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/shared/mapa/mapa.tsx` (`mousemove`/`mouseleave` na camada de linhas, cursor via `getCanvas().style.cursor`, callback aditivo)
+- `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (marcador fantasma)
+- `src/app/globals.css` (classe do fantasma) + `docs-dev/18-DESIGN_SYSTEM.md` (especificação do estado de pré-visualização)
+- `src/shared/mapa/ancoragem.ts` — **reusado sem alteração**
+
+## Riscos
+
+- `mousemove` em mapa dispara muito: garantir que o hit-test não recalcule geometria pesada por evento (a projeção é barata, mas o `queryRenderedFeatures` a cada pixel merece atenção).
+- Em telas de toque não há hover — a affordance não pode ser o **único** caminho de descoberta; a dica textual de `dica-gestos-mapa` permanece.
+- O fantasma não pode capturar o clique (`pointer-events`), sob pena de matar o gesto que ele anuncia.
+
+## Perguntas em aberto
+
+- Nenhuma (affordance fixada pela DEC-057).
+
+---
+
+## TASK-070 — Clicar sobre o vértice remove o ponto de rota (exclusivo do ponto de rota)
+
+## Objetivo
+
+Clicar (sem arrastar) sobre um vértice de ponto de rota **remove** aquele ponto e dispara o recálculo, no padrão consagrado dos editores de rota. Clicar num marcador de **Seção ou Local não remove nada** — a remoção de parada continua **só pela tabela lateral**.
+
+## Contexto
+
+A Spec 04 §7.3 item 5 já prevê que "ponto de rota criado/movido/**removido**" recalcula a rota, e a TASK-063 entregou a remoção pelo botão **"Remover"** da sub-lista — mas não pelo mapa, onde o usuário está olhando. O responsável decidiu o gesto na conversa da `/revisar-aderencia` da TASK-063 (**DEC-057**), com a restrição explícita de que **só o ponto de rota** responde ao clique. O motor está pronto: `removerPontoDeRota` ([`src/formulario/roteamento/posicionar-ponto-de-rota.ts`](../../src/formulario/roteamento/posicionar-ponto-de-rota.ts)) e o handler `aoRemoverPontoDeRota` da TASK-063 já fazem o trabalho — falta ligar o clique do marcador a eles, distinguindo clique de arraste.
+
+## Fora de escopo
+
+- **Remover Seção/Local por clique no marcador** — **proibido por DEC-057**: a remoção de parada é só pela tabela lateral. Marcador de parada segue **arrastável** (Spec 04 §7.3 item 4) e clicável sem efeito destrutivo.
+- Retirar o botão **"Remover" da sub-lista** — **permanece** (DEC-057): é o caminho por teclado e o gesto do mapa é adicional.
+- Cor/tamanho do vértice (**TASK-068**) e affordance de hover (**TASK-069**).
+- Arrastar o vértice (TASK-063, inalterado) e re-ancoragem por mudança de paradas (TASK-066/DEC-056).
+- Confirmação/desfazer da remoção — não previstos em spec nenhuma; **não inventar**.
+- Qualquer mudança no contrato JSON ou no motor de roteamento.
+
+## Specs fonte
+
+- Spec 04 §7.3 item 5 ("recalcula a rota sempre que o itinerário muda … ponto de rota criado/movido/**removido**")
+- Spec 04 §7.3 item 4 (marcadores de parada são **movidos** arrastando — não removidos por clique)
+- Spec 03 §3.6 (ponto de rota: propósito único, sem identidade)
+
+## Regras envolvidas
+
+- RN-042 (ponto de rota **sem `uuid`, sem identidade** — o fundamento da assimetria: é descartável e refazível)
+- RN-030 (Seção compartilhada entre Ida e Volta — o motivo de sua remoção **não** ficar num clique)
+- RN-052 (remover ponto de rota recalcula a rota)
+- RN-048 (falha do recálculo não apaga a última rota válida)
+- RN-041 (invariante `trechos == paradas − 1` — remover ponto de rota não muda a contagem de trechos)
+
+## Entidades afetadas
+
+- ponto de rota (removido pelo gesto); Seção e Local (**explicitamente não** afetados)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Clicar (sem arrastar) sobre um vértice de ponto de rota **remove** aquele ponto e dispara o recálculo (RN-052).
+- [ ] **Arrastar** o vértice continua **movendo** (TASK-063) e **nunca** removendo — clique e arraste são distinguidos por limiar de deslocamento, testado nos dois lados da borda.
+- [ ] Clicar num marcador de **Seção** ou de **Local não remove nada** (DEC-057, RN-030) — teste explícito por tipo de marcador.
+- [ ] O botão **"Remover" da sub-lista continua funcionando** (caminho por teclado preservado).
+- [ ] Remover o vértice remove **exatamente** aquele ponto (índice correto), preservando os demais na ordem de travessia (Spec 03 §3.6.1).
+- [ ] `trechos == paradas − 1` preservado; a tabela de paradas não muda (RN-041/RN-042).
+- [ ] Falha do OSRM no recálculo pós-remoção → mensagem da Spec 03 §3.5 (§14), sem apagar a última rota válida (RN-048).
+- [ ] Nenhum `data-testid`/`aria-*` alterado; E2E existentes verdes.
+
+## Casos válidos
+
+- Trecho com 3 pontos de rota (p1, p2, p3): clicar em p2 remove só p2; p1 e p3 permanecem, nessa ordem, e a rota recalcula com 2 pontos.
+- Único ponto de rota do itinerário: clicar remove; a rota volta ao traçado livre do OSRM e a sub-lista fica vazia.
+
+## Casos inválidos
+
+- **Arrastar** o vértice 30 px e soltar → **move** (não remove); a sub-lista continua com o mesmo número de pontos.
+- Micro-arraste abaixo do limiar (ex.: 1–2 px, tremor de mão) → tratado como clique → remove. Borda determinística, testada.
+- Clicar num marcador de **Seção** → nada é removido; a parada continua na tabela lateral (RN-030).
+- Clicar num marcador de **Local** → nada é removido.
+- OSRM falha no recálculo pós-remoção (mock em `sem-rota`) → pendência bloqueante (RN-048); a última rota válida do documento não é apagada.
+
+## Testes esperados
+
+- Unitários: o marcador do ponto de rota expõe o handler de clique com o **índice** correto; marcadores de Seção/Local **não** expõem handler de remoção (asserção negativa explícita — é a garantia da DEC-057); `removerPontoDeRota` reusado sem alteração (já testado na TASK-063).
+- Integração: clique no vértice → recálculo disparado com a lista sem aquele ponto (OSRM mockado); arraste → recálculo com a lista movida, mesma contagem.
+- E2E: criar 2 pontos de rota, clicar no primeiro, ver a sub-lista cair para 1 e o OSRM ser chamado com 1 ponto a menos (OSRM/tiles mockados).
+- Snapshot/contrato JSON: `pontos_de_rota` resultante bem-formado (`apos_parada_ordem ∈ [1, paradas−1]`, sem `uuid`).
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/shared/mapa/mapa.tsx` (distinção clique × arraste no marcador: comparar posição de `dragstart`/`dragend`, ou `click` no elemento só quando não houve arraste; callback aditivo por marcador)
+- `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (ligar o clique do vértice a `aoRemoverPontoDeRota` — que já existe)
+- `testes/unitarios/formulario/editor-mapa-itinerario.test.tsx`, `testes/e2e/etapa-itinerarios.spec.ts`
+- `src/formulario/roteamento/posicionar-ponto-de-rota.ts` — **reusado sem alteração**
+
+## Riscos
+
+- **Distinguir clique de arraste é o risco principal:** limiar muito baixo transforma tremor de mão em remoção acidental; muito alto, o clique não pega. Escolher limiar em pixels, documentá-lo e testar os dois lados da borda.
+- O marcador é elemento DOM acima do canvas: garantir que o clique nele **não** vaze para o `click` do mapa e crie um ponto novo no lugar do removido (a precedência "vértice ganha da linha" é a DEC-057).
+- Remoção sem desfazer: aceitável porque o ponto é refazível com um clique (RN-042) — **não** inventar confirmação (nenhuma spec a prevê).
+
+## Perguntas em aberto
+
+- Nenhuma (gesto e exclusividade fixados pela DEC-057).
+
+---
+
+## TASK-071 — Pontos de rota da sessão sobrevivem a um recálculo que falha (Q-038)
+
+## Objetivo
+
+Os pontos de rota do itinerário em edição passam a viver em **estado de sessão próprio**, que sobrevive à transição para `sem-rota` (RN-048), em vez de serem derivados de `estadoAtual.rota.pontos_de_rota`. Uma falha de rota deixa de apagar, em silêncio, o traçado forçado pelo usuário — inclusive o que veio do arquivo importado.
+
+## Contexto
+
+`pontosDeRotaAtual` é derivado de `estadoAtual.rota.pontos_de_rota` ([`etapa-itinerarios.tsx:202-205`](../../src/formulario/itinerarios/etapa-itinerarios.tsx#L202-L205)) — que **só existe** em `congelada`/`recalculada`. Quando o recálculo falha (RN-048), `estadoAtual` vira `sem-rota` e a lista lida volta a `[]`; o próximo recálculo bem-sucedido grava a rota **sem** os pontos anteriores, sem nenhum aviso. Levantada como **Q-038** na análise da TASK-063 e confirmada na revisão dela (`docs-dev/14-REVISOES/TASK-063-20260716.md`, ressalva 1); **decidida pela DEC-058** (opção A). O bug é **anterior à TASK-063** e alcançável sem ela (importar JSON com `pontos_de_rota` + falha no recálculo seguinte), mas o gesto de mapa o tornou rotineiro. Precede a **TASK-066**: a re-ancoragem da DEC-056 opera sobre "a lista de pontos a reaplicar", e construí-la sobre uma lista que evapora numa falha é construir sobre areia.
+
+## Fora de escopo
+
+- **Re-ancoragem** dos pontos quando o conjunto/ordem de paradas muda — é a **TASK-066** (DEC-056). Esta task só garante que a lista **exista** para ela re-ancorar.
+- Qualquer mudança no **contrato JSON**/schema — `rota.pontos_de_rota` mantém campo, semântica e schema; muda só **de onde a UI lê** enquanto edita.
+- **Criar** ponto de rota em `sem-rota` — sem rota não há linha para ancorar; segue indisponível (DEC-058). O que sobrevive é o que já existia.
+- Aviso de UI sobre pontos preservados — a DEC-058 não o pede; **não inventar**.
+- Gestos do mapa (TASK-063/068/069/070) e o motor de intercalação — reusados como estão.
+
+## Specs fonte
+
+- Spec 03 §3.6.2 ("Reedição fiel" — pontos persistidos são reaplicados ao recalcular, "sem retrabalho manual")
+- Spec 03 §3.5 / Spec 04 §14 (falha de rota: categorias e mensagens)
+- Spec 02 §10.4 (`rota.pontos_de_rota` — eco dos pontos aplicados, congelado com a rota)
+- Spec 04 §7.3 (registro: `router.project-osrm.org` é demo **sem SLA** — falha é transitória e corriqueira)
+
+## Regras envolvidas
+
+- RN-042 (persistência do ponto de rota; sem identidade, **sem fórmula de recomputação** — o que se perde, perde-se para sempre)
+- RN-048 (falha bloqueante **sem degradação silenciosa**)
+- RN-052 (recálculo ao editar)
+- RN-096 / NEG-004 (a lista da sessão é efêmera; nada gravado antes da exportação)
+- RN-015 (leitores nunca recalculam — o eco congelado que eles leem não muda)
+
+## Entidades afetadas
+
+- ponto de rota, Rota (fronteira estado de sessão × documento; o modelo e o contrato não mudam)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] A lista de pontos de rota em edição vive em **estado de sessão** por itinerário (`servicoUuid`+`sentido`), não derivada de `estadoAtual.rota`.
+- [ ] Após um recálculo que **falha** (RN-048), os pontos de rota **continuam** na sessão, no mapa e na sub-lista.
+- [ ] Recálculo falho seguido de recálculo **bem-sucedido** grava a rota **com** os pontos que já existiam antes da falha (Spec 03 §3.6.2).
+- [ ] Ao **abrir um JSON**, a lista da sessão nasce de `rota.pontos_de_rota` do arquivo (reedição fiel) — **sem chamar OSRM** (RN-052/RN-015).
+- [ ] `rota.pontos_de_rota` gravado continua sendo o **eco dos pontos aplicados no último recálculo bem-sucedido** — contrato e schema inalterados.
+- [ ] Nada é gravado no JSON antes da exportação (RN-096/NEG-004).
+- [ ] Nenhum `data-testid`/`aria-*` alterado; E2E existentes verdes.
+
+## Casos válidos
+
+- JSON com 2 pontos de rota → reordenar parada → OSRM falha (`sem-rota`) → desfazer a reordenação → OSRM ok: a rota gravada volta com os **2 pontos** originais.
+- Criar ponto de rota → OSRM falha → mover uma parada → OSRM ok: o ponto criado **sobrevive** e entra no recálculo.
+
+## Casos inválidos
+
+- Em `sem-rota`, clicar onde a linha estaria → nada é criado (não há linha nem trecho para ancorar) e nenhuma exceção é lançada.
+- OSRM falha **duas vezes** seguidas → os pontos continuam na sessão; a pendência bloqueante permanece e a última rota válida do documento não é apagada (RN-048).
+- Exportar com itinerário em `sem-rota` → continua **bloqueado** (RN-078) — pontos preservados na sessão **não** tornam a rota válida.
+
+## Testes esperados
+
+- Unitários: a redução de sessão preserva a lista de pontos na transição `congelada → sem-rota → recalculada`; a hidratação a partir do documento importado alimenta a lista.
+- Integração: `congelada` → gesto → OSRM **falha** → gesto → OSRM **ok** → a rota gravada contém os pontos anteriores (OSRM mockado alternando falha/sucesso) — é a lacuna que a revisão da TASK-063 apontou.
+- E2E: com OSRM mockado, provocar falha e depois sucesso, verificando que a sub-lista nunca esvazia e que a URL final leva os pontos (`waypoints=`).
+- Snapshot/contrato JSON: `rota.pontos_de_rota` exportado bem-formado e igual aos pontos aplicados (schema `zod` strict).
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/sessao.ts` (lista de pontos de rota por itinerário, no padrão de `paradasEmEdicaoMapa`/`estadosRotaViva`)
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (`pontosDeRotaAtual` passa a ler o estado novo; handlers da TASK-063 comitam nele; hidratação na abertura do JSON)
+- `src/formulario/roteamento/posicionar-ponto-de-rota.ts`, `intercalar-pontos-de-rota.ts` — **reusados sem alteração**
+
+## Riscos
+
+- **Duas fontes para o mesmo dado** (sessão × `rota.pontos_de_rota` congelado): deixar inequívoco quem manda em qual momento, sob pena de trocar um bug silencioso por outro. A DEC-058 fixa: sessão manda na edição, o congelado é eco.
+- Hidratação no modo "novo" × "carregado" (DEC-035/DEC-053): garantir que a lista nasça certa nos dois fluxos.
+- Colisão de merge com a TASK-066, que mexe no mesmo ponto — por isso a ordem 071 → 066.
+
+## Perguntas em aberto
+
+- Nenhuma (Q-038 decidida pela DEC-058).
+
+---
+
 ## Ordem recomendada de execução
 
 ```text
@@ -1064,10 +1726,15 @@ A TASK-060 unificou os mapas e pôs a tabela lateral ao lado (DEC-054 / doc 18 �
 **Correções da etapa de itinerários (mapa/rota — Spec 04 §7; descobertas na revisão da TASK-055):**
 
 ```text
-059 → 060 → 063 → 064
+059 → 060 → 063 → 065 → 071 → 066 → 067
+                  ├→ 064
+                  └→ 068 → 069 → 070
 ```
 
 - TASK-063 (gesto de ponto de rota) e TASK-064 (sync tabela↔mapa) foram deferidas da TASK-060 por DEC-054 — dependem da TASK-060 (mapa único) e podem seguir em qualquer ordem entre si.
+- TASK-068/069/070 vêm da **DEC-057** (decisão do responsável na revisão da TASK-063): identidade visual ciano do vértice, affordance de hover sobre a linha e clique-para-remover **exclusivo do ponto de rota** (Seção/Local só saem pela tabela lateral). Dependem só da TASK-063 (entregue) e não bloqueiam nem são bloqueadas pela TASK-065; a ordem 068 → 069 existe porque o vértice fantasma da 069 reusa o token de cor que a 068 cria.
+- TASK-071 vem da **DEC-058** (Q-038 decidida): os pontos de rota da sessão sobrevivem a um recálculo que falha. **Precede a TASK-066** — as duas tocam a reaplicação dos pontos, e re-ancorar (066) uma lista que evapora numa falha seria construir sobre areia.
+- TASK-065/066/067 vêm da **DEC-055** (Q-036), que superou em parte a DEC-054 invertendo os botões do mouse: esquerdo sobre a linha cria ponto de rota, direito abre menu Seção/Local. Todas dependem do **ancorador geométrico** entregue pela TASK-063. A **DEC-056** (Q-037) fixou a re-ancoragem dos pontos de rota e liberou TASK-066/067 — nenhuma task deste ramo está bloqueada.
 
 **Fluxo criar-do-zero — promoção `ServicoEmConstrucao → Servico` (DEC-053 / Q-034; TASK-062 depende da TASK-061):**
 
