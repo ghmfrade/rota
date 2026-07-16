@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Secao } from "@/shared/contrato";
 import type { Ponto } from "@/shared/geo";
-import { Mapa, type Coordenada, type MarcadorMapa } from "@/shared/mapa";
+import { Mapa, type Coordenada, type LinhaMapa, type MarcadorMapa } from "@/shared/mapa";
 import { Botao, Campo, Painel, Select } from "@/shared/ui";
 import {
   contribuirParaSecaoExistente,
@@ -42,6 +42,10 @@ export interface PropsEditorSecoes {
   /** Gesto aceito que alterou uma geolocalização — o recálculo real do estado
    * de rota ao vivo é do host (TASK-024/019); este editor só avisa. */
   aoSolicitarRecalculo?: () => void;
+  /** Rota ativa do itinerário (`estadoAtual.rota.geometria` convertida — Spec
+   * 04 §7.3, RN-046/052), desenhada sobre o mapa. `undefined`/ausente quando
+   * não há rota (`sem-rota`) — o host (TASK-024/019) nunca recalcula aqui. */
+  linhaRota?: LinhaMapa;
 }
 
 export function EditorSecoes({
@@ -53,6 +57,7 @@ export function EditorSecoes({
   aoCriarSecao,
   aoAtualizarSecao,
   aoSolicitarRecalculo,
+  linhaRota,
 }: PropsEditorSecoes) {
   const [mensagem, definirMensagem] = useState<string | null>(null);
   const [pontoPendente, definirPontoPendente] = useState<Coordenada | null>(null);
@@ -183,6 +188,7 @@ export function EditorSecoes({
       >
         <Mapa
           marcadores={[...marcadoresSecoes, ...marcadorPendente]}
+          linhas={linhaRota ? [linhaRota] : []}
           aoClicar={lidarCliqueNoMapa}
         />
       </div>

@@ -9,6 +9,7 @@ import {
   carregarGeojsonMunicipios,
 } from "@/shared/dados-estaticos";
 import { indiceDeNomes } from "@/shared/geo";
+import { linhaDaGeometria, type LinhaMapa } from "@/shared/mapa";
 import {
   EditorSecoes,
   nomeExibicaoSecao,
@@ -196,6 +197,14 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     estadoAtual && (estadoAtual.situacao === "congelada" || estadoAtual.situacao === "recalculada")
       ? estadoAtual.rota.pontos_de_rota
       : [];
+
+  // Rota ativa desenhada no mapa (TASK-059; Spec 04 §7.3, RN-046/052) — só a
+  // LineString congelada/recalculada; em `sem-rota` (RN-048) nenhuma linha é
+  // passada, sem disparar OSRM (a leitura é do estado já resolvido).
+  const linhaRotaAtual: LinhaMapa | undefined =
+    estadoAtual && (estadoAtual.situacao === "congelada" || estadoAtual.situacao === "recalculada")
+      ? linhaDaGeometria("rota-ativa", estadoAtual.rota.geometria)
+      : undefined;
 
   const paradasOutroSentido =
     linhaAtual && sentidoSelecionado && bidirecional
@@ -576,6 +585,7 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
             recursosMunicipio={recursosMunicipio}
             aoCriarSecao={aoCriarOuAtualizarSecao}
             aoAtualizarSecao={aoCriarOuAtualizarSecao}
+            linhaRota={linhaRotaAtual}
           />
 
           <EditorLocais
@@ -586,6 +596,7 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
             aoCriarLocal={aoCriarLocal}
             aoAtualizarLocal={aoAtualizarLocal}
             aoExcluirSentido={aoExcluirSentidoDeLocal}
+            linhaRota={linhaRotaAtual}
           />
 
           {estadoAtual && (estadoAtual.situacao === "congelada" || estadoAtual.situacao === "recalculada") && (

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Local } from "@/shared/contrato";
 import type { Ponto } from "@/shared/geo";
-import { Mapa, type Coordenada, type MarcadorMapa } from "@/shared/mapa";
+import { Mapa, type Coordenada, type LinhaMapa, type MarcadorMapa } from "@/shared/mapa";
 import { Botao, Campo, Painel } from "@/shared/ui";
 import {
   criarLocalNoPonto,
@@ -46,6 +46,10 @@ export interface PropsEditorLocais {
   /** Gesto aceito que alterou uma geolocalização — o recálculo real do estado de
    * rota ao vivo é do host (TASK-024/019); este editor só avisa. */
   aoSolicitarRecalculo?: () => void;
+  /** Rota ativa do itinerário (`estadoAtual.rota.geometria` convertida — Spec
+   * 04 §7.3, RN-046/052), desenhada sobre o mapa. `undefined`/ausente quando
+   * não há rota (`sem-rota`) — o host (TASK-024/019) nunca recalcula aqui. */
+  linhaRota?: LinhaMapa;
 }
 
 export function EditorLocais({
@@ -57,6 +61,7 @@ export function EditorLocais({
   aoAtualizarLocal,
   aoExcluirSentido,
   aoSolicitarRecalculo,
+  linhaRota,
 }: PropsEditorLocais) {
   const [mensagem, definirMensagem] = useState<string | null>(null);
   const [pontoPendente, definirPontoPendente] = useState<Coordenada | null>(null);
@@ -167,6 +172,7 @@ export function EditorLocais({
       >
         <Mapa
           marcadores={[...marcadoresLocais, ...marcadorPendente]}
+          linhas={linhaRota ? [linhaRota] : []}
           aoClicar={lidarCliqueNoMapa}
         />
       </div>
