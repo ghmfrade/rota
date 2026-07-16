@@ -3,7 +3,8 @@
 import { useState } from "react";
 import type { Secao } from "@/shared/contrato";
 import type { Ponto } from "@/shared/geo";
-import { Mapa, type Coordenada, type MarcadorMapa } from "@/shared/mapa";
+import { Mapa, type Coordenada, type LinhaMapa, type MarcadorMapa } from "@/shared/mapa";
+import { Botao, Campo, Painel, Select } from "@/shared/ui";
 import {
   contribuirParaSecaoExistente,
   criarSecaoNoPonto,
@@ -41,6 +42,10 @@ export interface PropsEditorSecoes {
   /** Gesto aceito que alterou uma geolocalização — o recálculo real do estado
    * de rota ao vivo é do host (TASK-024/019); este editor só avisa. */
   aoSolicitarRecalculo?: () => void;
+  /** Rota ativa do itinerário (`estadoAtual.rota.geometria` convertida — Spec
+   * 04 §7.3, RN-046/052), desenhada sobre o mapa. `undefined`/ausente quando
+   * não há rota (`sem-rota`) — o host (TASK-024/019) nunca recalcula aqui. */
+  linhaRota?: LinhaMapa;
 }
 
 export function EditorSecoes({
@@ -52,6 +57,7 @@ export function EditorSecoes({
   aoCriarSecao,
   aoAtualizarSecao,
   aoSolicitarRecalculo,
+  linhaRota,
 }: PropsEditorSecoes) {
   const [mensagem, definirMensagem] = useState<string | null>(null);
   const [pontoPendente, definirPontoPendente] = useState<Coordenada | null>(null);
@@ -169,48 +175,54 @@ export function EditorSecoes({
   }
 
   return (
-    <div data-testid="editor-secoes">
+    <div data-testid="editor-secoes" className="flex flex-col gap-4">
       {mensagem ? (
-        <p role="alert" data-testid="mensagem-recusa-secao">
+        <p role="alert" data-testid="mensagem-recusa-secao" className="text-sm text-erro">
           {mensagem}
         </p>
       ) : null}
 
-      <div style={{ width: "100%", height: "60vh" }}>
+      <div
+        className="overflow-hidden rounded-painel shadow-sombra-2"
+        style={{ width: "100%", height: "60vh" }}
+      >
         <Mapa
           marcadores={[...marcadoresSecoes, ...marcadorPendente]}
+          linhas={linhaRota ? [linhaRota] : []}
           aoClicar={lidarCliqueNoMapa}
         />
       </div>
 
       {pontoPendente ? (
-        <div data-testid="form-criar-secao">
-          <label>
-            Nome da Seção
-            <input
+        <Painel>
+          <div data-testid="form-criar-secao" className="flex flex-col gap-4">
+            <Campo
+              rotulo="Nome da Seção"
               data-testid="nome-secao-input"
               value={nomeNovaSecao}
               onChange={(evento) => definirNomeNovaSecao(evento.target.value)}
             />
-          </label>
-          <button
-            type="button"
-            data-testid="confirmar-criar-secao"
-            disabled={!nomeNovaSecao.trim()}
-            onClick={confirmarCriacao}
-          >
-            Criar Seção
-          </button>
-          <button type="button" onClick={cancelarCriacao}>
-            Cancelar
-          </button>
-        </div>
+            <div className="flex gap-2">
+              <Botao
+                variante="primario"
+                data-testid="confirmar-criar-secao"
+                disabled={!nomeNovaSecao.trim()}
+                onClick={confirmarCriacao}
+              >
+                Criar Seção
+              </Botao>
+              <Botao variante="fantasma" onClick={cancelarCriacao}>
+                Cancelar
+              </Botao>
+            </div>
+          </div>
+        </Painel>
       ) : null}
 
-      <div data-testid="reuso-secoes">
-        <label>
-          Reutilizar Seção existente
-          <select
+      <Painel>
+        <div data-testid="reuso-secoes" className="flex flex-col gap-4">
+          <Select
+            rotulo="Reutilizar Seção existente"
             data-testid="select-secao-reuso"
             value={secaoReusoUuid}
             onChange={(evento) => {
@@ -224,13 +236,11 @@ export function EditorSecoes({
                 {nomeExibicaoSecao(secao)}
               </option>
             ))}
-          </select>
-        </label>
+          </Select>
 
-        {secaoReuso && pontosReuso.length > 1 ? (
-          <label>
-            Posição
-            <select
+          {secaoReuso && pontosReuso.length > 1 ? (
+            <Select
+              rotulo="Posição"
               data-testid="select-ponto-reuso"
               value={indicePontoReuso}
               onChange={(evento) => definirIndicePontoReuso(Number(evento.target.value))}
@@ -240,20 +250,20 @@ export function EditorSecoes({
                   Ponto {indice + 1} ({ponto.latitude.toFixed(5)}, {ponto.longitude.toFixed(5)})
                 </option>
               ))}
-            </select>
-          </label>
-        ) : null}
+            </Select>
+          ) : null}
 
-        {secaoReuso ? (
-          <button
-            type="button"
-            data-testid="confirmar-reuso"
-            onClick={confirmarReuso}
-          >
-            Reutilizar Seção selecionada
-          </button>
-        ) : null}
-      </div>
+          {secaoReuso ? (
+            <Botao
+              variante="secundario"
+              data-testid="confirmar-reuso"
+              onClick={confirmarReuso}
+            >
+              Reutilizar Seção selecionada
+            </Botao>
+          ) : null}
+        </div>
+      </Painel>
     </div>
   );
 }

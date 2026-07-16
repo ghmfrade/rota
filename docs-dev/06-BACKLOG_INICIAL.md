@@ -522,10 +522,512 @@
 5. **[TASK-053 P3 — consistência] Estados de erro/carregamento da Identificação sem superfície** (`identificacao.tsx:156,164`): `erroListas` e `!listas` renderizam `<p>` solto enquanto o estado carregado é `Painel` — a etapa "muda de moldura". Envolver em `Painel` (escolha de aparência, DEC-050). O `data-testid="erro-listas-identificacao"` é intocável.
 6. **[Derivado — DEC-051/DEC-052] Atualizar `docs-dev/01-RULE_INDEX.md`:** na Origem da RN-069 (`:510`), acrescentar **Spec 04 §6** (a DEC-051 antecipou este ajuste de derivado). *(A Spec 04 §5 → "Tipo do Autos" da DEC-052 é edição de `docs/specs/**`, read-only — **não** entra aqui; é ação do dono da spec.)*
 **Specs fonte / decisões:** revisões `docs-dev/14-REVISOES/TASK-053-20260715.md` e `TASK-057-20260715.md`; DEC-050 (aparência), DEC-051 (Origem da RN-069), DEC-052 (rótulo "Tipo do Autos" **permanece** — item 6 do "Fora de escopo"); doc 18 §6. **Regras RN:** RN-069/NEG-018 (literal exato preservado), RN-001/RN-010 (UUIDv4 válido), RN-072/RN-006 (contagem intacta — nada de lógica muda). **Depende de:** TASK-056 (o item 3 unifica o literal tocando `resumo-operacional.tsx`, arquivo da TASK-056 — rodar depois evita conflito) e TASK-057 (fecha o parecer dela).
-**Fora de escopo:** **reverter o rótulo "Tipo do Autos" da Identificação** (DEC-052 — permanece; não tocar); alterar `src/shared/contagens/` ou qualquer lógica/regra de contagem, viagem ou feriado; editar `docs/specs/**` (o alinhamento da Spec 04 §5 e o restante são ações do dono da spec); as ressalvas de aparência já roteadas para a varredura da TASK-056 (marca "(sem itinerário ainda)", superfície da `Tabela`, aviso aninhado); qualquer mudança de comportamento, mensagem ou contrato JSON.
+**Fora de escopo:** **reverter o rótulo "Tipo do Autos" da Identificação** (DEC-052 — permanece; não tocar); alterar `src/shared/contagens/` ou qualquer lógica/regra de contagem, viagem ou feriado; editar `docs/specs/**` (o alinhamento da Spec 04 §5 e o restante são ações do dono da spec); as ressalvas de aparência já roteadas para a varredura da TASK-056 (marca "(sem itinerário ainda)", superfície da `Tabela`, aviso aninhado); a ressalva de layout da TASK-055 (tabela lateral / mapa único — tem task própria); qualquer mudança de comportamento, mensagem ou contrato JSON.
 **Critérios de aceite resumidos:** (1) fixture usa UUIDv4 válido e o documento montado passaria em `esquemaDocumentoOperacao`; (2) `grep` do testid do rótulo no lado servicos retorna nome único, distinto do resumo, e `resumo-operacional.spec.ts` volta a ser seguro sem `.first()`; (3) o literal "semana padrão (sem feriados)" tem **uma** declaração em `shared/`, consumida por servicos e resumo (`grep` acha uma só); (4) estados de erro/carregamento da Identificação em `Painel`, consistentes com o carregado, `data-testid` intocado; (5) Origem da RN-069 no RULE_INDEX cita Spec 04 §6; (6) rótulo "Tipo do Autos" **inalterado**; `data-testid`/`aria-*` existentes preservados exceto a renomeação deliberada do item 2; suíte completa (unit + E2E + build) verde, nenhum outro seletor alterado.
 **Testes esperados:** unitários e E2E existentes verdes; ajuste do único E2E que referencia o testid renomeado (item 2); nenhum teste de `shared/contagens` alterado; nenhum teste novo de regra (não há regra nova).
 **Riscos:** (a) renomear testid e esquecer um consumidor — `grep` do nome antigo antes/depois; (b) o item 3 toca `resumo-operacional.tsx` (TASK-056) — respeitar a dependência para não conflitar com a restilização; (c) mover os estados de erro para `Painel` sem alterar `data-testid="erro-listas-identificacao"`.
+
+---
+
+## TASK-059 — Desenhar a rota ativa no mapa da etapa de itinerários
+
+## Objetivo
+
+Ao final, a rota roteirizada ativa de um itinerário (a `Rota.geometria`, GeoJSON LineString) aparece **desenhada** no mapa da etapa "Seções, Locais e Itinerários". Hoje não aparece: os editores passam apenas `marcadores` ao `<Mapa>`, nunca a linha da rota — a rota calculada existe no estado ao vivo mas nunca chega à tela.
+
+## Contexto
+
+`EditorSecoes` e `EditorLocais` renderizam um `<Mapa>` passando só `marcadores` ([`editor-secoes.tsx:184`](../../src/formulario/secoes/editor-secoes.tsx#L184), [`editor-locais.tsx:168`](../../src/formulario/locais/editor-locais.tsx#L168)). O `<Mapa>` já sabe desenhar `linhas: LinhaMapa[]` (LineString) — demonstrado em [`src/app/mapa-demo/page.tsx:24`](../../src/app/mapa-demo/page.tsx#L24). A geometria da rota ativa está em `estadoAtual.rota.geometria` do `EstadoRotaViva` (TASK-024; `situacao` `congelada`/`recalculada`), disponível na etapa. A Spec 04 §7.3 diz que, a cada parada, "a rota é recalculada **e desenhada**". Defeito descoberto na revisão da TASK-055. Task pequena e de baixo risco; o conversor `geometria → LinhaMapa` que ela cria é reaproveitado pela TASK-060.
+
+## Fora de escopo
+
+- Unificar os dois mapas num só (é a TASK-060) — aqui a rota é passada aos dois editores como estão hoje.
+- Sincronização seleção tabela↔mapa; layout lateral da tabela (TASK-060).
+- Renderizar os **pontos de rota** como vértices próprios sobre a linha (Spec 04 §7.3 "vértice pequeno sobre a linha") — só a LineString da rota entra aqui; vértices de ponto de rota ficam para a TASK-060 se não forem triviais.
+- Promoção do `ServicoEmConstrucao` no fluxo "novo" (task própria — Defect B).
+- Qualquer chamada nova ao OSRM: abrir JSON **não** recalcula (RN-052), só desenha a rota congelada.
+
+## Specs fonte
+
+- Spec 04 §7.3
+- Spec 02 §10.2 (Rota; `geometria` GeoJSON LineString, coords `[longitude, latitude]`)
+
+## Regras envolvidas
+
+- RN-046 (descrição/rota derivada, congelada, recalculada com a rota)
+- RN-052 (abrir JSON não chama OSRM; a rota congelada é desenhada sem recalcular)
+- RN-015 (dados congelados não são recalculados por leitores)
+- RN-042 (ponto de rota sem identidade — não confundir a LineString com marcadores/paradas)
+
+## Entidades afetadas
+
+- Rota, Itinerário, Parada (só leitura da geometria)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Com `estadoAtual` em `congelada` ou `recalculada`, o `<Mapa>` da etapa recebe `linhas` com a geometria da rota ativa e a linha é desenhada.
+- [ ] Abrir um JSON existente desenha a rota **congelada** sem disparar o OSRM (RN-052).
+- [ ] Em `sem-rota`, nenhuma linha é desenhada; a mensagem de falha existente (`data-testid="mensagem-sem-rota"`) permanece.
+- [ ] Conversão `geometria.coordinates` (`[lon,lat]`) → `LinhaMapa` correta (ordem das coordenadas preservada).
+- [ ] Nenhum `data-testid`/`aria-*` alterado; E2E existentes verdes.
+
+## Casos válidos
+
+- Itinerário aberto de JSON com rota congelada → linha aparece no mapa sem chamada de rede.
+- Reordenar parada → recálculo com sucesso → a linha atualiza para a nova geometria.
+
+## Casos inválidos
+
+- Estado `sem-rota` (falha OSRM mockada) → nenhuma linha; pendência/mensagem existente intacta.
+- Abrir JSON → asserção de que o OSRM **não** foi chamado (mock sem chamadas).
+
+## Testes esperados
+
+- Unitários: conversor `geometria → LinhaMapa` (coords, vazio, ida/volta).
+- Integração: `EditorSecoes`/`EditorLocais` repassam `linhas` ao `<Mapa>` quando recebem uma rota; não repassam quando não há rota.
+- E2E: os specs de itinerários/editores seguem verdes sem alterar seletores (mock do OSRM).
+- Snapshot/contrato JSON: N/A (não toca contrato).
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/secoes/editor-secoes.tsx`, `src/formulario/locais/editor-locais.tsx` (aceitar a rota e repassá-la a `linhas`)
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (passar `estadoAtual.rota.geometria` aos editores)
+- Conversor `geometria → LinhaMapa` (novo helper em `src/shared/mapa/` ou `src/formulario/roteamento/`)
+
+## Riscos
+
+- Enquanto os mapas são dois, a rota é passada aos dois (redundante) — consolidado na TASK-060; aceitável como interino.
+- Não disparar recálculo ao desenhar (RN-052/RN-015): a linha vem do estado já congelado, nunca de uma nova chamada.
+
+## Perguntas em aberto
+
+- Nenhuma.
+
+---
+
+## TASK-060 — Unificar os dois mapas da etapa de itinerários num único mapa interativo + tabela lateral
+
+## Objetivo
+
+A etapa "Seções, Locais e Itinerários" passa a ter **um único mapa interativo** (Spec 04 §7) no lugar dos dois mapas separados de `EditorSecoes` e `EditorLocais`, com a **tabela lateral de paradas na mesma linha visual** do mapa (doc 18 §87) como consequência do layout. Seções, Locais e pontos de rota são lançados no mesmo mapa.
+
+## Contexto
+
+Hoje `EditorSecoes` e `EditorLocais` renderizam **cada um seu próprio `<Mapa>`** (dois mapas empilhados verticalmente), divergindo da Spec 04 §7 — "O cadastro de Seções, Locais, pontos de rota e a montagem do itinerário … acontecem **num mesmo mapa interativo**". A divergência entrou pelo fatiamento fino TASK-017 (motor+`EditorSecoes`) / TASK-018 (motor+`EditorLocais`) / TASK-019 (montou os dois), passou sem flag na revisão da TASK-019 e foi identificada na revisão da TASK-055 (`docs-dev/14-REVISOES/TASK-055-20260715.md`). A rota já é desenhada pela TASK-059. Padrão visual: DEC-050 / doc 18 §87 (mapa em destaque + tabela lateral). Substitui a ressalva 1 da TASK-055, retirada da TASK-058.
+
+## Fora de escopo
+
+- **Sincronização seleção tabela↔mapa** (clicar na parada destaca no mapa e vice-versa — Spec 04 §7): avaliar na `/analisar-task`; se for grande, vira task própria e fica fora daqui.
+- Promoção do `ServicoEmConstrucao` no fluxo "novo" (Defect B — task separada).
+- Qualquer regra de OSRM, 350 m, reuso, montagem de parada, descrição — **comportamento preservado**; a task só reorganiza a superfície de UI (RN-025..036, RN-041..052 inalteradas).
+- Alterar `data-testid`/`aria-*` existentes (E2E devem passar sem trocar seletores; testids **novos** só para o seletor de ferramenta, se houver).
+
+## Specs fonte
+
+- Spec 04 §7 (mapa único + tabela lateral), §7.1 (inserção/reuso de Seção), §7.2 (Locais), §7.3 (itinerário e mapa)
+- doc 18 §87 (mapa em destaque, moldura, tabela lateral na mesma linha visual)
+
+## Regras envolvidas
+
+- RN-025..036 (Seção/Local/parada — preservadas)
+- RN-041..052 (rota/ponto de rota/OSRM — preservadas)
+- RN-076 (rótulo `Cidade - Nome da Seção` na tabela — preservado)
+
+## Entidades afetadas
+
+- Seção, Local, Parada, ponto de rota, Rota (reorganização de UI; sem mudança de modelo)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] A etapa renderiza **um** `<Mapa>` (não dois); marcadores de Seção e de Local coexistem nele.
+- [ ] O clique no mapa permite escolher o que se cria (Seção / Local / ponto de rota) — afordância de ferramenta/modo conforme doc 18 (design a definir na `/analisar-task`).
+- [ ] Todos os fluxos preservados: criação de Seção/Local, reuso de Seção, arrasto sob 350 m (recusa → mensagem Spec 04 §14), exclusão de sentido de Local, montagem/reordenação de paradas, recálculo ao vivo.
+- [ ] Tabela de paradas **lateral** ao mapa em tela larga (empilha no estreito), via componente `Tabela`.
+- [ ] Rota desenhada (TASK-059) aparece no mapa único; zero chamada de rede nova.
+- [ ] E2E existentes (`editor-secoes-350m`, `editor-locais-350m`, `etapa-itinerarios`, `descricao-itinerario`) verdes **sem alterar seletores**.
+
+## Casos válidos
+
+- Criar Seção e depois Local no mesmo mapa, alternando a ferramenta → ambos os marcadores e a rota aparecem; paradas entram na tabela lateral.
+- Reordenar/remover parada pela tabela lateral → recálculo, como hoje.
+
+## Casos inválidos
+
+- Arrasto além de 350 m (Seção ou Local) → recusa com a mensagem da Spec 04 §14, agora no mapa único (comportamento idêntico ao atual).
+- Montagem inválida (< 2 paradas, extremo não-Seção) → avisos existentes (RN-034/035) inalterados.
+
+## Testes esperados
+
+- Unitários: nenhum novo de regra (comportamento não muda); ajustes se helpers de marcador forem consolidados.
+- Integração: o novo componente de mapa único monta marcadores de Seção+Local e repassa `aoClicar` conforme a ferramenta ativa.
+- E2E: adaptar os specs dos editores ao mapa único **preservando os `data-testid`**; cobrir a troca de ferramenta se receber testid novo.
+- Snapshot/contrato JSON: N/A.
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- Novo `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (mapa único que absorve `EditorSecoes` + `EditorLocais`)
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (layout de duas colunas tabela | mapa; usa o novo componente)
+- `src/formulario/secoes/editor-secoes.tsx`, `src/formulario/locais/editor-locais.tsx` (aposentados/absorvidos ou reduzidos a lógica sem `<Mapa>` próprio)
+
+## Riscos
+
+- **Refator grande e de alto risco** na parte mais complexa do app (roteamento ao vivo, 350 m pareado, reuso de Seção, montagem de paradas de dois tipos num só mapa). A `/analisar-task` deve avaliar quebrar em subtasks (ex.: consolidar marcadores; unificar clique/ferramenta; layout lateral) se o plano passar de ~10 passos.
+- O seletor de ferramenta (Seção/Local/ponto de rota no mesmo clique) é decisão de **UX sob DEC-050/doc 18** — a Spec 04 §7 diz que os três são lançados no mesmo mapa, mas não detalha a interface. Resolver na análise; se o dono do domínio quiser **fixar** a interação, abrir Q-xxx antes de implementar.
+- Não alterar `data-testid` existentes — os E2E dos editores dependem deles.
+
+## Dependências
+
+- TASK-059 (rota desenhada — o mapa único herda o desenho da rota).
+- TASK-055 (etapa/editores já no design system).
+
+## Perguntas em aberto
+
+- **Design de interação — decidido (DEC-054 / Q-035, 2026-07-16):** no mapa único, **clique esquerdo cria Seção, clique direito cria Local**; marcadores circulares diferenciados por tipo; tabela lateral à direita. O **gesto de ponto de rota** (motor pronto na TASK-023) e a **sincronização seleção tabela↔mapa** ficam **fora desta task** → **TASK-063** e **TASK-064**, respectivamente.
+
+---
+
+## TASK-061 — Promover `ServicoEmConstrucao` a `Servico` completo ao concluir o itinerário no fluxo "novo"
+
+## Objetivo
+
+No fluxo **"novo"** (documento criado do zero), ao concluir a edição do itinerário de um Serviço, o `ServicoEmConstrucao` correspondente passa a ser **promovido a `Servico` completo** — com `itinerarios[]` (paradas + rota + `matriz_distancias`) e `viagens` a preencher depois — e passa a viver na lista de Serviços do documento. Ao final, o fluxo criar-do-zero deixa de travar após os itinerários: as etapas Viagens e Matrizes voltam a enxergar o Serviço.
+
+## Contexto
+
+Hoje, no modo "novo", um Serviço recém-criado vive em `servicosEmConstrucao` (`ServicoEmConstrucao`, DEC-035), que não tem `itinerarios` ([`sessao.ts:41-53`](../../src/formulario/sessao.ts#L41-L53)). O itinerário montado na etapa de mapa fica só em estado efêmero (`paradasEmEdicao`/`estadosRotaViva`); a função que grava itinerário+matriz num Serviço (`documentoComItinerarioAtualizado`) exige um `DocumentoOperacao` e só roda no modo "carregado" ([`etapa-itinerarios.tsx:251-270`](../../src/formulario/itinerarios/etapa-itinerarios.tsx#L251-L270)). Viagens ([`etapa-viagens.tsx:80`](../../src/formulario/viagens/etapa-viagens.tsx#L80)) e Matrizes ([`etapa-matrizes.tsx:60`](../../src/formulario/matrizes/etapa-matrizes.tsx#L60)) leem serviços só no modo "carregado" e recebem `[]` no "novo". Resultado: o Serviço nunca vira `Servico` completo e as etapas seguintes ficam vazias. A DEC-035 já previa a promoção ("promovido a `Servico` completo quando as etapas seguintes preencherem o resto"); a **DEC-053 (opção A da Q-034)** fixou que o ponto de promoção é a conclusão do itinerário, concentrando o modo dual num único lugar. Descoberto em teste manual do usuário (2026-07-16), a partir da revisão da TASK-055.
+
+## Fora de escopo
+
+- O **E2E** do fluxo criar-do-zero ponta a ponta — é a **TASK-062** (esta task entrega os testes unitários/integração da promoção; o E2E completo é separado).
+- Desenho da rota no mapa (TASK-059) e unificação dos mapas (TASK-060) — independentes.
+- Qualquer mudança no **contrato JSON** (schema) ou em `shared/contrato`: a promoção é transição de estado de sessão efêmero, não persistência (RN-096/NEG-004).
+- Reimplementar contagens/matriz: reutiliza `matrizDistanciasDoServico`/`shared/contagens` como estão.
+- Alterar o CRUD da etapa Serviços ou a criação de itinerários por direcionalidade (DEC-036) — já existem.
+
+## Specs fonte
+
+- Spec 04 §6 (criar Serviço)
+- Spec 04 §7 (montagem do itinerário)
+- Spec 04 §8 ("Após criar/alterar o itinerário … a etapa seguinte é a grade de horários")
+- Spec 02 §6 (`Servico`: `itinerarios` ≥ 1, `matriz_distancias`)
+
+## Regras envolvidas
+
+- RN-001/002/004 (UUIDs preservadas na promoção — a `uuid` do `ServicoEmConstrucao` é herdada pelo `Servico`)
+- RN-018 (documento válido exige ≥ 1 Serviço)
+- RN-054..057 (matriz reconciliada ao concluir a edição do itinerário)
+- RN-096 / NEG-004 (nada gravado no JSON antes da exportação; sessão é efêmera)
+
+## Entidades afetadas
+
+- Serviço, Itinerário, Parada, Rota, matriz de distâncias (promoção `ServicoEmConstrucao → Servico`)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] No modo "novo", concluir a edição do itinerário de um `ServicoEmConstrucao` o promove a `Servico` completo (com `itinerarios[]` contendo paradas+rota e `matriz_distancias` reconciliada), removido de `servicosEmConstrucao`.
+- [ ] A `uuid` do `ServicoEmConstrucao` é preservada no `Servico` promovido (RN-001/002/004).
+- [ ] Após a promoção, as etapas Viagens e Matrizes enxergam o Serviço (não mais `[]`) no modo "novo".
+- [ ] A matriz do Serviço promovido é reconciliada no mesmo commit da rota (RN-054..057), como já ocorre no modo "carregado".
+- [ ] Nada é gravado no JSON antes da exportação; a promoção só altera estado de sessão (RN-096/NEG-004).
+- [ ] Nenhum `data-testid`/`aria-*` alterado; E2E existentes verdes.
+
+## Casos válidos
+
+- Modo "novo": Serviço criado (direcionalidade "ida") → itinerário montado → ao concluir, vira `Servico` com 1 itinerário, matriz reconciliada; Viagens/Matrizes passam a listá-lo.
+- Direcionalidade "ambos": os dois sentidos concluídos resultam em `Servico` com 2 itinerários.
+
+## Casos inválidos
+
+- Itinerário sem rota válida (OSRM mockado em `sem-rota`): a promoção **não** ocorre com rota inválida; o Serviço permanece em construção e a pendência ao vivo existente é mantida (RN-048) — sem gravar Serviço incompleto.
+- Concluir sem paradas suficientes: a promoção não produz um `Servico` que viole o schema (`itinerarios` min(1)).
+
+## Testes esperados
+
+- Unitários: função de promoção `ServicoEmConstrucao (+ itinerário/rota/matriz) → Servico` (uuid preservada; matriz reconciliada; ida / ambos; caso sem-rota não promove).
+- Integração: após concluir itinerário no modo "novo", `servicosDaSessao`/leitura de Viagens e Matrizes retorna o Serviço; assert de que o OSRM foi chamado só o esperado (mock).
+- E2E: N/A nesta task (é a TASK-062); specs existentes seguem verdes.
+- Snapshot/contrato JSON: N/A (não toca contrato); pode-se validar que o `Servico` promovido passa no schema `zod` strict.
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/sessao.ts` (modelo de sessão do modo "novo" — hoje sem `documento`; acomodar os `Servico` completos promovidos; possível helper `servicosDaSessao` unificado)
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (gatilho de promoção ao concluir o itinerário; hoje `documentoComItinerarioAtualizado` só roda no "carregado")
+- `src/formulario/viagens/etapa-viagens.tsx`, `src/formulario/matrizes/etapa-matrizes.tsx` (ler Serviços pelo caminho unificado)
+
+## Riscos
+
+- **Modelo de sessão:** o modo "novo" hoje não carrega `DocumentoOperacao`; decidir na `/analisar-task` onde o `Servico` promovido passa a viver (novo campo de sessão vs. montar documento parcial). Se implicar mudança do modelo além do previsto na DEC-053, vira **DEC própria** antes de codar.
+- Regressão no modo "carregado": a promoção não pode alterar o caminho já existente do documento carregado.
+- Preservação de UUID (RN-004) é a regra crítica nº 1 — round-trip provado por teste.
+
+## Perguntas em aberto
+
+- Nenhuma bloqueante. Decidido por **DEC-053** (opção A da Q-034). O gatilho/forma da promoção e o lar do `Servico` no modo "novo" fecham na `/analisar-task`; se mexerem no modelo de sessão além do previsto, viram DEC própria.
+
+---
+
+## TASK-062 — E2E do fluxo "criar do zero" ponta a ponta (Identificação → Exportação)
+
+## Objetivo
+
+Ao final existe um teste **E2E (Playwright)** que exercita o fluxo **"novo"** completo — Identificação → Serviços → Seções/Locais → Itinerários → Viagens → Matrizes → Resumo → Exportação —, com o OSRM mockado, cobrindo a lacuna que deixou a trava da Q-034 passar despercebida (nenhum E2E cobre criar-do-zero; só o fluxo de JSON aberto).
+
+## Contexto
+
+A Q-034 registrou que "nenhum E2E exercita o fluxo 'novo' de Serviços → Itinerários → Viagens (só o fluxo de JSON aberto é coberto)" — foi por isso que a trava só apareceu em teste manual. Depois da **TASK-061** (promoção `ServicoEmConstrucao → Servico`), o fluxo passa a funcionar ponta a ponta; falta a rede de segurança que impeça a regressão. Testes **nunca** dependem do OSRM real — mock sempre (stack fixada, DEC-029).
+
+## Fora de escopo
+
+- Implementar/alterar a promoção — é a **TASK-061** (esta task só testa o fluxo já corrigido; depende dela).
+- Cobrir o Comparador ou o fluxo de importação de JSON (já coberto por E2E existentes).
+- Testar variações exaustivas de PDF/exportação além de disparar a exportação e validar o JSON resultante.
+
+## Specs fonte
+
+- Spec 04 §5 (Identificação), §6 (Serviços), §7 (itinerário), §8 (grade de horários), §9 (matrizes), §10 (resumo), §12 (exportação)
+- Spec 02 §6 (`Servico` completo no JSON exportado)
+
+## Regras envolvidas
+
+- RN-018 (documento exportado tem ≥ 1 Serviço completo)
+- RN-004 (UUIDs preservadas — round-trip: reimportar o JSON exportado mantém as UUIDs)
+- RN-096 (exportar JSON é o "salvar")
+
+## Entidades afetadas
+
+- Documento de operação inteiro (Autos, Serviço, Seção, Local, Itinerário, Viagem, matriz) — via UI, ponta a ponta
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Um E2E cria um documento do zero pela UI (identidade → 1 Serviço → itinerário com paradas → horários → matriz) com o OSRM mockado.
+- [ ] Após concluir o itinerário, as etapas Viagens e Matrizes exibem o Serviço (regressão-guarda da TASK-061).
+- [ ] A exportação produz um JSON que **passa no schema** `zod` strict (Serviço completo, RN-018).
+- [ ] Round-trip: reimportar o JSON exportado preserva as UUIDs geradas (RN-004).
+- [ ] O teste não faz nenhuma chamada de rede real ao OSRM (mock verificado).
+
+## Casos válidos
+
+- Fluxo "novo" com 1 Serviço, direcionalidade "ida", itinerário de 2+ paradas, ao menos 1 Viagem → exporta JSON válido.
+
+## Casos inválidos
+
+- (guarda opcional) Tentar exportar antes de completar ≥ 1 Serviço → a UI bloqueia/sinaliza pendência (RN-018), sem gerar JSON inválido.
+
+## Testes esperados
+
+- Unitários: N/A (é uma task de E2E).
+- Integração: N/A.
+- E2E: o novo spec Playwright do fluxo criar-do-zero, com OSRM mockado; asserções de Viagens/Matrizes populadas e de JSON exportado válido + round-trip de UUID.
+- Snapshot/contrato JSON: validação do JSON exportado contra o schema.
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `e2e/` (novo spec, ex.: `e2e/fluxo-novo.spec.ts`) + helper de mock do OSRM já existente
+- Possíveis `data-testid` adicionais **apenas** se o fluxo não for selecionável hoje (mínimos; sem alterar os existentes)
+
+## Riscos
+
+- Depende da TASK-061: sem a promoção, o E2E falha por design (Viagens/Matrizes vazias) — sequenciar depois dela.
+- Flakiness de E2E: garantir mock determinístico do OSRM (sem rede real — DEC-029).
+
+## Perguntas em aberto
+
+- Nenhuma.
+
+---
+
+## TASK-063 — Gesto de ponto de rota no mapa único (forçar traçado pela interface)
+
+## Objetivo
+
+O usuário passa a **criar e mover pontos de rota diretamente no mapa** da etapa de itinerários: clicar sobre a **linha da rota** calculada cria um **vértice pequeno arrastável** (Spec 03 §3.6 / Spec 04 §7.3); soltar recalcula a rota reaplicando os pontos. Fecha a única parte do "mapa único" (DEC-054) que a TASK-060 deixou de fora, ligando o **motor já pronto da TASK-023** à interface.
+
+## Contexto
+
+A TASK-023 entregou **só a camada de cálculo/dados** de pontos de rota — `intercalar-pontos-de-rota.ts`, `&waypoints=` na URL, extração nos dois caminhos e persistência em `rota.pontos_de_rota` — e **deliberadamente deixou de fora a interação de mapa** (ver `docs-dev/14-REVISOES/TASK-023-20260713.md`: "a interação de mapa (clique/arraste para criar o vértice — Spec 04) … foram deliberadamente deixados de fora"). A etapa hoje apenas **reaplica** pontos persistidos no recálculo ([`etapa-itinerarios.tsx`](../../src/formulario/itinerarios/etapa-itinerarios.tsx)), sem UI para criá-los. A TASK-060 unificou os mapas e fixou o gesto de Seção/Local (DEC-054), mas o modo "ponto de rota" ficou dependente desta task. O mapa único e o desenho da rota (TASK-059) já existem.
+
+## Fora de escopo
+
+- Qualquer mudança no **contrato JSON**/schema — `pontos_de_rota` já existe (Spec 02 §10.3/§10.4); esta task só o alimenta pela UI.
+- Reescrever o motor de intercalação/roteamento (TASK-023 — reusar como está).
+- Seção/Local/reuso/350 m — inalterados (TASK-060).
+- Sincronização seleção tabela↔mapa (TASK-064).
+
+## Specs fonte
+
+- Spec 03 §3.6 (pontos de rota: clique na linha cria vértice; ordem `apos_parada_ordem`; §3.6.1 exemplo literal)
+- Spec 04 §7.3 (ponto de rota "visual distinto — vértice pequeno sobre a linha, sem rótulo, sem entrada na tabela de paradas; aparece em sub-lista própria"; recalcular ao soltar)
+
+## Regras envolvidas
+
+- RN-042 (ponto de rota: propósito único, sem identidade), RN-043 (forçar traçado altera distâncias), RN-051 (mapeamento legs→trechos com pontos de rota) — motor pronto (TASK-023)
+- RN-046/RN-052 (rota congelada/recalculada ao editar)
+- RN-041 (invariante de trechos)
+
+## Entidades afetadas
+
+- ponto de rota, Rota (a UI cria/move; o modelo não muda)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Clicar sobre a linha da rota cria um ponto de rota (vértice pequeno, sem rótulo — Spec 04 §7.3), visualmente distinto de Seção/Local.
+- [ ] Arrastar o vértice e soltar recalcula a rota (RN-052), reaplicando os pontos via o motor da TASK-023.
+- [ ] O ponto de rota **não** entra na tabela de paradas; aparece em **sub-lista própria** (Spec 04 §7.3).
+- [ ] Remover um ponto de rota recalcula a rota.
+- [ ] Invariante `trechos = paradas − 1` preservado (RN-041); zero campo novo no JSON.
+
+## Casos válidos
+
+- Rota com 2 Seções → clicar na linha entre elas cria 1 ponto de rota; a geometria/trechos refletem o desvio (RN-043); a sub-lista mostra o ponto.
+
+## Casos inválidos
+
+- Clique fora da linha da rota → não cria ponto de rota (só o gesto de Seção/Local do mapa vale, DEC-054).
+- Falha do OSRM ao recalcular → mensagem da Spec 03 §3.5 (§14), sem apagar a última rota válida (RN-048).
+
+## Testes esperados
+
+- Unitários: nenhum novo de motor (reusa TASK-023); helper de "clique-na-linha → `apos_parada_ordem`" se criado.
+- Integração: criar/mover/remover ponto de rota dispara recálculo com o motor real (OSRM mockado); sub-lista renderizada; ausência na tabela de paradas.
+- E2E: criar um ponto de rota no mapa único e ver a rota recalcular (OSRM/tiles mockados).
+- Snapshot/contrato JSON: `pontos_de_rota` bem-formado (sem `uuid`, `apos_parada_ordem ∈ [1, paradas−1]`).
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (gesto de clique-na-linha + vértices arrastáveis + sub-lista)
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (fio do recálculo com pontos de rota vindos do gesto — hoje só reaplica os persistidos)
+- Possível helper em `src/formulario/roteamento/` ou `src/shared/mapa/` para detectar o clique sobre a linha.
+
+## Riscos
+
+- Detecção geométrica de "clique sobre a linha" e o índice `apos_parada_ordem` correto (a que par de paradas o ponto pertence) — ponto de atenção principal.
+- Interação com o gesto de Seção/Local do mapa (DEC-054): distinguir clique-na-linha de clique-no-mapa-vazio.
+
+## Perguntas em aberto
+
+- Nenhuma (motor decidido na TASK-023; gesto habilitado por DEC-054).
+
+---
+
+## TASK-064 — Sincronização de seleção entre a tabela lateral e o mapa (etapa de itinerários)
+
+## Objetivo
+
+Selecionar uma parada na **tabela lateral destaca o marcador no mapa**, e selecionar um marcador no mapa **destaca a linha na tabela** — a sincronização bidirecional que a Spec 04 §7 pede ("selecionar na tabela destaca no mapa e vice-versa"), deixada fora da TASK-060 por ser substancial.
+
+## Contexto
+
+A TASK-060 unificou os mapas e pôs a tabela lateral ao lado (DEC-054 / doc 18 §87), mas **sem** o vínculo de seleção — o critério de aceite da TASK-060 pedia só a tabela lateral, não a sincronização, e a própria task marcou o sync como "avaliar; se for grande, vira task própria". A `/analisar-task` da TASK-060 confirmou que é grande (estado de seleção bidirecional + realce de marcador) e deferiu para cá (DEC-054).
+
+## Fora de escopo
+
+- Qualquer regra de OSRM/350 m/montagem/descrição — comportamento preservado; a task só adiciona realce/seleção de UI.
+- Contrato JSON/schema — seleção é estado de UI efêmero, nunca persistido (RN-096).
+- Criação/edição de paradas ou pontos de rota (TASK-060/063).
+
+## Specs fonte
+
+- Spec 04 §7 ("tabela lateral … sincronizada com o mapa (selecionar na tabela destaca no mapa e vice-versa)")
+- doc 18 §87 (mapa em destaque + tabela lateral)
+
+## Regras envolvidas
+
+- RN-076 (rótulo `Cidade - Nome da Seção` na tabela — preservado)
+- RN-025..036 (Seção/Local/parada — só realce, sem mudança de modelo)
+
+## Entidades afetadas
+
+- Seção, Local, Parada (realce de UI; sem mudança de modelo)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Clicar numa linha da tabela lateral destaca o marcador correspondente no mapa (cor/realce/`aria-current`).
+- [ ] Clicar num marcador no mapa destaca a linha correspondente na tabela.
+- [ ] A seleção é estado de UI efêmero — não altera o JSON nem dispara recálculo.
+- [ ] E2E existentes verdes sem alterar seletores; testids novos só para o realce/seleção, se houver.
+
+## Casos válidos
+
+- Tabela com 3 paradas → clicar na 2ª realça o 2º marcador; clicar no 1º marcador realça a 1ª linha.
+
+## Casos inválidos
+
+- Selecionar uma parada cujo marcador não existe no sentido atual (ex.: Local unidirecional) → sem realce no mapa, sem erro.
+
+## Testes esperados
+
+- Unitários: nenhum novo de regra.
+- Integração: seleção na tabela propaga ao mapa e vice-versa; nenhuma chamada de OSRM disparada pela seleção.
+- E2E: selecionar na tabela e ver o marcador destacado (tiles mockados).
+- Snapshot/contrato JSON: N/A (nada persistido).
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/itinerarios/editor-mapa-itinerario.tsx` e `etapa-itinerarios.tsx` (estado de seleção compartilhado tabela↔mapa)
+- Possível prop de realce em `src/shared/mapa/mapa.tsx` (marcador destacado)
+
+## Riscos
+
+- Estado de seleção bidirecional sem loops de atualização; realce de marcador na primitiva do mapa.
+- Não regredir os E2E da TASK-060 (seletores preservados).
+
+## Perguntas em aberto
+
+- Nenhuma (habilitada por DEC-054).
 
 ---
 
@@ -557,6 +1059,20 @@
 
 ```text
 058
+```
+
+**Correções da etapa de itinerários (mapa/rota — Spec 04 §7; descobertas na revisão da TASK-055):**
+
+```text
+059 → 060 → 063 → 064
+```
+
+- TASK-063 (gesto de ponto de rota) e TASK-064 (sync tabela↔mapa) foram deferidas da TASK-060 por DEC-054 — dependem da TASK-060 (mapa único) e podem seguir em qualquer ordem entre si.
+
+**Fluxo criar-do-zero — promoção `ServicoEmConstrucao → Servico` (DEC-053 / Q-034; TASK-062 depende da TASK-061):**
+
+```text
+061 → 062
 ```
 
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.

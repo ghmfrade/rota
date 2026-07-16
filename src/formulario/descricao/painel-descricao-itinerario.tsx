@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { DescricaoItinerario } from "@/shared/contrato";
+import { Botao, Painel } from "@/shared/ui";
 
 // Painel controlado "Descrição textual do itinerário" (TASK-025; Spec 04
 // §7.4): exibe `rota.descricao_itinerario` (Spec 02 §10.5) por Serviço/
@@ -37,9 +38,11 @@ export function PainelDescricaoItinerario({
   const [mostrarItens, setMostrarItens] = useState(false);
 
   return (
-    <section aria-label={`Descrição textual do itinerário — ${ROTULO_SENTIDO[sentido]}`}>
-      <h3>Descrição textual do itinerário — {ROTULO_SENTIDO[sentido]}</h3>
-      <p data-testid="descricao-texto">
+    <Painel aria-label={`Descrição textual do itinerário — ${ROTULO_SENTIDO[sentido]}`}>
+      <h3 className="mb-2 text-lg font-semibold text-cinza-900">
+        Descrição textual do itinerário — {ROTULO_SENTIDO[sentido]}
+      </h3>
+      <p data-testid="descricao-texto" className="text-sm text-cinza-700">
         {descricao.itens.map((item, indice) => (
           <span key={indice}>
             {indice > 0 && ", "}
@@ -48,25 +51,27 @@ export function PainelDescricaoItinerario({
         ))}
         {descricao.itens.length > 0 && "."}
       </p>
-      <p>
+      <p className="mt-1 text-xs text-cinza-500">
         <em>Texto gerado automaticamente a partir da rota roteirizada — não é digitado.</em>
       </p>
-      <button type="button" onClick={aoRecalcular} disabled={!aoRecalcular}>
-        Recalcular descrição
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          void navigator.clipboard?.writeText(descricao.texto);
-        }}
-      >
-        Copiar texto
-      </button>
-      <button type="button" onClick={() => setMostrarItens((atual) => !atual)}>
-        {mostrarItens ? "Ocultar itens estruturados" : "Ver itens estruturados"}
-      </button>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Botao variante="primario" onClick={aoRecalcular} disabled={!aoRecalcular}>
+          Recalcular descrição
+        </Botao>
+        <Botao
+          variante="secundario"
+          onClick={() => {
+            void navigator.clipboard?.writeText(descricao.texto);
+          }}
+        >
+          Copiar texto
+        </Botao>
+        <Botao variante="secundario" onClick={() => setMostrarItens((atual) => !atual)}>
+          {mostrarItens ? "Ocultar itens estruturados" : "Ver itens estruturados"}
+        </Botao>
+      </div>
       {mostrarItens && (
-        <ul data-testid="descricao-itens">
+        <ul data-testid="descricao-itens" className="mt-2 list-disc pl-5 text-sm text-cinza-700">
           {descricao.itens.map((item, indice) => (
             <li key={indice}>
               {item.tipo === "secao" ? <strong>{item.rotulo}</strong> : item.nome}
@@ -74,6 +79,6 @@ export function PainelDescricaoItinerario({
           ))}
         </ul>
       )}
-    </section>
+    </Painel>
   );
 }

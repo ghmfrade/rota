@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ParSecao, Secao, Servico } from "@/shared/contrato";
+import { Botao, Campo, Painel, Select, Tabela } from "@/shared/ui";
 import { nomeExibicaoSecao } from "@/formulario/secoes";
 import { secoesDaSessao, type SessaoFormulario } from "@/formulario/sessao";
 import { celulaDistancia, formatarKm } from "./apresentacao-matriz-distancias";
@@ -127,35 +128,35 @@ export function EtapaMatrizes({ sessao, aoAtualizarSessao }: PropsEtapaMatrizes)
 
   if (servicos.length === 0) {
     return (
-      <p data-testid="matrizes-sem-servico">
-        Conclua ao menos um Serviço com itinerário e rota calculada na etapa
-        Seções, Locais e Itinerários antes de editar as matrizes.
-      </p>
+      <Painel>
+        <p data-testid="matrizes-sem-servico">
+          Conclua ao menos um Serviço com itinerário e rota calculada na etapa
+          Seções, Locais e Itinerários antes de editar as matrizes.
+        </p>
+      </Painel>
     );
   }
 
   return (
     <div data-testid="etapa-matrizes">
-      <label>
-        Serviço
-        <select
-          data-testid="select-servico-matrizes"
-          value={servicoSelecionadoUuid ?? ""}
-          onChange={(evento) => definirServicoSelecionadoUuid(evento.target.value || null)}
-        >
-          <option value="">— selecione —</option>
-          {servicos.map((s) => (
-            <option key={s.uuid} value={s.uuid}>
-              {s.numero_n}
-            </option>
-          ))}
-        </select>
-      </label>
+      <Select
+        rotulo="Serviço"
+        data-testid="select-servico-matrizes"
+        value={servicoSelecionadoUuid ?? ""}
+        onChange={(evento) => definirServicoSelecionadoUuid(evento.target.value || null)}
+      >
+        <option value="">— selecione —</option>
+        {servicos.map((s) => (
+          <option key={s.uuid} value={s.uuid}>
+            {s.numero_n}
+          </option>
+        ))}
+      </Select>
 
       {servicoAtual && (
-        <section data-testid="matriz-distancias">
-          <h3>Matriz de distâncias</h3>
-          <table>
+        <section data-testid="matriz-distancias" className="mt-4">
+          <h3 className="text-lg font-semibold text-cinza-900">Matriz de distâncias</h3>
+          <Tabela className="mt-2">
             <thead>
               <tr>
                 <th scope="col">Origem/Destino</th>
@@ -219,31 +220,31 @@ export function EtapaMatrizes({ sessao, aoAtualizarSessao }: PropsEtapaMatrizes)
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Tabela>
         </section>
       )}
 
       {servicoAtual && (
-        <section data-testid="matriz-seccionamento">
-          <h3>Matriz de seccionamento</h3>
-          <div>
-            <button
-              type="button"
+        <section data-testid="matriz-seccionamento" className="mt-6">
+          <h3 className="text-lg font-semibold text-cinza-900">Matriz de seccionamento</h3>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Botao
+              variante="secundario"
               data-testid="botao-sugerir-menor-distancia"
               onClick={() => aoAcionarSugestaoEmLote("menor-distancia")}
             >
               Sugerir menor distância
-            </button>
-            <button
-              type="button"
+            </Botao>
+            <Botao
+              variante="secundario"
               data-testid="botao-sugerir-distancias-servico"
               onClick={() => aoAcionarSugestaoEmLote("do-servico")}
             >
               Sugerir distâncias do serviço
-            </button>
+            </Botao>
           </div>
 
-          <table>
+          <Tabela className="mt-2">
             <thead>
               <tr>
                 <th scope="col">Origem/Destino</th>
@@ -279,8 +280,8 @@ export function EtapaMatrizes({ sessao, aoAtualizarSessao }: PropsEtapaMatrizes)
                     return (
                       <td key={secaoColuna.uuid} data-testid="celula-seccionamento">
                         {par ? (
-                          <>
-                            <input
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Campo
                               type="number"
                               step="0.01"
                               min="0"
@@ -294,22 +295,22 @@ export function EtapaMatrizes({ sessao, aoAtualizarSessao }: PropsEtapaMatrizes)
                                 )
                               }
                             />
-                            <button
-                              type="button"
+                            <Botao
+                              variante="secundario"
                               aria-label={`Desabilitar seccionamento entre ${nomeExibicaoSecao(secaoLinha)} e ${nomeExibicaoSecao(secaoColuna)}`}
                               onClick={() => alternarPar(secaoLinha.uuid, secaoColuna.uuid)}
                             >
                               desabilitar
-                            </button>
-                          </>
+                            </Botao>
+                          </div>
                         ) : (
-                          <button
-                            type="button"
+                          <Botao
+                            variante="secundario"
                             aria-label={`Habilitar seccionamento entre ${nomeExibicaoSecao(secaoLinha)} e ${nomeExibicaoSecao(secaoColuna)}`}
                             onClick={() => alternarPar(secaoLinha.uuid, secaoColuna.uuid)}
                           >
                             —
-                          </button>
+                          </Botao>
                         )}
                       </td>
                     );
@@ -317,7 +318,7 @@ export function EtapaMatrizes({ sessao, aoAtualizarSessao }: PropsEtapaMatrizes)
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Tabela>
         </section>
       )}
     </div>

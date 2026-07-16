@@ -102,6 +102,16 @@ describe("Painel", () => {
       desmontar();
     });
 
+    it("elevacao plana não emite nenhuma classe de sombra (painel aninhado)", () => {
+      const { container, desmontar } = renderizar(
+        <Painel elevacao="plana">Aviso aninhado</Painel>,
+      );
+      const classes = container.querySelector("section")!.className;
+      expect(classes).not.toContain("shadow-sombra-2");
+      expect(classes).not.toContain("shadow-sombra-3");
+      desmontar();
+    });
+
     it("as variantes valem também no modo colapsavel", () => {
       const { container, desmontar } = renderizar(
         <Painel colapsavel tom="informativo" titulo="Resumo">

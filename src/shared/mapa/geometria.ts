@@ -2,7 +2,7 @@
 // consumido pelas fontes do MapLibre. Isolado para testar o desenho de
 // LineString (rota) sem depender de WebGL.
 
-import type { FeatureCollection, LineString } from "geojson";
+import type { FeatureCollection, LineString, Position } from "geojson";
 
 /** Coordenada geográfica em graus. */
 export interface Coordenada {
@@ -24,6 +24,29 @@ export const LARGURA_LINHA_PADRAO = 4;
 /** Converte uma Coordenada para o par `[lng, lat]` do GeoJSON. */
 export function paraPosicao(c: Coordenada): [number, number] {
   return [c.lng, c.lat];
+}
+
+/** Converte uma posição GeoJSON `[longitude, latitude, ...]` para Coordenada. */
+function dePosicao([lng, lat]: Position): Coordenada {
+  return { lng, lat };
+}
+
+/**
+ * Converte a `geometria` de uma Rota (GeoJSON `LineString`, coordenadas
+ * `[longitude, latitude]` — Spec 02 §10.2) para a `LinhaMapa` que o `<Mapa>`
+ * desenha. Função pura: não chama OSRM nem recalcula nada — só reformata a
+ * rota já congelada/recalculada (RN-015/RN-046/RN-052).
+ */
+export function linhaDaGeometria(
+  id: string,
+  geometria: LineString,
+  extras?: Pick<LinhaMapa, "cor" | "largura">,
+): LinhaMapa {
+  return {
+    id,
+    pontos: geometria.coordinates.map(dePosicao),
+    ...extras,
+  };
 }
 
 /**

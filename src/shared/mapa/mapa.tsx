@@ -36,6 +36,13 @@ export interface MarcadorMapa {
   posicao: Coordenada;
   arrastavel?: boolean;
   cor?: string;
+  /**
+   * Forma do marcador: `"pino"` (default, o pino teardrop do MapLibre) ou
+   * `"circulo"` (ponto circular colorido por `cor`). O mapa único de
+   * itinerários (TASK-060/DEC-054) usa `"circulo"` para Seção e Local; os
+   * demais consumidores mantêm o pino sem alteração (extensão opt-in).
+   */
+  forma?: "pino" | "circulo";
   aoArrastar?: (posicao: Coordenada) => void;
 }
 
@@ -46,8 +53,14 @@ export interface MapaProps {
   urlTiles?: string;
   marcadores?: readonly MarcadorMapa[];
   linhas?: readonly LinhaMapa[];
-  /** Chamado ao clicar no mapa, com a coordenada clicada. */
+  /** Chamado ao clicar no mapa (botão esquerdo), com a coordenada clicada. */
   aoClicar?: (posicao: Coordenada) => void;
+  /**
+   * Chamado ao clicar com o botão DIREITO (`contextmenu`), com a coordenada.
+   * No mapa único de itinerários o clique direito cria um Local (DEC-054); nos
+   * demais consumidores fica ausente e o gesto não tem efeito.
+   */
+  aoClicarDireito?: (posicao: Coordenada) => void;
   className?: string;
   style?: CSSProperties;
 }
@@ -61,6 +74,17 @@ export interface MapaHandle {
 const ID_FONTE_LINHAS = "linhas-mapa";
 const ID_CAMADA_LINHAS = "linhas-mapa-camada";
 
+// Elemento DOM de um marcador circular (`forma: "circulo"`). A forma (tamanho,
+// borda, sombra) vem da classe `.marcador-mapa-circulo` (globals.css); só a cor
+// é data-driven, aplicada imperativamente — não é um `style=` de componente
+// React (doc 18), e sim o elemento imperativo que o MapLibre recebe.
+function criarElementoCirculo(cor?: string): HTMLElement {
+  const elemento = document.createElement("div");
+  elemento.className = "marcador-mapa-circulo";
+  if (cor) elemento.style.backgroundColor = cor;
+  return elemento;
+}
+
 export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
   {
     centro = CENTRO_PADRAO_SP,
@@ -69,6 +93,7 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
     marcadores = [],
     linhas = [],
     aoClicar,
+    aoClicarDireito,
     className,
     style,
   },
@@ -83,6 +108,8 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
   // versão mais recente sem reassinar os listeners.
   const aoClicarRef = useRef(aoClicar);
   aoClicarRef.current = aoClicar;
+  const aoClicarDireitoRef = useRef(aoClicarDireito);
+  aoClicarDireitoRef.current = aoClicarDireito;
   const marcadoresRefProp = useRef(marcadores);
   marcadoresRefProp.current = marcadores;
   const linhasRefProp = useRef(linhas);
@@ -130,6 +157,16 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
 
       mapa.on("click", (evento) => {
         aoClicarRef.current?.({
+          lng: evento.lngLat.lng,
+          lat: evento.lngLat.lat,
+        });
+      });
+
+      // Clique direito (contextmenu): o MapLibre já suprime o menu nativo do
+      // navegador sobre o canvas ao emitir este evento. No mapa único de
+      // itinerários cria um Local (DEC-054); sem `aoClicarDireito` é inócuo.
+      mapa.on("contextmenu", (evento) => {
+        aoClicarDireitoRef.current?.({
           lng: evento.lngLat.lng,
           lat: evento.lngLat.lat,
         });
@@ -201,10 +238,16 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
         existente.setLngLat([spec.posicao.lng, spec.posicao.lat]);
         continue;
       }
-      const marcador = new maplibregl.Marker({
-        color: spec.cor,
-        draggable: spec.arrastavel ?? false,
-      });
+      const marcador =
+        spec.forma === "circulo"
+          ? new maplibregl.Marker({
+              element: criarElementoCirculo(spec.cor),
+              draggable: spec.arrastavel ?? false,
+            })
+          : new maplibregl.Marker({
+              color: spec.cor,
+              draggable: spec.arrastavel ?? false,
+            });
       marcador.setLngLat([spec.posicao.lng, spec.posicao.lat]).addTo(mapa);
       marcador.on("dragend", () => {
         const { lng, lat } = marcador.getLngLat();

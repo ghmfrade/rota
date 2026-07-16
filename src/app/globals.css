@@ -52,6 +52,18 @@
   }
 }
 
+/* Marcador circular do mapa único de itinerários (TASK-060/DEC-054). A forma
+   é fixa; a cor (Seção × Local) é aplicada imperativamente por `cor`. */
+.marcador-mapa-circulo {
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  border: 2px solid #fff;
+  box-shadow: var(--shadow-sombra-2);
+  cursor: pointer;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

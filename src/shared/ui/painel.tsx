@@ -19,8 +19,13 @@ import type { ComponentPropsWithoutRef, ReactNode } from "react";
 /** Superfície do painel (doc 18 §2/§3). */
 export type TomPainel = "padrao" | "informativo" | "destacado";
 
-/** Profundidade do painel (doc 18 §2 — sombra-3 só para flutuantes). */
-export type ElevacaoPainel = "padrao" | "flutuante";
+/**
+ * Profundidade do painel (doc 18 §2 — sombra-3 só para flutuantes).
+ * `plana` — sem sombra própria, só a borda: para painel aninhado dentro de
+ * outro `Painel` (a sombra do pai já dá profundidade; duas sombras empilhadas
+ * não são o pretendido — parecer da TASK-053, achado 2, fechado pela TASK-056).
+ */
+export type ElevacaoPainel = "padrao" | "flutuante" | "plana";
 
 export interface PainelProps extends ComponentPropsWithoutRef<"section"> {
   /** Título exibido no cabeçalho (ou no `<summary>`, se `colapsavel`). */
@@ -37,7 +42,10 @@ export interface PainelProps extends ComponentPropsWithoutRef<"section"> {
    * `destacado` — caminho recomendado (borda + anel `azul-600`), Spec 04 §3.
    */
   tom?: TomPainel;
-  /** `flutuante` usa `sombra-3`, reservada a diálogos/tooltips (doc 18 §2). */
+  /**
+   * `padrao` usa `sombra-2`; `flutuante` usa `sombra-3`, reservada a
+   * diálogos/tooltips (doc 18 §2); `plana` não emite sombra (painel aninhado).
+   */
   elevacao?: ElevacaoPainel;
   children?: ReactNode;
 }
@@ -53,6 +61,7 @@ const CLASSES_POR_TOM: Record<TomPainel, string> = {
 const CLASSES_POR_ELEVACAO: Record<ElevacaoPainel, string> = {
   padrao: "shadow-sombra-2",
   flutuante: "shadow-sombra-3",
+  plana: "",
 };
 
 export function Painel({

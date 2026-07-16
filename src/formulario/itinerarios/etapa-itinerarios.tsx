@@ -9,15 +9,17 @@ import {
   carregarGeojsonMunicipios,
 } from "@/shared/dados-estaticos";
 import { indiceDeNomes } from "@/shared/geo";
+import { linhaDaGeometria, type LinhaMapa } from "@/shared/mapa";
 import {
-  EditorSecoes,
   nomeExibicaoSecao,
   type RecursosMunicipio,
   type Sentido,
 } from "@/formulario/secoes";
-import { EditorLocais, nomeExibicaoLocal } from "@/formulario/locais";
+import { nomeExibicaoLocal } from "@/formulario/locais";
+import { EditorMapaItinerario } from "./editor-mapa-itinerario";
 import { PainelDescricaoItinerario } from "@/formulario/descricao";
 import { congelarRotaCarregada, mensagemDeFalha } from "@/formulario/roteamento";
+import { Botao, Painel, Select, Tabela } from "@/shared/ui";
 import { matrizDistanciasDoServico } from "@/formulario/matrizes";
 import {
   identidadeDaSessao,
@@ -47,22 +49,21 @@ import {
 } from "./motor-montagem";
 
 // Etapa real "Seções, Locais e Itinerários" (TASK-019; Spec 04 §7.1–§7.4). É a
-// etapa que MONTA os componentes controlados entregues pelas TASK-017
-// (`EditorSecoes`, DEC-043), TASK-018 (`EditorLocais`, DEC-045) e TASK-025
-// (`PainelDescricaoItinerario`, DEC-046), acrescentando o que só ela sabe:
-// seleção de Serviço/sentido, a sequência ordenada de paradas (tabela lateral,
-// Spec 04 §7.3 item 3) e o disparo do recálculo ao vivo (RN-052) que injeta o
-// `comporDescricao` REAL desde o início (DEC-046) — fecha o fio da TASK-044
-// (`ItinerarioAoVivo` → `coletarPendencias`, ver `docs-dev/06` "Obrigação de
-// fiação"). Também consome o sinal de exclusão de sentido de Local (DEC-045):
-// a Parada correspondente sai do itinerário daquele sentido.
+// etapa que MONTA o mapa único de itinerários (`EditorMapaItinerario`, TASK-060)
+// e o `PainelDescricaoItinerario` (TASK-025/DEC-046), acrescentando o que só ela
+// sabe: seleção de Serviço/sentido, a sequência ordenada de paradas (tabela
+// lateral, Spec 04 §7.3 item 3) e o disparo do recálculo ao vivo (RN-052) que
+// injeta o `comporDescricao` REAL desde o início (DEC-046) — fecha o fio da
+// TASK-044 (`ItinerarioAoVivo` → `coletarPendencias`, ver `docs-dev/06`
+// "Obrigação de fiação"). Também consome o sinal de exclusão de sentido de Local
+// (DEC-045): a Parada correspondente sai do itinerário daquele sentido.
 //
-// Limitação aceita (Pontos de atenção da entrega): `EditorSecoes` e
-// `EditorLocais` (TASK-017/018) embutem CADA UM seu próprio `<Mapa>` — esta
-// etapa os monta lado a lado, não fundidos num único canvas como descreve a
-// Spec 04 §7 ("num mesmo mapa interativo"). Unificar os dois num só mapa
-// exigiria alterar a API interna daqueles componentes já entregues/revisados,
-// fora do escopo desta task.
+// TASK-060 (DEC-054): Seções e Locais são lançados num MESMO mapa interativo
+// (Spec 04 §7) — clique esquerdo cria Seção, clique direito cria Local —, com a
+// tabela de paradas LATERAL ao mapa (doc 18 §87). Substitui os dois mapas
+// empilhados de `EditorSecoes`/`EditorLocais` (que seguem apenas em suas demo
+// pages). Os mesmos handlers de recálculo ao vivo são repassados ao novo
+// componente.
 
 type Rota = z.infer<typeof esquemaRota>;
 
@@ -195,6 +196,14 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     estadoAtual && (estadoAtual.situacao === "congelada" || estadoAtual.situacao === "recalculada")
       ? estadoAtual.rota.pontos_de_rota
       : [];
+
+  // Rota ativa desenhada no mapa (TASK-059; Spec 04 §7.3, RN-046/052) — só a
+  // LineString congelada/recalculada; em `sem-rota` (RN-048) nenhuma linha é
+  // passada, sem disparar OSRM (a leitura é do estado já resolvido).
+  const linhaRotaAtual: LinhaMapa | undefined =
+    estadoAtual && (estadoAtual.situacao === "congelada" || estadoAtual.situacao === "recalculada")
+      ? linhaDaGeometria("rota-ativa", estadoAtual.rota.geometria)
+      : undefined;
 
   const paradasOutroSentido =
     linhaAtual && sentidoSelecionado && bidirecional
@@ -411,149 +420,182 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
 
   if (!identidade) {
     return (
-      <p data-testid="itinerarios-sem-identidade">
-        Selecione primeiro o Autos na etapa Identificação.
-      </p>
+      <Painel tom="informativo">
+        <p data-testid="itinerarios-sem-identidade">
+          Selecione primeiro o Autos na etapa Identificação.
+        </p>
+      </Painel>
     );
   }
 
   if (linhas.length === 0) {
     return (
-      <p data-testid="itinerarios-sem-servico">
-        Cadastre ao menos um Serviço na etapa Serviços antes de montar os itinerários.
-      </p>
+      <Painel tom="informativo">
+        <p data-testid="itinerarios-sem-servico">
+          Cadastre ao menos um Serviço na etapa Serviços antes de montar os itinerários.
+        </p>
+      </Painel>
     );
   }
 
   if (erroRecursos) {
-    return <p role="alert">Falha ao carregar municípios: {erroRecursos}</p>;
+    return (
+      <p role="alert" className="text-sm text-erro">
+        Falha ao carregar municípios: {erroRecursos}
+      </p>
+    );
   }
 
   if (!recursosMunicipio) {
-    return <p data-testid="itinerarios-carregando">Carregando municípios…</p>;
+    return (
+      <p data-testid="itinerarios-carregando" className="text-sm text-cinza-500">
+        Carregando municípios…
+      </p>
+    );
   }
 
   return (
-    <div data-testid="etapa-itinerarios">
-      <label>
-        Serviço
-        <select
-          data-testid="select-servico-itinerario"
-          value={servicoSelecionado ?? ""}
-          onChange={(evento) => {
-            definirServicoSelecionado(evento.target.value || null);
-            definirSentidoSelecionado(null);
-          }}
-        >
-          <option value="">— selecione —</option>
-          {linhas.map((l) => (
-            <option key={l.servicoUuid} value={l.servicoUuid}>
-              {l.numeroN}
-            </option>
-          ))}
-        </select>
-      </label>
+    <div data-testid="etapa-itinerarios" className="flex flex-col gap-6">
+      <Select
+        rotulo="Serviço"
+        data-testid="select-servico-itinerario"
+        value={servicoSelecionado ?? ""}
+        onChange={(evento) => {
+          definirServicoSelecionado(evento.target.value || null);
+          definirSentidoSelecionado(null);
+        }}
+      >
+        <option value="">— selecione —</option>
+        {linhas.map((l) => (
+          <option key={l.servicoUuid} value={l.servicoUuid}>
+            {l.numeroN}
+          </option>
+        ))}
+      </Select>
 
       {linhaAtual && (
-        <div data-testid="seletor-sentido">
+        <div data-testid="seletor-sentido" className="flex gap-2">
           {linhaAtual.sentidos.map((sentido) => (
-            <button
+            <Botao
               key={sentido}
-              type="button"
+              variante={sentido === sentidoSelecionado ? "primario" : "secundario"}
               data-testid="botao-sentido"
               data-sentido={sentido}
               aria-current={sentido === sentidoSelecionado ? "true" : undefined}
               onClick={() => definirSentidoSelecionado(sentido)}
             >
               {ROTULO_SENTIDO[sentido]}
-            </button>
+            </Botao>
           ))}
         </div>
       )}
 
       {linhaAtual && sentidoSelecionado && (
-        <>
-          {bidirecional && !conjuntoConsistente && (
-            <p role="alert" data-testid="aviso-secoes-divergentes">
-              Ida e Volta referenciam conjuntos diferentes de Seções (Spec 02 §2). A
-              exportação será bloqueada até as duas convergirem.
-            </p>
-          )}
+        <div className="flex flex-col gap-6">
+          {/* Mapa único à esquerda + tabela de paradas lateral à direita
+              (Spec 04 §7; doc 18 §87; DEC-054). Empilha em tela estreita. */}
+          <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
+            <EditorMapaItinerario
+              secoes={secoes}
+              locais={linhaAtual.locais}
+              servicoUuid={linhaAtual.servicoUuid}
+              sentido={sentidoSelecionado}
+              bidirecional={bidirecional}
+              recursosMunicipio={recursosMunicipio}
+              aoCriarSecao={aoCriarOuAtualizarSecao}
+              aoAtualizarSecao={aoCriarOuAtualizarSecao}
+              aoCriarLocal={aoCriarLocal}
+              aoAtualizarLocal={aoAtualizarLocal}
+              aoExcluirSentido={aoExcluirSentidoDeLocal}
+              linhaRota={linhaRotaAtual}
+            />
 
-          {recalculando && <p data-testid="recalculando-rota">Recalculando rota…</p>}
+            <div data-testid="coluna-paradas" className="flex flex-col gap-4">
+              {bidirecional && !conjuntoConsistente && (
+                <p role="alert" data-testid="aviso-secoes-divergentes" className="text-sm text-erro">
+                  Ida e Volta referenciam conjuntos diferentes de Seções (Spec 02 §2). A
+                  exportação será bloqueada até as duas convergirem.
+                </p>
+              )}
 
-          {violacoesMontagemAtual.length > 0 && (
-            <ul role="alert" data-testid="avisos-montagem-invalida">
-              {violacoesMontagemAtual.map((violacao, indice) => (
-                <li key={`${violacao.codigo}-${indice}`} data-testid="aviso-montagem-invalida">
-                  {violacao.mensagem}
-                </li>
-              ))}
-            </ul>
-          )}
+              {recalculando && (
+                <p data-testid="recalculando-rota" className="text-sm text-cinza-500">
+                  Recalculando rota…
+                </p>
+              )}
 
-          <ol data-testid="tabela-paradas">
-            {paradasAtual.map((parada, indice) => {
-              const rotulo =
-                parada.tipo === "secao"
-                  ? (() => {
-                      const secao = secoes.find((s) => s.uuid === parada.secaoUuid);
-                      return secao ? nomeExibicaoSecao(secao) : parada.secaoUuid;
-                    })()
-                  : (() => {
-                      const local = linhaAtual.locais.find((l) => l.uuid === parada.localUuid);
-                      return local ? nomeExibicaoLocal(local) : parada.localUuid;
-                    })();
-              return (
-                <li key={`${parada.tipo}-${indice}`} data-testid="parada-item">
-                  <span data-testid="parada-rotulo">{rotulo}</span>{" "}
-                  <button
-                    type="button"
-                    data-testid="parada-mover-cima"
-                    disabled={indice === 0}
-                    onClick={() => moverParada(indice, indice - 1)}
-                  >
-                    ↑
-                  </button>{" "}
-                  <button
-                    type="button"
-                    data-testid="parada-mover-baixo"
-                    disabled={indice === paradasAtual.length - 1}
-                    onClick={() => moverParada(indice, indice + 1)}
-                  >
-                    ↓
-                  </button>{" "}
-                  <button
-                    type="button"
-                    data-testid="parada-remover"
-                    onClick={() => removerParadaNaTabela(indice)}
-                  >
-                    Remover
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
+              {violacoesMontagemAtual.length > 0 && (
+                <ul
+                  role="alert"
+                  data-testid="avisos-montagem-invalida"
+                  className="list-disc pl-5 text-sm text-erro"
+                >
+                  {violacoesMontagemAtual.map((violacao, indice) => (
+                    <li key={`${violacao.codigo}-${indice}`} data-testid="aviso-montagem-invalida">
+                      {violacao.mensagem}
+                    </li>
+                  ))}
+                </ul>
+              )}
 
-          <EditorSecoes
-            secoes={secoes}
-            servicoUuid={linhaAtual.servicoUuid}
-            sentido={sentidoSelecionado}
-            bidirecional={bidirecional}
-            recursosMunicipio={recursosMunicipio}
-            aoCriarSecao={aoCriarOuAtualizarSecao}
-            aoAtualizarSecao={aoCriarOuAtualizarSecao}
-          />
-
-          <EditorLocais
-            locais={linhaAtual.locais}
-            sentido={sentidoSelecionado}
-            bidirecional={bidirecional}
-            recursosMunicipio={recursosMunicipio}
-            aoCriarLocal={aoCriarLocal}
-            aoAtualizarLocal={aoAtualizarLocal}
-            aoExcluirSentido={aoExcluirSentidoDeLocal}
-          />
+              <Tabela data-testid="tabela-paradas">
+                <thead>
+                  <tr>
+                    <th scope="col">Parada</th>
+                    <th scope="col">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paradasAtual.map((parada, indice) => {
+                    const rotulo =
+                      parada.tipo === "secao"
+                        ? (() => {
+                            const secao = secoes.find((s) => s.uuid === parada.secaoUuid);
+                            return secao ? nomeExibicaoSecao(secao) : parada.secaoUuid;
+                          })()
+                        : (() => {
+                            const local = linhaAtual.locais.find((l) => l.uuid === parada.localUuid);
+                            return local ? nomeExibicaoLocal(local) : parada.localUuid;
+                          })();
+                    return (
+                      <tr key={`${parada.tipo}-${indice}`} data-testid="parada-item">
+                        <td>
+                          <span data-testid="parada-rotulo">{rotulo}</span>
+                        </td>
+                        <td>
+                          <div className="flex flex-wrap gap-2">
+                            <Botao
+                              variante="secundario"
+                              data-testid="parada-mover-cima"
+                              disabled={indice === 0}
+                              onClick={() => moverParada(indice, indice - 1)}
+                            >
+                              ↑
+                            </Botao>
+                            <Botao
+                              variante="secundario"
+                              data-testid="parada-mover-baixo"
+                              disabled={indice === paradasAtual.length - 1}
+                              onClick={() => moverParada(indice, indice + 1)}
+                            >
+                              ↓
+                            </Botao>
+                            <Botao
+                              variante="secundario"
+                              data-testid="parada-remover"
+                              onClick={() => removerParadaNaTabela(indice)}
+                            >
+                              Remover
+                            </Botao>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </Tabela>
+            </div>
+          </div>
 
           {estadoAtual && (estadoAtual.situacao === "congelada" || estadoAtual.situacao === "recalculada") && (
             <PainelDescricaoItinerario
@@ -564,11 +606,11 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
           )}
 
           {estadoAtual && estadoAtual.situacao === "sem-rota" && (
-            <p role="alert" data-testid="mensagem-sem-rota">
+            <p role="alert" data-testid="mensagem-sem-rota" className="text-sm text-erro">
               {mensagemDeFalha(estadoAtual.falha)}
             </p>
           )}
-        </>
+        </div>
       )}
     </div>
   );

@@ -25,6 +25,11 @@ export const FAIXAS_HORARIO = [
 
 export type IdFaixaHorario = (typeof FAIXAS_HORARIO)[number]["id"];
 
+// RN-069/NEG-018 — rótulo obrigatório em qualquer exibição de contagem
+// (tela e PDF — Spec 04 §11 item 9/§13.3). Fonte única: consumido por
+// servicos e resumo, nunca redeclarado.
+export const ROTULO_SEMANA_PADRAO = "semana padrão (sem feriados)";
+
 // Classifica `horario_saida` (HH:MM:SS de relógio) numa das 7 faixas, pela
 // hora de relógio (Spec 04 §10). As faixas cobrem o dia inteiro, então esta
 // função é total: sempre devolve uma faixa.

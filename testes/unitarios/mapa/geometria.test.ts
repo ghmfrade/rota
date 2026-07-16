@@ -1,7 +1,9 @@
+import type { LineString } from "geojson";
 import { describe, expect, it } from "vitest";
 import {
   COR_LINHA_PADRAO,
   LARGURA_LINHA_PADRAO,
+  linhaDaGeometria,
   linhasParaGeoJson,
   paraPosicao,
   type LinhaMapa,
@@ -79,5 +81,80 @@ describe("linhasParaGeoJson", () => {
     ]);
     expect(gj.features).toHaveLength(1);
     expect(gj.features[0].properties?.id).toBe("valida");
+  });
+});
+
+describe("linhaDaGeometria", () => {
+  // TASK-059 — conversor `rota.geometria` (GeoJSON LineString, Spec 02 §10.2)
+  // → LinhaMapa, para desenhar a rota ativa da etapa de itinerários.
+
+  it("converte coordinates [lon,lat] para pontos {lng,lat} preservando a ordem", () => {
+    const geometria: LineString = {
+      type: "LineString",
+      coordinates: [
+        [-46.64, -23.55],
+        [-46.62, -23.54],
+        [-46.6, -23.53],
+      ],
+    };
+    const linha = linhaDaGeometria("rota-ativa", geometria);
+    expect(linha).toEqual<LinhaMapa>({
+      id: "rota-ativa",
+      pontos: [
+        { lng: -46.64, lat: -23.55 },
+        { lng: -46.62, lat: -23.54 },
+        { lng: -46.6, lat: -23.53 },
+      ],
+    });
+  });
+
+  it("não confunde geometrias de ida e volta (ids e traçados distintos)", () => {
+    const geometriaIda: LineString = {
+      type: "LineString",
+      coordinates: [
+        [-46.64, -23.55],
+        [-46.62, -23.54],
+      ],
+    };
+    const geometriaVolta: LineString = {
+      type: "LineString",
+      coordinates: [
+        [-46.62, -23.54],
+        [-46.64, -23.55],
+      ],
+    };
+    const linhaIda = linhaDaGeometria("rota-ida", geometriaIda);
+    const linhaVolta = linhaDaGeometria("rota-volta", geometriaVolta);
+    expect(linhaIda.id).toBe("rota-ida");
+    expect(linhaVolta.id).toBe("rota-volta");
+    expect(linhaIda.pontos).not.toEqual(linhaVolta.pontos);
+  });
+
+  it("repassa cor/largura opcionais quando informadas", () => {
+    const geometria: LineString = {
+      type: "LineString",
+      coordinates: [
+        [0, 0],
+        [1, 1],
+      ],
+    };
+    const linha = linhaDaGeometria("rota-ativa", geometria, { cor: "#ff0000", largura: 6 });
+    expect(linha.cor).toBe("#ff0000");
+    expect(linha.largura).toBe(6);
+  });
+
+  // Caso inválido: LineString com o mínimo estrutural (2 pontos, Spec 02
+  // §10.2) continua convertendo normalmente — degeneração é tratada a jusante
+  // por `linhasParaGeoJson` (linha com < 2 pontos é descartada), não aqui.
+  it("converte o mínimo de 2 pontos sem descartar (a rejeição de linha degenerada é de linhasParaGeoJson)", () => {
+    const geometria: LineString = {
+      type: "LineString",
+      coordinates: [
+        [0, 0],
+        [1, 1],
+      ],
+    };
+    const linha = linhaDaGeometria("rota-ativa", geometria);
+    expect(linha.pontos).toHaveLength(2);
   });
 });

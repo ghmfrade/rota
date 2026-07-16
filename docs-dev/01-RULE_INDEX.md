@@ -507,7 +507,7 @@
 ## RN-069 — Feriado não altera contagens
 
 **Descrição:** Todas as contagens (viagens semanais, opções de deslocamento) usam a **semana padrão**: exclusivamente Viagens com `viagem_feriado = false`. Dois JSONs que difiram só na grade de feriados têm contagens idênticas. Contagens sempre rotuladas "semana padrão (sem feriados)".
-**Origem:** Spec 03 §9.2; Spec 04 §10, §13.3; Spec 05 §10.4.
+**Origem:** Spec 03 §9.2; Spec 04 §6, §10, §13.3; Spec 05 §10.4.
 **Tipo:** Cálculo | Domínio. **Criticidade:** Alta. **Afeta:** F, C, P, T.
 
 ## RN-070 — Calendário de feriados é externo
