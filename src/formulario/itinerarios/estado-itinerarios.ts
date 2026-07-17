@@ -35,6 +35,29 @@ export function chaveItinerario(servicoUuid: string, sentido: Sentido): string {
 
 export type EstadosRotaViva = Record<string, EstadoRotaViva>;
 
+/**
+ * Pontos de rota em edição de um itinerário (TASK-071; DEC-058): a entrada
+ * do estado de sessão (`pontosDeRotaEmEdicao`) manda, se existir — é ela que
+ * sobrevive a um recálculo que falha (RN-048). Na ausência dela, cai no eco
+ * congelado do itinerário já COMPLETO (`rota.pontos_de_rota` — reedição
+ * fiel, Spec 03 §3.6.2, síncrona e sem OSRM — RN-052). Sem sessão nem
+ * itinerário carregado (ex.: Serviço em construção ainda não tocado),
+ * devolve `[]` — não há o que reaplicar.
+ */
+export function pontosDeRotaDoItinerario(
+  sessao: SessaoFormulario,
+  servicoUuid: string,
+  sentido: Sentido,
+): readonly PontoDeRota[] {
+  const chave = chaveItinerario(servicoUuid, sentido);
+  const daSessao = sessao.pontosDeRotaEmEdicao?.[chave];
+  if (daSessao !== undefined) return daSessao;
+
+  const servico = servicosDaSessao(sessao).find((s) => s.uuid === servicoUuid);
+  const itinerario = servico?.itinerarios.find((i) => i.sentido === sentido);
+  return itinerario?.rota.pontos_de_rota ?? [];
+}
+
 function sentidosDeDirecionalidade(direcionalidade: Direcionalidade): Sentido[] {
   return direcionalidade === "ambos" ? ["ida", "volta"] : [direcionalidade];
 }

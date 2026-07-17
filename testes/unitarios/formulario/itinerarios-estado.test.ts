@@ -3,6 +3,7 @@ import {
   chaveItinerario,
   dispararRecalculo,
   itinerariosAoVivoDaSessao,
+  pontosDeRotaDoItinerario,
 } from "@/formulario/itinerarios";
 import { paradaDeSecao } from "@/formulario/itinerarios";
 import { esquemaRota, type DescricaoItinerario } from "@/shared/contrato";
@@ -49,6 +50,58 @@ describe("chaveItinerario", () => {
     expect(chaveItinerario("abc", "ida")).toBe("abc-ida");
     expect(chaveItinerario("abc", "ida")).toBe(chaveItinerario("abc", "ida"));
     expect(chaveItinerario("abc", "ida")).not.toBe(chaveItinerario("abc", "volta"));
+  });
+});
+
+describe("pontosDeRotaDoItinerario — TASK-071/DEC-058, fonte de sessão sobre o eco congelado", () => {
+  test("entrada na sessão (pontosDeRotaEmEdicao) tem prioridade sobre o eco do documento", () => {
+    const documento = documentoExemploMinimo();
+    const servico = documento.autos.servicos[0];
+    const itinerario = servico.itinerarios[0];
+    const chave = chaveItinerario(servico.uuid, itinerario.sentido);
+    const pontoDaSessao = { apos_parada_ordem: 2, latitude: -1, longitude: -2 };
+
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+      pontosDeRotaEmEdicao: { [chave]: [pontoDaSessao] },
+    };
+
+    expect(pontosDeRotaDoItinerario(sessao, servico.uuid, itinerario.sentido)).toEqual([pontoDaSessao]);
+  });
+
+  test("sem entrada na sessão, cai no eco `rota.pontos_de_rota` do itinerário carregado (reedição fiel, sem OSRM)", () => {
+    const documento = documentoExemploMinimo();
+    const servico = documento.autos.servicos[0];
+    const itinerario = servico.itinerarios[0];
+
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    expect(pontosDeRotaDoItinerario(sessao, servico.uuid, itinerario.sentido)).toEqual(
+      itinerario.rota.pontos_de_rota,
+    );
+  });
+
+  test("[inválido] entrada da sessão como lista VAZIA (pontos removidos) prevalece — não recai no eco do documento", () => {
+    const documento = documentoExemploMinimo();
+    const servico = documento.autos.servicos[0];
+    const itinerario = servico.itinerarios[0];
+    const chave = chaveItinerario(servico.uuid, itinerario.sentido);
+
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+      pontosDeRotaEmEdicao: { [chave]: [] },
+    };
+
+    expect(pontosDeRotaDoItinerario(sessao, servico.uuid, itinerario.sentido)).toEqual([]);
+  });
+
+  test("[inválido] Serviço/sentido inexistente, sem sessão nem documento → lista vazia, sem exceção", () => {
+    const sessao: SessaoFormulario = { modo: "novo" };
+    expect(pontosDeRotaDoItinerario(sessao, "uuid-inexistente", "ida")).toEqual([]);
   });
 });
 

@@ -23,6 +23,7 @@ export {
   chaveItinerario,
   dispararRecalculo,
   itinerariosAoVivoDaSessao,
+  pontosDeRotaDoItinerario,
   type EstadosRotaViva,
   type ResultadoDispararRecalculo,
 } from "./estado-itinerarios";

@@ -296,6 +296,89 @@ test.describe("Etapa Seções, Locais e Itinerários — gesto de ponto de rota 
     expect(coordenadas.split(";").length).toBe(4);
   });
 
+  test("TASK-071: ponto de rota sobrevive a um recálculo que falha; o recálculo seguinte bem-sucedido o reaplica", async ({
+    page,
+  }) => {
+    let chamada = 0;
+    let ultimaUrlOsrm: string | null = null;
+    const respostaOk = {
+      code: "Ok",
+      routes: [
+        {
+          geometry: {
+            type: "LineString",
+            coordinates: [
+              [-46.402, -24.0081],
+              [-46.396, -23.98],
+              [-46.3915, -23.9629],
+              [-46.3342, -23.9611],
+            ],
+          },
+          legs: [
+            { distance: 3000, duration: 400, steps: [{ name: "Via forçada" }] },
+            { distance: 3500, duration: 460, steps: [{ name: "Via forçada" }] },
+            { distance: 8000, duration: 1080, steps: [{ name: "Via 2" }] },
+          ],
+        },
+      ],
+    };
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamada += 1;
+      // A 2ª tentativa (após criar o ponto) falha — simula o soluço
+      // transitório do OSRM demo (Spec 04 §7.3) que a DEC-058 endereça.
+      if (chamada === 2) {
+        return rota.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({ code: "NoRoute", routes: [] }),
+        });
+      }
+      ultimaUrlOsrm = rota.request().url();
+      return rota.fulfill({ contentType: "application/json", body: JSON.stringify(respostaOk) });
+    });
+
+    await abrirEtapaVolta(page);
+
+    const mapa = page.getByTestId("mapa-base");
+    await expect(mapa).toBeVisible();
+    const marcadores = mapa.locator(".maplibregl-marker");
+    await expect(marcadores).toHaveCount(3);
+    await mapa.scrollIntoViewIfNeeded();
+
+    const caixaA = await marcadores.nth(0).boundingBox();
+    const caixaB = await marcadores.nth(1).boundingBox();
+    if (!caixaA || !caixaB) throw new Error("marcador sem bounding box");
+    const centroA = { x: caixaA.x + caixaA.width / 2, y: caixaA.y + caixaA.height / 2 };
+    const centroB = { x: caixaB.x + caixaB.width / 2, y: caixaB.y + caixaB.height / 2 };
+    const meio = { x: (centroA.x + centroB.x) / 2, y: (centroA.y + centroB.y) / 2 };
+
+    // Chamada 1 (Ok): cria o ponto de rota.
+    await page.mouse.click(meio.x, meio.y);
+    await expect(page.getByTestId("sub-lista-pontos-de-rota").getByTestId("ponto-rota-item")).toHaveCount(1);
+
+    // Chamada 2 (NoRoute): qualquer gesto que dispare recálculo (aqui, mover
+    // uma parada) leva o itinerário a `sem-rota` — mas o ponto de rota, que
+    // vive agora em estado de sessão PRÓPRIO (DEC-058), não some da sub-lista
+    // nem do mapa.
+    await page.getByTestId("parada-mover-baixo").first().click();
+    await expect(page.getByTestId("mensagem-sem-rota")).toBeVisible();
+    await expect(page.getByTestId("sub-lista-pontos-de-rota").getByTestId("ponto-rota-item")).toHaveCount(1);
+
+    // Chamada 3 (Ok): o próximo recálculo bem-sucedido REAPLICA o ponto que
+    // sobreviveu à falha (Spec 03 §3.6.2) — a URL final leva `waypoints=` e a
+    // sub-lista continua com o ponto. Move a mesma parada de volta (mover-baixo
+    // de novo — o índice 0 nunca fica desabilitado enquanto não for o último).
+    await page.getByTestId("parada-mover-baixo").first().click();
+    await expect(page.getByTestId("mensagem-sem-rota")).toHaveCount(0);
+    await expect(page.getByTestId("sub-lista-pontos-de-rota").getByTestId("ponto-rota-item")).toHaveCount(1);
+
+    expect(chamada).toBe(3);
+    expect(ultimaUrlOsrm).not.toBeNull();
+    const url = ultimaUrlOsrm as unknown as string;
+    expect(url).toContain("waypoints=");
+    const coordenadas = url.match(/\/driving\/([^?]+)/)?.[1] ?? "";
+    expect(coordenadas.split(";").length).toBe(4);
+  });
+
   test("[inválido] clicar FORA da linha da rota continua criando Seção (DEC-055, sem mudança até a TASK-065)", async ({
     page,
   }) => {

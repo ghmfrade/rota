@@ -1,4 +1,4 @@
-import type { Autos, DocumentoOperacao, Local, Secao, Servico } from "@/shared/contrato";
+import type { Autos, DocumentoOperacao, Local, PontoDeRota, Secao, Servico } from "@/shared/contrato";
 import type { TipoDeAutos } from "@/shared/tipificacao";
 import type { AlertaTecnico } from "@/formulario/importacao";
 import type { EstadoRotaViva } from "@/formulario/roteamento";
@@ -88,6 +88,17 @@ export interface ServicoEmConstrucao {
 export type ParadasEmEdicaoPorItinerario = Record<string, ParadaEmEdicao[]>;
 export type EstadosRotaVivaPorItinerario = Record<string, EstadoRotaViva>;
 
+// Pontos de rota do itinerário em edição (TASK-071; DEC-058; Spec 03 §3.6.2):
+// estado de sessão PRÓPRIO, que sobrevive à transição para `sem-rota`
+// (RN-048) — deixa de ser derivado de `estadoAtual.rota.pontos_de_rota`
+// (que só existe em `congelada`/`recalculada`). A entrada de uma chave só
+// existe depois do primeiro gesto de ponto de rota (ou de o itinerário ter
+// sido tocado); antes disso, a leitura cai no eco do arquivo/documento
+// (`rota.pontos_de_rota` congelado) — reedição fiel sem chamar OSRM
+// (RN-052). `rota.pontos_de_rota` no JSON continua sendo o eco do último
+// recálculo bem-sucedido; o contrato e o schema não mudam.
+export type PontosDeRotaEmEdicaoPorItinerario = Record<string, PontoDeRota[]>;
+
 // Âncoras manuais de horário por Viagem (TASK-029; Spec 03 §8.2). Cada Viagem
 // mapeia a lista de `parada.ordem` cujo offset o usuário fixou à mão — insumo
 // da redistribuição proporcional (RN-065). A primeira parada é âncora implícita
@@ -110,6 +121,7 @@ export type SessaoFormulario =
       servicosEmConstrucao?: ServicoEmConstrucao[];
       paradasEmEdicao?: ParadasEmEdicaoPorItinerario;
       estadosRotaViva?: EstadosRotaVivaPorItinerario;
+      pontosDeRotaEmEdicao?: PontosDeRotaEmEdicaoPorItinerario;
       ancorasHorario?: AncorasHorarioPorViagem;
     }
   | {
@@ -132,6 +144,7 @@ export type SessaoFormulario =
       servicos?: Servico[];
       paradasEmEdicao?: ParadasEmEdicaoPorItinerario;
       estadosRotaViva?: EstadosRotaVivaPorItinerario;
+      pontosDeRotaEmEdicao?: PontosDeRotaEmEdicaoPorItinerario;
       ancorasHorario?: AncorasHorarioPorViagem;
     };
 
@@ -188,6 +201,15 @@ export function estadosRotaVivaDaSessao(
   sessao: SessaoFormulario,
 ): EstadosRotaVivaPorItinerario {
   return sessao.estadosRotaViva ?? {};
+}
+
+/** Pontos de rota em edição por itinerário (TASK-071; DEC-058); ausência ≡
+ * mapa vazio — a leitura por itinerário cai no eco do arquivo/documento
+ * (ver `pontosDeRotaDoItinerario` em `itinerarios/estado-itinerarios.ts`). */
+export function pontosDeRotaEmEdicaoDaSessao(
+  sessao: SessaoFormulario,
+): PontosDeRotaEmEdicaoPorItinerario {
+  return sessao.pontosDeRotaEmEdicao ?? {};
 }
 
 /** Âncoras manuais de horário por Viagem (TASK-029; DEC-049); ausência ≡ mapa vazio. */

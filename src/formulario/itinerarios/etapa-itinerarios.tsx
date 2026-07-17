@@ -43,6 +43,7 @@ import {
 import {
   chaveItinerario,
   dispararRecalculo,
+  pontosDeRotaDoItinerario,
 } from "./estado-itinerarios";
 import { promoverServicoNaSessao } from "./promocao-servico";
 import {
@@ -198,13 +199,15 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     linhaAtual && sentidoSelecionado
       ? (violacoesMontagemMapa[chaveItinerario(linhaAtual.servicoUuid, sentidoSelecionado)] ?? [])
       : [];
-  // Pontos de rota persistidos a reaplicar no recálculo (Spec 03 §3.6.2) — o
-  // último `rota` conhecido (congelada do arquivo ou da última recomputação
-  // desta sessão). A EDIÇÃO de pontos de rota é a TASK-023 (fora de escopo);
-  // esta task só os REAPLICA para não perder o traçado forçado na reedição.
-  const pontosDeRotaAtual =
-    estadoAtual && (estadoAtual.situacao === "congelada" || estadoAtual.situacao === "recalculada")
-      ? estadoAtual.rota.pontos_de_rota
+  // Pontos de rota do itinerário em edição (TASK-071; DEC-058): vivem em
+  // estado de sessão PRÓPRIO, que sobrevive à transição para `sem-rota`
+  // (RN-048) — não são mais derivados de `estadoAtual.rota`, que deixa de
+  // existir quando o recálculo falha. `pontosDeRotaDoItinerario` cai no eco
+  // do arquivo/documento (`rota.pontos_de_rota`) quando a sessão ainda não
+  // tem entrada para este itinerário (reedição fiel, Spec 03 §3.6.2).
+  const pontosDeRotaAtual: readonly PontoDeRota[] =
+    linhaAtual && sentidoSelecionado
+      ? pontosDeRotaDoItinerario(sessao, linhaAtual.servicoUuid, sentidoSelecionado)
       : [];
 
   // Rota ativa desenhada no mapa (TASK-059; Spec 04 §7.3, RN-046/052) — só a
@@ -313,10 +316,16 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
   ) {
     if (!linhaAtual || !sentidoSelecionado || !recursosMunicipio) return;
     const chave = chaveItinerario(linhaAtual.servicoUuid, sentidoSelecionado);
+    // Pontos de rota a reaplicar neste gesto (Spec 03 §3.6.2) — comitados no
+    // MESMO commit síncrono das paradas (TASK-071; DEC-058), para que
+    // sobrevivam caso o recálculo abaixo falhe (RN-048: sem-rota não pode
+    // apagar o traçado forçado da sessão).
+    const pontosParaReaplicar = opcoes.pontosDeRota ?? pontosDeRotaAtual;
 
     const base = opcoes.aoComitarBase ? opcoes.aoComitarBase(sessao) : sessao;
     const paradasMapa = { ...(base.paradasEmEdicao ?? {}), [chave]: novasParadas };
-    aoAtualizarSessao({ ...base, paradasEmEdicao: paradasMapa });
+    const pontosDeRotaMapa = { ...(base.pontosDeRotaEmEdicao ?? {}), [chave]: [...pontosParaReaplicar] };
+    aoAtualizarSessao({ ...base, paradasEmEdicao: paradasMapa, pontosDeRotaEmEdicao: pontosDeRotaMapa });
 
     definirRecalculando(true);
     const resultado = await dispararRecalculo(
@@ -325,7 +334,7 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
       opcoes.locaisParaResolver ?? linhaAtual.locais,
       linhaAtual.servicoUuid,
       sentidoSelecionado,
-      opcoes.pontosDeRota ?? pontosDeRotaAtual,
+      pontosParaReaplicar,
     );
     definirRecalculando(false);
 
