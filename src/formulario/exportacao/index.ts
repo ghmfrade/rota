@@ -8,3 +8,9 @@ export {
   type ErroExportacao,
   type ResultadoExportacao,
 } from "./exportar-documento";
+export { montarDocumentoParaExportacao } from "./montar-documento";
+export {
+  avaliarGateExportacao,
+  type ResultadoGateExportacao,
+} from "./gate-exportacao";
+export { TelaExportacao } from "./tela-exportacao";

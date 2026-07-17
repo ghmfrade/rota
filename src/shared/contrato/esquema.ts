@@ -275,6 +275,13 @@ export const esquemaAutos = z.strictObject({
     .min(1, "[RN-018] autos.servicos deve ter ao menos 1 elemento (Spec 02 §14)"),
 });
 
+// Valor de `versao_schema` (Spec 02 §3) gravado num documento criado do zero
+// no Formulário (TASK-032; Q-046, opção (a)) — não há JSON de origem para
+// herdar a versão. "1.0" é a mesma versão usada nas fixtures canônicas e no
+// exemplo mínimo da Spec 02 §15; ponto único de atualização se a versão do
+// contrato mudar.
+export const VERSAO_SCHEMA_ATUAL = "1.0";
+
 // Spec 02 §3 — Objeto raiz (sem as validações cruzadas; ver index.ts)
 export const esquemaDocumentoOperacaoBase = z.strictObject({
   versao_schema: z

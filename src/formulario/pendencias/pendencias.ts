@@ -36,7 +36,9 @@ export interface ItinerarioAoVivo {
   estadoRota: EstadoRotaViva;
 }
 
-const ROTULO_SENTIDO: Record<Itinerario["sentido"], string> = {
+/** Rótulo de exibição por sentido (Spec 04 §7.4/§11) — reusado pela Revisão
+ * (TASK-032) para o título de cada bloco de descrição textual. */
+export const ROTULO_SENTIDO: Record<Itinerario["sentido"], string> = {
   ida: "Ida",
   volta: "Volta",
 };

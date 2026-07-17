@@ -8,6 +8,8 @@ import { EtapaServicos } from "@/formulario/servicos";
 import { EtapaItinerarios, itinerariosAoVivoDaSessao } from "@/formulario/itinerarios";
 import { EtapaMatrizes } from "@/formulario/matrizes";
 import { EtapaViagens } from "@/formulario/viagens";
+import { TelaRevisao } from "@/formulario/revisao";
+import { TelaExportacao } from "@/formulario/exportacao";
 import { Painel, Selo, Tooltip, Carimbo } from "@/shared/ui";
 import { ETAPAS, rotuloEtapa, type IdEtapa } from "./etapas";
 import { CARIMBO_DA_ETAPA } from "./carimbo-de-etapa";
@@ -208,11 +210,17 @@ export function LayoutFormulario({
                 <EtapaViagens sessao={sessao} aoAtualizarSessao={aoAtualizarSessao} />
               ) : etapaAtual === "matrizes" ? (
                 <EtapaMatrizes sessao={sessao} aoAtualizarSessao={aoAtualizarSessao} />
+              ) : etapaAtual === "revisao" ? (
+                <TelaRevisao
+                  sessao={sessao}
+                  pendencias={pendencias}
+                  aoNavegar={definirEtapa}
+                />
               ) : (
-                <p>
-                  Etapa em construção — o conteúdo será implementado nas próximas
-                  tasks.
-                </p>
+                <TelaExportacao
+                  sessao={sessao}
+                  aoFocarPendencias={() => definirEtapa("revisao")}
+                />
               )}
           </section>
         </div>

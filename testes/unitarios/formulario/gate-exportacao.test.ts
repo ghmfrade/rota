@@ -1,0 +1,96 @@
+import { describe, expect, test } from "vitest";
+import { avaliarGateExportacao } from "@/formulario/exportacao";
+import type { SessaoFormulario } from "@/formulario/sessao";
+import type { ItinerarioAoVivo } from "@/formulario/pendencias";
+import { documentoExemploMinimo } from "../../fixtures";
+
+// TASK-032 — gate de exportação (RN-078; Spec 04 §11/§14) que rege os botões
+// da etapa Exportação ANTES do clique ("Botões de exportação desabilitados +
+// painel de pendências em foco"). Combina pendências vivas de sessão com a
+// validação estrutural do schema, sem falso-bloqueio por bookkeeping de data
+// (RN-011) que só é resolvido no clique real.
+
+describe("avaliarGateExportacao — caminho liberado", () => {
+  test("documento carregado válido, sem pendências vivas → liberado", () => {
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento: documentoExemploMinimo(),
+      alertasImportacao: [],
+    };
+
+    const resultado = avaliarGateExportacao(sessao, []);
+
+    expect(resultado.liberado).toBe(true);
+    expect(resultado.pendenciasBloqueantes).toHaveLength(0);
+    expect(resultado.documentoIncompleto).toBe(false);
+  });
+
+  test("documento montável no modo novo, sem pendências → liberado", () => {
+    const base = documentoExemploMinimo();
+    const sessao: SessaoFormulario = {
+      modo: "novo",
+      identidade: {
+        codigo: base.autos.codigo,
+        empresa: base.autos.empresa,
+        tipo: base.autos.tipo,
+        status: "proposta",
+      },
+      secoesEmConstrucao: base.autos.secoes,
+      servicos: base.autos.servicos,
+    };
+
+    expect(avaliarGateExportacao(sessao, []).liberado).toBe(true);
+  });
+});
+
+describe("avaliarGateExportacao — casos bloqueantes (RN-078)", () => {
+  test("[inválido] modo novo sem identidade/Serviço → bloqueado (documentoIncompleto)", () => {
+    const sessao: SessaoFormulario = { modo: "novo" };
+
+    const resultado = avaliarGateExportacao(sessao, []);
+
+    expect(resultado.liberado).toBe(false);
+    expect(resultado.documentoIncompleto).toBe(true);
+  });
+
+  test("[inválido] pendência bloqueante ao vivo (rota ausente, TASK-044) bloqueia mesmo com documento schema-válido", () => {
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento: documentoExemploMinimo(),
+      alertasImportacao: [],
+    };
+    const itinerarios: ItinerarioAoVivo[] = [
+      {
+        numeroN: "0000-1CR",
+        sentido: "ida",
+        estadoRota: { situacao: "sem-rota", falha: { tipo: "sem-rota" } },
+      },
+    ];
+
+    const resultado = avaliarGateExportacao(sessao, itinerarios);
+
+    expect(resultado.liberado).toBe(false);
+    expect(resultado.pendenciasBloqueantes).toHaveLength(1);
+    expect(resultado.documentoIncompleto).toBe(false);
+  });
+
+  test("[inválido] documento estruturalmente inválido (itinerário sem viagem, §11/RN-039) bloqueia", () => {
+    const documento = documentoExemploMinimo();
+    documento.autos.servicos[0].itinerarios[0].viagens = [];
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    expect(avaliarGateExportacao(sessao, []).liberado).toBe(false);
+  });
+
+  test("[inválido] status 'vigente' sem estrutura de resto quebrada não é bloqueado por falta de data_publicacao (bookkeeping isolado de RN-011)", () => {
+    const documento = documentoExemploMinimo();
+    // Simula um documento que já seria "vigente" mas ainda sem a data (caso
+    // não ocorre de verdade na sessão — aqui só prova que o gate não falso-
+    // bloqueia pelo bookkeeping de data, isolado no placeholder do gate).
+    documento.autos = { ...documento.autos, status: "vigente" };
+    delete documento.autos.data_criacao;
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    expect(avaliarGateExportacao(sessao, []).liberado).toBe(true);
+  });
+});
