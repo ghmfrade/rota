@@ -10,6 +10,7 @@ import {
 } from "@/formulario/roteamento";
 import type { ItinerarioAoVivo } from "@/formulario/pendencias";
 import {
+  servicosDaSessao,
   servicosEmConstrucaoDaSessao,
   type Direcionalidade,
   type SessaoFormulario,
@@ -45,27 +46,25 @@ function sentidosDeDirecionalidade(direcionalidade: Direcionalidade): Sentido[] 
  * enxergue as pendências de todo itinerário do documento, mesmo um que o
  * usuário ainda não tenha revisitado nesta sessão de edição.
  *
- * - **Itinerários completos** (modo carregado, `documento.autos.servicos[].itinerarios[]`)
- *   sempre entram: com o `EstadoRotaViva` já registrado nesta sessão (recálculo/
+ * - **Itinerários completos** (`servicosDaSessao` — Serviços do `documento`
+ *   no carregado E Serviços promovidos no novo, DEC-053/TASK-061) sempre
+ *   entram: com o `EstadoRotaViva` já registrado nesta sessão (recálculo/
  *   tentativa) ou, na ausência dele, com o **congelamento** do `rota` gravado
- *   no arquivo (RN-015 — congelar é síncrono, sem OSRM, então computável aqui
- *   sem custo).
- * - **Itinerários em construção** (Serviço novo, DEC-035) só entram quando já
- *   têm ALGUM estado registrado (o usuário já tentou montá-los) — não há rota
- *   congelada de arquivo para servir de fallback, e um itinerário nunca
- *   tocado não deve gerar pendência prematura.
+ *   (RN-015 — congelar é síncrono, sem OSRM, então computável aqui sem custo).
+ * - **Itinerários em construção** (Serviço novo ainda não promovido, DEC-035)
+ *   só entram quando já têm ALGUM estado registrado (o usuário já tentou
+ *   montá-los) — não há rota congelada de arquivo para servir de fallback, e
+ *   um itinerário nunca tocado não deve gerar pendência prematura.
  */
 export function itinerariosAoVivoDaSessao(sessao: SessaoFormulario): ItinerarioAoVivo[] {
   const estados = sessao.estadosRotaViva ?? {};
   const lista: ItinerarioAoVivo[] = [];
 
-  if (sessao.modo === "carregado") {
-    for (const servico of sessao.documento.autos.servicos) {
-      for (const itinerario of servico.itinerarios) {
-        const chave = chaveItinerario(servico.uuid, itinerario.sentido);
-        const estadoRota = estados[chave] ?? congelarRotaCarregada(itinerario.rota);
-        lista.push({ numeroN: servico.numero_n, sentido: itinerario.sentido, estadoRota });
-      }
+  for (const servico of servicosDaSessao(sessao)) {
+    for (const itinerario of servico.itinerarios) {
+      const chave = chaveItinerario(servico.uuid, itinerario.sentido);
+      const estadoRota = estados[chave] ?? congelarRotaCarregada(itinerario.rota);
+      lista.push({ numeroN: servico.numero_n, sentido: itinerario.sentido, estadoRota });
     }
   }
 

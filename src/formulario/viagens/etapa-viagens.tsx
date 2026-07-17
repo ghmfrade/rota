@@ -6,7 +6,9 @@ import { Botao, Campo, Painel, Select, Tabela } from "@/shared/ui";
 import { nomeExibicaoSecao } from "@/formulario/secoes";
 import {
   ancorasHorarioDaSessao,
+  comServicosDaSessao,
   secoesDaSessao,
+  servicosDaSessao,
   type AncorasHorarioPorViagem,
   type SessaoFormulario,
 } from "@/formulario/sessao";
@@ -78,19 +80,20 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   // Dia-alvo escolhido em "Copiar viagem para outro dia", por Viagem (Spec 04 §8.3).
   const [diaCopiaPorViagem, definirDiaCopiaPorViagem] = useState<Record<string, DiaSemana>>({});
 
-  const servicos: Servico[] = sessao.modo === "carregado" ? sessao.documento.autos.servicos : [];
+  const servicos: Servico[] = servicosDaSessao(sessao);
   const servicoAtual = servicos.find((s) => s.uuid === servicoSelecionadoUuid) ?? null;
   const itinerarioAtual =
     servicoAtual?.itinerarios.find((it) => it.sentido === sentidoSelecionado) ?? null;
   const todasAsSecoes = secoesDaSessao(sessao);
   const ancoras = ancorasHorarioDaSessao(sessao);
 
-  // Grava no documento o itinerário atualizado e, opcionalmente, o novo conjunto
-  // de âncoras de sessão (DEC-049) — num único update para não haver estado
-  // parcial. Só o modo carregado tem `documento` (a etapa exige Serviços).
+  // Grava o itinerário atualizado pelo caminho unificado de Serviços (DEC-053;
+  // TASK-061 — `comServicosDaSessao`: documento carregado ou `sessao.servicos`
+  // promovidos no novo) e, opcionalmente, o novo conjunto de âncoras de sessão
+  // (DEC-049) — num único update para não haver estado parcial.
   function aplicar(itinerarioAtualizado: Itinerario, ancorasAtualizadas?: AncorasHorarioPorViagem) {
-    if (sessao.modo !== "carregado" || !servicoAtual) return;
-    const servicosAtualizados = sessao.documento.autos.servicos.map((s) =>
+    if (!servicoAtual) return;
+    const servicosAtualizados = servicos.map((s) =>
       s.uuid !== servicoAtual.uuid
         ? s
         : {
@@ -101,12 +104,8 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
           },
     );
     aoAtualizarSessao({
-      ...sessao,
+      ...comServicosDaSessao(sessao, servicosAtualizados),
       ...(ancorasAtualizadas ? { ancorasHorario: ancorasAtualizadas } : {}),
-      documento: {
-        ...sessao.documento,
-        autos: { ...sessao.documento.autos, servicos: servicosAtualizados },
-      },
     });
   }
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { z } from "zod";
-import type { DocumentoOperacao, Local, PontoDeRota, Secao } from "@/shared/contrato";
+import type { Local, PontoDeRota, Secao, Servico } from "@/shared/contrato";
 import { esquemaRota } from "@/shared/contrato";
 import {
   carregarBaseMunicipios,
@@ -24,12 +24,15 @@ import {
   mensagemDeFalha,
   moverPontoDeRota,
   removerPontoDeRota,
+  type EstadoRotaViva,
 } from "@/formulario/roteamento";
 import { Botao, Painel, Select, Tabela } from "@/shared/ui";
 import { matrizDistanciasDoServico } from "@/formulario/matrizes";
 import {
+  comServicosDaSessao,
   identidadeDaSessao,
   secoesDaSessao,
+  servicosDaSessao,
   servicosEmConstrucaoDaSessao,
   type Direcionalidade,
   type EstadosRotaVivaPorItinerario,
@@ -40,6 +43,7 @@ import {
   chaveItinerario,
   dispararRecalculo,
 } from "./estado-itinerarios";
+import { promoverServico } from "./promocao-servico";
 import {
   conjuntoSecoesConsistente,
   inserirParada,
@@ -84,6 +88,39 @@ interface LinhaItinerarios {
 
 function sentidosDeDirecionalidade(direcionalidade: Direcionalidade): Sentido[] {
   return direcionalidade === "ambos" ? ["ida", "volta"] : [direcionalidade];
+}
+
+/** Paradas em edição de CADA sentido da direcionalidade de um Serviço ainda em
+ * construção, lidas de `sessao.paradasEmEdicao` — insumo de `promoverServico`
+ * (DEC-053; TASK-061): "ambos" só promove quando os dois sentidos estão lá. */
+function paradasPorSentidoDoServico(
+  sessao: SessaoFormulario,
+  servicoUuid: string,
+  direcionalidade: Direcionalidade,
+): Partial<Record<Sentido, readonly ParadaEmEdicao[]>> {
+  const mapa = sessao.paradasEmEdicao ?? {};
+  const resultado: Partial<Record<Sentido, readonly ParadaEmEdicao[]>> = {};
+  for (const sentido of sentidosDeDirecionalidade(direcionalidade)) {
+    const paradas = mapa[chaveItinerario(servicoUuid, sentido)];
+    if (paradas) resultado[sentido] = paradas;
+  }
+  return resultado;
+}
+
+/** Estado de rota ao vivo de CADA sentido da direcionalidade — a contraparte
+ * de `paradasPorSentidoDoServico` para `promoverServico`. */
+function estadosPorSentidoDoServico(
+  sessao: SessaoFormulario,
+  servicoUuid: string,
+  direcionalidade: Direcionalidade,
+): Partial<Record<Sentido, EstadoRotaViva>> {
+  const mapa = sessao.estadosRotaViva ?? {};
+  const resultado: Partial<Record<Sentido, EstadoRotaViva>> = {};
+  for (const sentido of sentidosDeDirecionalidade(direcionalidade)) {
+    const estado = mapa[chaveItinerario(servicoUuid, sentido)];
+    if (estado) resultado[sentido] = estado;
+  }
+  return resultado;
 }
 
 const ROTULO_SENTIDO: Record<Sentido, string> = { ida: "Ida", volta: "Volta" };
@@ -139,16 +176,15 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
   const identidade = identidadeDaSessao(sessao);
   const secoes = secoesDaSessao(sessao);
 
-  const linhasCompletas: LinhaItinerarios[] =
-    sessao.modo === "carregado"
-      ? sessao.documento.autos.servicos.map((s) => ({
-          servicoUuid: s.uuid,
-          numeroN: s.numero_n,
-          completo: true,
-          sentidos: s.itinerarios.map((i) => i.sentido),
-          locais: s.locais,
-        }))
-      : [];
+  // `servicosDaSessao` cobre o documento carregado E os Serviços já
+  // promovidos no modo "novo" (DEC-053; TASK-061) — caminho único.
+  const linhasCompletas: LinhaItinerarios[] = servicosDaSessao(sessao).map((s) => ({
+    servicoUuid: s.uuid,
+    numeroN: s.numero_n,
+    completo: true,
+    sentidos: s.itinerarios.map((i) => i.sentido),
+    locais: s.locais,
+  }));
 
   const linhasConstrucao: LinhaItinerarios[] = servicosEmConstrucaoDaSessao(sessao).map((s) => ({
     servicoUuid: s.uuid,
@@ -166,8 +202,7 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
   const estadosRotaVivaMapa: EstadosRotaVivaPorItinerario = sessao.estadosRotaViva ?? {};
 
   function itinerarioCarregado(servicoUuid: string, sentido: Sentido) {
-    if (sessao.modo !== "carregado") return undefined;
-    const servico = sessao.documento.autos.servicos.find((s) => s.uuid === servicoUuid);
+    const servico = servicosDaSessao(sessao).find((s) => s.uuid === servicoUuid);
     return servico?.itinerarios.find((i) => i.sentido === sentido);
   }
 
@@ -257,20 +292,21 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
   }
 
   /**
-   * Grava a rota/paradas recalculadas do itinerário e, no MESMO commit,
-   * reconcilia `matriz_distancias` do Serviço (TASK-026; RN-054..057, Spec 04
-   * §9.1/§11 — recálculo automático "ao concluir a edição do itinerário").
-   * Reconciliar aqui, e não como um commit separado, evita a janela em que o
-   * documento teria uma rota nova com a matriz antiga.
+   * Grava a rota/paradas recalculadas do itinerário de um Serviço já COMPLETO
+   * (documento carregado, ou já promovido no modo "novo" — DEC-053; TASK-061)
+   * e, no MESMO commit, reconcilia `matriz_distancias` do Serviço (TASK-026;
+   * RN-054..057, Spec 04 §9.1/§11 — recálculo automático "ao concluir a
+   * edição do itinerário"). Reconciliar aqui, e não como um commit separado,
+   * evita a janela em que o documento teria uma rota nova com a matriz antiga.
    */
-  function documentoComItinerarioAtualizado(
-    base: DocumentoOperacao,
+  function servicosComItinerarioAtualizado(
+    base: Servico[],
     servicoUuid: string,
     sentido: Sentido,
     paradas: ParadaEmEdicao[],
     rota: Rota,
-  ): DocumentoOperacao {
-    const servicos = base.autos.servicos.map((s) => {
+  ): Servico[] {
+    return base.map((s) => {
       if (s.uuid !== servicoUuid) return s;
       const itinerarios = s.itinerarios.map((it) =>
         it.sentido === sentido ? { ...it, paradas: paradasParaContrato(paradas), rota } : it,
@@ -281,7 +317,6 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
         matriz_distancias: matrizDistanciasDoServico(servicoAtualizado),
       };
     });
-    return { ...base, autos: { ...base.autos, servicos } };
   }
 
   /**
@@ -346,23 +381,57 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     // continuou editando enquanto a rota calculava).
     const atual = sessaoRef.current;
     const estadosMapa = { ...(atual.estadosRotaViva ?? {}), [chave]: resultado.estado };
-    const proxima: SessaoFormulario =
-      atual.modo === "carregado"
-        ? {
-            ...atual,
-            documento:
-              linhaAtual.completo && resultado.estado.situacao === "recalculada"
-                ? documentoComItinerarioAtualizado(
-                    atual.documento,
-                    linhaAtual.servicoUuid,
-                    sentidoSelecionado,
-                    novasParadas,
-                    resultado.estado.rota,
-                  )
-                : atual.documento,
-            estadosRotaViva: estadosMapa,
-          }
-        : { ...atual, estadosRotaViva: estadosMapa };
+    let proxima: SessaoFormulario = { ...atual, estadosRotaViva: estadosMapa };
+
+    if (linhaAtual.completo && resultado.estado.situacao === "recalculada") {
+      // Serviço já completo (documento carregado, ou já promovido no modo
+      // "novo" — DEC-053): grava a rota+paradas novas e reconcilia a matriz
+      // no mesmo commit (RN-054..057).
+      const servicosAtualizados = servicosComItinerarioAtualizado(
+        servicosDaSessao(atual),
+        linhaAtual.servicoUuid,
+        sentidoSelecionado,
+        novasParadas,
+        resultado.estado.rota,
+      );
+      proxima = comServicosDaSessao(proxima, servicosAtualizados);
+    } else if (
+      !linhaAtual.completo &&
+      atual.modo === "novo" &&
+      resultado.estado.situacao === "recalculada"
+    ) {
+      // Ainda em construção, modo "novo": tenta promover (DEC-053/TASK-061).
+      // "Ambos" só promove quando os dois sentidos têm rota válida — o
+      // sentido que falta permanece em `servicosEmConstrucao`.
+      const emConstrucao = servicosEmConstrucaoDaSessao(atual).find(
+        (s) => s.uuid === linhaAtual.servicoUuid,
+      );
+      if (emConstrucao) {
+        const paradasPorSentido = paradasPorSentidoDoServico(
+          atual,
+          emConstrucao.uuid,
+          emConstrucao.direcionalidade,
+        );
+        const estadosPorSentido = estadosPorSentidoDoServico(
+          { ...atual, estadosRotaViva: estadosMapa },
+          emConstrucao.uuid,
+          emConstrucao.direcionalidade,
+        );
+        const servicoPromovido = promoverServico(emConstrucao, paradasPorSentido, estadosPorSentido);
+        if (servicoPromovido) {
+          proxima = comServicosDaSessao(
+            {
+              ...proxima,
+              servicosEmConstrucao: (atual.servicosEmConstrucao ?? []).filter(
+                (s) => s.uuid !== emConstrucao.uuid,
+              ),
+            },
+            [...servicosDaSessao(atual), servicoPromovido],
+          );
+        }
+      }
+    }
+
     aoAtualizarSessao(proxima);
   }
 

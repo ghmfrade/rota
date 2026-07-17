@@ -1,4 +1,4 @@
-import type { SessaoFormulario } from "@/formulario/sessao";
+import { servicosDaSessao, type SessaoFormulario } from "@/formulario/sessao";
 import type { IdEtapa } from "@/formulario/layout/etapas";
 import type { EstadoRotaViva } from "@/formulario/roteamento";
 import { matrizDistanciasDesatualizada } from "@/formulario/matrizes";
@@ -129,25 +129,24 @@ export function coletarPendencias(
   }
 
   // Bloqueante de §11: "matriz de distâncias desatualizada" (RN-054..057/078,
-  // TASK-026, Spec 04 §9.1/§11). Só se aplica a Serviços COMPLETOS do
-  // documento carregado — um `ServicoEmConstrucao` (modo novo/em construção)
-  // ainda não tem `matriz_distancias` (DEC-035; matriz só nasce nas etapas
-  // seguintes), então não há "desatualização" a checar nele. Recomputa a
-  // partir das rotas atuais do próprio Serviço (`matrizDistanciasDesatualizada`,
-  // intra-Serviço — RN-054) e compara com o array gravado; a reconciliação
-  // automática ao concluir a edição do itinerário (TASK-019/026) normalmente
-  // já mantém os dois em sincronia — esta pendência cobre o resíduo.
-  if (sessao.modo === "carregado") {
-    for (const servico of sessao.documento.autos.servicos) {
-      if (matrizDistanciasDesatualizada(servico)) {
-        pendencias.push({
-          id: `matriz-desatualizada-${servico.numero_n}`,
-          severidade: "bloqueante",
-          mensagem:
-            "O itinerário mudou depois do último cálculo. A matriz de distâncias será recalculada.",
-          etapaAlvo: "matrizes",
-        });
-      }
+  // TASK-026, Spec 04 §9.1/§11). Só se aplica a Serviços COMPLETOS
+  // (`servicosDaSessao` — documento carregado E promovidos no novo, DEC-053/
+  // TASK-061) — um `ServicoEmConstrucao` ainda em construção não tem
+  // `matriz_distancias` (DEC-035; matriz só nasce na promoção), então não há
+  // "desatualização" a checar nele. Recomputa a partir das rotas atuais do
+  // próprio Serviço (`matrizDistanciasDesatualizada`, intra-Serviço — RN-054)
+  // e compara com o array gravado; a reconciliação automática ao concluir a
+  // edição do itinerário (TASK-019/026/061) normalmente já mantém os dois em
+  // sincronia — esta pendência cobre o resíduo.
+  for (const servico of servicosDaSessao(sessao)) {
+    if (matrizDistanciasDesatualizada(servico)) {
+      pendencias.push({
+        id: `matriz-desatualizada-${servico.numero_n}`,
+        severidade: "bloqueante",
+        mensagem:
+          "O itinerário mudou depois do último cálculo. A matriz de distâncias será recalculada.",
+        etapaAlvo: "matrizes",
+      });
     }
   }
 

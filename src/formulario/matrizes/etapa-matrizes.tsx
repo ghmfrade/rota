@@ -4,7 +4,12 @@ import { useState } from "react";
 import type { ParSecao, Secao, Servico } from "@/shared/contrato";
 import { Botao, Campo, Painel, Select, Tabela } from "@/shared/ui";
 import { nomeExibicaoSecao } from "@/formulario/secoes";
-import { secoesDaSessao, type SessaoFormulario } from "@/formulario/sessao";
+import {
+  comServicosDaSessao,
+  secoesDaSessao,
+  servicosDaSessao,
+  type SessaoFormulario,
+} from "@/formulario/sessao";
 import { celulaDistancia, formatarKm } from "./apresentacao-matriz-distancias";
 import { secoesAtendidas } from "./calculo-matriz-distancias";
 import {
@@ -16,12 +21,12 @@ import {
 } from "./edicao-seccionamento";
 import { sugerirDistanciaDoServico, sugerirMenorDistancia } from "./sugestoes-seccionamento";
 
-// Etapa "Matrizes" (TASK-027; Spec 04 §9). Só Serviços já COMPLETOS (do
-// `documento`, modo carregado) entram no seletor: `ServicoEmConstrucao`
-// (DEC-035, modo novo/em construção) ainda não tem `matriz_distancias` — a
-// base a partir da qual todo par de seccionamento é habilitável (RN-059) —
-// então não há o que editar até a etapa Itinerários promovê-lo a `Servico`
-// completo. Limite conhecido (ver "Pontos de atenção" da entrega).
+// Etapa "Matrizes" (TASK-027; Spec 04 §9). Só Serviços já COMPLETOS
+// (`servicosDaSessao` — documento carregado E promovidos no novo, DEC-053/
+// TASK-061) entram no seletor: `ServicoEmConstrucao` (DEC-035, ainda em
+// construção) não tem `matriz_distancias` — a base a partir da qual todo par
+// de seccionamento é habilitável (RN-059) — até a etapa Itinerários
+// promovê-lo a `Servico` completo.
 //
 // TASK-027 entregou o shell (seletor de Serviço + grade triangular reutilizável)
 // e a matriz de SECCIONAMENTO editável (§9.2). A TASK-048 acopla ao mesmo shell o
@@ -58,7 +63,7 @@ export function EtapaMatrizes({ sessao, aoAtualizarSessao }: PropsEtapaMatrizes)
   // definitivo.
   const [modoAtivo, definirModoAtivo] = useState<ModoSugestaoSeccionamento>("menor-distancia");
 
-  const servicos: Servico[] = sessao.modo === "carregado" ? sessao.documento.autos.servicos : [];
+  const servicos: Servico[] = servicosDaSessao(sessao);
   const servicoAtual = servicos.find((s) => s.uuid === servicoSelecionadoUuid) ?? null;
   const todasAsSecoes = secoesDaSessao(sessao);
 
@@ -69,17 +74,11 @@ export function EtapaMatrizes({ sessao, aoAtualizarSessao }: PropsEtapaMatrizes)
     : [];
 
   function atualizarMatrizSeccionamento(matrizSeccionamento: ParSecao[]) {
-    if (sessao.modo !== "carregado" || !servicoAtual) return;
-    const servicosAtualizados = sessao.documento.autos.servicos.map((s) =>
+    if (!servicoAtual) return;
+    const servicosAtualizados = servicos.map((s) =>
       s.uuid === servicoAtual.uuid ? { ...s, matriz_seccionamento: matrizSeccionamento } : s,
     );
-    aoAtualizarSessao({
-      ...sessao,
-      documento: {
-        ...sessao.documento,
-        autos: { ...sessao.documento.autos, servicos: servicosAtualizados },
-      },
-    });
+    aoAtualizarSessao(comServicosDaSessao(sessao, servicosAtualizados));
   }
 
   function sugestaoAtivaPara(secaoAUuid: string, secaoBUuid: string): number {

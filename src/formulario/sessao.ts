@@ -121,6 +121,15 @@ export type SessaoFormulario =
       // (DEC-035). Seção é compartilhada pelo Autos inteiro, não por Serviço
       // (RN-025), por isso vive na raiz da sessão, não em `ServicoEmConstrucao`.
       secoesEmConstrucao?: Secao[];
+      // Serviços já PROMOVIDOS a `Servico` completo (DEC-053; TASK-061): o lar
+      // que a DEC-053 previu para o modo "novo", que ainda não carrega
+      // `DocumentoOperacao`. Um `ServicoEmConstrucao` sai de
+      // `servicosEmConstrucao` e entra aqui quando a edição do itinerário é
+      // concluída (`itinerarios[]` com paradas+rota, `matriz_distancias`
+      // reconciliada; `viagens` a preencher pelas etapas seguintes — RN-018,
+      // RN-054..057). Ausência ≡ lista vazia. NÃO é campo de contrato: nunca
+      // gravado no JSON antes da montagem final na exportação (RN-096/NEG-004).
+      servicos?: Servico[];
       paradasEmEdicao?: ParadasEmEdicaoPorItinerario;
       estadosRotaViva?: EstadosRotaVivaPorItinerario;
       ancorasHorario?: AncorasHorarioPorViagem;
@@ -131,6 +140,32 @@ export function servicosEmConstrucaoDaSessao(
   sessao: SessaoFormulario,
 ): ServicoEmConstrucao[] {
   return sessao.servicosEmConstrucao ?? [];
+}
+
+/** Lista de Serviços COMPLETOS da sessão (DEC-053; TASK-061), qualquer que
+ * seja o modo: `documento.autos.servicos` no carregado, `sessao.servicos`
+ * (promovidos) no novo — caminho único que Viagens/Matrizes/pendências
+ * consomem sem replicar o dual de modos. Ausência ≡ vazia. */
+export function servicosDaSessao(sessao: SessaoFormulario): Servico[] {
+  if (sessao.modo === "carregado") return sessao.documento.autos.servicos;
+  return sessao.servicos ?? [];
+}
+
+/** Grava `servicos` atualizados na sessão pelo caminho unificado (DEC-053):
+ * `documento.autos.servicos` no carregado, `sessao.servicos` no novo. Espelha
+ * `servicosDaSessao` do lado da escrita — os chamadores (etapas Itinerários/
+ * Viagens/Matrizes) não precisam mais bifurcar por `sessao.modo`. */
+export function comServicosDaSessao(
+  sessao: SessaoFormulario,
+  servicos: Servico[],
+): SessaoFormulario {
+  if (sessao.modo === "carregado") {
+    return {
+      ...sessao,
+      documento: { ...sessao.documento, autos: { ...sessao.documento.autos, servicos } },
+    };
+  }
+  return { ...sessao, servicos };
 }
 
 /** Seções disponíveis para reuso (Spec 04 §7.1), qualquer que seja o modo:
