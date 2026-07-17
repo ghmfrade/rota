@@ -152,14 +152,40 @@ export function coletarPendencias(
     }
   }
 
+  // Alerta de §11: "tabela de feriados vazia (nenhuma Viagem de feriado —
+  // pode ser intencional)" (RN-071, Spec 03 §9.3). Granularidade agregada
+  // (decisão do responsável, 2026-07-17 — TASK-081): em vez de um item por
+  // Serviço/sentido (ruído, já que muitas linhas legitimamente não operam em
+  // feriado), a Revisão emite NO MÁXIMO UM alerta, que enumera pelo `numero_n`
+  // os Serviços afetados, na ordem do documento — casa com o texto singular
+  // da spec ("tabela de feriados vazia"). Um Serviço entra na lista só quando
+  // NENHUM dos seus itinerários (sentido algum) tem Viagem de feriado —
+  // assimetria por sentido (feriado só na Ida, por exemplo) não entra, pois a
+  // linha ainda opera em feriado nesse caso.
+  const servicosSemGradeDeFeriado = servicosDaSessao(sessao)
+    .filter((servico) =>
+      servico.itinerarios.every((itinerario) =>
+        itinerario.viagens.every((viagem) => !viagem.viagem_feriado),
+      ),
+    )
+    .map((servico) => servico.numero_n);
+
+  if (servicosSemGradeDeFeriado.length > 0) {
+    pendencias.push({
+      id: "tabela-feriados-vazia",
+      severidade: "alerta",
+      mensagem: `Serviços ${servicosSemGradeDeFeriado.join(", ")} sem grade de feriados — confirme se é intencional.`,
+      etapaAlvo: "viagens-horarios",
+    });
+  }
+
   // TODO — demais pendências de §11, cada uma com a sua task (fora do escopo
   // desta implementação; não inventar aqui — docs-dev/04 princípio 2):
   //   bloqueantes: rota desatualizada/pendente de recálculo (TASK-032, gate),
   //   horários fora de ordem (TASK-029), Seção/Local incompletos e 350 m/
   //   tipificação em revalidação (TASK-015/017/018), itinerário sem viagem
   //   (TASK-028);
-  //   alertas: Serviço sem par habilitado na matriz (TASK-027), tabela de
-  //   feriados vazia (TASK-030).
+  //   alertas: Serviço sem par habilitado na matriz (TASK-027).
 
   return pendencias;
 }

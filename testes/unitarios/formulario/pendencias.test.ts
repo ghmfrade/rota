@@ -9,7 +9,7 @@ import {
 } from "@/formulario/roteamento";
 import type { DescricaoItinerario } from "@/shared/contrato";
 import type { Ponto } from "@/shared/geo";
-import { documentoExemploMinimo } from "../../fixtures";
+import { documentoExemploMinimo, documentoBidirecionalMultiServico } from "../../fixtures";
 
 // TASK-014 — layout por etapas + painel de pendências (Spec 04 §4/§11; RN-078).
 // Aqui se testa a parte pura: a coleta de pendências a partir da sessão e a
@@ -347,5 +347,90 @@ describe("coletarPendencias — matriz de distâncias desatualizada (TASK-026; R
 
   test("[inválido] modo 'novo' nunca emite pendência de matriz (Serviço em construção não tem matriz — DEC-035)", () => {
     expect(coletarPendencias(sessaoNovo).some((p) => p.id.startsWith("matriz-desatualizada-"))).toBe(false);
+  });
+});
+
+// TASK-081 — alerta "tabela de feriados vazia" agregado num único item
+// (Spec 04 §11; RN-071/078). `documentoBidirecionalMultiServico()` tem dois
+// Serviços (1000-1CR, 1000-2CR), nenhum com Viagem de feriado na fixture
+// original — cada teste muta uma cópia própria para cobrir os casos.
+
+describe('coletarPendencias — alerta "tabela de feriados vazia" (TASK-081; RN-071/078)', () => {
+  test("nenhum Serviço com feriado → 1 alerta listando todos os numero_n por vírgula, na ordem do documento", () => {
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento: documentoBidirecionalMultiServico(),
+      alertasImportacao: [],
+    };
+
+    const pendencias = coletarPendencias(sessao);
+    const feriado = pendencias.filter((p) => p.id === "tabela-feriados-vazia");
+
+    expect(feriado).toHaveLength(1);
+    expect(feriado[0].severidade).toBe("alerta");
+    expect(feriado[0].mensagem).toBe(
+      "Serviços 1000-1CR, 1000-2CR sem grade de feriados — confirme se é intencional.",
+    );
+    expect(feriado[0].etapaAlvo).toBe<IdEtapa>("viagens-horarios");
+  });
+
+  test("parte dos Serviços sem feriado → 1 alerta só com os afetados", () => {
+    const documento = documentoBidirecionalMultiServico();
+    // 1000-1CR ganha grade de feriado (Ida) — só 1000-2CR fica sem.
+    documento.autos.servicos[0].itinerarios[0].viagens[0].viagem_feriado = true;
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    const pendencias = coletarPendencias(sessao);
+    const feriado = pendencias.find((p) => p.id === "tabela-feriados-vazia");
+
+    expect(feriado).toBeDefined();
+    expect(feriado?.mensagem).toBe(
+      "Serviços 1000-2CR sem grade de feriados — confirme se é intencional.",
+    );
+  });
+
+  test("[inválido] todos os Serviços com ao menos 1 Viagem de feriado → nenhum alerta", () => {
+    const documento = documentoBidirecionalMultiServico();
+    documento.autos.servicos[0].itinerarios[0].viagens[0].viagem_feriado = true;
+    documento.autos.servicos[1].itinerarios[0].viagens[0].viagem_feriado = true;
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    expect(coletarPendencias(sessao).some((p) => p.id === "tabela-feriados-vazia")).toBe(false);
+  });
+
+  test("[inválido] assimetria por sentido: feriado só na Ida mantém o Serviço fora da lista (esta linha ainda opera em feriado)", () => {
+    const documento = documentoBidirecionalMultiServico();
+    // 1000-1CR: feriado só no sentido Ida — Volta sem feriado.
+    documento.autos.servicos[0].itinerarios[0].viagens[0].viagem_feriado = true;
+    // 1000-2CR: mantém ambos os sentidos sem feriado.
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    const feriado = coletarPendencias(sessao).find((p) => p.id === "tabela-feriados-vazia");
+
+    expect(feriado?.mensagem).toBe(
+      "Serviços 1000-2CR sem grade de feriados — confirme se é intencional.",
+    );
+  });
+
+  test("[inválido] alerta de feriado nunca é bloqueante — não entra em pendenciasBloqueantes do gate", () => {
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento: documentoBidirecionalMultiServico(),
+      alertasImportacao: [],
+    };
+
+    const pendencias = coletarPendencias(sessao);
+    const bloqueantes = pendencias.filter((p) => p.severidade === "bloqueante");
+
+    expect(bloqueantes.some((p) => p.id === "tabela-feriados-vazia")).toBe(false);
+  });
+
+  test("[inválido] modo 'novo' sem Serviços promovidos não emite alerta de feriado", () => {
+    expect(coletarPendencias(sessaoNovo).some((p) => p.id === "tabela-feriados-vazia")).toBe(false);
+  });
+
+  test("fixture 'carregado' padrão (com grade de feriados preenchida) não emite o alerta — regressão-guarda", () => {
+    // documentoExemploMinimo() já tem 1 Viagem de feriado no único Serviço.
+    expect(coletarPendencias(sessaoCarregado).some((p) => p.id === "tabela-feriados-vazia")).toBe(false);
   });
 });
