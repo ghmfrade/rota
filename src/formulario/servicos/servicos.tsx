@@ -13,7 +13,9 @@ import {
   type CaracteristicaDeVeiculo,
 } from "@/shared/tipificacao";
 import {
+  comServicosDaSessao,
   identidadeDaSessao,
+  servicosDaSessao,
   servicosEmConstrucaoDaSessao,
   type Direcionalidade,
   type ServicoEmConstrucao,
@@ -22,7 +24,7 @@ import {
 import { Botao, Campo, Painel, Select, Selo, Tabela } from "@/shared/ui";
 import { contarServico, ROTULO_SEMANA_PADRAO } from "@/shared/contagens";
 import { duplicarServico } from "./duplicar";
-import { podeRemoverServico, removerServico } from "./remover";
+import { podeRemoverServico, removerServico, removerServicoDeLista } from "./remover";
 import { regenerarSufixoNumeroN, sugerirNumeroN } from "./numero-n";
 
 // Etapa Serviços do Formulário (Spec 04 §6; TASK-016). Criar/editar/remover/
@@ -126,25 +128,26 @@ export function EtapaServicos({
   const { tipo, codigo } = identidade;
   const permitidas = caracteristicasPermitidas(tipo);
 
-  const completos: LinhaServico[] =
-    sessao.modo === "carregado"
-      ? sessao.documento.autos.servicos.map((s) => {
-          const c = contarServico(s);
-          return {
-            uuid: s.uuid,
-            numero_n: s.numero_n,
-            caracteristica_veiculo: s.caracteristica_veiculo,
-            carater: s.carater,
-            direcionalidade: direcionalidadeDeServico(s),
-            completo: true,
-            viagens: {
-              ida: c.ida.viagensSemana,
-              volta: c.volta.viagensSemana,
-              total: c.totalViagensSemana,
-            },
-          };
-        })
-      : [];
+  // Serviços COMPLETOS da sessão nos dois modos (DEC-053/TASK-061): no
+  // carregado, `documento.autos.servicos`; no novo, os já PROMOVIDOS
+  // (`sessao.servicos`, TASK-061) — antes desta task, sempre `[]` no modo novo,
+  // o que fazia o promovido sumir da lista (TASK-072).
+  const completos: LinhaServico[] = servicosDaSessao(sessao).map((s) => {
+    const c = contarServico(s);
+    return {
+      uuid: s.uuid,
+      numero_n: s.numero_n,
+      caracteristica_veiculo: s.caracteristica_veiculo,
+      carater: s.carater,
+      direcionalidade: direcionalidadeDeServico(s),
+      completo: true,
+      viagens: {
+        ida: c.ida.viagensSemana,
+        volta: c.volta.viagensSemana,
+        total: c.totalViagensSemana,
+      },
+    };
+  });
 
   const linhasEmConstrucao: LinhaServico[] = emConstrucao.map((s) => ({
     ...s,
@@ -222,12 +225,12 @@ export function EtapaServicos({
     }
 
     if (form.alvo.completo) {
-      // Serviço completo (modo carregado): edita só característica/caráter/
-      // `numero_n` (RN-003 preserva a uuid). Direcionalidade é derivada dos
-      // itinerários — não se altera aqui.
-      if (sessao.modo !== "carregado") return;
+      // Serviço completo (carregado ou promovido no modo novo — DEC-053/
+      // TASK-072): edita só característica/caráter/`numero_n` (RN-001/002
+      // preservam a uuid). Direcionalidade é derivada dos itinerários — não se
+      // altera aqui.
       const alvoUuid = form.alvo.uuid;
-      const servicos = sessao.documento.autos.servicos.map((s) =>
+      const servicos = servicosDaSessao(sessao).map((s) =>
         s.uuid === alvoUuid
           ? editarEntidade(s, {
               caracteristica_veiculo: form.caracteristica_veiculo,
@@ -236,10 +239,7 @@ export function EtapaServicos({
             })
           : s,
       );
-      atualizarDocumento({
-        ...sessao.documento,
-        autos: { ...sessao.documento.autos, servicos },
-      });
+      aoAtualizarSessao(comServicosDaSessao(sessao, servicos));
       definirForm(null);
       return;
     }
@@ -265,10 +265,8 @@ export function EtapaServicos({
 
   function duplicar(linha: LinhaServico) {
     if (linha.completo) {
-      if (sessao.modo !== "carregado") return;
-      const original = sessao.documento.autos.servicos.find(
-        (s) => s.uuid === linha.uuid,
-      );
+      const servicosAtuais = servicosDaSessao(sessao);
+      const original = servicosAtuais.find((s) => s.uuid === linha.uuid);
       if (!original) return;
       const copia = editarEntidade(duplicarServico(original), {
         numero_n: sugerirNumeroN(
@@ -277,13 +275,9 @@ export function EtapaServicos({
           original.caracteristica_veiculo,
         ),
       });
-      atualizarDocumento({
-        ...sessao.documento,
-        autos: {
-          ...sessao.documento.autos,
-          servicos: [...sessao.documento.autos.servicos, copia],
-        },
-      });
+      aoAtualizarSessao(
+        comServicosDaSessao(sessao, [...servicosAtuais, copia]),
+      );
       return;
     }
     const original = emConstrucao.find((s) => s.uuid === linha.uuid);
@@ -302,17 +296,36 @@ export function EtapaServicos({
 
   // --- Remover (RN-018) ---
 
-  // Um Serviço completo só pode ser removido se sobrar ao menos um no documento
-  // (RN-018); em construção pode sempre (não é entidade do documento).
+  // Um Serviço completo no documento CARREGADO só pode ser removido se sobrar
+  // ao menos um (RN-018 é gate de documento válido). No modo NOVO, RN-018 é
+  // gate de EXPORTAÇÃO, não de sessão em construção (TASK-072) — remover pode
+  // esvaziar a lista durante a montagem. Em construção pode sempre (não é
+  // entidade do documento).
   function podeRemover(linha: LinhaServico): boolean {
     if (!linha.completo) return true;
-    return sessao.modo === "carregado" && podeRemoverServico(sessao.documento);
+    return sessao.modo !== "carregado" || podeRemoverServico(sessao.documento);
   }
 
   function remover(linha: LinhaServico) {
     if (linha.completo) {
-      if (sessao.modo !== "carregado") return;
-      atualizarDocumento(removerServico(sessao.documento, linha.uuid));
+      if (sessao.modo === "carregado") {
+        atualizarDocumento(removerServico(sessao.documento, linha.uuid));
+      } else {
+        // Promovido no modo novo (DEC-053/TASK-072): cascata de Seção órfã
+        // sobre `secoesEmConstrucao`, sem trava de mínimo 1 (gate é de
+        // exportação — RN-018). `servicos` + `secoesEmConstrucao` gravados no
+        // MESMO commit.
+        const { servicos, secoes } = removerServicoDeLista(
+          sessao.servicos ?? [],
+          sessao.secoesEmConstrucao ?? [],
+          linha.uuid,
+        );
+        aoAtualizarSessao({
+          ...sessao,
+          servicos,
+          secoesEmConstrucao: secoes,
+        });
+      }
     } else {
       atualizarEmConstrucao(emConstrucao.filter((s) => s.uuid !== linha.uuid));
     }
@@ -365,7 +378,11 @@ export function EtapaServicos({
                     <span data-testid="servico-numero-n">
                       {linha.numero_n}
                     </span>
-                    {!linha.completo && (
+                    {linha.completo ? (
+                      <Selo tom="sucesso" className="ml-2" data-testid="servico-completo">
+                        completo
+                      </Selo>
+                    ) : (
                       <Selo tom="neutro" className="ml-2" data-testid="servico-em-construcao">
                         sem itinerário ainda
                       </Selo>

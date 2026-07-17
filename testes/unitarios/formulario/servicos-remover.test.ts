@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   podeRemoverServico,
   removerServico,
+  removerServicoDeLista,
 } from "@/formulario/servicos/remover";
 import { documentoBidirecionalMultiServico } from "../../fixtures";
 
@@ -74,5 +75,77 @@ describe("podeRemoverServico / remover o último — RN-018 (≥ 1 Serviço)", (
     const doc = documentoBidirecionalMultiServico();
     const umServico = removerServico(doc, UUID_A);
     expect(() => removerServico(umServico, UUID_B)).toThrow(/RN-018/);
+  });
+});
+
+// TASK-072 — `removerServicoDeLista` genérica, usada pelo modo NOVO (sessão em
+// construção: `sessao.servicos`/`secoesEmConstrucao`) sem a trava de mínimo 1
+// (RN-018 ali é gate de EXPORTAÇÃO, não de sessão). Mesma cascata de Seção
+// órfã que `removerServico`, mas nunca lança.
+describe("removerServicoDeLista — cascata sem trava de mínimo 1 (modo novo, TASK-072)", () => {
+  test("remove o Serviço e suas entradas em secao.servicos[], sem lançar mesmo restando 1", () => {
+    const doc = documentoBidirecionalMultiServico();
+    // Reduz a um único Serviço primeiro (via a função sob teste) para provar
+    // que remover o ÚLTIMO não lança — ao contrário de `removerServico`.
+    const umServico = removerServicoDeLista(
+      doc.autos.servicos,
+      doc.autos.secoes,
+      UUID_A,
+    );
+    expect(umServico.servicos).toHaveLength(1);
+
+    const vazio = removerServicoDeLista(
+      umServico.servicos,
+      umServico.secoes,
+      UUID_B,
+    );
+    expect(vazio.servicos).toHaveLength(0);
+    // Toda Seção que só o último Serviço usava também é descartada.
+    expect(vazio.secoes).toHaveLength(0);
+  });
+
+  test("Seção usada só pelo Serviço removido é descartada (cascata)", () => {
+    const doc = documentoBidirecionalMultiServico();
+    const resultado = removerServicoDeLista(
+      doc.autos.servicos,
+      doc.autos.secoes,
+      UUID_A,
+    );
+
+    const uuids = resultado.secoes.map((s) => s.uuid);
+    expect(uuids).not.toContain(SECAO_SO_DE_A);
+    expect(uuids).toContain(SECAO_COMPARTILHADA);
+  });
+
+  test("Seção ainda referenciada por outro Serviço não é descartada", () => {
+    const doc = documentoBidirecionalMultiServico();
+    const resultado = removerServicoDeLista(
+      doc.autos.servicos,
+      doc.autos.secoes,
+      UUID_A,
+    );
+
+    // bbbb… ainda usa a Seção compartilhada — ela permanece, sem entrada de A.
+    const compartilhada = resultado.secoes.find(
+      (s) => s.uuid === SECAO_COMPARTILHADA,
+    );
+    expect(compartilhada).toBeDefined();
+    expect(
+      compartilhada?.servicos.some((e) => e.servico_uuid === UUID_A),
+    ).toBe(false);
+    expect(
+      compartilhada?.servicos.some((e) => e.servico_uuid === UUID_B),
+    ).toBe(true);
+  });
+
+  test("não muta as listas de entrada", () => {
+    const doc = documentoBidirecionalMultiServico();
+    const antesServicos = doc.autos.servicos.length;
+    const antesSecoes = doc.autos.secoes.length;
+
+    removerServicoDeLista(doc.autos.servicos, doc.autos.secoes, UUID_A);
+
+    expect(doc.autos.servicos).toHaveLength(antesServicos);
+    expect(doc.autos.secoes).toHaveLength(antesSecoes);
   });
 });
