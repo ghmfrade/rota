@@ -2389,6 +2389,270 @@ A TASK-063 implementou o literal da Spec 04 §7.3 ("sub-lista própria"), mas §
 
 ---
 
+## TASK-080 — Promover `ServicoEmConstrucao` a `Servico` completo ao concluir o itinerário também no modo "carregado"
+
+## Objetivo
+
+No modo **"carregado"** (JSON importado), concluir a edição do itinerário de um `ServicoEmConstrucao` — um Serviço criado na sessão **além** dos que vieram no JSON — passa a **promovê-lo a `Servico` completo** (com `itinerarios[]` paradas+rota e `matriz_distancias` reconciliada), anexado a `documento.autos.servicos` e removido de `servicosEmConstrucao`. Ao final, esses Serviços novos deixam de ficar presos em "em construção" e voltam a ser elegíveis para as etapas Viagens/Matrizes, como já ocorre no modo "novo".
+
+## Contexto
+
+A TASK-061 (DEC-053) introduziu a promoção `ServicoEmConstrucao → Servico` ao concluir o itinerário, mas o gatilho em [`etapa-itinerarios.tsx`](../../src/formulario/itinerarios/etapa-itinerarios.tsx) está condicionado a `atual.modo === "novo"` no ramo `else if` do handler de conclusão do recálculo ([`etapa-itinerarios.tsx:400-435`](../../src/formulario/itinerarios/etapa-itinerarios.tsx#L400-L435)). Só que o modo "carregado" **também** cria Serviços em `servicosEmConstrucao`: a etapa Serviços grava todo Serviço novo por `atualizarEmConstrucao`, que escreve `servicosEmConstrucao` sem bifurcar por modo ([`servicos.tsx:168-170`](../../src/formulario/servicos/servicos.tsx#L168-L170)); e a etapa de itinerários lista esses Serviços como linhas em construção nos dois modos ([`etapa-itinerarios.tsx:191-197`](../../src/formulario/itinerarios/etapa-itinerarios.tsx#L191-L197)). Consequência descoberta em teste manual do responsável (2026-07-17): num documento carregado, os Serviços criados na sessão — mesmo com itinerário válido recalculado — **nunca** são promovidos, permanecem em "em construção" e não podem receber horários. A infraestrutura da promoção já é agnóstica de modo: `servicosDaSessao`/`comServicosDaSessao` (DEC-053; [`sessao.ts:145-169`](../../src/formulario/sessao.ts#L145-L169)) leem/escrevem `documento.autos.servicos` no carregado e `sessao.servicos` no novo; `servicosEmConstrucao?` existe nos dois variantes de `SessaoFormulario`; e `promoverServico` é função pura ([`promocao-servico.ts`](../../src/formulario/itinerarios/promocao-servico.ts)). Falta apenas o ramo do handler deixar de exigir `modo === "novo"` e passar a promover nos dois modos — no carregado, anexando a `documento.autos.servicos` via `comServicosDaSessao`. Follow-up direto da TASK-061, que declarou o modo carregado "já resolvido" para Serviços completos (verdadeiro para os do JSON, falso para os criados na sessão).
+
+## Fora de escopo
+
+- A mecânica da promoção em si (`promoverServico`, gatilho, reconciliação de matriz) — já entregue pela **TASK-061**; esta task só **remove o gate de modo** do ramo que a aciona.
+- O caminho do Serviço **já completo** (documento carregado ou já promovido) — continua como está (`servicosComItinerarioAtualizado`, [`etapa-itinerarios.tsx:388-399`](../../src/formulario/itinerarios/etapa-itinerarios.tsx#L388-L399)); nenhuma regressão.
+- O CRUD da etapa Serviços — no modo carregado, o Serviço promovido já aparece na lista porque `completos` deriva de `documento.autos.servicos`; a unificação do CRUD no modo novo é a **TASK-072** (entregue), não retocada aqui.
+- Qualquer mudança de **contrato/schema** (`shared/contrato`): a promoção é transição de estado de sessão efêmero, nunca persistência (RN-096/NEG-004).
+- O E2E ponta a ponta do fluxo carregar-JSON-e-editar — fora; esta task entrega unitário/integração da fiação.
+
+## Specs fonte
+
+- Spec 04 §7 (montagem do itinerário)
+- Spec 04 §8 ("Após criar/alterar o itinerário … a etapa seguinte é a grade de horários")
+- Spec 04 §9.1 (recálculo automático da matriz ao concluir o itinerário)
+- Spec 02 §6 (`Servico`: `itinerarios` ≥ 1, `matriz_distancias`), §10 (direcionalidade derivada dos `itinerarios[].sentido`)
+
+## Regras envolvidas
+
+- RN-001/002/004 (UUID do `ServicoEmConstrucao` preservada no `Servico` promovido — a regra crítica nº 1; round-trip provado por teste)
+- RN-018 (documento válido exige ≥ 1 Serviço — o promovido entra em `documento.autos.servicos`)
+- RN-038 (1 itinerário para ida/volta, 2 para "ambos"; "ambos" só promove com os dois sentidos prontos)
+- RN-034 (mínimo 2 paradas), RN-048 (`sem-rota`/OSRM falho não promove Serviço incompleto)
+- RN-054..057 (matriz reconciliada no mesmo commit da rota)
+- RN-096 / NEG-004 (nada gravado no JSON antes da exportação; sessão efêmera)
+
+## Entidades afetadas
+
+- Serviço, Itinerário, Parada, Rota, matriz de distâncias (promoção `ServicoEmConstrucao → Servico` no modo carregado)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] No modo "carregado", concluir o itinerário de um `ServicoEmConstrucao` criado na sessão o promove a `Servico` completo (com `itinerarios[]` paradas+rota e `matriz_distancias` reconciliada), **anexado a `documento.autos.servicos`** e removido de `servicosEmConstrucao`.
+- [ ] A `uuid` do `ServicoEmConstrucao` é preservada no `Servico` promovido (RN-001/002/004).
+- [ ] Após a promoção, o Serviço aparece como **completo** na etapa de itinerários e fica elegível para Viagens/Matrizes/horários no modo carregado.
+- [ ] A matriz é reconciliada no mesmo commit da rota (RN-054..057).
+- [ ] Direcionalidade "ambos" só promove com os dois sentidos válidos; `sem-rota` não promove (RN-038/RN-048) — mesmo comportamento já garantido por `promoverServico`.
+- [ ] Os Serviços que **já vieram completos no JSON** seguem pelo caminho de Serviço completo, sem regressão; a promoção não os toca.
+- [ ] Nada é gravado no JSON antes da exportação (RN-096/NEG-004); nenhum `data-testid`/`aria-*` alterado; E2E existentes verdes.
+
+## Casos válidos
+
+- Carregar JSON com 1 Serviço → criar Serviço B (ida) na sessão → montar itinerário válido → ao concluir, B vira `Servico` em `documento.autos.servicos` com 1 itinerário e matriz reconciliada; a linha de B passa a "completo"; Viagens/Matrizes o listam.
+- Carregado + Serviço B "ambos": os dois sentidos concluídos resultam em B com 2 itinerários; só um sentido pronto mantém B em construção.
+- Editar depois um Serviço **carregado do JSON**: continua pelo caminho de Serviço completo (regressão-guarda de que o modo carregado não mudou para os pré-existentes).
+
+## Casos inválidos
+
+- Carregado + Serviço em construção com itinerário `sem-rota` (OSRM mockado): **não** promove; permanece em construção e a pendência ao vivo é mantida (RN-048).
+- Carregado + "ambos" com só a Ida válida: **não** promove enquanto a Volta não fechar (RN-038).
+- Promoção **não** regenera a UUID (RN-001/002/004) — round-trip prova.
+
+## Testes esperados
+
+- Unitários: reuso dos testes de `promoverServico` (já cobrem uuid/matriz/ida/ambos/sem-rota) — validar que a função não depende de modo. Se necessário, um teste da composição de sessão no modo carregado (anexa a `documento.autos.servicos`, remove de `servicosEmConstrucao`, preserva os Serviços pré-existentes e suas UUIDs).
+- Integração: no modo carregado, após concluir o itinerário de um `ServicoEmConstrucao`, `servicosDaSessao` passa a incluí-lo e `servicosEmConstrucaoDaSessao` a excluí-lo; assert de round-trip de UUID de todos os Serviços (pré-existentes + promovido); OSRM mockado.
+- E2E: N/A nesta task; specs existentes seguem verdes.
+- Snapshot/contrato JSON: N/A (não toca contrato); pode-se validar que o `Servico` promovido passa no `zod` strict.
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (ramo de promoção do handler de conclusão — generalizar a condição `atual.modo === "novo"` para promover nos dois modos, escrevendo por `comServicosDaSessao`)
+- `testes/unitarios/formulario/promocao-servico.test.ts` e/ou um teste de integração da fiação no modo carregado (casos novos)
+
+## Riscos
+
+- **Regressão no modo carregado (pré-existentes):** a generalização não pode alterar o caminho dos Serviços que já vêm completos do JSON — cobrir com regressão-guarda.
+- **Preservação de UUID (RN-004):** regra crítica nº 1 — round-trip de todos os Serviços após a promoção.
+- **Interação com a fiação assíncrona:** o ramo mescla sobre `sessaoRef.current` (sessão mais recente); a generalização deve manter essa leitura para não sobrescrever commits concorrentes.
+
+## Dependências
+
+- **TASK-061** (entregue) — fornece `promoverServico`, `servicosDaSessao`/`comServicosDaSessao`, `sessao.servicos` e o ramo de promoção que esta task generaliza.
+
+## Perguntas em aberto
+
+- Nenhuma. É correção de bug contra a intenção já decidida na DEC-053 (a promoção ao concluir o itinerário vale para todo `ServicoEmConstrucao`, independentemente do modo); o gate `modo === "novo"` foi um recorte de escopo da TASK-061, não uma regra.
+
+---
+
+## TASK-081 — Alerta "tabela de feriados vazia" na Revisão (RN-071)
+
+## Objetivo
+
+A tela de Revisão passa a exibir o alerta não bloqueante "tabela de feriados vazia" (Spec 04 §11) para cada Serviço/sentido cuja grade de feriados (`viagem_feriado: true`) não tem nenhuma Viagem — hoje `coletarPendencias` não emite esse alerta, embora a checagem "grade vazia é válida" (RN-071) já esteja implementada no nível de dados desde a TASK-030.
+
+## Contexto
+
+Achado da revisão de aderência da TASK-032 (`docs-dev/14-REVISOES/TASK-032-20260717.md`): a Spec 04 §11 lista "tabela de feriados vazia (nenhuma Viagem de feriado — pode ser intencional)" entre os alertas da Revisão, mas nem a TASK-030 nem a TASK-032 o implementaram — a revisão da TASK-030 (`docs-dev/14-REVISOES/TASK-030-20260715.md:42-43`) já havia atribuído esse item à "TASK-031/032", e a TASK-032 não o cobriu (`coletarPendencias`, `src/formulario/pendencias/pendencias.ts`, só emite hoje: documento criado do zero, rota ausente, descrição ausente, matriz desatualizada). RN-071 (grade vazia é válida, tratada como alerta) já está provada no nível da montagem de blocos (`viagens-montagem-grade.test.ts`) — falta só o alerta na camada de pendências/Revisão.
+
+## Fora de escopo
+
+- Qualquer mudança na regra RN-071 em si (grade vazia continua válida) — só a exibição do alerta na Revisão.
+- Contadores/resumo operacional de feriados (TASK-031, já entregue) — não retocar.
+- Qualquer mudança de contrato JSON (o alerta é validação efêmera de sessão — NEG-004, nunca persistido).
+
+## Specs fonte
+
+- Spec 04 §11 (alertas da Revisão)
+- Spec 03 §9.3 (grade de feriados)
+
+## Regras envolvidas
+
+- RN-071 (grade de feriados vazia é válida, alerta não bloqueante)
+- RN-078 (alertas não bloqueiam a exportação — só bloqueantes bloqueiam)
+
+## Entidades afetadas
+
+- Viagem (`viagem_feriado: true`), Itinerário, Serviço
+
+## Ferramentas afetadas
+
+- [x] Formulário
+
+## Critérios de aceite
+
+- [ ] `coletarPendencias` emite um alerta por Serviço/sentido cuja grade de feriados não tem nenhuma Viagem, com mensagem alinhada à Spec 04 §11 e `etapaAlvo` apontando para a etapa de horários (mesmo padrão dos demais alertas sem entidade única de origem — DEC-033, se aplicável).
+- [ ] Serviço/sentido com ao menos 1 Viagem de feriado não gera o alerta.
+- [ ] O alerta é **não bloqueante**: não aparece em `pendenciasBloqueantes` do gate de exportação (`avaliarGateExportacao`) e não impede exportar.
+- [ ] Nenhum `data-testid`/`aria-*` existente alterado; testes e E2E existentes seguem verdes.
+
+## Casos válidos
+
+- Serviço com grade de feriados vazia: alerta emitido, exportação permanece liberada (sem outros bloqueantes).
+- Serviço com grade de feriados com 1+ Viagens: nenhum alerta.
+- Dois Serviços, um com grade vazia e outro não: só o primeiro gera alerta.
+
+## Casos inválidos
+
+- N/A (é um alerta, não uma validação de entrada — não há "caso inválido" de dado, só presença/ausência de Viagem de feriado).
+
+## Testes esperados
+
+- Unitários: `coletarPendencias` — grade de feriados vazia → 1 alerta; grade com Viagem → nenhum; alerta não entra em `pendenciasBloqueantes`.
+- Integração: N/A.
+- E2E: opcional, reaproveitando `revisao-exportacao.spec.ts` se a fixture carregada permitir cobrir os dois casos sem criar fixture nova.
+- Snapshot/contrato JSON: N/A.
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/pendencias/pendencias.ts` (nova checagem em `coletarPendencias`)
+- `testes/unitarios/formulario/pendencias.test.ts` (ou arquivo de teste equivalente já existente)
+
+## Riscos
+
+- Baixo — checagem de leitura pura sobre dados já existentes, sem novo estado nem mudança de contrato.
+
+## Dependências
+
+- **TASK-030** (entregue) — grade de feriados e RN-071 já implementadas no nível de dados.
+- **TASK-032** (entregue) — `coletarPendencias`/`TelaRevisao` já existem; esta task só acrescenta uma checagem.
+
+## Perguntas em aberto
+
+- Nenhuma.
+
+---
+
+## TASK-082 — Bloquear a exportação quando o documento tem violação técnica de 350 m ou tipificação (DEC-067)
+
+## Objetivo
+
+O gate de exportação passa a **bloquear** "Exportar proposta"/"Definir como vigente" quando o documento (montado para exportação) apresenta violação de 350 m estático de Seção (RN-028), 350 m pareado de Local (RN-032) ou tipificação `tipo` × `caracteristica_veiculo` (RN-019..022) — reaproveitando a checagem pura já existente (`coletarAlertasTecnicos`, `src/shared/checagens-leitor/checagens-leitor.ts`). Abrir, visualizar e editar o documento continuam permitidos e sem bloqueio nenhum (RN-091 intocada) — só a exportação passa a exigir a correção.
+
+## Contexto
+
+Achado da revisão de aderência da TASK-032 (`docs-dev/14-REVISOES/TASK-032-20260717.md`): a Spec 04 §11 lista "violação da regra dos 350 m detectada em revalidação" e "violação de tipificação tipo × característica" entre os erros bloqueantes da Revisão, mas o gate de exportação (`avaliarGateExportacao`, `src/formulario/exportacao/gate-exportacao.ts`) não reaplica essas checagens — hoje ele só combina as pendências vivas de `coletarPendencias` com a validação estrutural do schema (`validarParaExportacao`), e nem uma nem outra cobrem 350 m/tipificação. Ao mesmo tempo, a RN-091 (Spec 05 §4.1) fixa que essas mesmas checagens são **alerta técnico, nunca bloqueiam** para qualquer leitor estático — o que gerou uma aparente tensão entre as duas regras, resolvida pela **DEC-067**: são momentos diferentes (leitura × exportação), não uma contradição. A lógica pura já existe e já é testada (`coletarAlertasTecnicos`, usada hoje só no import); falta reaplicá-la no momento da exportação, com a severidade elevada a bloqueante **apenas nesse ponto**.
+
+## Fora de escopo
+
+- Qualquer mudança na severidade dessas checagens **na leitura/import** (`checagens-leitor.ts` continua devolvendo alerta técnico não bloqueante — RN-091 intocada; esta task não toca esse arquivo além de, no máximo, reexportar a função pura já existente).
+- A regra de negócio dos 350 m ou de tipificação em si (RN-027/028/032/019..022 inalteradas) — só o momento em que a violação passa a bloquear.
+- O gesto de realocação de Seção inteira (TASK-078/DEC-061) — trata de **evitar** uma violação nova durante a edição ao vivo; esta task trata de **um documento que já chega** com a violação (importado ou nunca corrigido).
+- Qualquer mudança de contrato JSON.
+
+## Specs fonte
+
+- Spec 04 §11 (bloqueantes da Revisão)
+- Spec 05 §4.1 (RN-091 — leitor estático, alerta técnico)
+- Spec 03 §7.3/§7.4 (350 m), §10 (tipificação)
+
+## Regras envolvidas
+
+- RN-091 (checagem técnica é alerta ao ler — permanece inalterada nesta task)
+- RN-028/RN-032 (350 m estático de Seção/pareado de Local)
+- RN-019..022 (tipificação `tipo` × `caracteristica_veiculo`)
+- RN-078 (exportação bloqueada com pendências — Spec 04 §11/§12/§14)
+- DEC-067 (a decisão que libera esta task)
+
+## Entidades afetadas
+
+- Seção, Local, Serviço (checagem sobre o documento montado, sem alterar o modelo)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+
+## Critérios de aceite
+
+- [ ] `avaliarGateExportacao` passa a considerar bloqueante qualquer item devolvido por `coletarAlertasTecnicos` sobre o documento montado para exportação — `liberado` só é `true` se, além dos critérios já existentes, essa lista vier vazia.
+- [ ] A mensagem exibida ao usuário segue o padrão operacional da Spec 04 §14 (sem tecniquês cru do RN citado — reaproveitar/adaptar a mensagem já existente em `AlertaTecnico.mensagem`, com `etapaAlvo` apontando para a Seção/Local/Serviço envolvido).
+- [ ] Abrir/visualizar/editar um documento com essas violações continua **sem nenhum bloqueio** (regressão-guarda explícita: `checagens-leitor.ts`/import inalterados, RN-091 intocada).
+- [ ] Um documento sem essas violações não é afetado pela mudança (regressão-guarda do caminho feliz do gate).
+- [ ] Nenhum `data-testid`/`aria-*` existente alterado; testes e E2E existentes seguem verdes.
+
+## Casos válidos
+
+- Documento carregado sem violação de 350 m/tipificação: gate liberado como hoje (se não houver outras pendências).
+- Documento corrigido durante a sessão (violação existia no import, usuário ajustou a Seção): gate libera assim que a violação some — checagem recomputada a cada avaliação, sem estado extra (mesmo padrão de `coletarPendencias`).
+
+## Casos inválidos
+
+- Documento carregado com uma Seção cujos pontos violam os 350 m estáticos: `avaliarGateExportacao` devolve `liberado: false`; abrir/editar o mesmo documento continua permitido, com alerta técnico não bloqueante (comportamento de `checagens-leitor.ts`, inalterado).
+- Documento com tipificação incompatível (`tipo` × `caracteristica_veiculo`): mesmo comportamento — bloqueia só a exportação.
+- Documento com violação de 350 m **e** demais pendências vivas (ex.: rota ausente): o gate permanece bloqueado por qualquer uma delas; a mensagem/lista reflete todas.
+
+## Testes esperados
+
+- Unitários: `avaliarGateExportacao` — documento com violação de 350 m de Seção → bloqueado; com violação de Local → bloqueado; com tipificação incompatível → bloqueado; documento limpo → comportamento inalterado (regressão-guarda).
+- Integração: N/A.
+- E2E: opcional — reaproveitar `revisao-exportacao.spec.ts` com uma fixture que viole 350 m/tipificação, se compensar o custo de manter uma fixture extra; senão, cobertura unitária basta.
+- Snapshot/contrato JSON: N/A (não toca contrato).
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/exportacao/gate-exportacao.ts` (reaplicar `coletarAlertasTecnicos` sobre o documento montado, tratando qualquer item como bloqueante neste ponto)
+- `testes/unitarios/formulario/gate-exportacao.test.ts` (casos novos)
+
+## Riscos
+
+- Reaproveitar `coletarAlertasTecnicos` errado (ex.: também elevá-lo a bloqueante dentro de `checagens-leitor.ts`) violaria a RN-091 — a task deve tocar só o ponto de exportação, nunca o de leitura.
+- Mensagem ao usuário não pode expor a redação técnica crua (`[RN-028] Seção "X": ...`) sem adaptação — Spec 04 §14 pede tom operacional; decidir na `/analisar-task` se a mensagem de `AlertaTecnico` é reaproveitada tal como está ou adaptada.
+
+## Dependências
+
+- **DEC-067** (decidida — task liberada).
+- **TASK-008/TASK-010** (entregues) — fornecem `coletarAlertasTecnicos`, `validaEstaticoSecao`, `validaLocalPareado`, `validarConjuntoDeCaracteristicas`.
+- **TASK-032** (entregue) — fornece `avaliarGateExportacao`, o ponto de entrada desta task.
+
+## Perguntas em aberto
+
+- Nenhuma (Q-047 decidida pela DEC-067).
+
+---
+
 ## Ordem recomendada de execução
 
 ```text
@@ -2458,5 +2722,6 @@ ramo do mapa: 064 → 065 → 071 → 066 → 067
 ```
 
 - TASK-062 (E2E criar-do-zero ponta a ponta) depende da **TASK-061** (promoção, entregue) **e da TASK-032** (tela de Revisão + gate/botão de exportação) — **DEC-059 / Q-039**: a UI de exportação que o E2E dispara é escopo da TASK-032, então a 062 foi re-sequenciada para rodar depois dela.
+- **TASK-080** (correção, 2026-07-17): a promoção da TASK-061 ficou condicionada a `modo === "novo"`, então Serviços criados na sessão sobre um **JSON carregado** nunca eram promovidos. A 080 remove esse gate e promove nos dois modos. Depende só da **TASK-061** (entregue); pode rodar a qualquer momento.
 
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.

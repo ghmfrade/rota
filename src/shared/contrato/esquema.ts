@@ -276,7 +276,7 @@ export const esquemaAutos = z.strictObject({
 });
 
 // Valor de `versao_schema` (Spec 02 §3) gravado num documento criado do zero
-// no Formulário (TASK-032; Q-046, opção (a)) — não há JSON de origem para
+// no Formulário (TASK-032; DEC-066/Q-046) — não há JSON de origem para
 // herdar a versão. "1.0" é a mesma versão usada nas fixtures canônicas e no
 // exemplo mínimo da Spec 02 §15; ponto único de atualização se a versão do
 // contrato mudar.

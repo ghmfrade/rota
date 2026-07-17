@@ -9,7 +9,7 @@ import { documentoExemploMinimo } from "../../fixtures";
 
 // TASK-032 — montagem do DocumentoOperacao final para a exportação (Spec 04
 // §12). Regras exercidas: RN-004 (round-trip de UUID), RN-018 (autos.servicos
-// >= 1), Q-046/opção (a) (VERSAO_SCHEMA_ATUAL num documento criado do zero).
+// >= 1), DEC-066/Q-046 (VERSAO_SCHEMA_ATUAL num documento criado do zero).
 
 describe("montarDocumentoParaExportacao — modo carregado", () => {
   test("devolve o documento tal como está (mesma referência, sem remontar)", () => {
