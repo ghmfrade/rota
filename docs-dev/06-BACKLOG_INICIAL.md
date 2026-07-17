@@ -793,6 +793,107 @@ Hoje, no modo "novo", um Serviço recém-criado vive em `servicosEmConstrucao` (
 
 ---
 
+## TASK-072 — Unificar o CRUD da etapa Serviços no modo "novo": listar/editar/duplicar/remover Serviços promovidos + numeração contínua
+
+## Objetivo
+
+No fluxo **"novo"**, a etapa Serviços passa a exibir e administrar, numa lista única, tanto os `ServicoEmConstrucao` quanto os `Servico` já **promovidos** (DEC-053/TASK-061): editar, duplicar e remover funcionam sobre qualquer um dos dois, e a numeração sugerida de `numero_n` (Spec 03 §10.3 regra 5) passa a ser **contínua** sobre as duas listas. A lista passa também a **rotular explicitamente o estado** de cada Serviço — em construção × completo — para todos, nos dois modos.
+
+## Contexto
+
+A TASK-061 introduziu a promoção `ServicoEmConstrucao → Servico`, movendo o Serviço concluído para `sessao.servicos` (modo novo). O CRUD da etapa Serviços ([`servicos.tsx`](../../src/formulario/servicos/servicos.tsx)) já foi construído para unir as duas listas (`completos` + `linhasEmConstrucao`, com `todosNumeros` contando ambas), mas deriva `completos` **só** de `sessao.documento.autos.servicos` quando `sessao.modo === "carregado"` — no modo novo é sempre `[]`. Consequência descoberta em teste manual do responsável (2026-07-16): o Serviço promovido **some da lista**, não pode ser editado/duplicado/removido, e a numeração colide (o promovido não entra em `todosNumeros`, então após finalizar `1-1CR` o próximo volta a sugerir `1-1CR` em vez de `1-2CR`). É o mesmo buraco `sessao.modo === "carregado"` que a TASK-061 fechou em Viagens/Matrizes/pendências/itinerários — mas o CRUD de Serviços ficou de fora porque a TASK-061 o declarou fora de escopo ("já existe"), premissa que a própria promoção invalidou. A base já existe: `servicosDaSessao`/`comServicosDaSessao` (`sessao.ts`, TASK-061); `duplicarServico`/`removerServico` já são puros; o CRUD já bifurca por `linha.completo`. Follow-up formal da revisão da TASK-061.
+
+## Fora de escopo
+
+- A promoção em si (gatilho, forma, lar do `Servico`) — é a **TASK-061**, entregue.
+- Alterar o comportamento do **modo carregado** (mantém a trava de mínimo 1 Serviço e a mesma cascata de Seção órfã — nenhuma regressão).
+- Mudança de contrato/schema (`shared/contrato`): tudo é estado de sessão efêmero (RN-096/NEG-004).
+- Reimplementar `duplicarServico`/`numero-n`/contagens — reusam-se como estão.
+- Troca de direcionalidade de um Serviço completo (é operação de itinerário, etapa de mapa — já fora do escopo da etapa Serviços).
+
+## Specs fonte
+
+- Spec 04 §6 (etapa Serviços: criar/editar/duplicar/remover; `numero_n` sugerido)
+- Spec 03 §10.3 regra 5 (`numero_n` sequencial por ordem de cadastro)
+- Spec 02 §6 (`Servico`), §14 (validação — documento exportado exige ≥ 1 Serviço; Seção com ≥ 1 entrada)
+
+## Regras envolvidas
+
+- RN-001/002 (identidade por UUID preservada em edição; cópia recebe UUID nova)
+- RN-006 (`numero_n` é rótulo de display, nunca identidade; sequencial é só sugestão)
+- RN-007 (duplicar = entidade nova, UUIDs novas, `secao_uuid` mantida, `local_uuid` re-mapeada)
+- RN-018 (documento válido exige ≥ 1 Serviço + cascata de Seção órfã) — **gate de exportação, não de sessão**: no modo novo a remoção não trava no "último Serviço"
+- RN-096 / NEG-004 (sessão efêmera; nada gravado no JSON antes da exportação)
+- DEC-035 (`ServicoEmConstrucao`), DEC-053 (`servicosDaSessao`/promoção), DEC-037 (sufixo de `numero_n` regenerado na troca de característica)
+- DEC-050 (design system vinculante para UI — o rótulo de estado usa `Selo` do `shared/ui`, tokens do doc 18; o estado "em construção" × "completo" não é conceito de contrato, é de sessão — DEC-035/DEC-053 —, logo o rótulo é *inferência controlada* de usabilidade sob o doc 18, não regra de spec)
+
+## Entidades afetadas
+
+- Serviço (completo e em construção), Seção (cascata de órfã na remoção)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] No modo "novo", a lista da etapa Serviços exibe `ServicoEmConstrucao` **e** `Servico` promovidos (DEC-053) num único conjunto — o promovido não some após concluir o itinerário.
+- [ ] A numeração sugerida de `numero_n` é contínua sobre as duas listas: criar `1-1CR`, promovê-lo e criar outro sugere `1-2CR` (Spec 03 §10.3 regra 5).
+- [ ] Cada linha da lista rotula explicitamente o estado do Serviço — **em construção** × **completo** — para todos, nos dois modos (`Selo` do `shared/ui`, doc 18/DEC-050), preservando o `data-testid="servico-em-construcao"` já existente para o estado em construção.
+- [ ] Editar/Duplicar/Remover operam sobre um Serviço promovido no modo novo (deixam de ser no-op).
+- [ ] Duplicar um Serviço promovido gera entidade nova com UUIDs novas (RN-007), `secao_uuid` mantidas e `local_uuid` re-mapeadas (reusa `duplicarServico`).
+- [ ] Remover um Serviço promovido no modo novo: sai de `sessao.servicos`, tira suas entradas de cada Seção de `secoesEmConstrucao` e descarta Seção que fique órfã (cascata — RN-018), **sem** trava de "mínimo 1 Serviço" durante a construção.
+- [ ] O modo "carregado" permanece inalterado (mesma trava de mínimo 1, mesma cascata).
+- [ ] UUIDs preservadas em edição (RN-001/002); nada gravado no JSON antes da exportação (RN-096/NEG-004).
+- [ ] Nenhum `data-testid`/`aria-*` alterado; E2E existentes verdes.
+
+## Casos válidos
+
+- Novo: criar Serviço A (`1-1CR`, ida) → montar itinerário (promoção) → a lista continua mostrando A com contadores de viagens; criar novo Serviço sugere `1-2CR`.
+- Estado visível: antes da promoção, A exibe o selo "em construção"; depois da promoção, A exibe o selo "completo" — na mesma tabela.
+- Duplicar A promovido → A' com UUID nova e `numero_n` no próximo sequencial livre, mesmas Seções.
+- Remover A promovido sendo o único Serviço do modo novo → some da lista; Seção usada só por ele é removida de `secoesEmConstrucao`; Seção ainda usada por um `ServicoEmConstrucao` permanece.
+
+## Casos inválidos
+
+- (carregado) Remover o último Serviço continua **bloqueado** (RN-018) — regressão-guarda de que a mudança não afrouxou o modo carregado.
+- Editar/duplicar **não** regeneram a UUID de um Serviço existente (RN-001/002) — round-trip prova.
+- Remover um Serviço no modo novo **não** apaga Seção ainda referenciada por outro Serviço (completo ou em construção) — cascata só sobre Seção efetivamente órfã.
+
+## Testes esperados
+
+- Unitários: função pura de remoção com cascata aplicável ao modo novo (`servicos` + `secoesEmConstrucao` → cascata de órfã, sem trava mínimo-1); numeração contínua (`sugerirNumeroN` sobre a lista unificada); duplicar promovido (RN-007 round-trip de UUID; `secao_uuid` mantida, `local_uuid` re-mapeada).
+- Integração: `EtapaServicos` no modo novo com um Serviço promovido — listar, editar, duplicar, remover; assert do selo de estado (em construção × completo) por linha; assert de que `sessao.servicos` muda e `secoesEmConstrucao` cascateia; e de que o modo carregado não regride.
+- E2E: N/A (o fluxo ponta a ponta é a TASK-062).
+- Snapshot/contrato JSON: N/A (não toca contrato).
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/servicos/servicos.tsx` (`completos` via `servicosDaSessao`; `salvar`/`duplicar`/`remover`/`podeRemover` via `comServicosDaSessao` no modo novo)
+- `src/formulario/servicos/remover.ts` (função pura de remoção com cascata genérica sobre `servicos` + `secoes`, reutilizável pelos dois modos, sem trava mínimo-1 quando aplicada à sessão novo)
+- `testes/unitarios/formulario/servicos-*.test.ts` (casos novos)
+
+## Riscos
+
+- **Regressão no modo carregado:** a generalização de `remover.ts` não pode mudar o comportamento carregado (mesma cascata, mesma trava mínimo-1). Cobrir com regressão-guarda.
+- **Condição da cascata:** uma Seção só é órfã quando **nenhum** Serviço — completo **ou** em construção — a referencia; a cascata deve operar sobre `secao.servicos[]` (que já reflete o uso por ambos), não sobre "está nas paradas de um Serviço completo".
+- Depende de `servicosDaSessao`/`comServicosDaSessao` e do campo `sessao.servicos` (TASK-061).
+
+## Dependências
+
+- **TASK-061** (entregue) — fornece `sessao.servicos`, `servicosDaSessao`, `comServicosDaSessao`.
+
+## Perguntas em aberto
+
+- Nenhuma bloqueante. O comportamento de remoção no modo novo (sem trava de mínimo 1 durante a construção — RN-018 é gate de exportação; cascata de Seção órfã como no carregado) foi **decidido pelo responsável nesta conversa (2026-07-17)**. Se quiser formalizá-lo, vira DEC via `/registrar-decisao`.
+
+---
+
 ## TASK-062 — E2E do fluxo "criar do zero" ponta a ponta (Identificação → Exportação)
 
 ## Objetivo
@@ -803,9 +904,12 @@ Ao final existe um teste **E2E (Playwright)** que exercita o fluxo **"novo"** co
 
 A Q-034 registrou que "nenhum E2E exercita o fluxo 'novo' de Serviços → Itinerários → Viagens (só o fluxo de JSON aberto é coberto)" — foi por isso que a trava só apareceu em teste manual. Depois da **TASK-061** (promoção `ServicoEmConstrucao → Servico`), o fluxo passa a funcionar ponta a ponta; falta a rede de segurança que impeça a regressão. Testes **nunca** dependem do OSRM real — mock sempre (stack fixada, DEC-029).
 
+**Depende também da TASK-032 (DEC-059 / Q-039).** A `/analisar-task` da TASK-062 (2026-07-17) descobriu que as etapas **Revisão e Exportação ainda são placeholder** — a UI que dispara a exportação (botão + gate, RN-078) é escopo da **TASK-032**, não implementada. Sem ela, os critérios de export/round-trip e o caso inválido do gate não são exercitáveis pela interface. Decisão do responsável (opção (a) da Q-039): **re-sequenciar a TASK-062 para depois da TASK-032** e simplificar o E2E, que passa a usar o botão de exportação e o gate reais — sem contornos. Cadeia: `061 → 032 → 062`.
+
 ## Fora de escopo
 
 - Implementar/alterar a promoção — é a **TASK-061** (esta task só testa o fluxo já corrigido; depende dela).
+- **Construir a tela de Revisão ou o botão/gate de exportação — é a TASK-032** (DEC-059). Esta task consome a UI de exportação pronta; não inventa seletores de exportação próprios nem antecipa a TASK-032.
 - Cobrir o Comparador ou o fluxo de importação de JSON (já coberto por E2E existentes).
 - Testar variações exaustivas de PDF/exportação além de disparar a exportação e validar o JSON resultante.
 
@@ -836,7 +940,7 @@ A Q-034 registrou que "nenhum E2E exercita o fluxo 'novo' de Serviços → Itine
 
 - [ ] Um E2E cria um documento do zero pela UI (identidade → 1 Serviço → itinerário com paradas → horários → matriz) com o OSRM mockado.
 - [ ] Após concluir o itinerário, as etapas Viagens e Matrizes exibem o Serviço (regressão-guarda da TASK-061).
-- [ ] A exportação produz um JSON que **passa no schema** `zod` strict (Serviço completo, RN-018).
+- [ ] Pela tela de Revisão/Exportação da TASK-032, o botão de exportação produz um JSON que **passa no schema** `zod` strict (Serviço completo, RN-018) — capturado pelo download real do Playwright.
 - [ ] Round-trip: reimportar o JSON exportado preserva as UUIDs geradas (RN-004).
 - [ ] O teste não faz nenhuma chamada de rede real ao OSRM (mock verificado).
 
@@ -846,7 +950,7 @@ A Q-034 registrou que "nenhum E2E exercita o fluxo 'novo' de Serviços → Itine
 
 ## Casos inválidos
 
-- (guarda opcional) Tentar exportar antes de completar ≥ 1 Serviço → a UI bloqueia/sinaliza pendência (RN-018), sem gerar JSON inválido.
+- Tentar exportar antes de completar ≥ 1 Serviço → o gate da TASK-032 bloqueia/sinaliza a pendência (RN-018/RN-078), sem gerar JSON inválido.
 
 ## Testes esperados
 
@@ -858,17 +962,18 @@ A Q-034 registrou que "nenhum E2E exercita o fluxo 'novo' de Serviços → Itine
 
 ## Arquivos prováveis
 
-- `e2e/` (novo spec, ex.: `e2e/fluxo-novo.spec.ts`) + helper de mock do OSRM já existente
-- Possíveis `data-testid` adicionais **apenas** se o fluxo não for selecionável hoje (mínimos; sem alterar os existentes)
+- `testes/e2e/fluxo-novo.spec.ts` (novo spec). Não há helper de mock do OSRM compartilhado — cada spec faz `page.route("https://router.project-osrm.org/**", …)` inline (padrão de `testes/e2e/etapa-itinerarios.spec.ts`); mockar também os tiles OSM.
+- Consome os `data-testid` do botão/gate de exportação criados pela **TASK-032** — sem inventar seletores de exportação próprios. `data-testid` adicionais **apenas** se algum passo do fluxo não for selecionável (mínimos; sem alterar os existentes — DEC-050).
 
 ## Riscos
 
-- Depende da TASK-061: sem a promoção, o E2E falha por design (Viagens/Matrizes vazias) — sequenciar depois dela.
-- Flakiness de E2E: garantir mock determinístico do OSRM (sem rede real — DEC-029).
+- Depende da TASK-061 (entregue) **e da TASK-032** (UI de exportação — DEC-059): sem a promoção, o E2E falha por design (Viagens/Matrizes vazias); sem a TASK-032, não há botão/gate para disparar a exportação. Sequenciar depois de ambas.
+- RN-039: o Serviço promovido nasce com `viagens: []` e só passa no schema strict após ≥ 1 Viagem — a etapa Viagens é obrigatória no roteiro, não opcional.
+- Flakiness de E2E: garantir mock determinístico do OSRM (sem rede real — DEC-029) e prontidão do MapLibre (esperar `.maplibregl-marker`) ao criar Seções por clique no mapa.
 
 ## Perguntas em aberto
 
-- Nenhuma.
+- Q-039 — **decidida (DEC-059, 2026-07-17):** re-sequenciar após a TASK-032 e simplificar o E2E (usa o botão/gate de exportação reais).
 
 ---
 
@@ -1028,6 +1133,7 @@ A TASK-060 unificou os mapas e pôs a tabela lateral ao lado (DEC-054 / doc 18 �
 ## Perguntas em aberto
 
 - Nenhuma (habilitada por DEC-054).
+- **Atenção (2026-07-17):** a **Q-040 foi decidida (DEC-060)** — os pontos de rota entram na tabela lateral, intercalados (TASK-079). A sincronização desta task deve projetar sobre a **lista unificada**; se esta task rodar antes da TASK-079, a 079 herda a obrigação de não quebrar o sync.
 
 ---
 
@@ -1137,6 +1243,8 @@ A DEC-054 atribuiu Seção ao botão esquerdo quando o gesto de ponto de rota ai
 ## TASK-066 — Re-ancorar os pontos de rota quando o conjunto ou a ordem das paradas muda
 
 > **Desbloqueada pela DEC-056 (2026-07-16)** — a Q-037 foi decidida na opção A (re-ancorar onde é determinístico, descartar só na reordenação). Os critérios de aceite abaixo são os da regra decidida.
+>
+> **Atualizada pela DEC-060 (2026-07-17):** o caso da **reordenação** deixou de descartar — os pontos preservam sua posição na lista unificada da tabela lateral (Q-040) e re-ancoram ao par de paradas que passa a cercá-los, com recálculo. O critério de aceite correspondente abaixo foi ajustado; os demais casos da DEC-056 permanecem.
 
 ## Objetivo
 
@@ -1186,7 +1294,7 @@ Levantada pela `/investigar-conflito` durante a análise da TASK-063. Hoje `etap
 - [ ] Parada **acrescentada ao fim** → nenhum `apos_parada_ordem` muda; traçado forçado idêntico.
 - [ ] Parada **removida** → os dois trechos adjacentes fundem-se; os pontos de ambos preservam a sequência e assumem a ordem do trecho fundido; nenhum valor fora de `[1, paradas.length − 1]`.
 - [ ] Parada **inserida no meio** → pontos antes dela mantêm a ordem; os depois recebem +1.
-- [ ] **Reordenação** → os pontos daquele itinerário são descartados, com aviso não bloqueante (precedente DEC-048).
+- [ ] **Reordenação** → os pontos **não** são descartados (DEC-060, que supera neste caso a DEC-056): preservam sua posição na lista unificada e re-ancoram ao par de paradas que passa a cercá-los; `apos_parada_ordem` re-derivado da posição, sempre em `[1, paradas.length − 1]`.
 - [ ] Nenhum gesto da etapa produz **rejeição não tratada**: violação de intervalo residual vira estado `sem-rota` (RN-048), sem apagar a última rota válida.
 - [ ] `trechos.length == paradas.length − 1` em todos os caminhos (RN-041).
 
@@ -1203,7 +1311,7 @@ Levantada pela `/investigar-conflito` durante a análise da TASK-063. Hoje `etap
 ## Testes esperados
 
 - Unitários: a função pura de re-ancoragem, caso a caso (fim/remoção/inserção/reordenação), incluindo vários pontos no mesmo trecho (§3.6.1) e os **inválidos** acima.
-- Integração: remover parada na tabela lateral de um itinerário com pontos de rota **não** produz rejeição não tratada e recalcula com os pontos re-ancorados (OSRM mockado); reordenar dispara o aviso de descarte.
+- Integração: remover parada na tabela lateral de um itinerário com pontos de rota **não** produz rejeição não tratada e recalcula com os pontos re-ancorados (OSRM mockado); reordenar re-ancora pela posição na lista (DEC-060), sem descarte e sem valor fora do intervalo.
 - E2E: opcional — o caminho crítico já fica coberto na integração.
 - Snapshot/contrato JSON: `pontos_de_rota` resultante válido por `esquemaRota` e por `validacoes-estruturais` (§14) em todos os caminhos.
 - PDF: N/A.
@@ -1693,6 +1801,594 @@ Os pontos de rota do itinerário em edição passam a viver em **estado de sess�
 
 ---
 
+## TASK-073 — Tela inicial: cartões inteiros clicáveis com hover e diálogo de confirmação ao lado
+
+## Objetivo
+
+Na tela inicial, os dois cartões ("Carregar JSON existente" e "Criar Autos do zero") passam a ser **superfícies de ação inteiras**: pôr o mouse sobre qualquer ponto do cartão dá feedback visual (fundo acinzentado/estado hover) e clicar em qualquer ponto dispara a ação — sem depender do input de arquivo cru nem do botão interno. O diálogo de confirmação do "criar do zero" abre **ao lado** dos cartões (não abaixo), sem empurrar o layout.
+
+## Contexto
+
+Relato do responsável em teste manual (2026-07-17): "não dá pra saber onde precisa clicar para escolher um JSON; não tem efeito de hover como ocorre com o botão criar do zero". Hoje (`src/formulario/tela-inicial/tela-inicial.tsx`, TASK-013/052) o cartão de carregar expõe um `<input type="file">` cru (`data-testid="input-arquivo-json"`) e o de criar tem um `Botao` pequeno; o `alertdialog` (`aviso-criar-zero`) renderiza abaixo. É mudança de **aparência/afordância** sob DEC-050/doc 18 — os fluxos e validações são preservados. **Q-045 decidida (DEC-065, opção B):** o aviso obrigatório ganha nova redação na Spec 04 §3.2; o texto proposto está na DEC-065, aguardando o dono da spec substituir o placeholder da §3.2 — esta task adota o **literal final da spec** no diálogo (o placeholder nunca vai para a UI).
+
+## Fora de escopo
+
+- Alterar qualquer fluxo/validação de importação ou criação (TASK-006/013 — reusar como estão).
+- Redigir/editar a Spec 04 §3.2 (o texto da DEC-065 é colado pelo dono; a task só consome o literal final).
+- O reforço de recomendação para Autos `operante` (Spec 04 §3.2, parte final — segue com a TASK-015/075).
+
+## Specs fonte
+
+- Spec 04 §3 (duas ações lado a lado; recomendação do "carregar"), §3.1/§3.2 (fluxos e avisos — inalterados)
+- `docs-dev/18-DESIGN_SYSTEM.md` (DEC-050 — estados de hover, sombras, flutuantes)
+
+## Regras envolvidas
+
+- RN-004/016/017 (comportamentos da tela preservados — não reimplementar)
+
+## Entidades afetadas
+
+- Nenhuma (só superfície de UI)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+
+## Critérios de aceite
+
+- [ ] O cartão "Carregar JSON existente" inteiro é clicável (abre o seletor de arquivo) e tem estado hover visível; o input de arquivo cru deixa de ser a única área ativa (o `data-testid="input-arquivo-json"` continua existindo e funcional para os E2E).
+- [ ] O cartão "Criar Autos do zero" inteiro é clicável (abre o diálogo) e tem estado hover visível.
+- [ ] O diálogo de confirmação abre **ao lado** da área dos cartões (posicionamento lateral em tela larga; empilha no estreito), com `sombra-3` de flutuante (doc 18 §5), sem sobrepor de forma bloqueante.
+- [ ] O diálogo exibe o texto do aviso obrigatório **conforme fixado na Spec 04 §3.2** (nova redação da DEC-065, após o dono substituir o placeholder), na íntegra; o E2E que asserta o texto é atualizado junto (mudança deliberada).
+- [ ] Acessibilidade preservada: cartões operáveis por teclado (foco visível, `Enter`/`Espaço`), `alertdialog` com foco gerenciado.
+- [ ] Nenhum `data-testid`/`aria-*` existente alterado; E2E atuais verdes sem trocar seletores.
+
+## Casos válidos
+
+- Clicar no meio do texto do cartão de carregar abre o seletor de arquivo; escolher um JSON válido segue o fluxo atual.
+- Clicar no cartão de criar abre o diálogo ao lado; confirmar entra no modo novo.
+
+## Casos inválidos
+
+- JSON inválido → mesma mensagem de erro atual (`mensagem-erro-carregar`).
+- Cancelar o diálogo → volta ao estado inicial, nada criado.
+
+## Testes esperados
+
+- E2E existentes da tela inicial verdes; caso novo leve: clique na área do cartão (fora do input/botão) dispara a ação.
+- Conferência visual (hover, posicionamento do diálogo).
+
+## Arquivos prováveis
+
+- `src/formulario/tela-inicial/tela-inicial.tsx`
+- `src/shared/ui/` (se o padrão "painel clicável" virar variante de `Painel`)
+
+## Riscos
+
+- Cartão inteiro clicável contendo controles internos (input/botões): evitar duplo disparo e manter o input funcional para os E2E.
+- Posição lateral do diálogo em telas estreitas — definir o empilhamento.
+
+## Dependências
+
+- TASK-052 (entregue). **DEC-065** (decidida) — o texto final precisa estar fixado na Spec 04 §3.2 pelo dono antes de a task tocar o literal do diálogo (o restante da task não depende disso).
+
+## Perguntas em aberto
+
+- Nenhuma (Q-045 decidida pela DEC-065). Pendência **do dono da spec**: colar na §3.2 o texto proposto na DEC-065 (ou redação própria equivalente).
+
+---
+
+## TASK-074 — Coluna lateral da etapa de itinerários: reuso de Seção acima da tabela de paradas + rolagem própria da tabela
+
+## Objetivo
+
+Na etapa "Seções, Locais e Itinerários": o painel **"Reutilizar Seção existente"** sai de baixo do mapa e passa a viver na **coluna lateral, acima da tabela de paradas**; a tabela de paradas ganha **rolagem vertical própria**, limitada à altura do mapa, em vez de crescer indefinidamente para baixo.
+
+## Contexto
+
+Relato do responsável (2026-07-17): "reutilizar seções existentes está mal localizado — deve ficar acima da tabela PARADA|AÇÕES ao lado do mapa; e a tabela, caso fique maior que o mapa, deve ter barra de rolagem própria". Hoje o painel de reuso (`data-testid="reuso-secoes"`) renderiza dentro do `EditorMapaItinerario`, abaixo do mapa (`editor-mapa-itinerario.tsx`), enquanto a tabela (`tabela-paradas`) fica na coluna lateral (`etapa-itinerarios.tsx`, `coluna-paradas`) sem limite de altura. É reorganização de **layout** sob DEC-050/doc 18 §5 (mapa em destaque + tabela lateral); nenhuma regra de reuso/350 m/montagem muda. Se a Q-043 for decidida (reuso passa a ofertar só Seções de outros Serviços), o **conteúdo** do dropdown muda na TASK-077 — esta task só muda o **lugar**.
+
+## Fora de escopo
+
+- Filtrar as Seções ofertadas no reuso (Q-043/TASK-077).
+- Sincronização seleção tabela↔mapa (TASK-064) e intercalação de pontos de rota (Q-040/TASK-079).
+- Qualquer regra de reuso, 350 m, montagem ou recálculo.
+
+## Specs fonte
+
+- Spec 04 §7 (mapa em destaque + tabela lateral), §7.1 (reutilização de Seções — comportamento inalterado)
+- `docs-dev/18-DESIGN_SYSTEM.md` §5 (DEC-050; rolagem própria de conteúdo largo/alto)
+
+## Regras envolvidas
+
+- RN-025..027 (reuso/350 m — comportamento preservado)
+- RN-076 (rótulo `Cidade - Nome da Seção` — preservado)
+
+## Entidades afetadas
+
+- Nenhuma (layout)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+
+## Critérios de aceite
+
+- [ ] O painel "Reutilizar Seção existente" aparece na coluna lateral, **acima** da tabela de paradas, com o mesmo comportamento (mesmos `data-testid`: `reuso-secoes`, `select-secao-reuso`, `select-ponto-reuso`, `confirmar-reuso`).
+- [ ] A tabela de paradas tem contêiner com `overflow-y: auto` e altura máxima atrelada à altura do mapa — a coluna lateral não cresce além da linha visual do mapa.
+- [ ] Em tela estreita (empilhado), a rolagem própria continua funcional.
+- [ ] Nenhum `data-testid`/`aria-*` alterado; E2E existentes verdes sem trocar seletores.
+
+## Casos válidos
+
+- Itinerário com 20 paradas: a tabela rola internamente; o mapa e o painel de reuso permanecem visíveis.
+- Reutilizar uma Seção pelo painel na nova posição funciona como hoje.
+
+## Casos inválidos
+
+- Recusa de 350 m no reuso → mesma mensagem atual, exibida em posição visível junto ao painel.
+
+## Testes esperados
+
+- E2E existentes verdes; conferência visual da rolagem.
+- Integração leve: o painel de reuso continua disparando `aoAtualizarSecao` (nenhuma mudança de comportamento).
+
+## Arquivos prováveis
+
+- `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (extrair o painel de reuso, ou expô-lo como slot)
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (coluna lateral: reuso acima da `Tabela`; wrapper com rolagem)
+
+## Riscos
+
+- O painel de reuso usa estado interno do `EditorMapaItinerario` (mensagens de recusa) — extrair sem duplicar estado.
+- Altura "igual à do mapa" (hoje `h-[60vh]`) — usar a mesma referência para não dessincronizar.
+
+## Dependências
+
+- TASK-060 (entregue). Independente das demais; recomendável **antes** de TASK-064/079 (que mexem na mesma coluna).
+
+## Perguntas em aberto
+
+- Nenhuma (aparência sob DEC-050).
+
+---
+
+## TASK-075 — Etapa Identificação: pré-visualização do Autos e confirmação explícita antes de congelar (DEC-064)
+
+## Objetivo
+
+No fluxo "novo", escolher um Autos no dropdown **não cria mais o documento na hora**: exibe um painel de pré-visualização com os dados do registro escolhido — código, denominação da linha (origem–destino), empresa, tipo e situação (`operante`) — permitindo trocar a seleção livremente. O botão **"Confirmar Autos"** é o ato que cria o documento e congela `codigo`/`empresa` (Spec 04 §5); depois de confirmado, o Autos não pode mais ser trocado.
+
+## Contexto
+
+Relato do responsável (2026-07-17): "só de escolher o Autos já congela ID e empresa; deve aparecer os dados do Autos escolhido e só congelar após clicar confirmar". Hoje `aoSelecionarAutos` (`src/formulario/identificacao/identificacao.tsx`) comita a identidade no primeiro `onChange` — inferência controlada da TASK-015 ("a seleção é o ato de criar o documento") que a Q-044 reabre. A lista estática (`data/autos_empresas.json`, DEC-030) já tem todos os campos da pré-visualização: `codigo`, `denominacao_linha`, `empresa_id`, `tipo`, `operante`. A exibição de `operante` também serve ao reforço da Spec 04 §3.1 (Autos que já opera → recomendar carregar o JSON vigente).
+
+## Fora de escopo
+
+- O modo "carregado" (identidade vem do JSON — inalterado).
+- A editabilidade do `tipo` e a reconversão (DEC-034 — inalteradas; o tipo segue editável após a confirmação).
+- Mudança de contrato/listas estáticas (nenhum campo novo).
+- Desfazer a confirmação depois de dada (Spec 04 §5 volta a valer: não editável após criado).
+
+## Specs fonte
+
+- Spec 04 §5 (Identificação; "não editável após criado o documento" — a Q-044 fixa o momento da criação)
+- Spec 04 §3.1 (final — reforço da recomendação de carregar quando o Autos já é operante)
+- Spec 01 §8 (listas estáticas)
+
+## Regras envolvidas
+
+- RN-016 (identificação vem das listas estáticas)
+- RN-023/DEC-034 (troca de tipo — preservada)
+- RN-096/NEG-004 (tudo estado de sessão efêmero)
+
+## Entidades afetadas
+
+- Autos (identidade de sessão; nenhuma mudança de contrato)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+
+## Critérios de aceite
+
+- [ ] Escolher um Autos no dropdown exibe a pré-visualização (código, denominação da linha, empresa, tipo, selo de situação `operante`/não operante) **sem** criar o documento.
+- [ ] Trocar a seleção antes de confirmar atualiza a pré-visualização, sem efeito colateral.
+- [ ] "Confirmar Autos" cria o documento (identidade fixada, `status: proposta`) e congela `codigo`/`empresa`; o seletor deixa de ser exibido.
+- [ ] Após confirmar, não há caminho de troca do Autos (Spec 04 §5).
+- [ ] Autos `operante: true` exibe o reforço recomendando carregar o JSON vigente (Spec 04 §3.1) na pré-visualização.
+- [ ] `data-testid`/`aria-*` existentes preservados (`seletor-autos`, `campo-codigo`, `campo-empresa`, `select-tipo`, `selo-status-identificacao`); testids novos só para a pré-visualização e o botão de confirmação.
+- [ ] E2E existentes verdes (ajuste apenas do passo novo de confirmação, se algum E2E cria documento do zero pela Identificação).
+
+## Casos válidos
+
+- Escolher Autos A → conferir → trocar para Autos B → confirmar B → identidade é B; etapas seguintes funcionam como hoje.
+
+## Casos inválidos
+
+- Confirmar sem seleção → botão desabilitado.
+- Depois de confirmado, o dropdown não é mais renderizado — sem troca.
+
+## Testes esperados
+
+- Unitários/integração: seleção não comita sessão; confirmação comita; troca antes de confirmar; reforço do `operante`.
+- E2E: fluxo novo passa pela confirmação (atualizar specs que hoje assumem congelamento imediato).
+
+## Arquivos prováveis
+
+- `src/formulario/identificacao/identificacao.tsx` (estado local de "seleção candidata" + painel de pré-visualização + confirmação)
+- `testes/unitarios/formulario/identificacao*.test.tsx`, `testes/e2e/*` que criem documento do zero
+
+## Riscos
+
+- E2E existentes que dependem do congelamento imediato precisam do passo extra — atualização deliberada, registrada na task.
+- `denominacao_linha` não está no contrato do documento (é só das listas) — exibir sem persistir.
+
+## Dependências
+
+- **DEC-064** (decidida — task liberada). TASK-053 (entregue).
+
+## Perguntas em aberto
+
+- Nenhuma (Q-044 decidida pela DEC-064).
+
+---
+
+## TASK-076 — Ida e Volta visíveis no mesmo mapa: abas de sentido ativo, numeração na ordem da viagem, Volta tracejada e dois painéis de descrição (DEC-062)
+
+## Objetivo
+
+Um **único mapa** exibe simultaneamente os marcadores e as rotas de Ida e de Volta (Ida em linha cheia, Volta **tracejada**, cores próprias por sentido), com **checklist de visibilidade** por sentido. O **sentido ativo** é escolhido por **botão tipo aba** (Ida/Volta) e rege a tabela lateral (Seções, Locais e pontos de rota do sentido ativo, na ordem em que o veículo passa). Os itens ficam **numerados (1, 2, 3…) na ordem da viagem** nos marcadores do mapa, conforme a tabela lateral do sentido ativo; o ponto do sentido **inativo** de uma Seção aparece na mesma tonalidade, levemente acinzentado, em **segundo plano** (ativo sempre à frente). Os **dois painéis de descrição textual** (Ida e Volta) aparecem embaixo, cada um com copiar / recalcular / ver itens estruturados (Spec 04 §7.4).
+
+## Contexto
+
+Pedido do responsável (2026-07-17), **decidido pela DEC-062**. Hoje `etapa-itinerarios.tsx` renderiza um sentido por vez (`seletor-sentido` com botões Ida/Volta), e o `PainelDescricaoItinerario` só do sentido ativo. A Spec 04 §7.4 manda o painel "para **cada** Serviço e sentido" — compatível com exibir os dois. Alvo de gesto (DEC-062): arrastar um marcador edita o sentido daquele marcador; gestos ambíguos (criar por clique direito, clique na linha) vão para o **sentido ativo** (a aba). O recálculo continua **por sentido** (RN-052), inclusive `sem-rota` e violações de montagem, exibidos por sentido. A numeração é indicação posicional de UI (RN-042 intocada); a tabela lateral é a lista unificada da DEC-060 (TASK-079).
+
+## Fora de escopo
+
+- Espelhamento automático da Volta e regra de ordem inversa (Q-043/TASK-077 — independente; os dois convivem).
+- Gestos de criação/menu (DEC-055/TASK-065) e inserção posicional (TASK-067) — inalterados; apenas ganham o alvo de sentido definido pela Q-042.
+- Sincronização seleção tabela↔mapa (TASK-064).
+- Qualquer regra de OSRM/350 m/montagem/descrição; qualquer mudança de contrato.
+
+## Specs fonte
+
+- Spec 04 §7 (mapa único da etapa), §7.3 (montagem/recálculo por sentido), §7.4 (painel de descrição por Serviço e sentido)
+- `docs-dev/18-DESIGN_SYSTEM.md` (DEC-050 — cores por sentido, tracejado, legenda; tokens novos se necessários, registrados no doc 18 §2)
+
+## Regras envolvidas
+
+- RN-046/052 (recálculo por sentido — preservado; exibir os dois não recalcula nada)
+- RN-015 (rotas congeladas desenhadas sem recalcular)
+- RN-030 (conjunto de Seções Ida=Volta — o aviso existente permanece)
+- RN-076 (rótulos — preservados)
+
+## Entidades afetadas
+
+- Itinerário, Rota, Seção, Local, ponto de rota (só apresentação/alvo de gesto)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+
+## Critérios de aceite
+
+- [ ] Com um Serviço bidirecional selecionado, o mapa exibe as duas rotas (quando existem): Ida em linha cheia, Volta **tracejada**, cores distintas (tokens do doc 18), com legenda.
+- [ ] Checklist de visibilidade por sentido: ocultar um sentido remove seus marcadores e linha do mapa sem alterar dados.
+- [ ] O sentido ativo é escolhido por **botão tipo aba** (Ida/Volta); trocar a aba troca o conteúdo da tabela lateral (itens do sentido ativo, na ordem de passagem — lista unificada da DEC-060).
+- [ ] Os marcadores do sentido ativo exibem a **numeração 1..n na ordem da viagem**, idêntica à ordem da tabela lateral; o ponto do sentido inativo de uma Seção fica na mesma tonalidade, levemente acinzentado, em segundo plano, com o ativo sempre à frente (z-order).
+- [ ] Arrastar um marcador edita o sentido daquele marcador (revalidação 350 m e recálculo **do sentido dele**).
+- [ ] Gestos sem alvo natural (criar por clique direito, clique na linha) vão para o **sentido ativo** (a aba — DEC-062).
+- [ ] Os dois painéis de descrição (Ida e Volta) aparecem embaixo, cada um com copiar/recalcular/ver estruturado; recalcular um sentido não toca o outro.
+- [ ] Estados `sem-rota`/violações de montagem exibidos por sentido, sem ambiguidade.
+- [ ] Abrir JSON desenha as duas rotas congeladas **sem** chamar OSRM (RN-052/RN-015).
+- [ ] Serviço unidirecional: comportamento equivalente ao atual (um sentido só).
+- [ ] `data-testid`/`aria-*` existentes preservados onde a estrutura sobreviver; mudanças de seletor só as inevitáveis pela remoção das abas, registradas e com E2E atualizados na mesma task.
+
+## Casos válidos
+
+- Serviço "ambos" com as duas rotas: alternar visibilidade; arrastar ponto da Volta recalcula só a Volta; os dois painéis de descrição atualizam de forma independente.
+
+## Casos inválidos
+
+- Ida `recalculada` e Volta `sem-rota` (OSRM mockado): a linha da Ida permanece; a mensagem de falha aparece atribuída à Volta.
+- Ocultar um sentido não dispara recálculo nem altera a sessão.
+
+## Testes esperados
+
+- Integração: duas linhas passadas ao `<Mapa>` (cheia/tracejada); visibilidade filtra; alvo de gesto por marcador; zero chamada OSRM na abertura (espião ativo, DEC-042).
+- E2E: fluxo bidirecional com os dois sentidos visíveis (OSRM/tiles mockados).
+
+## Arquivos prováveis
+
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (estado por sentido em paralelo; dois painéis de descrição)
+- `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (marcadores/linhas dos dois sentidos; alvo de gesto)
+- `src/shared/mapa/mapa.tsx` (estilo tracejado em `LinhaMapa` — extensão aditiva)
+- `docs-dev/18-DESIGN_SYSTEM.md` (tokens/espec do tracejado e cores por sentido)
+
+## Riscos
+
+- **Refator grande** sobre a superfície mais ativa do app; rodar **depois** do ramo pendente do mapa (TASK-064..071) para não retrabalhar.
+- O modelo atual de estado é fortemente indexado por `(servicoUuid, sentido)` — favorece a mudança, mas os handlers assumem "sentido selecionado" único em vários pontos.
+- Tabela lateral: definir na análise se mostra o sentido ativo (recomendado, com a Q-043 tornando a Volta derivada) ou as duas listas.
+
+## Dependências
+
+- **DEC-062** (decidida — task liberada). Recomendado: após TASK-064..071 e a TASK-079 (lista unificada que a aba rege).
+
+## Perguntas em aberto
+
+- Nenhuma (Q-042 decidida pela DEC-062; com a DEC-063, a tabela da Volta é derivada da Ida e a aba rege os ajustes por sentido).
+
+---
+
+## TASK-077 — Volta espelhada: montagem automática na ordem inversa da Ida + reuso ofertando só Seções de outros Serviços (DEC-063)
+
+## Objetivo
+
+Num Serviço bidirecional, montar a **Ida** passa a montar a **Volta automaticamente na ordem inversa** (Seções A→B→C na Ida ⇒ Volta C→B→A, com os pontos de Volta pré-posicionados conforme a criação espelhada já existente); a edição da Volta se restringe ao que é legitimamente por sentido (posições de pontos, Locais, pontos de rota — e, se a Q-043 decidir a opção B, reordenação com aviso). O painel "Reutilizar Seção existente" deixa de ofertar Seções já usadas no Serviço corrente — reuso passa a servir para trazer Seções **de outros Serviços** (e, num Serviço bidirecional, a Seção reutilizada entra nos dois sentidos, na posição inversa correspondente).
+
+## Contexto
+
+Pedido do responsável (2026-07-17): "ABCD sempre volta DCBA — não sendo necessário reutilizar a seção já usada na ida". **Decidido pela DEC-063 (opção A — regra dura):** o dono da spec **já editou a Spec 02 §14** ("se na ida as seções são ABCD, na volta necessariamente são DCBA") e atualizou a RN-030 no RULE_INDEX — a validação estrutural nova em `validarServico` está **no escopo desta task**, com base na spec editada; importação recusa Volta fora da ordem inversa (trava dura, tratamento estrutural existente da RN-030). Hoje a Volta nasce vazia e é montada à mão, e o reuso oferta todas as Seções do documento (inclusive as do próprio Serviço) exatamente para viabilizar essa montagem manual. A Spec 04 §7.1 já manda a criação espelhada dos **pontos**; esta task espelha o **itinerário** (lista `paradas[]`). Locais e pontos de rota permanecem livres por sentido (Spec 02 §14).
+
+## Fora de escopo
+
+- A exibição simultânea Ida+Volta no mapa (Q-042/TASK-076 — independente).
+- Edição da Spec 02 §14 (ação do dono da spec, se opção A).
+- Regra dos 350 m, criação espelhada de pontos, exclusão de sentido de Local — inalteradas.
+- Reconciliação de horários (TASK-046) e re-ancoragem de pontos de rota (TASK-066) — reusadas como estão; o espelhamento dispara os mesmos caminhos de mudança de itinerário já existentes.
+
+## Specs fonte
+
+- Spec 02 §14 (validação de conjunto Ida=Volta; ordem — conforme Q-043), §10/§10.1 (itinerários e paradas)
+- Spec 04 §7.1 (criação espelhada; reutilização de Seções), §7.2 (Locais por sentido)
+- Spec 03 §4.2 (matriz por posições — indiferente à ordem, mas recalculada quando o itinerário muda)
+
+## Regras envolvidas
+
+- RN-030 (conjunto Ida=Volta — o espelhamento a satisfaz por construção; RULE_INDEX a atualizar conforme a decisão)
+- RN-004/001 (nenhuma UUID nova no espelhamento — as mesmas Seções são referenciadas)
+- RN-033..036 (validações de Parada — a Volta espelhada nasce válida: extremos Seção, geoloc do sentido exigida)
+- RN-052/054..057 (recálculo e matriz ao mudar itinerário — dos dois sentidos quando o espelhamento muda ambos)
+
+## Entidades afetadas
+
+- Itinerário, Parada, Seção (Volta derivada da Ida); Local e ponto de rota (livres por sentido)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+
+## Critérios de aceite
+
+- [ ] Inserir/remover Seção na Ida de um Serviço bidirecional reflete na Volta na posição inversa correspondente, no mesmo commit de sessão; a Volta de um Serviço com Ida A→B→C é C→B→A.
+- [ ] Reordenar Seções na Ida reordena a Volta para o inverso (e vice-versa, se a edição da Volta for permitida pela decisão).
+- [ ] Locais e pontos de rota **não** são espelhados — cada sentido tem os seus (Spec 02 §14; Spec 04 §7.2).
+- [ ] O recálculo de rota dispara para os sentidos alterados (RN-052) e a matriz reconcilia (RN-054..057).
+- [ ] O dropdown de reuso não oferta Seções já presentes no itinerário do Serviço corrente; oferta as demais Seções do documento (RN-025 — Seções de outros Serviços).
+- [ ] Reutilizar uma Seção num Serviço bidirecional insere a parada nos dois sentidos (posição inversa na Volta), com as contribuições de geoloc dos dois sentidos (sob 350 m).
+- [ ] Sequência de Seções da Volta divergente do inverso da Ida é **inválida** (validação estrutural nova em `validarServico`, Spec 02 §14 editada — DEC-063); importação/exportação/Revisão recusam (trava dura da RN-030).
+- [ ] UUIDs preservadas (RN-004); nenhum campo novo no contrato.
+- [ ] `data-testid`/`aria-*` existentes preservados; E2E atualizados onde o fluxo de montagem da Volta mudou (mudança deliberada, registrada).
+
+## Casos válidos
+
+- Montar Ida A→B→C (Serviço "ambos") → Volta nasce C→B→A sem nenhum gesto; ajustar a posição do ponto de Volta de B (sob 350 m) não muda a ordem.
+- Reutilizar Seção de outro Serviço no meio da Ida → entra na posição inversa correspondente da Volta.
+
+## Casos inválidos
+
+- Importar JSON com Volta fora da ordem inversa → recusa estrutural (DEC-063; mesmo tratamento da trava dura da RN-030).
+- Excluir o ponto de Volta de um Local (unidirecional) não afeta a Ida — como hoje.
+- O reuso não lista Seção já usada no Serviço corrente (asserção de filtro).
+
+## Testes esperados
+
+- Unitários do motor de espelhamento (inserir/remover/reordenar na Ida ⇒ Volta inversa; Locais/pontos de rota intocados; UUIDs preservadas — round-trip).
+- Integração: montagem da Ida popula a Volta; promoção no modo novo (DEC-053) com "ambos" funciona com a Volta derivada; reuso filtrado.
+- E2E: fluxo bidirecional monta só a Ida e exporta com a Volta inversa válida (OSRM mockado).
+
+## Arquivos prováveis
+
+- `src/formulario/itinerarios/motor-montagem.ts` (espelhamento como função pura sobre as duas listas)
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (aplicar o espelho no commit dos gestos de Seção)
+- `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (filtro do reuso)
+- `src/shared/contrato/validacoes-estruturais.ts` (validação nova da ordem inversa — Spec 02 §14 já editada pelo dono, DEC-063)
+- `docs-dev/01-RULE_INDEX.md` (RN-030 — **já atualizada pelo dono**; conferir Traceability se necessário)
+
+## Riscos
+
+- **Fixtures e JSONs existentes** com Volta fora da ordem inversa passam a ser inválidos — revisar fixtures canônicas (TASK-041) e o snapshot de contrato ao introduzir a validação.
+- Espelhar no commit certo: os gestos hoje comitam um sentido por vez (`aplicarNovasParadas`); o espelho dobra o commit para os dois sentidos e dispara **dois** recálculos — atenção a corridas (padrão `sessaoRef` existente).
+- Interação com a promoção (DEC-053): "ambos" exige os dois sentidos com rota válida — com a Volta derivada, a promoção pode acontecer num gesto só; cobrir com teste.
+
+## Dependências
+
+- **DEC-063** (decidida — task liberada; Spec 02 §14 e RN-030 já editadas pelo dono). Recomendado: após TASK-076.
+
+## Perguntas em aberto
+
+- Nenhuma (Q-043 decidida pela DEC-063). Pendência **do dono da spec** (não desta task): alinhar a Spec 02 §2, que ainda descreve só o conjunto idêntico sem a ordem.
+
+---
+
+## TASK-078 — Gesto de realocação de Seção inteira (translação rígida de todos os pontos do cluster) (DEC-061)
+
+## Objetivo
+
+O usuário passa a poder **mover uma Seção inteira** no mapa: um gesto explícito de realocação exibe todos os pontos contribuídos à Seção (todas as entradas de `secao.servicos[]`, Ida e Volta) e arrasta o conjunto todo pelo **mesmo vetor** — preservando o invariante dos 350 m por construção, re-derivando o município do novo centroide e disparando o recálculo das rotas de todos os itinerários que a referenciam. Corrige a impossibilidade prática de realocar uma Seção mal posicionada sem destruir sua UUID.
+
+## Contexto
+
+Relato do responsável (2026-07-17): mover uma Seção hoje exige arrastar ponto a ponto, cada um preso aos 350 m do centroide do conjunto — "impraticável". A proposta dele: entrar no modo de realocação pela própria Seção (ex.: duplo clique no marcador), os demais pontos aparecem em cor neutra, arrastar move todos juntos, com gesto de cancelamento. A translação rígida não viola RN-027 (distâncias ao centroide inalteradas); o que muda é o **lugar** da Seção — por isso a operação é deliberada e distinta do arrasto simples, que continua recusando >350 m (DEC-044 permanece). O desenho exato do gesto (duplo clique × item no menu de contexto do marcador; cancelar por `Esc`) é design sob DEC-050/doc 18, fixado na `/analisar-task` conforme a decisão da Q-041.
+
+## Fora de escopo
+
+- Afrouxar/alterar a regra dos 350 m do arrasto individual (DEC-044 e RN-027 intocadas).
+- Mover Locais em conjunto (Local é pareado, por Serviço — o arrasto atual basta).
+- Qualquer mudança de contrato (nenhum campo novo; as coordenadas mudam pelos caminhos existentes).
+- Re-anexar itinerários/horários além do que os caminhos de recálculo existentes já fazem (TASK-046/066 reusadas).
+
+## Specs fonte
+
+- Spec 02 §5.1/§5.2 (contribuições e clustering)
+- Spec 03 §7.2 (invariante dos 350 m — preservado por construção), §2.3 (município derivado)
+- Spec 04 §7.1 (arrasto por ponto — inalterado; a realocação é gesto novo, conforme Q-041), §14 (mensagens)
+
+## Regras envolvidas
+
+- RN-027 (350 m — invariante mantido; teste prova que a translação nunca é recusada por 350 m)
+- RN-029 (município re-derivado do novo lugar; fora de SP → recusa com `MENSAGEM_FORA_DE_SP`)
+- RN-004/001 (UUID da Seção preservada — a razão de ser da operação)
+- RN-052 (mover coordenadas recalcula as rotas dos itinerários afetados — de **todos** os Serviços que usam a Seção)
+- RN-054..057 (matrizes dos Serviços afetados reconciliadas)
+
+## Entidades afetadas
+
+- Seção (todas as contribuições), Rota/Itinerário/matriz dos Serviços que a referenciam
+
+## Ferramentas afetadas
+
+- [x] Formulário
+
+## Critérios de aceite
+
+- [ ] O gesto decidido na Q-041 entra no modo de realocação da Seção; todos os pontos do cluster ficam visíveis (cor neutra) durante o modo.
+- [ ] Arrastar move todos os pontos pelo mesmo vetor; soltar confirma; o gesto de cancelamento decidido restaura as posições originais sem efeito.
+- [ ] Ao confirmar: município re-derivado do novo centroide (RN-029); destino fora de SP → recusa com a mensagem existente, sem mover nada.
+- [ ] Nenhuma recusa por 350 m é possível na translação (invariante preservado — teste com cluster no limite).
+- [ ] Todos os itinerários (de todos os Serviços) que referenciam a Seção têm a rota recalculada (RN-052) e a matriz reconciliada (RN-054..057); falha de OSRM em um deles → `sem-rota` daquele itinerário (RN-048), sem apagar a última rota válida.
+- [ ] A UUID da Seção e as entradas de `secao.servicos[]` são preservadas (round-trip).
+- [ ] O arrasto simples de um ponto continua com o comportamento atual (DEC-044) — regressão-guarda.
+- [ ] Nenhum `data-testid`/`aria-*` existente alterado; E2E atuais verdes.
+
+## Casos válidos
+
+- Seção com 4 pontos (2 Serviços × Ida/Volta) transladada 5 km: os 4 pontos mantêm as distâncias relativas; município muda; as rotas dos 2 Serviços recalculam.
+- Cancelar no meio do gesto: nada muda, nenhuma chamada OSRM.
+
+## Casos inválidos
+
+- Translação para fora de SP → recusa integral (nenhum ponto movido).
+- OSRM falha no recálculo de um dos itinerários afetados → aquele itinerário em `sem-rota` com pendência; os demais seguem.
+
+## Testes esperados
+
+- Unitários: função pura de translação (vetor aplicado a todas as contribuições; invariante 350 m preservado; município re-derivado; fora de SP recusa).
+- Integração: confirmar dispara recálculo por itinerário afetado (OSRM mockado; contagem de chamadas); cancelamento não dispara nada.
+- E2E: realocar uma Seção usada por um Serviço e ver rota/tabela atualizarem (OSRM/tiles mockados).
+
+## Arquivos prováveis
+
+- `src/formulario/secoes/fluxos-secao.ts` (função pura `transladarSecao`)
+- `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (modo de realocação, pontos em cor neutra)
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (commit + recálculo em cascata dos itinerários afetados)
+- `docs-dev/18-DESIGN_SYSTEM.md` (estado visual do modo, cor neutra)
+
+## Riscos
+
+- **Cascata de recálculo multi-Serviço** é caminho novo (hoje o recálculo é do itinerário corrente): definir na análise se recalcula na hora (várias chamadas OSRM) ou marca os itinerários como desatualizados com pendência — decisão de UX a alinhar na `/analisar-task` (sem inventar regra: RN-052 manda recalcular ao editar coordenada).
+- Conflito de gesto com DEC-055 (clique direito = menu) e TASK-070 (clique no vértice remove): o gesto de entrada/cancelamento não pode colidir — por isso a Q-041 deixa o desenho para o design sob DEC-050.
+- Serviço em construção (modo novo): pontos vivem em `secoesEmConstrucao` — cobrir os dois modos.
+
+## Dependências
+
+- **DEC-061** (decidida — task liberada). Recomendado: após o ramo pendente do mapa (TASK-064..071).
+
+## Perguntas em aberto
+
+- Nenhuma (Q-041 decidida pela DEC-061). O gesto exato (entrada no modo/cancelamento) fecha na `/analisar-task` sob DEC-050 — candidato: item "Mover Seção" em menu de contexto do marcador, `Esc` cancela.
+
+---
+
+## TASK-079 — Pontos de rota na lista lateral, intercalados na ordem da travessia, com setinhas e "Remover" (DEC-060)
+
+## Objetivo
+
+Os pontos de rota deixam de aparecer numa sub-lista solta abaixo do mapa e passam a ser exibidos **na mesma tabela lateral** das paradas, intercalados na ordem real da travessia (ex.: Seção A / ponto de rota 1 / Seção B / ponto de rota 2 / Local X / Seção C), como itens visualmente distintos — sem nome/município/`Cidade - Nome` — **com setinhas de subir/descer e "Remover"** (DEC-060). A posição na lista unificada passa a reger a ancoragem: mover um item (ponto ou parada) re-deriva `apos_parada_ordem`/índice dos pontos afetados e recalcula.
+
+## Contexto
+
+A TASK-063 implementou o literal da Spec 04 §7.3 ("sub-lista própria"), mas §7 e §7.3 item 3 dizem o contrário ("a tabela lateral lista Seções, paradas comuns e pontos de rota na ordem da travessia") — conflito real de redação registrado na **Q-040** (`/investigar-conflito`, 2026-07-17) e **decidido pela DEC-060**: lista lateral única intercalada, com a semântica posicional — a posição do item na lista determina a que trecho o ponto pertence; Seções/paradas que sobem ou descem ultrapassando pontos fazem esses pontos pertencerem ao outro trecho (re-ancoragem posicional, **superando em parte a DEC-056** no caso da reordenação). Cabe ao dono da spec alinhar a redação da §7.3 (a exemplo da DEC-052).
+
+## Fora de escopo
+
+- Gestos de criar/mover/remover ponto de rota no mapa (TASK-063/070) e visual do vértice (TASK-068/069) — inalterados.
+- O motor de re-ancoragem por mudança de conjunto (inserir/remover parada) — TASK-066 (esta task consome; a 066 já implementa o caso da reordenação conforme a DEC-060).
+- Sobrevivência dos pontos à falha de recálculo (TASK-071) — fonte de dados reusada.
+- Qualquer mudança de contrato.
+
+## Specs fonte
+
+- Spec 04 §7 (layout da tabela lateral), §7.3 item 3 (leitura vigente pela DEC-060)
+- Spec 03 §3.6/§3.6.1 (ordem de travessia: `(apos_parada_ordem, índice no array)`)
+
+## Regras envolvidas
+
+- RN-042 (ponto de rota sem identidade: sem nome, sem município, sem `Cidade - Nome` — o número/posição é indicação de UI; DEC-060 dá a ele setinhas e "Remover")
+- RN-076 (padrão de rótulo só para Seção)
+- RN-052 (mover/remover pela lista recalcula)
+
+## Entidades afetadas
+
+- ponto de rota (só apresentação)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+
+## Critérios de aceite
+
+- [ ] A lista lateral exibe os pontos de rota intercalados entre as paradas, na posição dada por `apos_parada_ordem` + índice no array.
+- [ ] O item de ponto de rota é visualmente distinto (sem rótulo `Cidade - Nome`, sem nome/município, sem edição de campos) e oferece **setinhas de subir/descer** e **"Remover"** (DEC-060), ambos com recálculo (RN-052).
+- [ ] Mover um ponto de rota pela setinha re-deriva sua ancoragem pela nova posição na lista: dentro do mesmo trecho muda o índice no array; ultrapassando uma parada, muda o `apos_parada_ordem` (a coordenada do ponto não muda — só a ancoragem).
+- [ ] Mover uma **parada** pela setinha re-ancora os pontos ultrapassados pela posição na lista (DEC-060 — sem descarte; supera o caso de reordenação da DEC-056), com recálculo.
+- [ ] A `sub-lista-pontos-de-rota` abaixo do mapa deixa de existir **ou** é substituída pela representação nova — sem duplicação.
+- [ ] As paradas mantêm exatamente as ações e `data-testid` atuais (`parada-item`, `parada-mover-cima/baixo`, `parada-remover`).
+- [ ] Remover uma parada re-intercala os pontos conforme a re-ancoragem vigente (TASK-066) — a lista nunca mostra ponto órfão.
+- [ ] `apos_parada_ordem ∈ [1, paradas−1]` e `trechos == paradas − 1` em todos os caminhos (RN-041/042).
+- [ ] E2E existentes verdes; seletores da sub-lista antiga atualizados de forma deliberada e registrada (`ponto-rota-item`/`remover-ponto-rota` preservados se possível).
+
+## Casos válidos
+
+- Itinerário A→B com 2 pontos no trecho 1: lista mostra A, ponto 1, ponto 2, B; remover o ponto 1 pela lista recalcula e a lista atualiza.
+- Itinerário A→B→C com ponto p no trecho A→B: subir a parada B acima de A (setinha) mantém p na sua posição da lista, agora ancorado ao par que o cerca (B→A), com recálculo.
+- Descer o ponto p pela setinha, ultrapassando B: p passa ao trecho B→C (`apos_parada_ordem` 2), mesma coordenada.
+
+## Casos inválidos
+
+- Ponto de rota não expõe edição de campos nem rótulo `Cidade - Nome` (asserção negativa — RN-042/076).
+- Itinerário `sem-rota` com pontos preservados na sessão (TASK-071): a lista continua exibindo os pontos (não órfãos do estado).
+- Nenhum movimento pela lista produz `apos_parada_ordem` fora do intervalo (RN-042) — teste de borda nos extremos da lista.
+
+## Testes esperados
+
+- Unitários: função pura de intercalação (paradas + pontos → lista de exibição) e a inversa (posição na lista → `apos_parada_ordem`/índice), casos do §3.6.1 (vários pontos no mesmo trecho), extremos da lista.
+- Integração: renderização intercalada; setinhas e "Remover" da lista disparam recálculo com a lista re-ancorada (OSRM mockado).
+- E2E: criar ponto pelo mapa e vê-lo aparecer intercalado na lista; movê-lo pela setinha (OSRM/tiles mockados).
+
+## Arquivos prováveis
+
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (a lista lateral passa a receber também os pontos de rota)
+- `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (remoção da sub-lista antiga)
+- `testes/unitarios/formulario/editor-mapa-itinerario.test.tsx`, `testes/e2e/etapa-itinerarios.spec.ts`
+
+## Riscos
+
+- Interação com a TASK-064 (sync tabela↔mapa): se a 064 rodar antes, esta task não pode quebrar o sync; se rodar depois, a 064 já projeta sobre a lista unificada (ver nota na TASK-064).
+- Interação com a TASK-071: a fonte dos pontos exibidos passa a ser o estado de sessão (DEC-058) — exibir da fonte certa.
+
+## Dependências
+
+- **DEC-060** (decidida — task liberada). TASK-063 (entregue). **TASK-066** (a re-ancoragem por posição que as setinhas consomem) e **TASK-071** (fonte de dados) antes; coordenada com a TASK-064.
+
+## Perguntas em aberto
+
+- Nenhuma (Q-040 decidida pela DEC-060).
+
+---
+
 ## Ordem recomendada de execução
 
 ```text
@@ -1736,10 +2432,31 @@ Os pontos de rota do itinerário em edição passam a viver em **estado de sess�
 - TASK-071 vem da **DEC-058** (Q-038 decidida): os pontos de rota da sessão sobrevivem a um recálculo que falha. **Precede a TASK-066** — as duas tocam a reaplicação dos pontos, e re-ancorar (066) uma lista que evapora numa falha seria construir sobre areia.
 - TASK-065/066/067 vêm da **DEC-055** (Q-036), que superou em parte a DEC-054 invertendo os botões do mouse: esquerdo sobre a linha cria ponto de rota, direito abre menu Seção/Local. Todas dependem do **ancorador geométrico** entregue pela TASK-063. A **DEC-056** (Q-037) fixou a re-ancoragem dos pontos de rota e liberou TASK-066/067 — nenhuma task deste ramo está bloqueada.
 
-**Fluxo criar-do-zero — promoção `ServicoEmConstrucao → Servico` (DEC-053 / Q-034; TASK-062 depende da TASK-061):**
+**Revisão de UX do responsável (2026-07-17 — Q-040..Q-045 decididas em DEC-060..065; tasks TASK-073..079, todas liberadas):**
 
 ```text
-061 → 062
+073 (livre; literal do aviso após o dono fixar a §3.2 — DEC-065)
+074 (livre, rodar antes das demais da etapa de mapa)
+075 (livre — DEC-064)
+
+ramo do mapa: 064 → 065 → 071 → 066 → 067
+                        ├→ 068 → 069 → 070
+                        └→ (depois do ramo) 079 → 076 → 077 → 078
 ```
+
+- **Todas as Q foram decididas (DEC-060..065, 2026-07-17)** — nenhuma task deste bloco está bloqueada. **TASK-073/074/075** são independentes do ramo do mapa e podem rodar a qualquer momento (a 073 depende só de o dono colar o texto da DEC-065 na Spec 04 §3.2 para o passo do literal).
+- Terminar o **ramo pendente do mapa** (064 → 065 → 071 → 066 → 067; 068 → 069 → 070) **antes** de 079/076/077/078, que retrabalham a mesma superfície — exceto a **074**, pequena, que convém rodar antes para não mover o alvo das demais.
+- Ordem do sub-ramo novo: **079 → 076 → 077 → 078** — lista unificada primeiro (DEC-060, que a TASK-066 já implementa no caso da reordenação), depois o mapa bidirecional com abas/numeração (DEC-062), depois o espelhamento da Volta (DEC-063, que simplifica a tabela da Volta), e por fim a realocação de Seção (DEC-061, gesto novo sobre a superfície estabilizada).
+- **Atenção TASK-066:** implementar já com o caso da reordenação da **DEC-060** (re-ancoragem posicional, sem descarte) — o critério de aceite correspondente foi atualizado na própria task.
+
+**Fluxo criar-do-zero — promoção `ServicoEmConstrucao → Servico` (DEC-053 / Q-034) + E2E ponta a ponta (DEC-059 / Q-039):**
+
+```text
+061 (entregue) ─┐
+                ├→ 062
+032 ────────────┘
+```
+
+- TASK-062 (E2E criar-do-zero ponta a ponta) depende da **TASK-061** (promoção, entregue) **e da TASK-032** (tela de Revisão + gate/botão de exportação) — **DEC-059 / Q-039**: a UI de exportação que o E2E dispara é escopo da TASK-032, então a 062 foi re-sequenciada para rodar depois dela.
 
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.

@@ -225,7 +225,7 @@
 
 ## RN-030 — Ida e Volta referenciam o mesmo conjunto de Seções
 
-**Descrição:** Quando um Serviço tem os dois itinerários, o conjunto de Seções referenciadas pelas paradas de Ida é idêntico ao de Volta (a ordem pode diferir; Locais podem divergir livremente). Garante que `matriz_distancias` é sempre satisfazível. Divergência grande → criam-se dois Serviços unidirecionais.
+**Descrição:** Quando um Serviço tem os dois itinerários, o conjunto de Seções referenciadas pelas paradas de Ida é idêntico ao de Volta (a ordem deve ser a inversa, ABCD vira DCBA; Locais podem divergir livremente). Garante que `matriz_distancias` é sempre satisfazível. Divergência grande → criam-se dois Serviços unidirecionais.
 **Origem:** Spec 01 §8; Spec 02 §2, §14.
 **Tipo:** Validação | Domínio. **Criticidade:** Alta. **Afeta:** F, C, I, J, T.
 
@@ -681,7 +681,7 @@
 
 ## Grupo 20 — Regras negativas (o que o ROTA não deve fazer)
 
-*(Detalhamento com riscos e revisão em `11-NEGATIVE_REQUIREMENTS.md` — aqui só o índice normativo.)*
+_(Detalhamento com riscos e revisão em `11-NEGATIVE_REQUIREMENTS.md` — aqui só o índice normativo.)_
 
 ## RN-095 — ROTA não é sistema de gestão de processo
 
@@ -705,9 +705,9 @@
 
 ## Anotações de conflito e dúvida (resumo)
 
-| ID | Tipo | Descrição | Encaminhamento |
-|---|---|---|---|
-| CONFLITO-01 | Prompt × Specs | O prompt gerador deste kit (regra 24) descreve Viagem com "frequência semanal e regra binária de feriado" — modelo **superado** pela Spec 02 §11 v0.6 (Viagem estratificada por dia + `viagem_feriado` booleano). **As specs prevalecem** (RN-061). | Registrado; nenhum documento deste kit usa o modelo antigo. |
-| CONFLITO-02 | Redação Spec 03 | §3.7.3 lista `matriz_distancias` entre os lugares onde Locais "continuam existindo normalmente"; Locais não têm entrada na matriz (pares são de Seções — RN-054), apenas seus trechos são somados (RN-055). Conflito aparente de redação, sem impacto normativo. | Ver Q-002. |
-| ~~DÚVIDA-01~~ | Spec 03 §10.2 | ~~Partição código-a-código dos mistos rodoviários não fechada.~~ **Resolvida (DEC-026):** Spec 03 v0.5 fechou a partição com os códigos definitivos (`CR`/`CL`, `EX`, `LE`, `ME`/`MEL`, `ML`/`MLL`, `MX`, `MM`/`MML`); `SL` não existe. | Q-001 decidida. |
-| DÚVIDA-02 | Spec 05 §15.3 | Tolerância numérica para "distância/duração com tolerância" não fixada. | Q-004. |
+| ID            | Tipo            | Descrição                                                                                                                                                                                                                                                        | Encaminhamento                                              |
+| ------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| CONFLITO-01   | Prompt × Specs  | O prompt gerador deste kit (regra 24) descreve Viagem com "frequência semanal e regra binária de feriado" — modelo **superado** pela Spec 02 §11 v0.6 (Viagem estratificada por dia + `viagem_feriado` booleano). **As specs prevalecem** (RN-061).              | Registrado; nenhum documento deste kit usa o modelo antigo. |
+| CONFLITO-02   | Redação Spec 03 | §3.7.3 lista `matriz_distancias` entre os lugares onde Locais "continuam existindo normalmente"; Locais não têm entrada na matriz (pares são de Seções — RN-054), apenas seus trechos são somados (RN-055). Conflito aparente de redação, sem impacto normativo. | Ver Q-002.                                                  |
+| ~~DÚVIDA-01~~ | Spec 03 §10.2   | ~~Partição código-a-código dos mistos rodoviários não fechada.~~ **Resolvida (DEC-026):** Spec 03 v0.5 fechou a partição com os códigos definitivos (`CR`/`CL`, `EX`, `LE`, `ME`/`MEL`, `ML`/`MLL`, `MX`, `MM`/`MML`); `SL` não existe.                          | Q-001 decidida.                                             |
+| DÚVIDA-02     | Spec 05 §15.3   | Tolerância numérica para "distância/duração com tolerância" não fixada.                                                                                                                                                                                          | Q-004.                                                      |
