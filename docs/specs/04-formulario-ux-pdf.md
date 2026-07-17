@@ -55,7 +55,7 @@ Este é o caminho **padrão e fortemente guiado para alterações** de operaçã
 - Todas as entidades criadas terão UUIDs novas (Spec 02 §12).
 - Aviso obrigatório antes de prosseguir:
 
-  > "REDIGIR UM AVISO SIMPLES E FACIL DE ENTENDER DIZENDO QUE CRIANDO AUTOS DO ZERO, A COMPARAÇÃO NÃO SERÁ POSSIVEL DE SER FEITA. DIZER QUE A FUNCIONALIDADE DEVE SER USADA CASO SEJA O PRIMEIRO ARQUIVO ROTA CRIADO DA LINHA OU TENHA PERDIDO O ARQUIVO, USE BOM PORTUGUES E ESCREVA BEM ISSO."
+  > "Este documento será criado do zero, sem partir de um JSON anterior. Use este caminho apenas se a linha ainda não tem arquivo ROTA (primeira criação) ou se o arquivo anterior foi perdido. Sem o JSON anterior, não será possível comparar esta versão com a operação atual: o Comparador tratará tudo como novo."
 
 ---
 
