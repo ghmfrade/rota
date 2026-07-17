@@ -4,14 +4,11 @@ import { useState } from "react";
 import type { Local, PontoDeRota, Secao } from "@/shared/contrato";
 import type { Ponto } from "@/shared/geo";
 import { Mapa, type Coordenada, type LinhaMapa, type MarcadorMapa } from "@/shared/mapa";
-import { Botao, Campo, Painel, Select } from "@/shared/ui";
+import { Botao, Campo, Painel } from "@/shared/ui";
 import {
-  contribuirParaSecaoExistente,
   criarSecaoNoPonto,
   MENSAGEM_FORA_DE_SP,
   MENSAGEM_RECUSA_350M_SECAO,
-  nomeExibicaoSecao,
-  pontosOfertadosParaReuso,
   revalidarArrasto,
   type RecursosMunicipio,
   type Sentido,
@@ -23,6 +20,7 @@ import {
   nomeExibicaoLocal,
   revalidarArrastoLocal,
 } from "@/formulario/locais";
+import { ALTURA_MAPA_CLASSE } from "./altura-mapa";
 
 // Mapa ÚNICO da etapa de itinerários (TASK-060; Spec 04 §7 — "num mesmo mapa
 // interativo"), que funde os antigos `EditorSecoes` e `EditorLocais` (cada um
@@ -119,11 +117,6 @@ export function EditorMapaItinerario({
   const [mensagemLocal, definirMensagemLocal] = useState<string | null>(null);
   const [criacaoPendente, definirCriacaoPendente] = useState<CriacaoPendente | null>(null);
   const [nomeNovo, definirNomeNovo] = useState("");
-  const [secaoReusoUuid, definirSecaoReusoUuid] = useState("");
-  const [indicePontoReuso, definirIndicePontoReuso] = useState(0);
-
-  const secaoReuso = secoes.find((s) => s.uuid === secaoReusoUuid);
-  const pontosReuso = secaoReuso ? pontosOfertadosParaReuso(secaoReuso) : [];
 
   const marcadoresSecoes: MarcadorMapa[] = secoes.flatMap((secao) => {
     const entrada = secao.servicos.find((s) => s.servico_uuid === servicoUuid);
@@ -229,31 +222,6 @@ export function EditorMapaItinerario({
     definirNomeNovo("");
   }
 
-  function confirmarReuso() {
-    if (!secaoReuso) return;
-    const ponto = pontosReuso[indicePontoReuso];
-    if (!ponto) return;
-    const resultado = contribuirParaSecaoExistente({
-      secao: secaoReuso,
-      servicoUuid,
-      sentido,
-      bidirecional,
-      ponto,
-      features: recursosMunicipio.features,
-      nomes: recursosMunicipio.nomes,
-    });
-    if (!resultado.ok) {
-      definirMensagemSecao(
-        resultado.motivo === "350m" ? MENSAGEM_RECUSA_350M_SECAO : MENSAGEM_FORA_DE_SP,
-      );
-      return;
-    }
-    aoAtualizarSecao(resultado.secao);
-    definirMensagemSecao(null);
-    definirSecaoReusoUuid("");
-    definirIndicePontoReuso(0);
-  }
-
   function lidarArrastoSecao(secao: Secao, posicao: Coordenada) {
     const resultado = revalidarArrasto({
       secao,
@@ -334,7 +302,7 @@ export function EditorMapaItinerario({
         </p>
       ) : null}
 
-      <div className="h-[60vh] w-full overflow-hidden rounded-painel shadow-sombra-2">
+      <div className={`${ALTURA_MAPA_CLASSE} w-full overflow-hidden rounded-painel shadow-sombra-2`}>
         <Mapa
           marcadores={[
             ...marcadoresSecoes,
@@ -414,48 +382,6 @@ export function EditorMapaItinerario({
           </div>
         </Painel>
       ) : null}
-
-      <Painel>
-        <div data-testid="reuso-secoes" className="flex flex-col gap-4">
-          <Select
-            rotulo="Reutilizar Seção existente"
-            data-testid="select-secao-reuso"
-            value={secaoReusoUuid}
-            onChange={(evento) => {
-              definirSecaoReusoUuid(evento.target.value);
-              definirIndicePontoReuso(0);
-            }}
-          >
-            <option value="">— selecione —</option>
-            {secoes.map((secao) => (
-              <option key={secao.uuid} value={secao.uuid}>
-                {nomeExibicaoSecao(secao)}
-              </option>
-            ))}
-          </Select>
-
-          {secaoReuso && pontosReuso.length > 1 ? (
-            <Select
-              rotulo="Posição"
-              data-testid="select-ponto-reuso"
-              value={indicePontoReuso}
-              onChange={(evento) => definirIndicePontoReuso(Number(evento.target.value))}
-            >
-              {pontosReuso.map((ponto, indice) => (
-                <option key={`${ponto.latitude},${ponto.longitude}`} value={indice}>
-                  Ponto {indice + 1} ({ponto.latitude.toFixed(5)}, {ponto.longitude.toFixed(5)})
-                </option>
-              ))}
-            </Select>
-          ) : null}
-
-          {secaoReuso ? (
-            <Botao variante="secundario" data-testid="confirmar-reuso" onClick={confirmarReuso}>
-              Reutilizar Seção selecionada
-            </Botao>
-          ) : null}
-        </div>
-      </Painel>
 
       <ul data-testid="lista-locais" className="flex flex-col gap-2">
         {locaisDoSentido.map((local) => {

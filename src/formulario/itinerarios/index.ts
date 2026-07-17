@@ -32,3 +32,7 @@ export {
   EditorMapaItinerario,
   type PropsEditorMapaItinerario,
 } from "./editor-mapa-itinerario";
+export {
+  PainelReusoSecao,
+  type PropsPainelReusoSecao,
+} from "./painel-reuso-secao";

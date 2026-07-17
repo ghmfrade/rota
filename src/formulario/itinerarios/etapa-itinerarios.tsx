@@ -17,6 +17,8 @@ import {
 } from "@/formulario/secoes";
 import { nomeExibicaoLocal } from "@/formulario/locais";
 import { EditorMapaItinerario } from "./editor-mapa-itinerario";
+import { PainelReusoSecao } from "./painel-reuso-secao";
+import { ALTURA_MAPA_CLASSE_LG } from "./altura-mapa";
 import { PainelDescricaoItinerario } from "@/formulario/descricao";
 import {
   congelarRotaCarregada,
@@ -579,7 +581,19 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
               aoRemoverPontoDeRota={aoRemoverPontoDeRota}
             />
 
-            <div data-testid="coluna-paradas" className="flex flex-col gap-4">
+            <div
+              data-testid="coluna-paradas"
+              className={`flex min-h-0 flex-col gap-4 ${ALTURA_MAPA_CLASSE_LG}`}
+            >
+              <PainelReusoSecao
+                secoes={secoes}
+                servicoUuid={linhaAtual.servicoUuid}
+                sentido={sentidoSelecionado}
+                bidirecional={bidirecional}
+                recursosMunicipio={recursosMunicipio}
+                aoAtualizarSecao={aoCriarOuAtualizarSecao}
+              />
+
               {bidirecional && !conjuntoConsistente && (
                 <p role="alert" data-testid="aviso-secoes-divergentes" className="text-sm text-erro">
                   Ida e Volta referenciam conjuntos diferentes de Seções (Spec 02 §2). A
@@ -607,62 +621,69 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
                 </ul>
               )}
 
-              <Tabela data-testid="tabela-paradas">
-                <thead>
-                  <tr>
-                    <th scope="col">Parada</th>
-                    <th scope="col">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paradasAtual.map((parada, indice) => {
-                    const rotulo =
-                      parada.tipo === "secao"
-                        ? (() => {
-                            const secao = secoes.find((s) => s.uuid === parada.secaoUuid);
-                            return secao ? nomeExibicaoSecao(secao) : parada.secaoUuid;
-                          })()
-                        : (() => {
-                            const local = linhaAtual.locais.find((l) => l.uuid === parada.localUuid);
-                            return local ? nomeExibicaoLocal(local) : parada.localUuid;
-                          })();
-                    return (
-                      <tr key={`${parada.tipo}-${indice}`} data-testid="parada-item">
-                        <td>
-                          <span data-testid="parada-rotulo">{rotulo}</span>
-                        </td>
-                        <td>
-                          <div className="flex flex-wrap gap-2">
-                            <Botao
-                              variante="secundario"
-                              data-testid="parada-mover-cima"
-                              disabled={indice === 0}
-                              onClick={() => moverParada(indice, indice - 1)}
-                            >
-                              ↑
-                            </Botao>
-                            <Botao
-                              variante="secundario"
-                              data-testid="parada-mover-baixo"
-                              disabled={indice === paradasAtual.length - 1}
-                              onClick={() => moverParada(indice, indice + 1)}
-                            >
-                              ↓
-                            </Botao>
-                            <Botao
-                              variante="secundario"
-                              data-testid="parada-remover"
-                              onClick={() => removerParadaNaTabela(indice)}
-                            >
-                              Remover
-                            </Botao>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </Tabela>
+              {/* Rolagem própria (doc 18 §5) — na coluna larga (`lg:`), o
+                  contêiner ocupa o espaço restante da coluna, que está presa à
+                  altura do mapa (`ALTURA_MAPA_CLASSE_LG`); empilhado (tela
+                  estreita), o teto próprio `max-h-[60vh]` mantém a rolagem
+                  funcional mesmo sem a coluna ter altura fixa. */}
+              <div className="min-h-0 flex-1 overflow-y-auto max-h-[60vh] lg:max-h-none">
+                <Tabela data-testid="tabela-paradas">
+                  <thead>
+                    <tr>
+                      <th scope="col">Parada</th>
+                      <th scope="col">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paradasAtual.map((parada, indice) => {
+                      const rotulo =
+                        parada.tipo === "secao"
+                          ? (() => {
+                              const secao = secoes.find((s) => s.uuid === parada.secaoUuid);
+                              return secao ? nomeExibicaoSecao(secao) : parada.secaoUuid;
+                            })()
+                          : (() => {
+                              const local = linhaAtual.locais.find((l) => l.uuid === parada.localUuid);
+                              return local ? nomeExibicaoLocal(local) : parada.localUuid;
+                            })();
+                      return (
+                        <tr key={`${parada.tipo}-${indice}`} data-testid="parada-item">
+                          <td>
+                            <span data-testid="parada-rotulo">{rotulo}</span>
+                          </td>
+                          <td>
+                            <div className="flex flex-wrap gap-2">
+                              <Botao
+                                variante="secundario"
+                                data-testid="parada-mover-cima"
+                                disabled={indice === 0}
+                                onClick={() => moverParada(indice, indice - 1)}
+                              >
+                                ↑
+                              </Botao>
+                              <Botao
+                                variante="secundario"
+                                data-testid="parada-mover-baixo"
+                                disabled={indice === paradasAtual.length - 1}
+                                onClick={() => moverParada(indice, indice + 1)}
+                              >
+                                ↓
+                              </Botao>
+                              <Botao
+                                variante="secundario"
+                                data-testid="parada-remover"
+                                onClick={() => removerParadaNaTabela(indice)}
+                              >
+                                Remover
+                              </Botao>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </Tabela>
+              </div>
             </div>
           </div>
 
