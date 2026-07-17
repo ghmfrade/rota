@@ -48,11 +48,17 @@ export interface PainelProps extends ComponentPropsWithoutRef<"section"> {
    */
   elevacao?: ElevacaoPainel;
   /**
-   * Superfície de ação inteira (TASK-073): cursor de ponteiro, hover
-   * (`sombra-2`→hover mais forte + leve tom de fundo) e anel de foco via
-   * `focus-within` — o alvo de teclado continua sendo o controle interno
-   * (input/botão), nunca o `Painel` em si (evita `role`/controle duplicado).
-   * Não usa `ring-*` para não colidir com o anel do `tom="destacado"`.
+   * Superfície de ação inteira (TASK-073): cursor de ponteiro, fundo
+   * acinzentado no hover (`cinza-50`) e anel de foco via `focus-within` — o
+   * alvo de teclado continua sendo o controle interno (input/botão), nunca o
+   * `Painel` em si (evita `role`/controle duplicado).
+   *
+   * O hover NÃO mexe na sombra de propósito: a elevação de repouso já é
+   * `sombra-2` (`elevacao="padrao"`) e `sombra-3` é reservada a flutuantes
+   * efêmeros — tooltip, diálogo (doc 18 §2/§5). Elevar o cartão no hover
+   * exigiria mudar essa reserva do design system, o que é decisão de doc 18,
+   * não de componente. Não usa `ring-*` para não colidir com o anel do
+   * `tom="destacado"`.
    */
   interativo?: boolean;
   children?: ReactNode;
@@ -74,7 +80,7 @@ const CLASSES_POR_ELEVACAO: Record<ElevacaoPainel, string> = {
 
 const CLASSES_INTERATIVO =
   "cursor-pointer [transition:all_var(--transicao-rapida)] " +
-  "hover:shadow-sombra-2 hover:bg-cinza-50 " +
+  "hover:bg-cinza-50 " +
   "focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-azul-300";
 
 export function Painel({

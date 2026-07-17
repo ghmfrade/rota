@@ -135,14 +135,33 @@ describe("Painel", () => {
       desmontar();
     });
 
-    it("interativo emite cursor-pointer e hover/foco de superfície de ação", () => {
+    it("interativo emite cursor-pointer, fundo acinzentado no hover e anel de foco", () => {
       const { container, desmontar } = renderizar(
         <Painel interativo>Conteúdo</Painel>,
       );
       const classes = container.querySelector("section")!.className;
       expect(classes).toContain("cursor-pointer");
-      expect(classes).toContain("hover:shadow-sombra-2");
+      // O feedback de hover da task é o "fundo acinzentado" (doc 18 §3).
+      expect(classes).toContain("hover:bg-cinza-50");
       expect(classes).toContain("focus-within:outline");
+      desmontar();
+    });
+
+    // Regressão do achado 1 da revisão da TASK-073: `hover:shadow-sombra-2`
+    // era classe morta — a elevação de repouso do `elevacao="padrao"` JÁ é
+    // `sombra-2`, então a sombra no hover saía idêntica à de repouso, sem
+    // efeito visual nenhum, e o teste antigo (que só checava a presença da
+    // string) dava cobertura falsa. `sombra-3` não entra aqui: é reservada a
+    // flutuantes (doc 18 §2/§5). Se um dia o hover precisar elevar o cartão,
+    // isso muda o doc 18 primeiro — este teste é o lembrete.
+    it("interativo não emite sombra de hover (a de repouso já é sombra-2; sombra-3 é de flutuante)", () => {
+      const { container, desmontar } = renderizar(
+        <Painel interativo>Conteúdo</Painel>,
+      );
+      const classes = container.querySelector("section")!.className;
+      expect(classes).not.toContain("hover:shadow-");
+      // A elevação de repouso segue intacta.
+      expect(classes).toContain("shadow-sombra-2");
       desmontar();
     });
 
