@@ -66,7 +66,7 @@ test.describe("Tela Inicial — carregar JSON existente", () => {
 });
 
 test.describe("Tela Inicial — criar Autos do zero", () => {
-  test("exibe o aviso obrigatório antes de prosseguir (Spec 04 §3.2)", async ({
+  test("exibe o aviso obrigatório antes de prosseguir (Spec 04 §3.2, DEC-065)", async ({
     page,
   }) => {
     await page.goto("/");
@@ -75,15 +75,48 @@ test.describe("Tela Inicial — criar Autos do zero", () => {
     const aviso = page.getByTestId("aviso-criar-zero");
     await expect(aviso).toBeVisible();
     await expect(aviso).toContainText(
-      "não haverá preservação de identidade das entidades",
+      "não será possível comparar esta versão com a operação atual",
     );
 
     await page.getByTestId("confirmar-criar-zero").click();
     await expect(page.getByTestId("mensagem-novo-documento")).toBeVisible();
+  });
+
+  test("clicar em qualquer ponto do cartão (fora do botão) abre o diálogo (TASK-073)", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page
+      .getByTestId("acao-criar-zero")
+      .getByText("Criar Autos do zero")
+      .click();
+
+    await expect(page.getByTestId("aviso-criar-zero")).toBeVisible();
+  });
+
+  test("Cancelar fecha o diálogo sem criar documento", async ({ page }) => {
+    await page.goto("/");
+    await page.getByTestId("acao-criar-zero").getByRole("button").click();
+    await page.getByTestId("aviso-criar-zero").getByText("Cancelar").click();
+
+    await expect(page.getByTestId("aviso-criar-zero")).toHaveCount(0);
+    await expect(page.getByTestId("layout-formulario")).toHaveCount(0);
   });
 });
 
 test("caminho de carregar é destacado como recomendado", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByTestId("acao-carregar")).toContainText("Recomendado");
+});
+
+test("clicar em qualquer ponto do cartão de carregar (fora do input cru) abre o seletor de arquivo (TASK-073)", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const escolhaArquivo = page.waitForEvent("filechooser");
+  await page
+    .getByTestId("acao-carregar")
+    .getByText("Carregar JSON existente")
+    .click();
+  await escolhaArquivo;
 });

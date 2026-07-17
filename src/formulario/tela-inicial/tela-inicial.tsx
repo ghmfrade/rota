@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { carregarListasAutosEmpresas } from "@/shared/dados-estaticos";
 import type { ListasAutosEmpresas } from "@/shared/dados-estaticos";
 import { importarDocumento } from "@/formulario/importacao";
@@ -36,6 +36,15 @@ import {
 // (TASK-006/012); esta tela só chama a função pura e traduz o resultado: sucesso
 // vira `aoCarregar`, erro fica exibido aqui. Leitura de arquivo via File API do
 // navegador — nada sobe para servidor (RN-095/096, NEG-009).
+//
+// TASK-073: os dois cartões viram superfícies de ação inteiras (`Painel
+// interativo`) — o alvo de TECLADO continua sendo o controle interno (o
+// `<input type="file">`, agora `sr-only` mas funcional, no cartão de carregar;
+// o `Botao` no de criar), nunca o `Painel`, para não aninhar controles
+// interativos nem quebrar os E2E que buscam `getByRole("button")` dentro do
+// cartão. O diálogo passa a ocupar uma coluna lateral reservada (fixa em
+// telas largas) para nunca empurrar os cartões ao abrir/fechar; em telas
+// estreitas empilha abaixo deles.
 
 export interface PropsTelaInicial {
   /** Carregamento válido de um JSON existente — UUIDs preservadas (RN-004). */
@@ -60,6 +69,16 @@ type EstadoEntrada =
 
 export function TelaInicial({ aoCarregar, aoCriarDoZero }: PropsTelaInicial) {
   const [entrada, definirEntrada] = useState<EstadoEntrada>({ tipo: "nenhuma" });
+  const refBotaoConfirmar = useRef<HTMLButtonElement>(null);
+  const dialogoAberto = entrada.tipo === "confirmando_zero";
+
+  // Foco gerenciado (doc 18 §5, critério de acessibilidade da task): ao abrir
+  // o diálogo, o foco vai para a confirmação — o caminho mais provável.
+  useEffect(() => {
+    if (dialogoAberto) {
+      refBotaoConfirmar.current?.focus();
+    }
+  }, [dialogoAberto]);
 
   // `carregarListasAutosEmpresas` já é memoizada (import dinâmico do bundle,
   // sem rede — Spec 01 §8): aguardá-la aqui, no momento da escolha do
@@ -94,89 +113,116 @@ export function TelaInicial({ aoCarregar, aoCriarDoZero }: PropsTelaInicial) {
   return (
     <section
       aria-labelledby="tela-inicial-titulo"
-      className="flex w-full max-w-3xl flex-col items-center gap-6"
+      className="grid w-full max-w-4xl grid-cols-1 items-start gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]"
     >
-      <h2 id="tela-inicial-titulo" className="text-lg font-semibold text-cinza-900">
-        Começar
-      </h2>
+      <div className="flex flex-col items-center gap-6">
+        <h2 id="tela-inicial-titulo" className="text-lg font-semibold text-cinza-900">
+          Começar
+        </h2>
 
-      <div className="flex flex-wrap justify-center gap-8">
-        <Painel
-          data-testid="acao-carregar"
-          tom="destacado"
-          className="flex w-full max-w-sm flex-col gap-3"
-        >
-          <div className="flex items-center gap-3">
-            <MolduraCarimbo tom="destaque">
-              <CarimboCarregar className="size-6" />
-            </MolduraCarimbo>
-            <div className="flex flex-wrap items-center gap-2">
-              <strong className="text-base text-cinza-900">
-                Carregar JSON existente
-              </strong>
-              <Selo tom="azul">Recomendado</Selo>
-            </div>
-          </div>
-          <p className="text-sm text-cinza-700">
-            Caminho padrão para alterar uma operação já cadastrada: preserva as
-            UUIDs das entidades existentes.
-          </p>
-          <label className="text-sm text-cinza-700">
-            <input
-              type="file"
-              accept=".json,application/json"
-              data-testid="input-arquivo-json"
-              onChange={aoEscolherArquivo}
-            />
-          </label>
-        </Painel>
+        <div className="flex flex-wrap justify-center gap-8">
+          <Painel
+            data-testid="acao-carregar"
+            tom="destacado"
+            interativo
+            className="flex w-full max-w-sm flex-col gap-3"
+          >
+            {/* O `<label>` envolve o cartão inteiro: clicar em qualquer ponto
+                dele abre o seletor de arquivo nativamente (associação
+                label→control do HTML), sem handler de clique em JS. */}
+            <label className="contents cursor-pointer">
+              <div className="flex items-center gap-3">
+                <MolduraCarimbo tom="destaque">
+                  <CarimboCarregar className="size-6" />
+                </MolduraCarimbo>
+                <div className="flex flex-wrap items-center gap-2">
+                  <strong className="text-base text-cinza-900">
+                    Carregar JSON existente
+                  </strong>
+                  <Selo tom="azul">Recomendado</Selo>
+                </div>
+              </div>
+              <p className="text-sm text-cinza-700">
+                Caminho padrão para alterar uma operação já cadastrada: preserva
+                as UUIDs das entidades existentes.
+              </p>
+              <input
+                type="file"
+                accept=".json,application/json"
+                data-testid="input-arquivo-json"
+                onChange={aoEscolherArquivo}
+                className="sr-only"
+              />
+            </label>
+          </Painel>
 
-        <Painel
-          data-testid="acao-criar-zero"
-          className="flex w-full max-w-sm flex-col gap-3"
-        >
-          <div className="flex items-center gap-3">
-            <MolduraCarimbo tom="repouso">
-              <CarimboCriar className="size-6" />
-            </MolduraCarimbo>
-            <strong className="text-base text-cinza-900">Criar Autos do zero</strong>
-          </div>
-          <p className="text-sm text-cinza-700">
-            Para Autos que ainda não têm JSON no formato ROTA (implantação). O
-            Autos em si já existe nas listas estáticas — esta ação só inicia o
-            documento.
-          </p>
-          <Botao
-            variante="secundario"
-            className="self-start"
+          <Painel
+            data-testid="acao-criar-zero"
+            interativo
+            className="flex w-full max-w-sm flex-col gap-3"
             onClick={() => definirEntrada({ tipo: "confirmando_zero" })}
           >
-            Criar do zero
-          </Botao>
-        </Painel>
+            <div className="flex items-center gap-3">
+              <MolduraCarimbo tom="repouso">
+                <CarimboCriar className="size-6" />
+              </MolduraCarimbo>
+              <strong className="text-base text-cinza-900">Criar Autos do zero</strong>
+            </div>
+            <p className="text-sm text-cinza-700">
+              Para Autos que ainda não têm JSON no formato ROTA (implantação). O
+              Autos em si já existe nas listas estáticas — esta ação só inicia o
+              documento.
+            </p>
+            <Botao
+              variante="secundario"
+              className="self-start"
+              onClick={(evento) => {
+                evento.stopPropagation();
+                definirEntrada({ tipo: "confirmando_zero" });
+              }}
+            >
+              Criar do zero
+            </Botao>
+          </Painel>
+        </div>
+
+        {entrada.tipo === "erro_listas" && (
+          <p role="alert" data-testid="mensagem-erro-listas" className="text-sm text-erro">
+            Não foi possível carregar as listas estáticas de Autos/empresas:{" "}
+            {entrada.mensagem}
+          </p>
+        )}
+
+        {entrada.tipo === "erro_carregar" && (
+          <p role="alert" data-testid="mensagem-erro-carregar" className="text-sm text-erro">
+            {entrada.resultado.erro.mensagem}
+          </p>
+        )}
       </div>
 
-      {entrada.tipo === "erro_listas" && (
-        <p role="alert" data-testid="mensagem-erro-listas" className="text-sm text-erro">
-          Não foi possível carregar as listas estáticas de Autos/empresas:{" "}
-          {entrada.mensagem}
-        </p>
-      )}
-
-      {entrada.tipo === "confirmando_zero" && (
+      {dialogoAberto && (
         <Painel
           role="alertdialog"
+          aria-describedby="aviso-criar-zero-texto"
           data-testid="aviso-criar-zero"
           elevacao="flutuante"
-          className="w-full max-w-lg"
+          className="w-full"
+          onKeyDown={(evento) => {
+            if (evento.key === "Escape") {
+              definirEntrada({ tipo: "nenhuma" });
+            }
+          }}
         >
-          <p className="text-sm text-cinza-700">
-            Este documento não parte de um JSON anterior. Sem ele, não haverá
-            preservação de identidade das entidades para comparação entre
-            versões (o Comparador tratará tudo como novo).
+          <p id="aviso-criar-zero-texto" className="text-sm text-cinza-700">
+            Este documento será criado do zero, sem partir de um JSON anterior.
+            Use este caminho apenas se a linha ainda não tem arquivo ROTA
+            (primeira criação) ou se o arquivo anterior foi perdido. Sem o JSON
+            anterior, não será possível comparar esta versão com a operação
+            atual: o Comparador tratará tudo como novo.
           </p>
           <div className="mt-3 flex gap-2">
             <Botao
+              ref={refBotaoConfirmar}
               variante="primario"
               data-testid="confirmar-criar-zero"
               onClick={aoCriarDoZero}
@@ -191,12 +237,6 @@ export function TelaInicial({ aoCarregar, aoCriarDoZero }: PropsTelaInicial) {
             </Botao>
           </div>
         </Painel>
-      )}
-
-      {entrada.tipo === "erro_carregar" && (
-        <p role="alert" data-testid="mensagem-erro-carregar" className="text-sm text-erro">
-          {entrada.resultado.erro.mensagem}
-        </p>
       )}
     </section>
   );

@@ -118,9 +118,43 @@ describe("Painel", () => {
           Conteúdo
         </Painel>,
       );
-      const classes = container.querySelector("details")!.className;
-      expect(classes).toContain("border-azul-300");
-      expect(classes).not.toContain("border-cinza-200");
+      const detalhes = container.querySelector("details")!.className;
+      expect(detalhes).toContain("border-azul-300");
+      expect(detalhes).not.toContain("border-cinza-200");
+      desmontar();
+    });
+  });
+
+  // TASK-073: superfície de ação inteira (cartões da tela inicial).
+  describe("prop interativo (doc 18 §3, TASK-073)", () => {
+    it("por padrão não emite classes de hover/foco de superfície de ação", () => {
+      const { container, desmontar } = renderizar(<Painel>Conteúdo</Painel>);
+      const classes = container.querySelector("section")!.className;
+      expect(classes).not.toContain("cursor-pointer");
+      expect(classes).not.toContain("focus-within:outline");
+      desmontar();
+    });
+
+    it("interativo emite cursor-pointer e hover/foco de superfície de ação", () => {
+      const { container, desmontar } = renderizar(
+        <Painel interativo>Conteúdo</Painel>,
+      );
+      const classes = container.querySelector("section")!.className;
+      expect(classes).toContain("cursor-pointer");
+      expect(classes).toContain("hover:shadow-sombra-2");
+      expect(classes).toContain("focus-within:outline");
+      desmontar();
+    });
+
+    it("interativo com tom destacado preserva o anel azul-600 (não sobrepõe a variante de tom)", () => {
+      const { container, desmontar } = renderizar(
+        <Painel interativo tom="destacado">
+          Carregar
+        </Painel>,
+      );
+      const classes = container.querySelector("section")!.className;
+      expect(classes).toContain("ring-azul-600");
+      expect(classes).toContain("cursor-pointer");
       desmontar();
     });
   });

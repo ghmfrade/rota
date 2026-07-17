@@ -47,6 +47,14 @@ export interface PainelProps extends ComponentPropsWithoutRef<"section"> {
    * diálogos/tooltips (doc 18 §2); `plana` não emite sombra (painel aninhado).
    */
   elevacao?: ElevacaoPainel;
+  /**
+   * Superfície de ação inteira (TASK-073): cursor de ponteiro, hover
+   * (`sombra-2`→hover mais forte + leve tom de fundo) e anel de foco via
+   * `focus-within` — o alvo de teclado continua sendo o controle interno
+   * (input/botão), nunca o `Painel` em si (evita `role`/controle duplicado).
+   * Não usa `ring-*` para não colidir com o anel do `tom="destacado"`.
+   */
+  interativo?: boolean;
   children?: ReactNode;
 }
 
@@ -64,6 +72,11 @@ const CLASSES_POR_ELEVACAO: Record<ElevacaoPainel, string> = {
   plana: "",
 };
 
+const CLASSES_INTERATIVO =
+  "cursor-pointer [transition:all_var(--transicao-rapida)] " +
+  "hover:shadow-sombra-2 hover:bg-cinza-50 " +
+  "focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-azul-300";
+
 export function Painel({
   titulo,
   colapsavel = false,
@@ -71,6 +84,7 @@ export function Painel({
   defaultOpen,
   tom = "padrao",
   elevacao = "padrao",
+  interativo = false,
   className,
   children,
   ...props
@@ -79,6 +93,7 @@ export function Painel({
     CLASSES_BASE,
     CLASSES_POR_TOM[tom],
     CLASSES_POR_ELEVACAO[elevacao],
+    interativo ? CLASSES_INTERATIVO : "",
     className,
   ]
     .filter(Boolean)

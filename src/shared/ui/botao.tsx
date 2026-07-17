@@ -4,13 +4,15 @@
 // puro de apresentação — nenhuma lógica de negócio, nenhum import fora de
 // `shared/`. Variantes visuais via prop `variante`; todo o resto (type,
 // handlers, data-testid, aria-*) é repassado das props nativas de `<button>`
-// sem ser sobrescrito.
+// sem ser sobrescrito — inclusive `ref` (React 19 aceita `ref` como prop
+// normal em componente de função), usado pelo foco gerenciado do diálogo da
+// tela inicial (TASK-073).
 
-import type { ButtonHTMLAttributes, ComponentPropsWithoutRef } from "react";
+import type { ButtonHTMLAttributes, ComponentProps } from "react";
 
 export type VarianteBotao = "primario" | "secundario" | "perigo" | "fantasma";
 
-export interface BotaoProps extends ComponentPropsWithoutRef<"button"> {
+export interface BotaoProps extends ComponentProps<"button"> {
   variante?: VarianteBotao;
 }
 
