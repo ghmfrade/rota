@@ -26,7 +26,7 @@ export {
   type EstadosRotaViva,
   type ResultadoDispararRecalculo,
 } from "./estado-itinerarios";
-export { promoverServico } from "./promocao-servico";
+export { promoverServico, promoverServicoNaSessao } from "./promocao-servico";
 export { EtapaItinerarios } from "./etapa-itinerarios";
 export {
   EditorMapaItinerario,
