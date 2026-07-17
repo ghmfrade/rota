@@ -2486,15 +2486,17 @@ A TASK-061 (DEC-053) introduziu a promoção `ServicoEmConstrucao → Servico` a
 
 ---
 
-## TASK-081 — Alerta "tabela de feriados vazia" na Revisão (RN-071)
+## TASK-081 — Alerta "tabela de feriados vazia" na Revisão, agregado num único item (RN-071)
 
 ## Objetivo
 
-A tela de Revisão passa a exibir o alerta não bloqueante "tabela de feriados vazia" (Spec 04 §11) para cada Serviço/sentido cuja grade de feriados (`viagem_feriado: true`) não tem nenhuma Viagem — hoje `coletarPendencias` não emite esse alerta, embora a checagem "grade vazia é válida" (RN-071) já esteja implementada no nível de dados desde a TASK-030.
+A tela de Revisão passa a exibir **um único** alerta não bloqueante "tabela de feriados vazia" (Spec 04 §11) quando **algum** Serviço não tem nenhuma Viagem de feriado (`viagem_feriado: true`) — o alerta **lista os Serviços afetados pelo `numero_n`, separados por vírgula** (ex.: "Serviços 0000-1CR, 0000-2CR sem grade de feriados"). Hoje `coletarPendencias` não emite esse alerta, embora a checagem "grade vazia é válida" (RN-071) já esteja implementada no nível de dados desde a TASK-030.
 
 ## Contexto
 
 Achado da revisão de aderência da TASK-032 (`docs-dev/14-REVISOES/TASK-032-20260717.md`): a Spec 04 §11 lista "tabela de feriados vazia (nenhuma Viagem de feriado — pode ser intencional)" entre os alertas da Revisão, mas nem a TASK-030 nem a TASK-032 o implementaram — a revisão da TASK-030 (`docs-dev/14-REVISOES/TASK-030-20260715.md:42-43`) já havia atribuído esse item à "TASK-031/032", e a TASK-032 não o cobriu (`coletarPendencias`, `src/formulario/pendencias/pendencias.ts`, só emite hoje: documento criado do zero, rota ausente, descrição ausente, matriz desatualizada). RN-071 (grade vazia é válida, tratada como alerta) já está provada no nível da montagem de blocos (`viagens-montagem-grade.test.ts`) — falta só o alerta na camada de pendências/Revisão.
+
+**Granularidade agregada (decisão do responsável, 2026-07-17):** como muitas linhas legitimamente não operam em feriado, um alerta por Serviço/sentido produziria ruído (dezenas de itens repetindo o óbvio). O alerta é, portanto, **um só item**, que **enumera os Serviços afetados** pelo `numero_n` numa lista separada por vírgula — sinaliza sem poluir, e o texto singular da spec ("tabela de feriados vazia") casa com um alerta único. Um Serviço entra na lista quando **nenhum** dos seus itinerários tem Viagem de feriado (o serviço inteiro não roda em feriado); a assimetria por sentido — Ida com feriado, Volta sem — é rara e fica como detalhe a fechar na `/analisar-task` (candidato: só entra na lista o Serviço **sem nenhuma** Viagem de feriado em sentido algum, para manter o alerta como "esta linha não opera em feriado").
 
 ## Fora de escopo
 
@@ -2522,16 +2524,17 @@ Achado da revisão de aderência da TASK-032 (`docs-dev/14-REVISOES/TASK-032-202
 
 ## Critérios de aceite
 
-- [ ] `coletarPendencias` emite um alerta por Serviço/sentido cuja grade de feriados não tem nenhuma Viagem, com mensagem alinhada à Spec 04 §11 e `etapaAlvo` apontando para a etapa de horários (mesmo padrão dos demais alertas sem entidade única de origem — DEC-033, se aplicável).
-- [ ] Serviço/sentido com ao menos 1 Viagem de feriado não gera o alerta.
+- [ ] `coletarPendencias` emite **no máximo um** alerta "tabela de feriados vazia" para todo o documento (nunca um por Serviço), presente somente quando ao menos um Serviço não tem nenhuma Viagem de feriado.
+- [ ] A mensagem do alerta **lista os Serviços afetados pelo `numero_n`, separados por vírgula** (ex.: "Serviços 0000-1CR, 0000-2CR sem grade de feriados — confirme se é intencional"), na ordem em que aparecem no documento, com `etapaAlvo` apontando para a etapa de horários (mesmo padrão dos demais alertas sem entidade única de origem — DEC-033, se aplicável).
+- [ ] Se **todos** os Serviços têm ao menos 1 Viagem de feriado, nenhum alerta é emitido.
 - [ ] O alerta é **não bloqueante**: não aparece em `pendenciasBloqueantes` do gate de exportação (`avaliarGateExportacao`) e não impede exportar.
 - [ ] Nenhum `data-testid`/`aria-*` existente alterado; testes e E2E existentes seguem verdes.
 
 ## Casos válidos
 
-- Serviço com grade de feriados vazia: alerta emitido, exportação permanece liberada (sem outros bloqueantes).
-- Serviço com grade de feriados com 1+ Viagens: nenhum alerta.
-- Dois Serviços, um com grade vazia e outro não: só o primeiro gera alerta.
+- Um Serviço (0000-1CR) sem Viagem de feriado, dois com: um único alerta, mensagem "Serviços 0000-1CR sem grade de feriados…", exportação permanece liberada (sem outros bloqueantes).
+- Três Serviços sem Viagem de feriado: **um** alerta só, listando os três `numero_n` por vírgula na ordem do documento.
+- Todos os Serviços com grade de feriados preenchida: nenhum alerta.
 
 ## Casos inválidos
 
@@ -2539,9 +2542,9 @@ Achado da revisão de aderência da TASK-032 (`docs-dev/14-REVISOES/TASK-032-202
 
 ## Testes esperados
 
-- Unitários: `coletarPendencias` — grade de feriados vazia → 1 alerta; grade com Viagem → nenhum; alerta não entra em `pendenciasBloqueantes`.
+- Unitários: `coletarPendencias` — nenhum Serviço com feriado → 1 alerta listando todos os `numero_n` por vírgula; parte dos Serviços sem feriado → 1 alerta só com os afetados, na ordem do documento; todos com feriado → nenhum alerta; o alerta não entra em `pendenciasBloqueantes`.
 - Integração: N/A.
-- E2E: opcional, reaproveitando `revisao-exportacao.spec.ts` se a fixture carregada permitir cobrir os dois casos sem criar fixture nova.
+- E2E: opcional, reaproveitando `revisao-exportacao.spec.ts` se a fixture carregada permitir cobrir os casos sem criar fixture nova.
 - Snapshot/contrato JSON: N/A.
 - PDF: N/A.
 
@@ -2561,7 +2564,7 @@ Achado da revisão de aderência da TASK-032 (`docs-dev/14-REVISOES/TASK-032-202
 
 ## Perguntas em aberto
 
-- Nenhuma.
+- Nenhuma que bloqueie. Detalhe de design a fechar na `/analisar-task` (não é regra de negócio nova — a agregação num único alerta já está decidida): tratamento da assimetria por sentido (Serviço que roda feriado num sentido e não no outro). Candidato: só entra na lista o Serviço **sem nenhuma** Viagem de feriado em sentido algum, mantendo o alerta como "esta linha não opera em feriado".
 
 ---
 
