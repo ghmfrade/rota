@@ -153,6 +153,30 @@ describe("solicitarRota — pontos de rota (Spec 03 §3.6; RN-042/051)", () => {
   });
 });
 
+describe("solicitarRota — apos_parada_ordem inválido não propaga rejeição não tratada (TASK-066; RN-048)", () => {
+  test("[inválido] apos_parada_ordem == paradas.length → { ok:false, ponto-de-rota-invalido }, sem lançar nem chamar fetch", async () => {
+    const fetchFn = respostaFetchMock(ENVELOPE_OK);
+    const pontoInvalido: PontoDeRota = { apos_parada_ordem: 2, latitude: 0, longitude: 0 };
+
+    const resultado = await solicitarRota([PARADA_A, PARADA_B], {
+      fetchFn,
+      pontosDeRota: [pontoInvalido],
+    });
+
+    expect(resultado).toEqual({ ok: false, falha: { tipo: "ponto-de-rota-invalido" } });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  test("[inválido] apos_parada_ordem == 0 → mesma falha bloqueante, sem exceção", async () => {
+    const fetchFn = respostaFetchMock(ENVELOPE_OK);
+    const pontoInvalido: PontoDeRota = { apos_parada_ordem: 0, latitude: 0, longitude: 0 };
+
+    await expect(
+      solicitarRota([PARADA_A, PARADA_B], { fetchFn, pontosDeRota: [pontoInvalido] }),
+    ).resolves.toEqual({ ok: false, falha: { tipo: "ponto-de-rota-invalido" } });
+  });
+});
+
 describe("solicitarRota — erros semânticos sem retry (Spec 03 §3.5)", () => {
   test("[inválido] NoRoute → { ok:false, sem-rota }, SEM retry (fetch 1×)", async () => {
     const fetchFn = respostaFetchMock({ code: "NoRoute", routes: [] });

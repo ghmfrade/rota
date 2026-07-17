@@ -51,7 +51,17 @@ export async function solicitarRota(
     timeoutMs = OSRM_TIMEOUT_PADRAO_MS,
     pontosDeRota = [],
   } = opcoes;
-  const { indicesParadas } = intercalarPontosDeRota(paradas, pontosDeRota);
+  // `apos_parada_ordem` fora de [1, paradas.length-1] (Spec 02 §10.4) é
+  // alcançável por gesto de UI (RN-042) — hoje `intercalarPontosDeRota` lança;
+  // sem este `catch`, a rejeição atravessa `dispararRecalculo` sem tratamento
+  // (TASK-066, DEC-056). Vira falha bloqueante bem-comportada (RN-048), nunca
+  // exceção não tratada.
+  let indicesParadas: readonly number[];
+  try {
+    indicesParadas = intercalarPontosDeRota(paradas, pontosDeRota).indicesParadas;
+  } catch {
+    return { ok: false, falha: { tipo: "ponto-de-rota-invalido" } };
+  }
   const url = montarUrlOsrm(paradas, baseUrl, pontosDeRota);
 
   // Falha de rede/timeout é re-tentada 1×; a segunda falha vira `indisponivel`.

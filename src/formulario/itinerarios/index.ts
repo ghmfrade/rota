@@ -5,6 +5,7 @@
 export {
   paradaDeSecao,
   paradaDeLocal,
+  chaveParadaEmEdicao,
   inserirParada,
   removerParada,
   reordenarParada,

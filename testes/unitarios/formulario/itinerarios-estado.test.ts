@@ -1,13 +1,15 @@
 import { describe, expect, test, vi } from "vitest";
 import {
   chaveItinerario,
+  chaveParadaEmEdicao,
   dispararRecalculo,
   itinerariosAoVivoDaSessao,
   pontosDeRotaDoItinerario,
 } from "@/formulario/itinerarios";
 import { paradaDeSecao } from "@/formulario/itinerarios";
+import { reancorarPontosDeRota } from "@/formulario/roteamento";
 import { esquemaRota, type DescricaoItinerario } from "@/shared/contrato";
-import type { Secao } from "@/shared/contrato";
+import type { PontoDeRota, Secao } from "@/shared/contrato";
 import type { SessaoFormulario } from "@/formulario/sessao";
 import { documentoExemploMinimo } from "../../fixtures";
 
@@ -36,6 +38,17 @@ const SECAO_B: Secao = {
     {
       servico_uuid: "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
       geolocalizacao_ida: { latitude: -23.963, longitude: -46.391 },
+    },
+  ],
+};
+const SECAO_C: Secao = {
+  uuid: "33333333-3333-4333-8333-333333333333",
+  municipio: "Praia Grande",
+  nome: "Terminal C",
+  servicos: [
+    {
+      servico_uuid: "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+      geolocalizacao_ida: { latitude: -24.0, longitude: -46.4 },
     },
   ],
 };
@@ -160,6 +173,95 @@ describe("dispararRecalculo — injeta o comporDescricao REAL (DEC-046), OSRM mo
     expect(resultado.ok).toBe(false);
     if (resultado.ok) throw new Error("esperava violação");
     expect(resultado.violacoes.length).toBeGreaterThan(0);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+});
+
+describe("TASK-066 — re-ancoragem antes de reaplicar (DEC-056/DEC-060), composição real da etapa", () => {
+  // Reproduz a composição de `aplicarNovasParadas` (etapa-itinerarios.tsx):
+  // re-ancorar os pontos de rota persistidos ANTES de repassá-los a
+  // `dispararRecalculo` — sem isso, remover uma parada faz
+  // `intercalarPontosDeRota` lançar dentro de `solicitarRota`, virando
+  // rejeição não tratada (o bug que esta task fecha).
+  const envelopeDoisTrechos = {
+    code: "Ok",
+    routes: [
+      {
+        geometry: { type: "LineString", coordinates: [[-46.33, -23.96], [-46.4, -24.0]] },
+        legs: [
+          { distance: 1000, duration: 60, steps: [{ name: "Rua Treta" }] },
+        ],
+      },
+    ],
+  };
+
+  test("remover a parada do meio (B): pontos dos dois trechos sobrevivem, fundidos, sem rejeição não tratada", async () => {
+    const paradasAntes = [paradaDeSecao(SECAO_A.uuid), paradaDeSecao(SECAO_B.uuid), paradaDeSecao(SECAO_C.uuid)];
+    const paradasDepois = [paradaDeSecao(SECAO_A.uuid), paradaDeSecao(SECAO_C.uuid)];
+    const pontosCrus: PontoDeRota[] = [
+      { apos_parada_ordem: 1, latitude: -23.97, longitude: -46.34 }, // A→B
+      { apos_parada_ordem: 2, latitude: -23.99, longitude: -46.38 }, // B→C
+    ];
+
+    const pontosReancorados = reancorarPontosDeRota(
+      paradasAntes.map(chaveParadaEmEdicao),
+      paradasDepois.map(chaveParadaEmEdicao),
+      pontosCrus,
+    );
+    // Fundidos no único trecho A→C (apos_parada_ordem=1), sequência preservada.
+    expect(pontosReancorados).toEqual([
+      { ...pontosCrus[0], apos_parada_ordem: 1 },
+      { ...pontosCrus[1], apos_parada_ordem: 1 },
+    ]);
+
+    const fetchFn = vi.fn().mockResolvedValue({
+      json: () => Promise.resolve(envelopeDoisTrechos),
+    }) as unknown as typeof fetch;
+
+    const resultado = await dispararRecalculo(
+      paradasDepois,
+      [SECAO_A, SECAO_C],
+      [],
+      SERVICO_UUID,
+      "ida",
+      pontosReancorados,
+      { fetchFn },
+    );
+
+    expect(resultado.ok).toBe(true);
+    if (!resultado.ok) throw new Error("esperava ok");
+    expect(resultado.estado.situacao).toBe("recalculada");
+    if (resultado.estado.situacao !== "recalculada") throw new Error("esperava recalculada");
+    // `pontos_de_rota` resultante válido por esquemaRota (Spec 02 §14) em todos
+    // os caminhos — inclusive depois de fundir os pontos dos dois trechos.
+    expect(esquemaRota.safeParse(resultado.estado.rota).success).toBe(true);
+    expect(resultado.estado.rota.pontos_de_rota).toEqual(pontosReancorados);
+  });
+
+  test("[inválido] reaplicar os pontos CRUS (sem re-ancorar) após remover a parada do meio não lança — vira sem-rota (RN-048)", async () => {
+    const paradasDepois = [paradaDeSecao(SECAO_A.uuid), paradaDeSecao(SECAO_C.uuid)];
+    const pontosCrus: PontoDeRota[] = [
+      { apos_parada_ordem: 1, latitude: -23.97, longitude: -46.34 },
+      { apos_parada_ordem: 2, latitude: -23.99, longitude: -46.38 }, // fora de [1, 1] após a remoção
+    ];
+    const fetchFn = vi.fn();
+
+    const resultado = await dispararRecalculo(
+      paradasDepois,
+      [SECAO_A, SECAO_C],
+      [],
+      SERVICO_UUID,
+      "ida",
+      pontosCrus,
+      { fetchFn: fetchFn as unknown as typeof fetch },
+    );
+
+    expect(resultado.ok).toBe(true);
+    if (!resultado.ok) throw new Error("esperava ok (sem-rota é um ESTADO, não uma rejeição)");
+    expect(resultado.estado).toEqual({
+      situacao: "sem-rota",
+      falha: { tipo: "ponto-de-rota-invalido" },
+    });
     expect(fetchFn).not.toHaveBeenCalled();
   });
 });

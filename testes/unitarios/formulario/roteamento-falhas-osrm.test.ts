@@ -12,6 +12,7 @@ const TODAS_AS_FALHAS: FalhaOsrm[] = [
   { tipo: "sem-segmento" },
   { tipo: "sem-segmento", indiceCoordenada: 2 },
   { tipo: "codigo-inesperado", code: "InvalidQuery" },
+  { tipo: "ponto-de-rota-invalido" },
 ];
 
 describe("mensagemDeFalha — textos por tipo (Spec 04 §14)", () => {
@@ -43,6 +44,12 @@ describe("mensagemDeFalha — textos por tipo (Spec 04 §14)", () => {
   test("codigo-inesperado → mensagem genérica com o código retornado (§3.5 linha 4)", () => {
     expect(mensagemDeFalha({ tipo: "codigo-inesperado", code: "InvalidQuery" })).toContain(
       "InvalidQuery",
+    );
+  });
+
+  test("ponto-de-rota-invalido → mensagem adotada (TASK-066; RN-048)", () => {
+    expect(mensagemDeFalha({ tipo: "ponto-de-rota-invalido" })).toBe(
+      "Não foi possível calcular a rota deste itinerário. Revise as paradas e os pontos de rota e tente novamente.",
     );
   });
 });

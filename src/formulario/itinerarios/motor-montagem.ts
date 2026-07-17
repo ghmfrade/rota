@@ -32,6 +32,14 @@ export function paradaDeLocal(localUuid: string): ParadaEmEdicao {
   return { tipo: "local", localUuid };
 }
 
+/** Chave de identidade estável de uma `ParadaEmEdicao` (TASK-066) — insumo da
+ * re-ancoragem de pontos de rota (`reancorarPontosDeRota`, `formulario/
+ * roteamento`), que compara paradas antes/depois por identidade, não por
+ * posição, para classificar o gesto (acrescentar/inserir/remover/reordenar). */
+export function chaveParadaEmEdicao(parada: ParadaEmEdicao): string {
+  return parada.tipo === "secao" ? `secao:${parada.secaoUuid}` : `local:${parada.localUuid}`;
+}
+
 /** Insere uma parada na posição `indice` (default: ao final — Spec 04 §7.3
  * item 2, "insere em ordem"). Não muta `paradas`. */
 export function inserirParada(

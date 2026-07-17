@@ -25,6 +25,7 @@ import {
   inserirPontoDeRota,
   mensagemDeFalha,
   moverPontoDeRota,
+  reancorarPontosDeRota,
   removerPontoDeRota,
 } from "@/formulario/roteamento";
 import { Botao, Painel, Select, Tabela } from "@/shared/ui";
@@ -47,6 +48,7 @@ import {
 } from "./estado-itinerarios";
 import { promoverServicoNaSessao } from "./promocao-servico";
 import {
+  chaveParadaEmEdicao,
   conjuntoSecoesConsistente,
   inserirParada,
   paradaDeLocal,
@@ -308,9 +310,11 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
       locaisParaResolver?: Local[];
       aoComitarBase?: (base: SessaoFormulario) => SessaoFormulario;
       /** Pontos de rota a reaplicar neste recálculo (Spec 03 §3.6.2). Default:
-       * os do último estado conhecido — a maioria dos gestos (Seção/Local/
-       * reordenar) não toca pontos de rota; só os handlers de ponto de rota
-       * (TASK-063) passam a lista já atualizada. */
+       * os do último estado conhecido, RE-ANCORADOS para `novasParadas`
+       * (TASK-066; DEC-056/DEC-060) — a maioria dos gestos (Seção/Local/
+       * reordenar) muda o CONJUNTO ou a ORDEM das paradas sem tocar pontos de
+       * rota diretamente; só os handlers de ponto de rota (TASK-063) passam a
+       * lista já atualizada (paradas inalteradas — a re-ancoragem vira no-op). */
       pontosDeRota?: readonly PontoDeRota[];
     } = {},
   ) {
@@ -319,8 +323,17 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     // Pontos de rota a reaplicar neste gesto (Spec 03 §3.6.2) — comitados no
     // MESMO commit síncrono das paradas (TASK-071; DEC-058), para que
     // sobrevivam caso o recálculo abaixo falhe (RN-048: sem-rota não pode
-    // apagar o traçado forçado da sessão).
-    const pontosParaReaplicar = opcoes.pontosDeRota ?? pontosDeRotaAtual;
+    // apagar o traçado forçado da sessão). Re-ancorados ANTES do commit
+    // (TASK-066): reaplicar `apos_parada_ordem` cru contra a lista de paradas
+    // que acabou de mudar é o bug que gerava rejeição não tratada (remoção) ou
+    // reancoragem silenciosa ao par errado (inserção/reordenação).
+    const pontosParaReaplicar =
+      opcoes.pontosDeRota ??
+      reancorarPontosDeRota(
+        paradasAtual.map(chaveParadaEmEdicao),
+        novasParadas.map(chaveParadaEmEdicao),
+        pontosDeRotaAtual,
+      );
 
     const base = opcoes.aoComitarBase ? opcoes.aoComitarBase(sessao) : sessao;
     const paradasMapa = { ...(base.paradasEmEdicao ?? {}), [chave]: novasParadas };

@@ -26,12 +26,18 @@ import type { ResultadoRotaOsrm } from "./extrair-rota";
  *   genérica — TASK-023).
  * - `codigo-inesperado` — qualquer outro `code != "Ok"` (§3.5 linha 4); carrega
  *   o `code` para a mensagem genérica.
+ * - `ponto-de-rota-invalido` — `apos_parada_ordem` de algum ponto de rota fora
+ *   de `[1, paradas.length-1]` (Spec 02 §10.4/RN-042) após a re-ancoragem
+ *   (TASK-066, DEC-056): antes tratado como rejeição não tratada
+ *   (`intercalar-pontos-de-rota.ts` lançava sem `catch`); vira falha
+ *   bloqueante bem-comportada, sem apagar a última rota válida (RN-048).
  */
 export type FalhaOsrm =
   | { tipo: "indisponivel" }
   | { tipo: "sem-rota" }
   | { tipo: "sem-segmento"; indiceCoordenada?: number }
-  | { tipo: "codigo-inesperado"; code: string };
+  | { tipo: "codigo-inesperado"; code: string }
+  | { tipo: "ponto-de-rota-invalido" };
 
 /**
  * Resultado de `solicitarRota`: ou a `rota` extraída com sucesso, ou uma
@@ -65,5 +71,7 @@ export function mensagemDeFalha(falha: FalhaOsrm): string {
         : "Uma das paradas não pôde ser associada a uma via. Arraste o ponto para mais perto de uma rua.";
     case "codigo-inesperado":
       return `Não foi possível calcular a rota: o serviço de roteamento retornou uma condição inesperada ("${falha.code}"). Revise o itinerário e tente novamente.`;
+    case "ponto-de-rota-invalido":
+      return "Não foi possível calcular a rota deste itinerário. Revise as paradas e os pontos de rota e tente novamente.";
   }
 }
