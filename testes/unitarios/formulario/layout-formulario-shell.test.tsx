@@ -5,6 +5,7 @@ import { LayoutFormulario } from "@/formulario/layout/layout-formulario";
 import { ETAPAS } from "@/formulario/layout/etapas";
 import type { SessaoFormulario } from "@/formulario/sessao";
 import { renderizar, act } from "../shared-ui/_ajuda-render";
+import { documentoExemploMinimo } from "../../fixtures";
 
 // TASK-051 — casca full-screen do Formulário (Spec 04 §4; doc 18 §5). Cobre só
 // a parte estrutural do shell (sidebar de carimbos + troca de etapa + selo de
@@ -73,6 +74,45 @@ describe("LayoutFormulario — cabeçalho no modo novo", () => {
     expect(
       container.querySelector('[data-testid="cabecalho-codigo"]')?.textContent,
     ).toContain("a definir");
+
+    desmontar();
+  });
+});
+
+describe("LayoutFormulario — motivo estrutural do bloqueio visível na Revisão (TASK-085; RN-078)", () => {
+  it("[inválido] Seção órfã bloqueia a exportação E aparece em Erros bloqueantes (regressão: antes mostrava 'Nenhum erro bloqueante')", () => {
+    const documento = documentoExemploMinimo();
+    documento.autos.secoes.push({
+      uuid: "9f9f9f9f-1111-4111-8111-999999999999",
+      municipio: "Guarujá",
+      nome: "Terminal Extra",
+      servicos: [
+        {
+          servico_uuid: documento.autos.servicos[0].uuid,
+          geolocalizacao_ida: { latitude: -23.99, longitude: -46.25 },
+          geolocalizacao_volta: { latitude: -23.99, longitude: -46.25 },
+        },
+      ],
+    });
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+    const { container, desmontar } = renderizar(
+      <LayoutFormulario sessao={sessao} aoAtualizarSessao={vi.fn()} />,
+    );
+
+    const botaoRevisao = container.querySelector(
+      '[data-testid="etapa-botao"][data-etapa="revisao"]',
+    ) as HTMLButtonElement;
+    act(() => {
+      botaoRevisao.click();
+    });
+
+    expect(container.querySelector('[data-testid="revisao-bloqueantes-vazio"]')).toBeNull();
+    const itensBloqueantes = container.querySelectorAll(
+      '[data-testid="revisao-item-bloqueante"]',
+    );
+    expect(itensBloqueantes.length).toBeGreaterThan(0);
+    const textos = Array.from(itensBloqueantes).map((item) => item.textContent);
+    expect(textos.some((texto) => texto?.includes("Guarujá - Terminal Extra"))).toBe(true);
 
     desmontar();
   });

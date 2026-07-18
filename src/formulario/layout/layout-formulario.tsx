@@ -9,7 +9,7 @@ import { EtapaItinerarios, itinerariosAoVivoDaSessao } from "@/formulario/itiner
 import { EtapaMatrizes } from "@/formulario/matrizes";
 import { EtapaViagens } from "@/formulario/viagens";
 import { TelaRevisao } from "@/formulario/revisao";
-import { TelaExportacao } from "@/formulario/exportacao";
+import { TelaExportacao, avaliarGateExportacao } from "@/formulario/exportacao";
 import { Painel, Selo, Tooltip, Carimbo } from "@/shared/ui";
 import { ETAPAS, rotuloEtapa, type IdEtapa } from "./etapas";
 import { CARIMBO_DA_ETAPA } from "./carimbo-de-etapa";
@@ -88,7 +88,15 @@ export function LayoutFormulario({
   // não só o que a etapa "Seções, Locais e Itinerários" tem em foco — assim a
   // pendência bloqueante de rota/descrição aparece mesmo antes de o usuário
   // revisitar aquele Serviço/sentido nesta sessão.
-  const pendencias = coletarPendencias(sessao, itinerariosAoVivoDaSessao(sessao));
+  //
+  // Mesclada com os motivos ESTRUTURAIS do gate de exportação (TASK-085; Spec
+  // 02 §14 via `avaliarGateExportacao`) — antes descartados, deixavam o
+  // bloqueio mudo na Revisão/painel de pendências. A casca consome o mesmo
+  // `avaliarGateExportacao` que a etapa Exportação usa para os botões (fonte
+  // única de verdade — não recomputa violações por conta própria).
+  const itinerariosAoVivo = itinerariosAoVivoDaSessao(sessao);
+  const gate = avaliarGateExportacao(sessao, itinerariosAoVivo);
+  const pendencias = [...coletarPendencias(sessao, itinerariosAoVivo), ...gate.errosEstruturais];
   const cabecalho = dadosCabecalho(sessao);
 
   return (

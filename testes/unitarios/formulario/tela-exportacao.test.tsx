@@ -166,4 +166,19 @@ describe("TelaExportacao — gate bloqueado (Spec 04 §14)", () => {
 
     desmontar();
   });
+
+  it("[inválido] bloqueio por violação estrutural (TASK-085; RN-078/§14) lista o motivo concreto, não só a mensagem genérica", () => {
+    const documento = documentoExemploMinimo();
+    documento.autos.servicos[0].itinerarios[0].viagens = [];
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    const { container, desmontar } = renderizar(<TelaExportacao sessao={sessao} />);
+
+    const motivos = container.querySelector('[data-testid="exportacao-motivos-bloqueio"]');
+    expect(motivos).not.toBeNull();
+    expect(motivos!.textContent).toContain("0000-1CR");
+    expect(motivos!.textContent).not.toMatch(/\[RN-\d+\]/);
+
+    desmontar();
+  });
 });

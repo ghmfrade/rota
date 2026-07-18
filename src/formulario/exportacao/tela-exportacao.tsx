@@ -103,6 +103,13 @@ export function TelaExportacao({
       {!gate.liberado && (
         <Painel tom="informativo" data-testid="exportacao-mensagem-gate">
           <p>{MENSAGEM_GATE}</p>
+          {[...gate.pendenciasBloqueantes, ...gate.errosEstruturais].length > 0 && (
+            <ul className="mt-2 list-disc space-y-1 pl-5" data-testid="exportacao-motivos-bloqueio">
+              {[...gate.pendenciasBloqueantes, ...gate.errosEstruturais].map((motivo) => (
+                <li key={motivo.id}>{motivo.mensagem}</li>
+              ))}
+            </ul>
+          )}
         </Painel>
       )}
 

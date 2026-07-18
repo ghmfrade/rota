@@ -22,6 +22,7 @@ describe("avaliarGateExportacao — caminho liberado", () => {
 
     expect(resultado.liberado).toBe(true);
     expect(resultado.pendenciasBloqueantes).toHaveLength(0);
+    expect(resultado.errosEstruturais).toHaveLength(0);
     expect(resultado.documentoIncompleto).toBe(false);
   });
 
@@ -92,5 +93,86 @@ describe("avaliarGateExportacao — casos bloqueantes (RN-078)", () => {
     const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
 
     expect(avaliarGateExportacao(sessao, []).liberado).toBe(true);
+  });
+});
+
+describe("avaliarGateExportacao — motivos estruturais visíveis (TASK-085; RN-078)", () => {
+  test("Seção órfã (RN-018): motivo aparece com Cidade/Nome e Serviço, sem uuid/RN cru, apontando para a etapa de itinerários", () => {
+    const documento = documentoExemploMinimo();
+    documento.autos.secoes.push({
+      uuid: "9f9f9f9f-1111-4111-8111-999999999999",
+      municipio: "Guarujá",
+      nome: "Terminal Extra",
+      servicos: [
+        {
+          servico_uuid: documento.autos.servicos[0].uuid,
+          geolocalizacao_ida: { latitude: -23.99, longitude: -46.25 },
+          geolocalizacao_volta: { latitude: -23.99, longitude: -46.25 },
+        },
+      ],
+    });
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    const resultado = avaliarGateExportacao(sessao, []);
+
+    expect(resultado.liberado).toBe(false);
+    expect(resultado.errosEstruturais.length).toBeGreaterThan(0);
+    const motivo = resultado.errosEstruturais.find((e) =>
+      e.mensagem.includes("Guarujá - Terminal Extra"),
+    );
+    expect(motivo).toBeDefined();
+    expect(motivo!.mensagem).toContain("0000-1CR");
+    expect(motivo!.mensagem).not.toMatch(/\[RN-\d+\]/);
+    expect(motivo!.mensagem).not.toContain("uuid");
+    expect(motivo!.mensagem).not.toContain("Spec 02");
+    expect(motivo!.etapaAlvo).toBe("secoes-locais-itinerarios");
+  });
+
+  test("itinerário sem viagem (RN-039): mensagem operacional cita Serviço e sentido, aponta para Viagens e horários", () => {
+    const documento = documentoExemploMinimo();
+    documento.autos.servicos[0].itinerarios[0].viagens = [];
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    const resultado = avaliarGateExportacao(sessao, []);
+
+    const motivo = resultado.errosEstruturais.find((e) => e.mensagem.includes("nenhuma viagem"));
+    expect(motivo).toBeDefined();
+    expect(motivo!.mensagem).toContain("0000-1CR");
+    expect(motivo!.mensagem).toContain("Ida");
+    expect(motivo!.mensagem).not.toMatch(/\[RN-\d+\]/);
+    expect(motivo!.etapaAlvo).toBe("viagens-horarios");
+  });
+
+  test("paradas insuficientes (RN-034): mensagem operacional cita o Serviço, sem jargão técnico", () => {
+    const documento = documentoExemploMinimo();
+    documento.autos.servicos[0].itinerarios[0].paradas =
+      documento.autos.servicos[0].itinerarios[0].paradas.slice(0, 1);
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    const resultado = avaliarGateExportacao(sessao, []);
+
+    const motivo = resultado.errosEstruturais.find((e) => e.mensagem.includes("0000-1CR"));
+    expect(motivo).toBeDefined();
+    expect(motivo!.mensagem).not.toMatch(/\[RN-\d+\]/);
+    expect(motivo!.mensagem).not.toContain("Spec 02");
+  });
+
+  test("violação sem tradução dedicada (uuid de Viagem duplicada, RN-005) cai no fallback operacional — cita o Serviço e a etapa, nunca uuid/RN", () => {
+    const documento = documentoExemploMinimo();
+    const viagens = documento.autos.servicos[0].itinerarios[0].viagens;
+    viagens[1].uuid = viagens[0].uuid;
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    const resultado = avaliarGateExportacao(sessao, []);
+
+    expect(resultado.errosEstruturais.length).toBeGreaterThan(0);
+    for (const erro of resultado.errosEstruturais) {
+      expect(erro.mensagem).not.toMatch(/\[RN-\d+\]/);
+      expect(erro.mensagem).not.toContain("uuid");
+      expect(erro.mensagem).not.toContain("Spec 02");
+    }
+    const motivo = resultado.errosEstruturais.find((e) => e.mensagem.includes("0000-1CR"));
+    expect(motivo).toBeDefined();
+    expect(motivo!.mensagem).toMatch(/Revise a etapa/);
   });
 });
