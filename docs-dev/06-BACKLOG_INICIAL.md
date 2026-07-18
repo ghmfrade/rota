@@ -2657,6 +2657,348 @@ Achado da revisão de aderência da TASK-032 (`docs-dev/14-REVISOES/TASK-032-202
 
 ---
 
+## TASK-083 — Ponto de rota órfão na remoção de parada de extremo é descartado, com aviso (DEC-068)
+
+## Objetivo
+
+Fechar o subcaso que a TASK-066 deixou como ressalva (`docs-dev/14-REVISOES/TASK-066-20260717.md`): ao remover a **primeira** ou a **última** parada de um itinerário, o trecho terminal deixa de existir e os pontos de rota daquele trecho ficam **órfãos**. `reancorarPontosDeRota` passa a **descartá-los** (em vez de produzir `apos_parada_ordem` fora de `[1, paradas.length − 1]`, que hoje cai na rede da RN-048 e vira `sem-rota`), com **aviso não bloqueante** na etapa — conforme a **DEC-068**.
+
+## Contexto
+
+Ressalva da revisão de aderência da TASK-066: na remoção de extremo, `reancorar-pontos-de-rota.ts` produz `apos_parada_ordem = 0` (removida a primeira parada) ou `= length` (removida a última), fora do intervalo da RN-042. Hoje isso é **contido** — `intercalarPontosDeRota` lança, `solicitarRota` captura e o itinerário vira `sem-rota` —, seguro mas inexplicável: o usuário removeu uma parada terminal e a rota "some" por causa de pontos órfãos que ele não vê. A DEC-068 (Q-048, decidida pelo responsável) fixou: o ponto órfão **não faz mais sentido** (o trecho que ele forçava sumiu) e deve ser **descartado**, com aviso. Remoção do meio continua fundindo (sem descarte); reordenação continua sem descarte (DEC-060).
+
+## Fora de escopo
+
+- Os demais casos de `reancorarPontosDeRota` (acrescentar ao fim, inserir no meio, remover do meio, reordenar) — já entregues pela TASK-066/DEC-056/DEC-060, **inalterados**.
+- A rede de segurança da RN-048 (`catch` em `cliente-osrm.ts`) — **permanece** como defesa em profundidade contra JSON importado já corrompido; esta task não a remove, só deixa de depender dela no gesto normal de remoção.
+- A limpeza de `secao.servicos[]` na remoção de parada (Seção) — é a TASK-084; independente desta.
+- Qualquer mudança de contrato JSON (a re-ancoragem só altera o valor calculado antes da requisição OSRM).
+
+## Specs fonte
+
+- Spec 03 §3.6/§3.6.1/§3.6.2 (pontos de rota, ancoragem, reedição fiel)
+- Spec 02 §10.4 (`apos_parada_ordem` ∈ `[1, paradas.length − 1]`)
+
+## Regras envolvidas
+
+- RN-042 (ancoragem/intervalo — agora garantido **pela própria função**, não só pela rede)
+- RN-048 (falha bloqueante — mantida como defesa em profundidade)
+- RN-041 (`trechos == paradas − 1`, preservado)
+- DEC-068 (a decisão que libera esta task)
+
+## Entidades afetadas
+
+- ponto de rota, Parada, Rota (reindexação; nenhum modelo muda)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+
+## Critérios de aceite
+
+- [ ] Remover a **última** parada de um itinerário com ponto de rota no trecho terminal → o ponto é **descartado** (não vira `sem-rota`); a rota recalcula com as paradas restantes; aviso não bloqueante exibido.
+- [ ] Remover a **primeira** parada → idem para os pontos do trecho inicial.
+- [ ] Remover uma parada do **meio** → comportamento inalterado (funde os dois trechos, nenhum descarte) — regressão-guarda da TASK-066.
+- [ ] `reancorarPontosDeRota` **nunca** devolve `apos_parada_ordem` fora de `[1, paradas.length − 1]` em nenhum caminho (a pós-condição do docstring passa a valer pela função; corrige o overclaim apontado na revisão da TASK-066).
+- [ ] O aviso é **não bloqueante** (nunca pendência de §11 — lista fechada; mesmo padrão da DEC-047/DEC-056).
+
+## Casos válidos
+
+- 3 paradas A,B,C com ponto no trecho B→C (`apos_parada_ordem: 2`); remover C → o ponto é descartado, rota A→B recalcula, aviso exibido.
+- Mesma base, ponto no trecho A→B (`apos_parada_ordem: 1`); remover A → ponto descartado, rota B→C recalcula.
+
+## Casos inválidos
+
+- JSON importado com `apos_parada_ordem` já fora do intervalo (arquivo corrompido) → a rede da RN-048 continua produzindo `sem-rota` (defesa em profundidade preservada — não é o caminho do gesto de remoção).
+
+## Testes esperados
+
+- Unitários: `reancorarPontosDeRota` — remoção de extremo (primeiro/último) descarta os órfãos e mantém o resto; remoção do meio inalterada; pós-condição de intervalo em **todos** os caminhos (fechar a lacuna de cobertura da TASK-066).
+- Integração: remover parada de extremo na tabela lateral com ponto no trecho terminal recalcula (OSRM mockado) sem `sem-rota`, e sinaliza o descarte.
+- E2E: opcional.
+- Snapshot/contrato JSON: `pontos_de_rota` resultante válido por `esquemaRota`/§14 em todos os caminhos.
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/roteamento/reancorar-pontos-de-rota.ts` (filtrar órfãos na remoção; corrigir docstring da pós-condição)
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (aviso não bloqueante quando houver descarte)
+- `testes/unitarios/formulario/roteamento-reancorar-pontos-de-rota.test.ts` e `itinerarios-estado.test.ts` (casos novos)
+
+## Dependências
+
+- **DEC-068** (decidida — task liberada).
+- **TASK-066** (entregue) — esta task modifica `reancorarPontosDeRota` que a 066 criou.
+
+## Riscos
+
+- Confundir "remoção de extremo" com "remoção do meio": a condição correta é filtrar todo ponto cujo `apos_parada_ordem` re-ancorado caia fora de `[1, len − 1]` — isso descarta exatamente os órfãos do trecho terminal e preserva os demais, sem detectar extremo explicitamente.
+
+## Perguntas em aberto
+
+- Nenhuma (Q-048 decidida pela DEC-068).
+
+---
+
+## TASK-084 — Remover uma parada (Seção) de um itinerário limpa `secao.servicos[]` e descarta a Seção órfã
+
+## Objetivo
+
+Corrigir um **bug vivo**: ao remover uma parada de Seção de um itinerário pela tabela lateral, a entrada correspondente em `secao.servicos[]` **não é removida**. A Seção continua aparecendo no mapa e nas opções de "reutilizar Seção existente", e — pior — o documento fica **estruturalmente inválido** (RN-018: "o Serviço referenciado não tem nenhuma Parada apontando para esta Seção", `validacoes-estruturais.ts:115-124`), bloqueando a exportação sem que o usuário consiga desfazer, a não ser removendo o Serviço inteiro. A remoção de parada passa a limpar a contribuição do Serviço à Seção e, se a Seção ficar sem nenhum Serviço, a descartá-la (cascata — o análogo por-parada do que a TASK-080 já faz por-Serviço).
+
+## Contexto
+
+Reportado pelo responsável (2026-07-17): "após excluir uma seção de um serviço, essa seção continua aparecendo no mapa, além de continuar existindo nas opções de reutilizar seção existente, mesmo que nenhum outro serviço utilize ela… o JSON fica bloqueado". Diagnóstico: `servicosComItinerarioAtualizado` (`etapa-itinerarios.tsx:275-293`) reescreve `paradas` e `rota` do itinerário no write-back, mas **nunca toca `secao.servicos[]`**. Uma Seção deixa de ser referenciada por qualquer parada do Serviço, mas mantém sua contribuição de geolocalização em `secao.servicos[]` — o que (a) a mantém no mapa/reuso (derivados de `secao.servicos[]`) e (b) dispara a violação RN-018 de `validarSecoesDoAutos`. A "cascata de Seção órfã" já existe para remoção de **Serviço inteiro** (`removerServicoDeLista`, `src/formulario/servicos/remover.ts`), keyed por `servico_uuid`; falta o análogo **por-parada**: quando um Serviço deixa de referenciar uma Seção em **todos** os seus itinerários (Ida e Volta), remover a contribuição desse Serviço; Seção sem nenhuma contribuição é descartada de `autos.secoes`/`secoesEmConstrucao`.
+
+## Fora de escopo
+
+- Remoção de **Serviço inteiro** — já é a TASK-080/`removerServicoDeLista` (reusar a mesma noção de órfã, não reimplementar).
+- O espelhamento Ida↔Volta na remoção de Seção de Serviço bidirecional (RN-030/DEC-063) — é a **TASK-077**; esta task coordena com ela (a limpeza opera sobre "nenhum itinerário do Serviço referencia a Seção", correta com ou sem o espelho), mas não implementa o gesto espelhado.
+- Tornar o bloqueio de exportação **visível** ao usuário — é a TASK-085 (complementar; sem ela, o sintoma fica diagnosticável mas a causa desta task já some).
+- Qualquer mudança de contrato JSON.
+
+## Specs fonte
+
+- Spec 02 §5.1/§10.1/§14 (Seção, `secao.servicos[]`, integridade referencial de parada)
+- Spec 04 §6/§7.1/§7.3 (remoção de parada pela tabela lateral; reuso de Seção)
+
+## Regras envolvidas
+
+- RN-018 (Seção exige ≥ 1 Serviço referenciando-a por parada; cascata de órfã)
+- RN-036 (integridade referencial parada↔Seção)
+- RN-026 (contribuição de geolocalização por Serviço/sentido)
+- RN-004 (UUIDs preservadas — a Seção que **permanece** referenciada mantém `uuid` e entradas)
+- RN-030 (Ida e Volta referenciam o mesmo conjunto de Seções — a limpeza considera ambos os sentidos do Serviço)
+
+## Entidades afetadas
+
+- Seção (`secao.servicos[]`, cascata de órfã), Parada, Serviço
+
+## Ferramentas afetadas
+
+- [x] Formulário
+
+## Critérios de aceite
+
+- [ ] Remover a parada de uma Seção do itinerário de um Serviço, quando **nenhum** outro itinerário desse Serviço a referencia, remove a entrada desse Serviço de `secao.servicos[]`.
+- [ ] Uma Seção que fique **sem nenhuma** entrada em `secao.servicos[]` é descartada de `autos.secoes` (modo carregado) / `secoesEmConstrucao` (modo novo) — cascata análoga à `removerServicoDeLista`.
+- [ ] Após a remoção, a Seção descartada **não aparece** mais no mapa nem nas opções de "reutilizar Seção existente".
+- [ ] Após a remoção, o documento **não** apresenta a violação RN-018 de `validarSecoesDoAutos` para aquela Seção (deixa de bloquear a exportação por esse motivo).
+- [ ] Uma Seção ainda referenciada por **outro** Serviço (ou pelo outro sentido do mesmo Serviço) **não** é removida — a cascata opera só sobre Seção efetivamente órfã (RN-030/RN-004).
+- [ ] UUIDs das Seções que permanecem são preservadas (round-trip) — RN-004.
+
+## Casos válidos
+
+- Serviço unidirecional A→B→C; remover B → a Seção B perde a contribuição desse Serviço; como nenhum outro Serviço a usa, B sai de `autos.secoes`; mapa e reuso deixam de listá-la; exportação deixa de bloquear por RN-018.
+- Seção compartilhada por dois Serviços; remover a parada dela em um Serviço → a contribuição **daquele** Serviço sai de `secao.servicos[]`, a Seção permanece (o outro Serviço ainda a referencia), UUID intacta.
+
+## Casos inválidos
+
+- Remover uma parada de Seção **sem** limpar `secao.servicos[]` (comportamento atual) → RN-018 em `coletarViolacoesEstruturais` — é a regressão que esta task fecha; teste-guarda garante que a violação some.
+
+## Testes esperados
+
+- Unitários: a função pura de limpeza (por-parada, análoga a `removerServicoDeLista`) — remove a contribuição só quando nenhum itinerário do Serviço referencia a Seção; descarta Seção órfã; preserva Seção ainda usada; não muta a entrada; round-trip de UUID (RN-004).
+- Integração: remover parada na tabela lateral → o documento resultante passa em `coletarViolacoesEstruturais` (sem RN-018) e a Seção some do mapa/reuso; OSRM mockado.
+- E2E: opcional — remover Seção e confirmar que a exportação libera (coordenar com a TASK-085 se a visibilidade do gate for exercitada).
+- Snapshot/contrato JSON: documento resultante válido por `esquemaDocumentoOperacao` + `validacoes-estruturais`.
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/secoes/remover.ts` (novo) ou `src/formulario/servicos/remover.ts` (função pura de limpeza por-parada, reaproveitando a noção de órfã)
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (`servicosComItinerarioAtualizado`/write-back da remoção aplica a limpeza no mesmo commit)
+- Testes correspondentes em `testes/unitarios/formulario/`
+
+## Dependências
+
+- **TASK-019** (entregue) — write-back de itinerário que esta task estende.
+- **TASK-080** (entregue) — fornece a cascata por-Serviço (`removerServicoDeLista`) como referência/reuso.
+- Coordenar com **TASK-077** (espelho Ida↔Volta) — a limpeza deve continuar correta quando a remoção de Seção reflete nos dois sentidos.
+
+## Riscos
+
+- Descartar uma Seção ainda referenciada por outro sentido do **mesmo** Serviço (Ida vs. Volta) ou por outro Serviço — a condição de órfã deve olhar **todos** os itinerários de **todos** os Serviços (a base já existente em `removerServicoDeLista` opera sobre `secao.servicos[]`, que reflete isso).
+- Interação com RN-030: num Serviço bidirecional, remover a Seção de só um sentido deixaria Ida/Volta com conjuntos diferentes (RN-030) — por isso a coordenação com a TASK-077; decidir na `/analisar-task` se esta task exige o espelho da 077 como pré-requisito ou trata o unidirecional primeiro.
+
+## Perguntas em aberto
+
+- Nenhuma (bug de integridade; comportamento-alvo determinado pela RN-018 e pelo precedente `removerServicoDeLista`). A ordenação frente à TASK-077 é decisão de sequenciamento, não de domínio.
+
+---
+
+## TASK-085 — Erros que bloqueiam a exportação ficam visíveis ao usuário (bloqueio sem aviso)
+
+## Objetivo
+
+Corrigir um **bug de feedback**: quando a exportação é bloqueada por uma **violação estrutural** (Spec 02 §14 — ex.: a Seção órfã da TASK-084) ou pelos alertas técnicos elevados a bloqueante (TASK-082/DEC-067), os botões de exportação ficam desabilitados **sem que o usuário veja o quê corrigir**. `avaliarGateExportacao` calcula `errosEstruturais` e os usa para `liberado: false`, mas **não os devolve**; a tela de Revisão lista só as pendências de `coletarPendencias`, e o botão desabilitado impede o clique que mostraria `exportacao-erros`. O gate passa a **expor** os motivos estruturais/técnicos do bloqueio, e a Revisão/Exportação passa a **exibi-los** em linguagem operacional (Spec 04 §14).
+
+## Contexto
+
+Reportado pelo responsável (2026-07-17): "o bloqueio do JSON vem sem nenhum aviso do que tem de errado… precisa de algum tipo de aviso do que está errado para o usuário conseguir corrigir". Diagnóstico: em `src/formulario/exportacao/gate-exportacao.ts`, `avaliarGateExportacao` retorna `{ liberado, pendenciasBloqueantes, documentoIncompleto }` — `pendenciasBloqueantes` vem só de `coletarPendencias` (rota/descrição/matriz ausentes), enquanto `errosEstruturais` (de `validarParaExportacao`/`coletarViolacoesEstruturais`) entra no cálculo de `liberado` e é **descartado**. Resultado: uma violação estrutural (como a Seção órfã) desabilita os botões enquanto a lista "Erros bloqueantes" da `tela-revisao.tsx` mostra "Nenhum erro bloqueante", e a `tela-exportacao.tsx` mostra só a mensagem genérica "Existem pendências bloqueantes. Resolva os itens listados" — sem itens listados. As mensagens de `ViolacaoEstrutural.mensagem` já existem e já citam a RN + explicação; falta **transportá-las** ao gate e à UI. Nota de sequenciamento: sem esta task, o bloqueio novo da **TASK-082** (350 m/tipificação) também nasceria invisível — por isso esta task idealmente precede ou acompanha a 082.
+
+## Fora de escopo
+
+- Introduzir ou mudar **quais** validações bloqueiam (isso é a TASK-082 para técnicas e a TASK-084 para a Seção órfã) — esta task só torna **visível** o que já bloqueia.
+- Reescrever a taxonomia de `Pendencia` — reaproveitar a estrutura existente (mensagem + `etapaAlvo`/`severidade`) para acomodar os motivos estruturais.
+- A mensagem literal de falha de rota/OSRM (§14) — já entregue (TASK-022/047).
+- Qualquer mudança de contrato JSON.
+
+## Specs fonte
+
+- Spec 04 §11 (Revisão: duas listas — bloqueantes e alertas; item navegável), §12/§14 ("botões desabilitados + painel de pendências em foco"; mensagens operacionais)
+- Spec 02 §14 (violações estruturais — a fonte das mensagens a exibir)
+
+## Regras envolvidas
+
+- RN-078 (exportação bloqueada com pendências — e o usuário precisa saber quais)
+- RN-076 (nomenclatura/rótulos operacionais nas mensagens; `Cidade - Nome` onde couber)
+- Spec 04 §14 (tom operacional, sem tecniquês cru do RN)
+
+## Entidades afetadas
+
+- Nenhuma do modelo — camada de apresentação/gate (Pendências, Revisão, Exportação)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+
+## Critérios de aceite
+
+- [ ] `avaliarGateExportacao` passa a **devolver** os motivos estruturais do bloqueio (não só usá-los para `liberado`), numa forma consumível pela UI (lista de pendências/mensagens com `etapaAlvo`).
+- [ ] Com uma violação estrutural presente (ex.: Seção órfã — RN-018), a tela de **Revisão** lista o motivo em "Erros bloqueantes" (deixa de mostrar "Nenhum erro bloqueante" com o botão desabilitado), navegável para a etapa/entidade de origem (§11).
+- [ ] A tela de **Exportação** deixa de exibir a mensagem genérica sem itens: mostra os motivos concretos do bloqueio (ou remete claramente ao painel de pendências em foco — §14).
+- [ ] As mensagens seguem o tom da Spec 04 §14 (adaptar a redação técnica de `ViolacaoEstrutural.mensagem` para linguagem operacional; não expor "[RN-018] …" cru).
+- [ ] Documento sem bloqueios: comportamento inalterado (regressão-guarda; nenhum item novo aparece).
+- [ ] `data-testid`/`aria-*` existentes preservados; E2E verdes.
+
+## Casos válidos
+
+- Documento com uma Seção órfã (RN-018): Revisão mostra 1 erro bloqueante com mensagem operacional apontando a Seção e a etapa; corrigida a causa, o item some e o gate libera.
+- Documento limpo: "Nenhum erro bloqueante", botões habilitados — como hoje.
+
+## Casos inválidos
+
+- Bloqueio ativo (estrutural/técnico) com "Erros bloqueantes: 0" na Revisão e botão desabilitado (comportamento atual) → é a regressão que esta task fecha; teste-guarda garante que o motivo aparece.
+
+## Testes esperados
+
+- Unitários: `avaliarGateExportacao` devolve os motivos estruturais quando `liberado === false` por violação estrutural; vazio quando liberado.
+- Unitários/componente: `tela-revisao.tsx` renderiza os motivos estruturais na lista de bloqueantes; `tela-exportacao.tsx` exibe os motivos em vez da mensagem genérica sozinha.
+- E2E: opcional — documento com Seção órfã (ou fixture com violação estrutural) mostra o motivo na Revisão e o botão desabilitado com explicação.
+- Snapshot/contrato JSON: N/A (não toca contrato).
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/exportacao/gate-exportacao.ts` (expor os motivos estruturais no `ResultadoGateExportacao`)
+- `src/formulario/pendencias/pendencias.ts` (adaptar `ViolacaoEstrutural` → `Pendencia` operacional, ou estrutura equivalente)
+- `src/formulario/revisao/tela-revisao.tsx` e `src/formulario/exportacao/tela-exportacao.tsx` (exibir os motivos)
+- Testes correspondentes
+
+## Dependências
+
+- **TASK-032** (entregue) — fornece o gate e as telas de Revisão/Exportação.
+- Relaciona-se com **TASK-082** (bloqueio técnico) e **TASK-084** (Seção órfã): esta task torna **visíveis** os bloqueios que ambas produzem. Recomendável **antes** ou junto da 082/084 para que os bloqueios não nasçam mudos.
+
+## Riscos
+
+- Expor a redação técnica crua (`[RN-018] …`) sem adaptação viola o tom da Spec 04 §14 — decidir na `/analisar-task` o mapeamento `ViolacaoEstrutural.mensagem` → texto operacional, reaproveitando o padrão já usado nas pendências existentes.
+- Duplicar a fonte de verdade do gate: a UI deve consumir o que `avaliarGateExportacao` devolve, não recomputar violações por conta própria (evitar divergência entre botão e lista).
+
+## Perguntas em aberto
+
+- Nenhuma (bug de feedback; o formato das duas listas já é fixado pela Spec 04 §11 e o tom pela §14).
+
+---
+
+## TASK-086 — Diagnóstico técnico de DEV para os erros estruturais do gate de exportação (complemento da TASK-085)
+
+## Objetivo
+
+Devolver aos DEVs a trilha técnica que a TASK-085 traduziu para linguagem operacional: cada erro estrutural do gate passa a carregar um `diagnostico` técnico (RN + caminho JSON + mensagem crua do schema), **invisível ao usuário**, exposto (A) num atributo `data-diagnostico` no item da lista de bloqueio e (B) num `console.debug` só fora de produção. Facilita localizar a origem do bloqueio e reproduzir qual entrada o gerou, sem reexpor tecniquês na tela (Spec 04 §14).
+
+## Contexto
+
+Na TASK-085, `coletarErrosEstruturais` (`src/formulario/exportacao/gate-exportacao.ts`) traduz cada `issue` do `esquemaDocumentoOperacao.safeParse` para uma `Pendencia` com `mensagem` operacional — mas **descarta** o `issue.message` cru (com `[RN-xxx]`) e o `issue.path`. Consequência levantada pelo responsável (2026-07-17): quando um bloqueio cai no fallback genérico ("Há um problema nos dados de … Revise a etapa …"), o DEV não sabe **qual** checagem falhou nem **qual entrada** disparou. O `id` da pendência já preserva o caminho parcialmente (`estrutural-0-autos-secoes-1-servicos-0`, `gate-exportacao.ts:239`), mas sem RN nem a descrição da checagem; e o antigo `ErroExportacao.detalhe` técnico (`exportar-documento.ts:87`) tornou-se inalcançável na prática, porque o botão de exportar agora nasce desabilitado no bloqueio (não há clique que produza o `detalhe`). Esta task recompõe a trilha de diagnóstico **por fora** da mensagem do usuário. Não é regra de negócio — é ferramenta de DEV; por isso não altera spec nem contrato.
+
+## Fora de escopo
+
+- Mudar **quais** documentos bloqueiam ou **como** a mensagem operacional é redigida (isso é a TASK-085, entregue) — o `mensagem` do usuário fica **intocado**, incluindo os testes-guarda que garantem que ele não vaza `[RN-xxx]`/`uuid`.
+- Renderizar o diagnóstico técnico como **texto visível** na tela de Revisão ou Exportação (o `data-diagnostico` é atributo, não conteúdo; nada aparece para o usuário).
+- Painel de DEV dedicado, feature-flag de UI, ou `NODE_ENV`-gated visual (alternativa D descartada — só A+B).
+- Qualquer mudança de contrato JSON, de `ViolacaoEstrutural`/`esquemaDocumentoOperacao`, ou da taxonomia base de `Pendencia` além de **acrescentar um campo opcional** (`diagnostico?: string`) que os demais produtores de pendência simplesmente não preenchem.
+- Estender o diagnóstico às pendências vivas (`coletarPendencias` — rota/descrição/matriz): esta task cobre só os erros estruturais do gate (origem do sintoma relatado).
+
+## Specs fonte
+
+- Spec 04 §14 (tom operacional na mensagem ao usuário — o diagnóstico técnico **não** pode reintroduzir tecniquês na superfície visível)
+- Spec 04 §11 (as duas listas de Revisão — estrutura preservada; só ganha um atributo invisível)
+
+## Regras envolvidas
+
+- RN-078 (exportação bloqueada com pendências — o gate cujo diagnóstico esta task expõe)
+- RN-076 / Spec 04 §14 (a mensagem visível segue linguagem operacional; o diagnóstico técnico vive fora dela, sem violar o tom)
+
+## Entidades afetadas
+
+- Nenhuma do modelo de domínio — camada de apresentação/gate (`Pendencia` ganha campo opcional; itens de lista de bloqueio)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+
+## Critérios de aceite
+
+- [ ] `coletarErrosEstruturais` preenche, em cada erro estrutural, um `diagnostico` técnico com RN (quando houver), caminho JSON (`issue.path.join(".")`) e a mensagem crua do schema — sem alterar o campo `mensagem` operacional.
+- [ ] O campo `diagnostico` é **opcional** em `Pendencia` (`diagnostico?: string`); pendências que não o preenchem continuam válidas e inalteradas (regressão-guarda: `coletarPendencias` intocado).
+- [ ] Na lista de "Erros bloqueantes" (Revisão) e na lista de motivos da Exportação, cada item com `diagnostico` renderiza um atributo `data-diagnostico` com esse texto; itens sem `diagnostico` não recebem o atributo.
+- [ ] Quando há erro estrutural e o ambiente **não é produção** (`process.env.NODE_ENV !== "production"`), um `console.debug` emite os diagnósticos; em produção, nenhum log é emitido.
+- [ ] Nada do diagnóstico técnico aparece como **texto visível** na tela (o usuário continua vendo só a `mensagem` operacional — testes-guarda da TASK-085 permanecem verdes).
+- [ ] `data-testid`/`aria-*` existentes preservados; E2E verdes.
+
+## Casos válidos
+
+- Documento com Seção órfã (RN-018): o `<li>` de bloqueio tem `data-diagnostico` contendo `RN-018` e o caminho `autos.secoes[i].servicos[j]`; o `mensagem` visível continua "A Seção Cidade - Nome não está sendo usada…" sem RN.
+- Violação sem tradução dedicada (uuid de Viagem duplicada, cai no fallback): a `mensagem` visível é genérica, mas o `data-diagnostico` traz `RN-005` + caminho, e o `console.debug` (fora de produção) lista o item.
+
+## Casos inválidos
+
+- Diagnóstico técnico (`[RN-xxx]`, `uuid`, caminho JSON) aparecendo como **texto visível** no `<li>` (não só em atributo) → regressão do tom da Spec 04 §14; teste-guarda garante que o `textContent` do item permanece sem `[RN-` e sem `uuid`.
+- Log emitido em produção (`NODE_ENV === "production"`) → teste garante `console.debug` não chamado nesse ambiente.
+
+## Testes esperados
+
+- Unitários: `coletarErrosEstruturais` popula `diagnostico` com RN+caminho+mensagem crua para casos dedicados e fallback; `mensagem` inalterado; pendências de `coletarPendencias` continuam sem `diagnostico`.
+- Unitários/componente: a lista de bloqueio (Revisão) e a de Exportação renderizam `data-diagnostico` quando presente e o omitem quando ausente; `textContent` do item não contém `[RN-`/`uuid` (o técnico só no atributo).
+- Unitários: `console.debug` chamado fora de produção e **não** chamado com `NODE_ENV === "production"` (mock de `console.debug`/`process.env`).
+- E2E: opcional — inspecionar `data-diagnostico` num documento com violação estrutural.
+- Snapshot/contrato JSON: N/A (não toca contrato).
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/pendencias/pendencias.ts` (campo opcional `diagnostico?: string` em `Pendencia`)
+- `src/formulario/exportacao/gate-exportacao.ts` (montar `diagnostico`; `console.debug` guardado por ambiente)
+- `src/formulario/revisao/tela-revisao.tsx` e `src/formulario/exportacao/tela-exportacao.tsx` (renderizar `data-diagnostico` no `<li>`)
+- Testes correspondentes em `testes/unitarios/formulario/`
+
+## Dependências
+
+- **TASK-085** (entregue, aprovada — `docs-dev/14-REVISOES/TASK-085-20260717.md`) — fornece `coletarErrosEstruturais`/`errosEstruturais` que esta task enriquece.
+
+## Riscos
+
+- Vazar o diagnóstico técnico para texto visível (em vez de só atributo) reintroduz o tecniquês que a TASK-085 removeu (Spec 04 §14) — o teste-guarda de `textContent` é o freio.
+- `console.debug` ruidoso em teste: guardar por `NODE_ENV` e, se necessário, silenciar/mokar nos testes que não o exercitam.
+- Acoplar `data-diagnostico` a um seletor de E2E: é atributo de diagnóstico, não contrato de teste público — E2E existentes não devem depender dele.
+
+## Perguntas em aberto
+
+- Nenhuma (ferramenta de diagnóstico de DEV; não é regra de negócio, não altera spec nem contrato — o formato visível segue fixado pela Spec 04 §14 e pela TASK-085).
+
+---
+
 ## Ordem recomendada de execução
 
 ```text
@@ -2727,5 +3069,16 @@ ramo do mapa: 064 → 065 → 071 → 066 → 067
 
 - TASK-062 (E2E criar-do-zero ponta a ponta) depende da **TASK-061** (promoção, entregue) **e da TASK-032** (tela de Revisão + gate/botão de exportação) — **DEC-059 / Q-039**: a UI de exportação que o E2E dispara é escopo da TASK-032, então a 062 foi re-sequenciada para rodar depois dela.
 - **TASK-080** (correção, 2026-07-17): a promoção da TASK-061 ficou condicionada a `modo === "novo"`, então Serviços criados na sessão sobre um **JSON carregado** nunca eram promovidos. A 080 remove esse gate e promove nos dois modos. Depende só da **TASK-061** (entregue); pode rodar a qualquer momento.
+
+**Correções de edição de itinerário e feedback de bloqueio (relatadas pelo responsável em 2026-07-17):**
+
+```text
+085 → 084
+083 (independente)
+```
+
+- **TASK-083** vem da **DEC-068** (Q-048): ponto de rota órfão na remoção de parada de extremo é descartado com aviso, fechando a ressalva da revisão da TASK-066. Toca só `reancorar-pontos-de-rota.ts` — independente das outras duas, pode rodar a qualquer momento.
+- **TASK-084** (bug) corrige a raiz do "JSON travado após remover uma Seção": a remoção de parada passa a limpar `secao.servicos[]` e descartar a Seção órfã (análogo por-parada da cascata da TASK-080). Coordenar com a **TASK-077** (espelho Ida↔Volta).
+- **TASK-085** (bug) torna **visível** o motivo de qualquer bloqueio de exportação (estrutural/técnico), hoje mudo. Recomendada **antes** da 084 (torna o sintoma diagnosticável de imediato) e **antes/junto da TASK-082** (senão o bloqueio de 350 m/tipificação da 082 também nasceria invisível).
 
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.
