@@ -11,6 +11,7 @@ import {
 import { indiceDeNomes } from "@/shared/geo";
 import { ancorarPontoNaRota, linhaDaGeometria, type Coordenada, type LinhaMapa } from "@/shared/mapa";
 import {
+  limparSecoesAposEdicaoDeParadas,
   nomeExibicaoSecao,
   type RecursosMunicipio,
   type Sentido,
@@ -385,6 +386,21 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
         resultado.estado.rota,
       );
       proxima = comServicosDaSessao(proxima, servicosAtualizados);
+
+      // TASK-084 (RN-018): a remoção de parada pode ter deixado de referenciar
+      // uma Seção em TODOS os itinerários do Serviço — limpa a contribuição
+      // dele e descarta a Seção que ficar órfã, no MESMO commit (senão o
+      // documento fica com a violação estrutural RN-018 até o próximo gesto).
+      const servicoAtualizado = servicosAtualizados.find(
+        (s) => s.uuid === linhaAtual.servicoUuid,
+      );
+      if (servicoAtualizado) {
+        const secoesLimpas = limparSecoesAposEdicaoDeParadas(
+          secoesDaSessao(atual),
+          servicoAtualizado,
+        );
+        proxima = comSecoesAtualizadas(proxima, secoesLimpas);
+      }
     } else if (!linhaAtual.completo && resultado.estado.situacao === "recalculada") {
       // Ainda em construção, em QUALQUER modo (DEC-053/TASK-061; gate de modo
       // removido pela TASK-080): tenta promover. "Ambos" só promove quando os
