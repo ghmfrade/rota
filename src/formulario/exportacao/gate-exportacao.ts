@@ -225,6 +225,18 @@ function mensagemOperacional(
 }
 
 /**
+ * Trilha técnica de DEV (TASK-086): RN (quando a mensagem do schema traz a
+ * tag `[RN-xxx]`) + caminho JSON do issue + a mensagem crua do schema — nunca
+ * exposta como texto visível (Spec 04 §14), só em `diagnostico` (atributo/log).
+ */
+function montarDiagnostico(caminho: Caminho, mensagemTecnica: string): string {
+  const codigoRn = mensagemTecnica.match(/^\[RN-(\d+)\]/)?.[1];
+  const rn = codigoRn ? `RN-${codigoRn}` : "sem RN";
+  const caminhoTexto = caminho.join(".") || "documento";
+  return `[${rn}] ${caminhoTexto}: ${mensagemTecnica}`;
+}
+
+/**
  * Roda a validação completa do schema (forma + Spec 02 §14) sobre o
  * documento e devolve cada violação já traduzida em `Pendencia` operacional.
  * `[]` quando o documento é estruturalmente válido.
@@ -240,6 +252,7 @@ function coletarErrosEstruturais(documento: DocumentoOperacao): Pendencia[] {
       severidade: "bloqueante",
       mensagem: mensagemOperacional(documento, caminho, issue.message, etapaAlvo),
       etapaAlvo,
+      diagnostico: montarDiagnostico(caminho, issue.message),
     };
   });
 }
@@ -284,6 +297,11 @@ export function avaliarGateExportacao(
     };
   }
   const errosEstruturais = coletarErrosEstruturais(paraChecagemEstrutural(documento));
+  if (errosEstruturais.length > 0 && process.env.NODE_ENV !== "production") {
+    for (const erro of errosEstruturais) {
+      console.debug("[gate-exportacao] erro estrutural:", erro.diagnostico);
+    }
+  }
   return {
     liberado: pendenciasBloqueantes.length === 0 && errosEstruturais.length === 0,
     pendenciasBloqueantes,

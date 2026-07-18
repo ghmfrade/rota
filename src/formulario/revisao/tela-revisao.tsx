@@ -133,6 +133,7 @@ function ListaPendencias({
                 <button
                   type="button"
                   data-testid={itemTestId}
+                  data-diagnostico={pendencia.diagnostico}
                   onClick={() => aoNavegar(pendencia.etapaAlvo)}
                   className="block w-full rounded-controle px-2 py-1 text-left text-sm hover:bg-cinza-100"
                 >

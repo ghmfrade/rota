@@ -83,6 +83,44 @@ describe("TelaRevisao — com pendências (RN-078)", () => {
     desmontar();
   });
 
+  it("item com diagnostico (TASK-086) recebe o atributo data-diagnostico, sem vazar para o texto visível", () => {
+    const pendenciaComDiagnostico: Pendencia = {
+      id: "estrutural-0-autos-secoes-1-servicos-0",
+      severidade: "bloqueante",
+      mensagem: "A Seção Guarujá - Terminal Extra não está sendo usada por nenhuma Parada.",
+      etapaAlvo: "secoes-locais-itinerarios",
+      diagnostico: "[RN-018] autos.secoes.1.servicos.0: mensagem crua do schema",
+    };
+    const { container, desmontar } = renderizar(
+      <TelaRevisao
+        sessao={SESSAO_CARREGADA}
+        pendencias={[pendenciaComDiagnostico]}
+        aoNavegar={vi.fn()}
+      />,
+    );
+
+    const botao = container.querySelector(
+      '[data-testid="revisao-item-bloqueante"]',
+    ) as HTMLButtonElement;
+    expect(botao.getAttribute("data-diagnostico")).toBe(pendenciaComDiagnostico.diagnostico);
+    expect(botao.textContent).not.toMatch(/\[RN-\d+\]/);
+
+    desmontar();
+  });
+
+  it("[inválido] item sem diagnostico não recebe o atributo data-diagnostico", () => {
+    const { container, desmontar } = renderizar(
+      <TelaRevisao sessao={SESSAO_CARREGADA} pendencias={PENDENCIAS} aoNavegar={vi.fn()} />,
+    );
+
+    const botao = container.querySelector(
+      '[data-testid="revisao-item-bloqueante"]',
+    ) as HTMLButtonElement;
+    expect(botao.hasAttribute("data-diagnostico")).toBe(false);
+
+    desmontar();
+  });
+
   it("clicar um item navega para a etapaAlvo da pendência (§11)", () => {
     const aoNavegar = vi.fn();
     const { container, desmontar } = renderizar(

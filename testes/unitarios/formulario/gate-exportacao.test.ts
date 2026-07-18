@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { avaliarGateExportacao } from "@/formulario/exportacao";
 import type { SessaoFormulario } from "@/formulario/sessao";
 import type { ItinerarioAoVivo } from "@/formulario/pendencias";
@@ -174,5 +174,90 @@ describe("avaliarGateExportacao — motivos estruturais visíveis (TASK-085; RN-
     const motivo = resultado.errosEstruturais.find((e) => e.mensagem.includes("0000-1CR"));
     expect(motivo).toBeDefined();
     expect(motivo!.mensagem).toMatch(/Revise a etapa/);
+  });
+});
+
+describe("avaliarGateExportacao — diagnóstico técnico de DEV (TASK-086)", () => {
+  test("Seção órfã (RN-018): diagnostico traz a RN e o caminho JSON, mensagem operacional intocada", () => {
+    const documento = documentoExemploMinimo();
+    documento.autos.secoes.push({
+      uuid: "9f9f9f9f-1111-4111-8111-999999999999",
+      municipio: "Guarujá",
+      nome: "Terminal Extra",
+      servicos: [
+        {
+          servico_uuid: documento.autos.servicos[0].uuid,
+          geolocalizacao_ida: { latitude: -23.99, longitude: -46.25 },
+          geolocalizacao_volta: { latitude: -23.99, longitude: -46.25 },
+        },
+      ],
+    });
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    const resultado = avaliarGateExportacao(sessao, []);
+
+    const motivo = resultado.errosEstruturais.find((e) =>
+      e.mensagem.includes("Guarujá - Terminal Extra"),
+    );
+    expect(motivo).toBeDefined();
+    expect(motivo!.diagnostico).toContain("RN-018");
+    expect(motivo!.diagnostico).toContain("autos.secoes");
+    expect(motivo!.diagnostico).not.toBe(motivo!.mensagem);
+  });
+
+  test("violação sem tradução dedicada (uuid de Viagem duplicada, RN-005): diagnostico traz RN-005 + caminho + mensagem crua do schema", () => {
+    const documento = documentoExemploMinimo();
+    const viagens = documento.autos.servicos[0].itinerarios[0].viagens;
+    viagens[1].uuid = viagens[0].uuid;
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    const resultado = avaliarGateExportacao(sessao, []);
+
+    const motivo = resultado.errosEstruturais.find((e) => e.mensagem.includes("0000-1CR"));
+    expect(motivo).toBeDefined();
+    expect(motivo!.diagnostico).toContain("RN-005");
+    expect(motivo!.diagnostico).toContain("uuid de Viagem repetida");
+    expect(motivo!.mensagem).not.toMatch(/\[RN-\d+\]/);
+  });
+
+  test("[inválido] pendência viva (coletarPendencias) continua sem diagnostico — regressão-guarda", () => {
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento: documentoExemploMinimo(),
+      alertasImportacao: [],
+    };
+    const itinerarios: ItinerarioAoVivo[] = [
+      {
+        numeroN: "0000-1CR",
+        sentido: "ida",
+        estadoRota: { situacao: "sem-rota", falha: { tipo: "sem-rota" } },
+      },
+    ];
+
+    const resultado = avaliarGateExportacao(sessao, itinerarios);
+
+    expect(resultado.pendenciasBloqueantes).toHaveLength(1);
+    expect(resultado.pendenciasBloqueantes[0].diagnostico).toBeUndefined();
+  });
+
+  test("console.debug emite os diagnósticos fora de produção e não emite em produção", () => {
+    const documento = documentoExemploMinimo();
+    documento.autos.servicos[0].itinerarios[0].viagens = [];
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+    const espiao = vi.spyOn(console, "debug").mockImplementation(() => {});
+
+    try {
+      vi.stubEnv("NODE_ENV", "development");
+      avaliarGateExportacao(sessao, []);
+      expect(espiao).toHaveBeenCalled();
+
+      espiao.mockClear();
+      vi.stubEnv("NODE_ENV", "production");
+      avaliarGateExportacao(sessao, []);
+      expect(espiao).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+      espiao.mockRestore();
+    }
   });
 });

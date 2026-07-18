@@ -68,6 +68,13 @@ export interface Pendencia {
    * destino é a etapa Revisão (DEC-033).
    */
   etapaAlvo: IdEtapa;
+  /**
+   * Trilha técnica para DEV (TASK-086): RN + caminho JSON + mensagem crua do
+   * schema. Opcional — só os erros estruturais do gate de exportação a
+   * preenchem hoje; nunca exibida como texto, só em atributo/log (Spec 04
+   * §14 — a `mensagem` acima é o que o usuário vê).
+   */
+  diagnostico?: string;
 }
 
 /**

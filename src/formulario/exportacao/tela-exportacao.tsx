@@ -106,7 +106,9 @@ export function TelaExportacao({
           {[...gate.pendenciasBloqueantes, ...gate.errosEstruturais].length > 0 && (
             <ul className="mt-2 list-disc space-y-1 pl-5" data-testid="exportacao-motivos-bloqueio">
               {[...gate.pendenciasBloqueantes, ...gate.errosEstruturais].map((motivo) => (
-                <li key={motivo.id}>{motivo.mensagem}</li>
+                <li key={motivo.id} data-diagnostico={motivo.diagnostico}>
+                  {motivo.mensagem}
+                </li>
               ))}
             </ul>
           )}

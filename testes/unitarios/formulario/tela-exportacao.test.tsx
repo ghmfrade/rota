@@ -181,4 +181,20 @@ describe("TelaExportacao — gate bloqueado (Spec 04 §14)", () => {
 
     desmontar();
   });
+
+  it("erro estrutural (TASK-086) recebe data-diagnostico no item, sem vazar para o texto visível", () => {
+    const documento = documentoExemploMinimo();
+    documento.autos.servicos[0].itinerarios[0].viagens = [];
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    const { container, desmontar } = renderizar(<TelaExportacao sessao={sessao} />);
+
+    const item = container.querySelector('[data-testid="exportacao-motivos-bloqueio"] li');
+    expect(item).not.toBeNull();
+    expect(item!.getAttribute("data-diagnostico")).toMatch(/RN-039/);
+    expect(item!.textContent).not.toMatch(/\[RN-\d+\]/);
+
+    desmontar();
+  });
+
 });
