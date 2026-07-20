@@ -4,7 +4,7 @@
 
 **O que este documento NÃO é:** não é fonte de verdade sobre o conteúdo, escopo ou regras de nenhuma task — isso continua sendo o `06-BACKLOG_INICIAL.md` (e, acima dele, as specs e o `01-RULE_INDEX.md`, conforme a hierarquia do `00-README-SPEC-DRIVEN.md`). Aqui só se registra **status e sequenciamento**. Em caso de divergência sobre escopo, o backlog vence.
 
-**Última atualização:** 2026-07-20 (branch `redesign`).
+**Última atualização:** 2026-07-20 (branch `redesign`) — revisão da TASK-065 reavaliada e aprovada com ressalvas.
 
 ---
 
@@ -39,7 +39,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 
 ## 3. Tasks executadas
 
-67 tasks concluídas. Agrupadas pela fase do backlog.
+68 tasks concluídas. Agrupadas pela fase do backlog.
 
 ### Fases 1–3 — Fundação, contrato JSON e validações de domínio
 
@@ -142,6 +142,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 082 | Bloquear exportação com violação de 350 m ou tipificação |
 | 083 | Descartar ponto de rota órfão na remoção de extremo (DEC-068) |
 | 088 | Remover Seção reconcilia `matriz_seccionamento` com `matriz_distancias` (RN-059) |
+| 065 | Inverter os gestos do mapa único: esquerdo = ponto de rota, direito = menu Seção/Local |
 
 ---
 
@@ -156,21 +157,20 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 ## 5. Tasks a executar — ordem recomendada
 
-20 tasks pendentes. A ordem abaixo respeita as dependências declaradas nas próprias tasks; onde há folga, ela é indicada. A antiga prioridade máxima (TASK-082) foi concluída; a visibilidade dos motivos usa a infraestrutura entregue pelas TASK-085/086. O Grupo A (bug vivo de integridade das matrizes) foi fechado pela **TASK-088**, implementada em `2b27c9a` e aprovada em `docs-dev/14-REVISOES/TASK-088-20260720.md` — não há mais bug bloqueando a exportação após remover uma Seção. A **TASK-065** tem código no histórico (`edf0b44`) mas **segue pendente**: a revisão de 2026-07-20 a reprovou por verificação falhando; ciclo só fecha após correção e nova revisão.
+19 tasks pendentes. A ordem abaixo respeita as dependências declaradas nas próprias tasks; onde há folga, ela é indicada. A antiga prioridade máxima (TASK-082) foi concluída; a visibilidade dos motivos usa a infraestrutura entregue pelas TASK-085/086. O Grupo A (bug vivo de integridade das matrizes) foi fechado pela **TASK-088**, implementada em `2b27c9a` e aprovada em `docs-dev/14-REVISOES/TASK-088-20260720.md` — não há mais bug bloqueando a exportação após remover uma Seção. A **TASK-065** saiu da lista de pendentes: reprovada em 2026-07-20 por E2E vermelho, foi corrigida em `6469a04` e **aprovada com ressalvas** na reavaliação `docs-dev/14-REVISOES/TASK-065-20260720-reavaliacao.md`.
 
 ### Grupo B — Ramo do mapa e pontos de rota
 
-Fecha a UX de mapa e interações. Depende só do que já está entregue (060, 063, 066, 071).
+Fecha a UX de mapa e interações. Depende só do que já está entregue (060, 063, 065, 066, 071).
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 1 | **065** — Inverter gestos: esquerdo = ponto de rota, direito = menu Seção/Local | **3** | Só depende da 063. **Implementada em `edf0b44`, mas REPROVADA** na revisão de 2026-07-20 (`14-REVISOES/TASK-065-20260720.md`): o E2E `etapa-itinerarios.spec.ts:465` (clique direito **sobre a linha** → menu → Local) falha de forma reproduzível. Continua pendente até a correção ser reapresentada e revisada. |
-| 2 | **067** — Inserção posicional: clique direito na linha insere no trecho | **3** | Precisa de 066 (✅) + 065. **Não iniciar antes de a 065 ser aprovada:** a 067 consome o callback `aoClicarDireitoNaLinha`, que é exatamente o caminho cuja falha reprovou a 065. |
-| 3 | **068** — Identidade visual do vértice (ciano) | **1** | Precede a 069 (que reusa o token). |
-| 4 | **069** — Affordance de hover sobre a linha | **2** | Precisa da 068. |
-| 5 | **070** — Clique sobre o vértice remove o ponto de rota | **2** | Independente de 065/067. |
-| 6 | **079** — Pontos de rota na lista lateral intercalados | **4** | Desbloqueada por 066 + 071. |
-| 7 | **064** — Sincronização de seleção tabela↔mapa | **3** | Depois da 079, para projetar sobre a lista unificada. |
+| 1 | **067** — Inserção posicional: clique direito na linha insere no trecho | **3** | Precisa de 066 (✅) + 065 (✅, aprovada com ressalvas em 2026-07-20). **Condição de entrada herdada da revisão da 065:** cobrir com teste o hit-test de `contextmenu` sobre a camada de linhas (`src/shared/mapa/mapa.tsx:236-249`) — hoje `aoClicarDireitoNaLinha` e `aoClicarDireito` abrem o mesmo menu, então nenhum teste distingue os dois caminhos; a 067 é quem os faz divergir. |
+| 2 | **068** — Identidade visual do vértice (ciano) | **1** | Precede a 069 (que reusa o token). |
+| 3 | **069** — Affordance de hover sobre a linha | **2** | Precisa da 068. |
+| 4 | **070** — Clique sobre o vértice remove o ponto de rota | **2** | Independente de 067. |
+| 5 | **079** — Pontos de rota na lista lateral intercalados | **4** | Desbloqueada por 066 + 071. |
+| 6 | **064** — Sincronização de seleção tabela↔mapa | **3** | Depois da 079, para projetar sobre a lista unificada. |
 
 Travas rígidas: `068 → 069` e `079 → 064`. As demais têm folga entre si.
 
@@ -180,16 +180,16 @@ As próprias tasks pedem rodar **depois** do Grupo B, para não retrabalhar a su
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 8 | **077** — Volta espelhada (ordem inversa como regra dura) | **4** | Antes da 076 (que assume Volta derivada). **Herda a obrigação** de manter corretas a limpeza de Seção (084, entregue), a reconciliação de horários (046) e a reconciliação das matrizes (088) quando o espelho refletir a remoção nos dois sentidos. |
-| 9 | **076** — Ida e Volta no mesmo mapa (abas, tracejado, dois painéis) | **5** | A mais cara do backlog pendente. Deixar por último do grupo. |
-| 10 | **078** — Realocação de Seção inteira (translação rígida) | **4** | Cascata de recálculo multi-Serviço — caminho novo. |
+| 7 | **077** — Volta espelhada (ordem inversa como regra dura) | **4** | Antes da 076 (que assume Volta derivada). **Herda a obrigação** de manter corretas a limpeza de Seção (084, entregue), a reconciliação de horários (046) e a reconciliação das matrizes (088) quando o espelho refletir a remoção nos dois sentidos. |
+| 8 | **076** — Ida e Volta no mesmo mapa (abas, tracejado, dois painéis) | **5** | A mais cara do backlog pendente. Deixar por último do grupo. |
+| 9 | **078** — Realocação de Seção inteira (translação rígida) | **4** | Cascata de recálculo multi-Serviço — caminho novo. |
 
 ### Grupo D — UX restante e qualidade
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 11 | **075** — Identificação: pré-visualização + confirmação explícita | **2** | Encaixe livre — independente de tudo acima. |
-| 12 | **062** — E2E do fluxo "criar do zero" ponta a ponta | **3** | Depois do mapa estabilizado, senão os seletores mudam de novo. |
+| 10 | **075** — Identificação: pré-visualização + confirmação explícita | **2** | Encaixe livre — independente de tudo acima. |
+| 11 | **062** — E2E do fluxo "criar do zero" ponta a ponta | **3** | Depois do mapa estabilizado, senão os seletores mudam de novo. |
 
 ### Grupo E — Fases originais restantes (MVP 3 em diante)
 
@@ -197,13 +197,13 @@ Independentes do ramo do mapa: nada aqui bloqueia ou é bloqueado por ele.
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 13 | **033** — PDF operacional: estrutura e identificação | **4** | Subsistema novo (@react-pdf) + captura do mapa. |
-| 14 | **034** — PDF operacional: tabelas horárias e matrizes | **3** | Sobre a 033. |
-| 15 | **035** — Comparador: carregamento e validação dos dois arquivos | **3** | |
-| 16 | **036** — Motor de diff por UUID + taxonomia | **5** | Núcleo do Comparador; casamento por UUID e por contexto. |
-| 17 | **037** — Telas de comparação | **4** | Superfície ampla (5 visões/abas). |
-| 18 | **038** — Mapa comparativo | **3** | Bloqueio parcial: Q-004 (tolerância). |
-| 19 | **039** — PDF comparativo completo | **4** | |
+| 12 | **033** — PDF operacional: estrutura e identificação | **4** | Subsistema novo (@react-pdf) + captura do mapa. |
+| 13 | **034** — PDF operacional: tabelas horárias e matrizes | **3** | Sobre a 033. |
+| 14 | **035** — Comparador: carregamento e validação dos dois arquivos | **3** | |
+| 15 | **036** — Motor de diff por UUID + taxonomia | **5** | Núcleo do Comparador; casamento por UUID e por contexto. |
+| 16 | **037** — Telas de comparação | **4** | Superfície ampla (5 visões/abas). |
+| 17 | **038** — Mapa comparativo | **3** | Bloqueio parcial: Q-004 (tolerância). |
+| 18 | **039** — PDF comparativo completo | **4** | |
 
 ### Grupo F — Bloqueada
 
@@ -241,3 +241,11 @@ O write-back atual verificado na revisão é `servicosComItinerarioAtualizado`.
 ### 6.3 TASK-004 fechada sem parecer
 
 Ver §4. Código entregue, ciclo formal não encerrado.
+
+### 6.4 `etapa-itinerarios.spec.ts:71` ficou desatualizado desde a TASK-081 — aberto em 2026-07-20
+
+Achado na reavaliação da TASK-065 (`14-REVISOES/TASK-065-20260720-reavaliacao.md`, problema 4). O E2E `mover parada recalcula com sucesso …` exige `painel-pendencias → pendencia-item` com contagem **0**, mas o fixture `carregar-multi-servico.json` passou a produzir o alerta *"Serviços 0001-1SU, 0001-2SU sem grade de feriados"*, emitido por `src/formulario/pendencias/pendencias.ts:184` — introduzido pela **TASK-081** (`06a7ed4`). Falha determinística (3/3 em `--repeat-each=3`), e **não** é a flakiness intermitente descrita no parecer anterior da 065.
+
+**Atribuição:** não é da TASK-065 — nenhum dos seus commits toca `src/formulario/pendencias/`. É débito de teste da TASK-081, que acrescentou o alerta sem atualizar o E2E que assume zero pendências nesse fixture.
+
+**Ação pendente:** abrir task própria para decidir entre dar grade de feriados ao fixture ou filtrar a asserção por severidade. Enquanto não for feita, a suíte `etapa-itinerarios.spec.ts` fica em **8 passed / 1 failed** e esse vermelho não deve ser confundido com regressão de tasks novas do mapa.
