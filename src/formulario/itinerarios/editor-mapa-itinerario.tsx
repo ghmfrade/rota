@@ -3,8 +3,14 @@
 import { useState } from "react";
 import type { Local, PontoDeRota, Secao } from "@/shared/contrato";
 import type { Ponto } from "@/shared/geo";
-import { Mapa, type Coordenada, type LinhaMapa, type MarcadorMapa } from "@/shared/mapa";
-import { Botao, Campo, Painel } from "@/shared/ui";
+import {
+  Mapa,
+  type AncoraTelaMapa,
+  type Coordenada,
+  type LinhaMapa,
+  type MarcadorMapa,
+} from "@/shared/mapa";
+import { Botao, Campo, MenuFlutuante, Painel } from "@/shared/ui";
 import {
   criarSecaoNoPonto,
   MENSAGEM_FORA_DE_SP,
@@ -29,14 +35,11 @@ import { ALTURA_MAPA_CLASSE } from "./altura-mapa";
 // derivação de município é reescrita aqui; a task só reorganiza a superfície de
 // UI.
 //
-// Interação decidida em DEC-054 (Q-035): **clique esquerdo cria Seção, clique
-// direito cria Local**; marcadores circulares com cores distintas por tipo.
-// A TASK-063 (DEC-055) inverte a exclusividade do esquerdo apenas SOBRE A
-// LINHA da rota, onde passa a criar um ponto de rota em vez de Seção (fora da
-// linha, o esquerdo continua criando Seção — a inversão completa dos botões é
-// a TASK-065). A sincronização seleção tabela↔mapa (TASK-064) fica fora desta
-// task. Os componentes `EditorSecoes`/`EditorLocais` permanecem para suas demo
-// pages (E2E dos 350 m).
+// Interação decidida em DEC-055 (TASK-065): clique esquerdo SOBRE A LINHA cria
+// ponto de rota; fora dela não cria nada. Clique direito, sobre ou fora da
+// linha, abre o menu Seção/Local. A inserção posicional é da TASK-067 — aqui
+// toda Parada nova continua indo para o fim. A sincronização seleção
+// tabela↔mapa (TASK-064) também permanece fora deste escopo.
 
 // Cores dos marcadores (tokens do doc 18): Seção azul-700, Local sucesso,
 // ponto pendente alerta, ponto de rota cinza-700 — inferência controlada (a
@@ -56,6 +59,11 @@ const geolocDoSentido = (local: Local, sentido: Sentido): Ponto | undefined =>
 interface CriacaoPendente {
   tipo: "secao" | "local";
   posicao: Coordenada;
+}
+
+interface MenuCriacaoPendente {
+  posicao: Coordenada;
+  ancoraTela: AncoraTelaMapa;
 }
 
 export interface PropsEditorMapaItinerario {
@@ -116,6 +124,7 @@ export function EditorMapaItinerario({
   const [mensagemSecao, definirMensagemSecao] = useState<string | null>(null);
   const [mensagemLocal, definirMensagemLocal] = useState<string | null>(null);
   const [criacaoPendente, definirCriacaoPendente] = useState<CriacaoPendente | null>(null);
+  const [menuCriacao, definirMenuCriacao] = useState<MenuCriacaoPendente | null>(null);
   const [nomeNovo, definirNomeNovo] = useState("");
 
   const marcadoresSecoes: MarcadorMapa[] = secoes.flatMap((secao) => {
@@ -177,6 +186,19 @@ export function EditorMapaItinerario({
     definirMensagemLocal(null);
     definirCriacaoPendente({ tipo, posicao });
     definirNomeNovo("");
+  }
+
+  function abrirMenuCriacao(posicao: Coordenada, ancoraTela: AncoraTelaMapa) {
+    definirMensagemSecao(null);
+    definirMensagemLocal(null);
+    definirCriacaoPendente(null);
+    definirNomeNovo("");
+    definirMenuCriacao({ posicao, ancoraTela });
+  }
+
+  function escolherTipoCriacao(tipo: "secao" | "local") {
+    if (!menuCriacao) return;
+    iniciarCriacao(tipo, menuCriacao.posicao);
   }
 
   function confirmarCriacao() {
@@ -286,9 +308,9 @@ export function EditorMapaItinerario({
   return (
     <div data-testid="editor-mapa-itinerario" className="flex flex-col gap-4">
       <p data-testid="dica-gestos-mapa" className="text-sm text-cinza-500">
-        Clique no mapa para criar uma <strong>Seção</strong>; clique com o botão direito
-        para criar um <strong>Local</strong>. Clique sobre a linha da rota para criar um{" "}
-        <strong>ponto de rota</strong> e forçar o traçado.
+        Clique sobre a linha da rota para criar um <strong>ponto de rota</strong>. Clique
+        com o botão direito no mapa e escolha <strong>Seção</strong> ou{" "}
+        <strong>Local</strong>. O clique esquerdo fora da linha apenas movimenta o mapa.
       </p>
 
       {mensagemSecao ? (
@@ -311,11 +333,32 @@ export function EditorMapaItinerario({
             ...marcadoresPontosDeRota,
           ]}
           linhas={linhaRota ? [linhaRota] : []}
-          aoClicar={(posicao) => iniciarCriacao("secao", posicao)}
           aoClicarNaLinha={aoCriarPontoDeRota}
-          aoClicarDireito={(posicao) => iniciarCriacao("local", posicao)}
+          aoClicarDireito={abrirMenuCriacao}
+          aoClicarDireitoNaLinha={abrirMenuCriacao}
         />
       </div>
+
+      {menuCriacao ? (
+        <MenuFlutuante
+          data-testid="menu-criar-parada"
+          rotuloAcessivel="Escolher tipo de Parada"
+          ancora={menuCriacao.ancoraTela}
+          aoFechar={() => definirMenuCriacao(null)}
+          opcoes={[
+            {
+              id: "secao",
+              rotulo: "Seção",
+              aoSelecionar: () => escolherTipoCriacao("secao"),
+            },
+            {
+              id: "local",
+              rotulo: "Local",
+              aoSelecionar: () => escolherTipoCriacao("local"),
+            },
+          ]}
+        />
+      ) : null}
 
       <ul
         data-testid="legenda-marcadores"

@@ -146,7 +146,7 @@ test.describe("Etapa Seções, Locais e Itinerários — reordenar dispara recá
 });
 
 test.describe("Etapa Seções, Locais e Itinerários — criar Seção via mapa insere parada nova", () => {
-  test("clicar no mapa cria a Seção, insere a parada e recalcula já com ela (sem perder a Seção nova)", async ({
+  test("clique direito + Seção cria a entidade, insere a parada e recalcula já com ela", async ({
     page,
   }) => {
     // Prova direta de que `aplicarNovasParadas` resolve a Seção RECÉM-criada
@@ -184,8 +184,8 @@ test.describe("Etapa Seções, Locais e Itinerários — criar Seção via mapa 
 
     await abrirEtapaVolta(page);
 
-    // Mapa ÚNICO da etapa (TASK-060): Seção e Local no mesmo canvas. Clique
-    // esquerdo cria Seção (DEC-054).
+    // Mapa ÚNICO da etapa: clique direito abre a escolha Seção/Local
+    // (TASK-065/DEC-055).
     const mapa = page.getByTestId("mapa-base");
     await expect(mapa).toBeVisible();
     // Espera o mapa terminar a carga (evento "load" do MapLibre) e plotar os 3
@@ -199,7 +199,11 @@ test.describe("Etapa Seções, Locais e Itinerários — criar Seção via mapa 
     // Clica no centro exato do canvas (via locator, que rola o elemento para a
     // viewport antes do clique) — no zoom default (Estado inteiro,
     // CENTRO_PADRAO_SP), cai dentro do município de Jaú no geojson real.
-    await mapa.click({ position: { x: caixa.width / 2, y: caixa.height / 2 } });
+    await mapa.click({
+      button: "right",
+      position: { x: caixa.width / 2, y: caixa.height / 2 },
+    });
+    await page.getByRole("menuitem", { name: "Seção" }).click();
 
     await page.getByTestId("nome-secao-input").fill("Nova Seção E2E");
     await page.getByTestId("confirmar-criar-secao").click();
@@ -379,9 +383,14 @@ test.describe("Etapa Seções, Locais e Itinerários — gesto de ponto de rota 
     expect(coordenadas.split(";").length).toBe(4);
   });
 
-  test("[inválido] clicar FORA da linha da rota continua criando Seção (DEC-055, sem mudança até a TASK-065)", async ({
+  test("[inválido] clicar com o esquerdo FORA da linha não cria entidade nem chama OSRM", async ({
     page,
   }) => {
+    let chamadasOsrm = 0;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamadasOsrm += 1;
+      return rota.abort();
+    });
     await abrirEtapaVolta(page);
 
     const mapa = page.getByTestId("mapa-base");
@@ -394,8 +403,11 @@ test.describe("Etapa Seções, Locais e Itinerários — gesto de ponto de rota 
     // na região central inferior do Estado no zoom default).
     await mapa.click({ position: { x: 5, y: 5 } });
 
-    await expect(page.getByTestId("form-criar-secao")).toBeVisible();
+    await expect(page.getByTestId("form-criar-secao")).toHaveCount(0);
+    await expect(page.getByTestId("form-criar-local")).toHaveCount(0);
+    await expect(page.getByTestId("menu-criar-parada")).toHaveCount(0);
     await expect(page.getByTestId("sub-lista-pontos-de-rota").getByTestId("ponto-rota-item")).toHaveCount(0);
+    expect(chamadasOsrm).toBe(0);
   });
 });
 
@@ -477,25 +489,32 @@ test.describe("Etapa Seções, Locais e Itinerários — feedback de montagem in
 
     await abrirEtapaVolta(page);
 
-    // Mapa único (TASK-060): as 3 Seções já plotadas servem de sinal de que o
-    // bundle do MapLibre está pronto. Criar Local é CLIQUE DIREITO no mesmo
-    // canvas (DEC-054).
+    // As 3 Seções já plotadas servem de sinal de que o MapLibre está pronto.
+    // O clique direito é feito SOBRE a linha para provar que a TASK-065 ainda
+    // acrescenta a Parada ao fim (inserção posicional é da TASK-067).
     const mapa = page.getByTestId("mapa-base");
-    await mapa.locator(".maplibregl-marker").first().waitFor();
+    const marcadores = mapa.locator(".maplibregl-marker");
+    await marcadores.first().waitFor();
     await expect(mapa).toBeVisible();
     await mapa.scrollIntoViewIfNeeded();
-    const caixa = await mapa.boundingBox();
-    if (!caixa) throw new Error("mapa sem bounding box");
-    await mapa.click({
-      button: "right",
-      position: { x: caixa.width / 2, y: caixa.height / 2 },
-    });
+    const caixaA = await marcadores.nth(0).boundingBox();
+    const caixaB = await marcadores.nth(1).boundingBox();
+    if (!caixaA || !caixaB) throw new Error("marcador sem bounding box");
+    const meio = {
+      x: (caixaA.x + caixaA.width / 2 + caixaB.x + caixaB.width / 2) / 2,
+      y: (caixaA.y + caixaA.height / 2 + caixaB.y + caixaB.height / 2) / 2,
+    };
+    await page.mouse.click(meio.x, meio.y, { button: "right" });
+    await page.getByRole("menuitem", { name: "Local" }).click();
 
     await page.getByTestId("nome-local-input").fill("Novo Local E2E");
     await page.getByTestId("confirmar-criar-local").click();
 
     // O novo Local entra ao final da tabela (RN-035: último precisa ser Seção).
     await expect(page.getByTestId("tabela-paradas").getByTestId("parada-item")).toHaveCount(4);
+    await expect(page.getByTestId("tabela-paradas").getByTestId("parada-rotulo").last()).toContainText(
+      "Novo Local E2E",
+    );
     await expect(page.getByTestId("avisos-montagem-invalida")).toBeVisible();
     await expect(page.getByTestId("aviso-montagem-invalida")).toContainText(
       "A última parada do itinerário deve ser uma Seção, nunca um Local",
@@ -506,11 +525,8 @@ test.describe("Etapa Seções, Locais e Itinerários — feedback de montagem in
     await page.getByTestId("parada-mover-cima").last().click();
 
     await expect(page.getByTestId("avisos-montagem-invalida")).toHaveCount(0);
-    await expect(page.getByTestId("tabela-paradas").getByTestId("parada-rotulo")).toHaveText([
-      "Praia Grande - Rodoviária Praia Grande",
-      "São Vicente - Terminal São Vicente",
-      "Jaú - Novo Local E2E",
-      "Santos - Terminal Santos",
-    ]);
+    const rotulos = page.getByTestId("tabela-paradas").getByTestId("parada-rotulo");
+    await expect(rotulos.nth(2)).toContainText("Novo Local E2E");
+    await expect(rotulos.last()).toHaveText("Santos - Terminal Santos");
   });
 });

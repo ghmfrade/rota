@@ -30,6 +30,12 @@ import {
 
 export type { Coordenada, LinhaMapa } from "./geometria";
 
+/** Posição efêmera do gesto na viewport, usada apenas para ancorar UI. */
+export interface AncoraTelaMapa {
+  x: number;
+  y: number;
+}
+
 /** Marcador arrastável no mapa (ex.: Seção, Local, ponto de rota). */
 export interface MarcadorMapa {
   id: string;
@@ -77,10 +83,16 @@ export interface MapaProps {
   aoClicarNaLinha?: (posicao: Coordenada) => void;
   /**
    * Chamado ao clicar com o botão DIREITO (`contextmenu`), com a coordenada.
-   * No mapa único de itinerários o clique direito cria um Local (DEC-054); nos
-   * demais consumidores fica ausente e o gesto não tem efeito.
+   * No mapa único de itinerários o clique direito fora da linha abre o menu
+   * Seção/Local (DEC-055); nos demais consumidores pode ficar ausente.
    */
-  aoClicarDireito?: (posicao: Coordenada) => void;
+  aoClicarDireito?: (posicao: Coordenada, ancoraTela: AncoraTelaMapa) => void;
+  /**
+   * Chamado ao clicar com o botão DIREITO SOBRE uma linha desenhada. Quando
+   * presente, exclui-se de `aoClicarDireito`, simetricamente ao gesto do botão
+   * esquerdo. Consumidores sem esta prop mantêm o comportamento anterior.
+   */
+  aoClicarDireitoNaLinha?: (posicao: Coordenada, ancoraTela: AncoraTelaMapa) => void;
   className?: string;
   style?: CSSProperties;
 }
@@ -118,6 +130,7 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
     aoClicar,
     aoClicarNaLinha,
     aoClicarDireito,
+    aoClicarDireitoNaLinha,
     className,
     style,
   },
@@ -136,6 +149,8 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
   aoClicarNaLinhaRef.current = aoClicarNaLinha;
   const aoClicarDireitoRef = useRef(aoClicarDireito);
   aoClicarDireitoRef.current = aoClicarDireito;
+  const aoClicarDireitoNaLinhaRef = useRef(aoClicarDireitoNaLinha);
+  aoClicarDireitoNaLinhaRef.current = aoClicarDireitoNaLinha;
   const marcadoresRefProp = useRef(marcadores);
   marcadoresRefProp.current = marcadores;
   const linhasRefProp = useRef(linhas);
@@ -206,14 +221,33 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
         aoClicarRef.current?.(posicao);
       });
 
-      // Clique direito (contextmenu): o MapLibre já suprime o menu nativo do
-      // navegador sobre o canvas ao emitir este evento. No mapa único de
-      // itinerários cria um Local (DEC-054); sem `aoClicarDireito` é inócuo.
+      // Clique direito (contextmenu): sobre e fora da linha são callbacks
+      // mutuamente exclusivos (TASK-065/DEC-055). A âncora de viewport é
+      // efêmera e serve somente para posicionar o menu Seção/Local.
       mapa.on("contextmenu", (evento) => {
-        aoClicarDireitoRef.current?.({
+        const posicao = {
           lng: evento.lngLat.lng,
           lat: evento.lngLat.lat,
-        });
+        };
+        const ancoraTela = {
+          x: evento.originalEvent.clientX,
+          y: evento.originalEvent.clientY,
+        };
+        if (aoClicarDireitoNaLinhaRef.current && mapa.getLayer(ID_CAMADA_LINHAS)) {
+          const { x, y } = evento.point;
+          const acertos = mapa.queryRenderedFeatures(
+            [
+              [x - TOLERANCIA_PX, y - TOLERANCIA_PX],
+              [x + TOLERANCIA_PX, y + TOLERANCIA_PX],
+            ],
+            { layers: [ID_CAMADA_LINHAS] },
+          );
+          if (acertos.length > 0) {
+            aoClicarDireitoNaLinhaRef.current(posicao, ancoraTela);
+            return;
+          }
+        }
+        aoClicarDireitoRef.current?.(posicao, ancoraTela);
       });
 
       mapa.on("load", () => {

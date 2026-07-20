@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Local, PontoDeRota, Secao } from "@/shared/contrato";
 import type { FeatureMunicipio } from "@/shared/dados-estaticos";
 import { indiceDeNomes } from "@/shared/geo";
-import type { Coordenada, LinhaMapa, MarcadorMapa } from "@/shared/mapa";
+import type { AncoraTelaMapa, Coordenada, LinhaMapa, MarcadorMapa } from "@/shared/mapa";
 import { act, renderizar } from "../shared-ui/_ajuda-render";
 
 // TASK-060 — mapa ÚNICO de itinerários (`EditorMapaItinerario`, Spec 04 §7;
@@ -20,7 +20,8 @@ interface PropsMapaCapturadas {
   linhas?: readonly LinhaMapa[];
   aoClicar?: (p: Coordenada) => void;
   aoClicarNaLinha?: (p: Coordenada) => void;
-  aoClicarDireito?: (p: Coordenada) => void;
+  aoClicarDireito?: (p: Coordenada, ancora: AncoraTelaMapa) => void;
+  aoClicarDireitoNaLinha?: (p: Coordenada, ancora: AncoraTelaMapa) => void;
 }
 
 const capturado = vi.hoisted<{ props: PropsMapaCapturadas | null }>(() => ({ props: null }));
@@ -145,6 +146,21 @@ function clicar(el: Element) {
   });
 }
 
+function abrirMenuDireito(naLinha = false) {
+  const callback = naLinha
+    ? capturado.props?.aoClicarDireitoNaLinha
+    : capturado.props?.aoClicarDireito;
+  act(() => callback?.(P0_COORD, { x: 100, y: 120 }));
+}
+
+function escolherOpcao(container: HTMLElement, rotulo: "Seção" | "Local") {
+  const opcao = [...container.querySelectorAll('[role="menuitem"]')].find(
+    (item) => item.textContent === rotulo,
+  );
+  if (!opcao) throw new Error(`opção ${rotulo} não encontrada`);
+  clicar(opcao);
+}
+
 describe("EditorMapaItinerario — marcadores de Seção e Local no mesmo mapa", () => {
   it("monta ambos os marcadores, circulares e com cores distintas por tipo", () => {
     const { desmontar } = montar();
@@ -172,23 +188,31 @@ describe("EditorMapaItinerario — marcadores de Seção e Local no mesmo mapa",
   });
 });
 
-describe("EditorMapaItinerario — roteamento do gesto (DEC-054)", () => {
-  it("clique esquerdo abre o formulário de Seção; clique direito o de Local", () => {
+describe("EditorMapaItinerario — roteamento do gesto (DEC-055/TASK-065)", () => {
+  it("clique direito abre menu com Seção e Local; cada escolha abre só seu formulário", () => {
     const { container, desmontar } = montar();
 
-    act(() => capturado.props?.aoClicar?.(P0_COORD));
+    abrirMenuDireito();
+    const opcoes = [...container.querySelectorAll('[role="menuitem"]')];
+    expect(opcoes.map((opcao) => opcao.textContent)).toEqual(["Seção", "Local"]);
+    expect(container.querySelector('[data-testid="form-criar-secao"]')).toBeNull();
+    expect(container.querySelector('[data-testid="form-criar-local"]')).toBeNull();
+
+    escolherOpcao(container, "Seção");
     expect(container.querySelector('[data-testid="form-criar-secao"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="form-criar-local"]')).toBeNull();
 
-    act(() => capturado.props?.aoClicarDireito?.(P0_COORD));
+    abrirMenuDireito(true);
+    escolherOpcao(container, "Local");
     expect(container.querySelector('[data-testid="form-criar-local"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="form-criar-secao"]')).toBeNull();
     desmontar();
   });
 
-  it("clique esquerdo + Criar Seção chama aoCriarSecao com município derivado", () => {
+  it("clique direito + Seção + Criar Seção chama aoCriarSecao com município derivado", () => {
     const { container, aoCriarSecao, desmontar } = montar();
-    act(() => capturado.props?.aoClicar?.(P0_COORD));
+    abrirMenuDireito();
+    escolherOpcao(container, "Seção");
 
     const input = container.querySelector('[data-testid="nome-secao-input"]') as HTMLInputElement;
     digitar(input, "Nova Seção");
@@ -199,9 +223,10 @@ describe("EditorMapaItinerario — roteamento do gesto (DEC-054)", () => {
     desmontar();
   });
 
-  it("clique direito + Criar Local chama aoCriarLocal com município derivado", () => {
+  it("clique direito + Local + Criar Local chama aoCriarLocal com município derivado", () => {
     const { container, aoCriarLocal, desmontar } = montar();
-    act(() => capturado.props?.aoClicarDireito?.(P0_COORD));
+    abrirMenuDireito();
+    escolherOpcao(container, "Local");
 
     const input = container.querySelector('[data-testid="nome-local-input"]') as HTMLInputElement;
     digitar(input, "Novo Local");
@@ -216,7 +241,8 @@ describe("EditorMapaItinerario — roteamento do gesto (DEC-054)", () => {
 describe("EditorMapaItinerario — casos inválidos (comportamento preservado)", () => {
   it("criar Seção fora de SP: mensagem de recusa e NENHUM aoCriarSecao", () => {
     const { container, aoCriarSecao, desmontar } = montar({ recursosMunicipio: RECURSOS_FORA_DE_SP });
-    act(() => capturado.props?.aoClicar?.(P0_COORD));
+    abrirMenuDireito();
+    escolherOpcao(container, "Seção");
 
     const input = container.querySelector('[data-testid="nome-secao-input"]') as HTMLInputElement;
     digitar(input, "Fora de SP");
@@ -272,12 +298,14 @@ describe("EditorMapaItinerario — gesto de ponto de rota (TASK-063; Spec 04 §7
     desmontar();
   });
 
-  it("clique fora da linha continua criando Seção (DEC-055: sem mudança até a TASK-065)", () => {
+  it("clique esquerdo fora da linha não cria nada [inválido]", () => {
     const { container, aoCriarPontoDeRota, desmontar } = montar();
     act(() => capturado.props?.aoClicar?.(P0_COORD));
 
+    expect(capturado.props?.aoClicar).toBeUndefined();
     expect(aoCriarPontoDeRota).not.toHaveBeenCalled();
-    expect(container.querySelector('[data-testid="form-criar-secao"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="form-criar-secao"]')).toBeNull();
+    expect(container.querySelector('[data-testid="form-criar-local"]')).toBeNull();
     desmontar();
   });
 
