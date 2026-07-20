@@ -3088,6 +3088,162 @@ Reportado pelo responsável (2026-07-18): "ao excluir uma seção de um serviço
 
 ---
 
+# TASK-088 — Remover Seção reconcilia `matriz_seccionamento` com `matriz_distancias`
+
+## Objetivo
+
+Ao editar um itinerário e remover uma Seção atendida pelo Serviço, reconciliar
+`matriz_seccionamento` no mesmo write-back que recompõe `matriz_distancias`,
+eliminando pares que deixaram de existir e mantendo o documento exportável pela
+RN-059.
+
+## Contexto
+
+Bug vivo reportado pelo responsável em 2026-07-20: após remover uma Seção, a
+exportação é bloqueada por `[RN-059] par de matriz_seccionamento deve existir em
+matriz_distancias deste mesmo Serviço`. O write-back atual em
+`servicosComItinerarioAtualizado` recompõe `matriz_distancias` pela TASK-026,
+mas preserva integralmente a `matriz_seccionamento` anterior. Assim, pares que
+referenciam a Seção removida ficam obsoletos.
+
+A TASK-084 já limpa `secao.servicos[]` e descarta a Seção órfã; a TASK-046 já
+reconcilia `horarios_paradas`. Esta task fecha apenas a terceira consequência
+estrutural da mesma edição: a integridade entre as duas matrizes. Como
+`matriz_seccionamento.distancia_km` é valor confirmado/editado pelo usuário
+(RN-058), pares sobreviventes preservam seu valor; somente pares ausentes na
+nova `matriz_distancias` são removidos.
+
+## Fora de escopo
+
+- Alterar o cálculo de `matriz_distancias` (TASK-026) ou seus valores.
+- Alterar o editor da matriz de seccionamento, os botões de sugestão ou a regra
+  de `distancia_km` confirmada (TASK-027; RN-058/RN-060).
+- Habilitar automaticamente novos pares ao inserir uma Seção.
+- Recalcular ou substituir `distancia_km` dos pares sobreviventes.
+- Alterar a limpeza de `secao.servicos[]`, o descarte de Seção órfã ou a
+  reconciliação de horários (TASK-084/TASK-046).
+- Alterar o gate ou as mensagens de exportação (TASK-085/TASK-086/TASK-082).
+- Qualquer mudança no contrato JSON, Comparador, PDF ou Ingestor.
+
+## Specs fonte
+
+- Spec 02 §8 — `matriz_distancias` contém todas as combinações de Seções
+  atendidas pelo Serviço.
+- Spec 02 §9 — cada par de `matriz_seccionamento` deve existir em
+  `matriz_distancias`; `distancia_km` é o valor confirmado pelo usuário.
+- Spec 02 §14 — integridade estrutural das duas matrizes.
+
+## Regras envolvidas
+
+- RN-054 — `matriz_distancias` tem todas as combinações não ordenadas de Seções
+  atendidas pelo Serviço.
+- RN-058 — `matriz_seccionamento` guarda pares habilitados e a distância
+  confirmada/editada pelo usuário.
+- RN-059 — cada par de seccionamento deve existir na `matriz_distancias` do
+  mesmo Serviço, sem duplicatas e independentemente da ordem `{a,b}`.
+- RN-015 — a reconciliação ocorre no Formulário; leitores não recalculam dados
+  congelados.
+
+## Entidades afetadas
+
+- Serviço.
+- Seção.
+- Itinerário/Parada, apenas como origem da mudança do conjunto atendido.
+- `ParDistancia` (`matriz_distancias`).
+- `ParSecao` (`matriz_seccionamento`).
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor (⚠ exige decisão humana — RN-093)
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Depois de recompor `matriz_distancias`, `matriz_seccionamento` contém
+  somente pares cuja chave não-direcional ainda existe na nova matriz.
+- [ ] Remover uma Seção elimina todos e somente os pares de seccionamento que a
+  referenciam; pares entre Seções sobreviventes permanecem.
+- [ ] `distancia_km` e a ordem de armazenamento dos pares sobreviventes são
+  preservados, sem reaplicar sugestões ou valores de `matriz_distancias`.
+- [ ] Inserir uma Seção cria os novos pares apenas em `matriz_distancias` e não
+  os habilita automaticamente em `matriz_seccionamento`.
+- [ ] Editar Local, reordenar as mesmas Seções ou recalcular apenas a rota
+  preserva todos os pares de seccionamento ainda válidos.
+- [ ] A reconciliação ocorre no mesmo update de sessão do write-back de
+  Paradas/rota, matriz de distâncias, horários e limpeza de Seções.
+- [ ] O documento resultante não apresenta RN-059 e passa pela validação
+  estrutural/exportação quando não houver outras violações.
+
+## Casos válidos
+
+- Serviço com Seções A, B e C, `matriz_distancias = [AB, AC, BC]` e
+  `matriz_seccionamento = [AB(10), AC(20), BC(12)]`; remover C resulta em
+  `matriz_distancias = [AB]` e `matriz_seccionamento = [AB(10)]`.
+- No mesmo cenário, inserir D gera AD/BD/CD em `matriz_distancias`, mas mantém
+  apenas os pares de seccionamento que o usuário já havia habilitado.
+- Remover ou mover um Local intermediário, mantendo A/B/C, preserva integralmente
+  `[AB(10), AC(20), BC(12)]`, mesmo que as distâncias roteadas mudem.
+
+## Casos inválidos
+
+- Preservar `AC` ou `BC` em `matriz_seccionamento` após C deixar de existir na
+  nova `matriz_distancias` deve ser impedido pelo teste de regressão RN-059.
+- Reconciliar sobrescrevendo `AB.distancia_km = 10` pelo novo
+  `valor_adotado_de_distancia` é inválido: o valor confirmado do usuário deve
+  permanecer.
+- Inserir D e habilitar automaticamente AD/BD/CD em `matriz_seccionamento` é
+  inválido: habilitação continua sendo escolha explícita do usuário.
+
+## Testes esperados
+
+- Unitários: função pura de reconciliação por chave não-direcional; remoção de
+  todos e somente os pares obsoletos; preservação de `distancia_km`, ordem e
+  imutabilidade; matriz vazia; ordem invertida `{a,b}`/`{b,a}`.
+- Integração: write-back de remoção de Seção recompõe `matriz_distancias`,
+  filtra `matriz_seccionamento` no mesmo update e produz documento sem RN-059;
+  OSRM mockado.
+- E2E: opcional — remover Seção com par de seccionamento habilitado e confirmar
+  que a exportação deixa de bloquear por RN-059.
+- Snapshot/contrato JSON: documento resultante passa no schema strict e em
+  `coletarViolacoesEstruturais`; nenhuma mudança de contrato.
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/matrizes/` — função pura para reconciliar pares de
+  `matriz_seccionamento` contra `matriz_distancias` e exportação no `index.ts`.
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` — aplicar a reconciliação
+  em `servicosComItinerarioAtualizado` no mesmo write-back.
+- `testes/unitarios/formulario/` — testes puros e de integração do fluxo.
+
+## Dependências
+
+- TASK-026 — cálculo/recomposição de `matriz_distancias` (entregue).
+- TASK-027 — semântica e operações de `matriz_seccionamento` (entregue).
+- TASK-084 — limpeza de Seção na mesma ação de remoção (entregue).
+- TASK-046 — reconciliação de horários no mesmo write-back (entregue).
+
+## Riscos
+
+- Filtrar por par ordenado apagaria escolhas válidas quando o armazenamento usa
+  `{b,a}`; reutilizar `chaveParNaoDirecional` da TASK-026/RN-059.
+- Recalcular `distancia_km` de par sobrevivente apagaria confirmação manual do
+  usuário e violaria RN-058.
+- Aplicar a limpeza em commit separado criaria uma janela de documento inválido
+  entre o recálculo da matriz e a reconciliação.
+- A futura TASK-077, ao espelhar remoções entre Ida/Volta, deve continuar
+  passando pelo mesmo write-back consolidado.
+
+## Perguntas em aberto
+
+Nenhuma. A remoção de pares inexistentes é exigida pela RN-059, e a preservação
+dos valores sobreviventes decorre da confirmação explícita da RN-058.
+
+---
+
 ## Ordem recomendada de execução
 
 ```text
@@ -3162,13 +3318,14 @@ ramo do mapa: 064 → 065 → 071 → 066 → 067
 **Correções de edição de itinerário e feedback de bloqueio (relatadas pelo responsável em 2026-07-17):**
 
 ```text
-085 → 084 → 087
+085 → 084 → 046 (absorve 087) → 088
 083 (independente)
 ```
 
 - **TASK-083** vem da **DEC-068** (Q-048): ponto de rota órfão na remoção de parada de extremo é descartado com aviso, fechando a ressalva da revisão da TASK-066. Toca só `reancorar-pontos-de-rota.ts` — independente das outras duas, pode rodar a qualquer momento.
 - **TASK-084** (bug) corrige a raiz do "JSON travado após remover uma Seção": a remoção de parada passa a limpar `secao.servicos[]` e descartar a Seção órfã (análogo por-parada da cascata da TASK-080). Coordenar com a **TASK-077** (espelho Ida↔Volta).
 - **TASK-085** (bug) torna **visível** o motivo de qualquer bloqueio de exportação (estrutural/técnico), hoje mudo. Recomendada **antes** da 084 (torna o sintoma diagnosticável de imediato) e **antes/junto da TASK-082** (senão o bloqueio de 350 m/tipificação da 082 também nasceria invisível).
-- **TASK-087** (bug, 2026-07-18) é o **irmão RN-063** da TASK-084: a mesma ação de remover uma Seção/parada deixava os `horarios_paradas[]` das Viagens já preenchidas com contagem estale, violando a RN-063 e travando a exportação. A 084 fechou o caminho RN-018 (Seção órfã), a 087 fecha o RN-063 (Viagens defasadas) no mesmo write-back. Depende da **TASK-084** (mesma ação/commit).
+- **TASK-087** foi absorvida pela **TASK-046**: o caso de remoção é regressão da reconciliação geral de horários (inserir/remover/reordenar) e não deve ser implementado isoladamente.
+- **TASK-088** (bug, 2026-07-20) fecha o caminho **RN-059** da mesma ação: depois de `matriz_distancias` ser recomposta, filtra de `matriz_seccionamento` os pares que deixaram de existir, preservando os valores confirmados dos pares sobreviventes. Depende das **TASK-026/027/084/046**, todas entregues, e é prioridade máxima por bloquear a exportação.
 
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.

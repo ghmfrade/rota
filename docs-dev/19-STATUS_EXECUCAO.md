@@ -154,7 +154,16 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 ## 5. Tasks a executar — ordem recomendada
 
-21 tasks pendentes. A ordem abaixo respeita as dependências declaradas nas próprias tasks; onde há folga, ela é indicada. A antiga prioridade máxima (TASK-082) foi concluída; a visibilidade dos motivos usa a infraestrutura entregue pelas TASK-085/086.
+22 tasks pendentes. A ordem abaixo respeita as dependências declaradas nas próprias tasks; onde há folga, ela é indicada. A antiga prioridade máxima (TASK-082) foi concluída; a visibilidade dos motivos usa a infraestrutura entregue pelas TASK-085/086.
+
+### Grupo A — Bug vivo de integridade das matrizes (prioridade máxima)
+
+Bloqueia a exportação depois de remover uma Seção que participa da matriz de
+seccionamento.
+
+| # | Task | Complex. | Observação |
+|:---:|---|:---:|---|
+| 1 | **088** — Remover Seção reconcilia `matriz_seccionamento` com `matriz_distancias` | **2** | Fecha a RN-059 no mesmo write-back das TASK-084/046; depende de 026/027, todas entregues. |
 
 ### Grupo B — Ramo do mapa e pontos de rota
 
@@ -162,14 +171,14 @@ Fecha a UX de mapa e interações. Depende só do que já está entregue (060, 0
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 1 | **083** — Descartar ponto de rota órfão na remoção de extremo | **2** | Follow-up da 066 (entregue). |
-| 2 | **065** — Inverter gestos: esquerdo = ponto de rota, direito = menu Seção/Local | **3** | Só depende da 063. |
-| 3 | **067** — Inserção posicional: clique direito na linha insere no trecho | **3** | Precisa de 066 (✅) + 065. |
-| 4 | **068** — Identidade visual do vértice (ciano) | **1** | Precede a 069 (que reusa o token). |
-| 5 | **069** — Affordance de hover sobre a linha | **2** | Precisa da 068. |
-| 6 | **070** — Clique sobre o vértice remove o ponto de rota | **2** | Independente de 065/067. |
-| 7 | **079** — Pontos de rota na lista lateral intercalados | **4** | Desbloqueada por 066 + 071. |
-| 8 | **064** — Sincronização de seleção tabela↔mapa | **3** | Depois da 079, para projetar sobre a lista unificada. |
+| 2 | **083** — Descartar ponto de rota órfão na remoção de extremo | **2** | Follow-up da 066 (entregue). |
+| 3 | **065** — Inverter gestos: esquerdo = ponto de rota, direito = menu Seção/Local | **3** | Só depende da 063. |
+| 4 | **067** — Inserção posicional: clique direito na linha insere no trecho | **3** | Precisa de 066 (✅) + 065. |
+| 5 | **068** — Identidade visual do vértice (ciano) | **1** | Precede a 069 (que reusa o token). |
+| 6 | **069** — Affordance de hover sobre a linha | **2** | Precisa da 068. |
+| 7 | **070** — Clique sobre o vértice remove o ponto de rota | **2** | Independente de 065/067. |
+| 8 | **079** — Pontos de rota na lista lateral intercalados | **4** | Desbloqueada por 066 + 071. |
+| 9 | **064** — Sincronização de seleção tabela↔mapa | **3** | Depois da 079, para projetar sobre a lista unificada. |
 
 Travas rígidas: `068 → 069` e `079 → 064`. As demais têm folga entre si.
 
@@ -179,16 +188,16 @@ As próprias tasks pedem rodar **depois** do Grupo B, para não retrabalhar a su
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 9 | **077** — Volta espelhada (ordem inversa como regra dura) | **4** | Antes da 076 (que assume Volta derivada). **Herda a obrigação** de manter corretas a limpeza de Seção (084, entregue) e a reconciliação de horários (046) quando o espelho refletir a remoção nos dois sentidos. |
-| 10 | **076** — Ida e Volta no mesmo mapa (abas, tracejado, dois painéis) | **5** | A mais cara do backlog pendente. Deixar por último do grupo. |
-| 11 | **078** — Realocação de Seção inteira (translação rígida) | **4** | Cascata de recálculo multi-Serviço — caminho novo. |
+| 10 | **077** — Volta espelhada (ordem inversa como regra dura) | **4** | Antes da 076 (que assume Volta derivada). **Herda a obrigação** de manter corretas a limpeza de Seção (084, entregue), a reconciliação de horários (046) e a reconciliação das matrizes (088) quando o espelho refletir a remoção nos dois sentidos. |
+| 11 | **076** — Ida e Volta no mesmo mapa (abas, tracejado, dois painéis) | **5** | A mais cara do backlog pendente. Deixar por último do grupo. |
+| 12 | **078** — Realocação de Seção inteira (translação rígida) | **4** | Cascata de recálculo multi-Serviço — caminho novo. |
 
 ### Grupo D — UX restante e qualidade
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 12 | **075** — Identificação: pré-visualização + confirmação explícita | **2** | Encaixe livre — independente de tudo acima. |
-| 13 | **062** — E2E do fluxo "criar do zero" ponta a ponta | **3** | Depois do mapa estabilizado, senão os seletores mudam de novo. |
+| 13 | **075** — Identificação: pré-visualização + confirmação explícita | **2** | Encaixe livre — independente de tudo acima. |
+| 14 | **062** — E2E do fluxo "criar do zero" ponta a ponta | **3** | Depois do mapa estabilizado, senão os seletores mudam de novo. |
 
 ### Grupo E — Fases originais restantes (MVP 3 em diante)
 
@@ -196,13 +205,13 @@ Independentes do ramo do mapa: nada aqui bloqueia ou é bloqueado por ele.
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 14 | **033** — PDF operacional: estrutura e identificação | **4** | Subsistema novo (@react-pdf) + captura do mapa. |
-| 15 | **034** — PDF operacional: tabelas horárias e matrizes | **3** | Sobre a 033. |
-| 16 | **035** — Comparador: carregamento e validação dos dois arquivos | **3** | |
-| 17 | **036** — Motor de diff por UUID + taxonomia | **5** | Núcleo do Comparador; casamento por UUID e por contexto. |
-| 18 | **037** — Telas de comparação | **4** | Superfície ampla (5 visões/abas). |
-| 19 | **038** — Mapa comparativo | **3** | Bloqueio parcial: Q-004 (tolerância). |
-| 20 | **039** — PDF comparativo completo | **4** | |
+| 15 | **033** — PDF operacional: estrutura e identificação | **4** | Subsistema novo (@react-pdf) + captura do mapa. |
+| 16 | **034** — PDF operacional: tabelas horárias e matrizes | **3** | Sobre a 033. |
+| 17 | **035** — Comparador: carregamento e validação dos dois arquivos | **3** | |
+| 18 | **036** — Motor de diff por UUID + taxonomia | **5** | Núcleo do Comparador; casamento por UUID e por contexto. |
+| 19 | **037** — Telas de comparação | **4** | Superfície ampla (5 visões/abas). |
+| 20 | **038** — Mapa comparativo | **3** | Bloqueio parcial: Q-004 (tolerância). |
+| 21 | **039** — PDF comparativo completo | **4** | |
 
 ### Grupo F — Bloqueada
 
