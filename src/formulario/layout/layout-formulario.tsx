@@ -96,7 +96,11 @@ export function LayoutFormulario({
   // única de verdade — não recomputa violações por conta própria).
   const itinerariosAoVivo = itinerariosAoVivoDaSessao(sessao);
   const gate = avaliarGateExportacao(sessao, itinerariosAoVivo);
-  const pendencias = [...coletarPendencias(sessao, itinerariosAoVivo), ...gate.errosEstruturais];
+  const pendencias = [
+    ...coletarPendencias(sessao, itinerariosAoVivo),
+    ...gate.errosTecnicos,
+    ...gate.errosEstruturais,
+  ];
   const cabecalho = dadosCabecalho(sessao);
 
   return (

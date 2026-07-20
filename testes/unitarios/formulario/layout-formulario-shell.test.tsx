@@ -116,4 +116,32 @@ describe("LayoutFormulario — motivo estrutural do bloqueio visível na Revisã
 
     desmontar();
   });
+
+  it("[inválido] violação técnica da TASK-082 aparece em Erros bloqueantes", () => {
+    const documento = documentoExemploMinimo();
+    documento.autos.secoes[0].servicos[0].geolocalizacao_volta = {
+      latitude: -23.97,
+      longitude: -46.3339,
+    };
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+    const { container, desmontar } = renderizar(
+      <LayoutFormulario sessao={sessao} aoAtualizarSessao={vi.fn()} />,
+    );
+
+    const botaoRevisao = container.querySelector(
+      '[data-testid="etapa-botao"][data-etapa="revisao"]',
+    ) as HTMLButtonElement;
+    act(() => {
+      botaoRevisao.click();
+    });
+
+    const itensBloqueantes = container.querySelectorAll(
+      '[data-testid="revisao-item-bloqueante"]',
+    );
+    const textos = Array.from(itensBloqueantes).map((item) => item.textContent);
+    expect(textos.some((texto) => texto?.includes(documento.autos.secoes[0].nome))).toBe(true);
+    expect(textos.every((texto) => !texto?.match(/\[RN-\d+\]/))).toBe(true);
+
+    desmontar();
+  });
 });

@@ -197,4 +197,19 @@ describe("TelaExportacao — gate bloqueado (Spec 04 §14)", () => {
     desmontar();
   });
 
+  it("[inválido] bloqueio técnico da TASK-082 lista o motivo operacional na Exportação", () => {
+    const documento = documentoExemploMinimo();
+    documento.autos.servicos[0].caracteristica_veiculo = "SU";
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    const { container, desmontar } = renderizar(<TelaExportacao sessao={sessao} />);
+
+    const item = container.querySelector('[data-testid="exportacao-motivos-bloqueio"] li');
+    expect(item).not.toBeNull();
+    expect(item!.textContent).toContain(documento.autos.servicos[0].numero_n);
+    expect(item!.textContent).not.toMatch(/\[RN-\d+\]|caracteristica_veiculo/);
+
+    desmontar();
+  });
+
 });

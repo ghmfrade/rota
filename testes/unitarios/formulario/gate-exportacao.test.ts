@@ -22,6 +22,7 @@ describe("avaliarGateExportacao — caminho liberado", () => {
 
     expect(resultado.liberado).toBe(true);
     expect(resultado.pendenciasBloqueantes).toHaveLength(0);
+    expect(resultado.errosTecnicos).toHaveLength(0);
     expect(resultado.errosEstruturais).toHaveLength(0);
     expect(resultado.documentoIncompleto).toBe(false);
   });
@@ -93,6 +94,116 @@ describe("avaliarGateExportacao — casos bloqueantes (RN-078)", () => {
     const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
 
     expect(avaliarGateExportacao(sessao, []).liberado).toBe(true);
+  });
+});
+
+describe("avaliarGateExportacao — violações técnicas bloqueiam só a exportação (TASK-082/DEC-067)", () => {
+  test("[inválido] Seção com violação estática de 350 m bloqueia com mensagem operacional", () => {
+    const documento = documentoExemploMinimo();
+    documento.autos.secoes[0].servicos[0].geolocalizacao_volta = {
+      latitude: -23.97,
+      longitude: -46.3339,
+    };
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    const resultado = avaliarGateExportacao(sessao, []);
+
+    expect(resultado.liberado).toBe(false);
+    const motivo = resultado.errosTecnicos.find((item) =>
+      item.id.startsWith("tecnico-350m_secao"),
+    );
+    expect(motivo).toBeDefined();
+    expect(motivo!.mensagem).toContain(documento.autos.secoes[0].nome);
+    expect(motivo!.mensagem).toContain("350 m");
+    expect(motivo!.mensagem).not.toMatch(/\[RN-\d+\]|Spec 03|centroide/);
+    expect(motivo!.etapaAlvo).toBe("secoes-locais-itinerarios");
+    expect(motivo!.diagnostico).toContain("RN-028");
+  });
+
+  test("[inválido] Local com Ida e Volta a mais de 350 m bloqueia e identifica Local e Serviço", () => {
+    const documento = documentoExemploMinimo();
+    documento.autos.servicos[0].locais[0].geolocalizacao_volta = {
+      latitude: -24.015,
+      longitude: -46.398,
+    };
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    const resultado = avaliarGateExportacao(sessao, []);
+
+    expect(resultado.liberado).toBe(false);
+    const motivo = resultado.errosTecnicos.find((item) =>
+      item.id.startsWith("tecnico-350m_local"),
+    );
+    expect(motivo).toBeDefined();
+    expect(motivo!.mensagem).toContain(documento.autos.servicos[0].locais[0].nome);
+    expect(motivo!.mensagem).toContain(documento.autos.servicos[0].numero_n);
+    expect(motivo!.mensagem).not.toMatch(/\[RN-\d+\]|geolocalizacao_/);
+    expect(motivo!.etapaAlvo).toBe("secoes-locais-itinerarios");
+  });
+
+  test("[inválido] tipificação incompatível bloqueia e aponta para Serviços", () => {
+    const documento = documentoExemploMinimo();
+    documento.autos.servicos[0].caracteristica_veiculo = "SU";
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    const resultado = avaliarGateExportacao(sessao, []);
+
+    expect(resultado.liberado).toBe(false);
+    const motivo = resultado.errosTecnicos.find((item) =>
+      item.id.startsWith("tecnico-tipificacao"),
+    );
+    expect(motivo).toBeDefined();
+    expect(motivo!.mensagem).toContain(documento.autos.servicos[0].numero_n);
+    expect(motivo!.mensagem).toContain(documento.autos.tipo);
+    expect(motivo!.mensagem).not.toMatch(/\[RN-\d+\]|caracteristica_veiculo/);
+    expect(motivo!.etapaAlvo).toBe("servicos");
+  });
+
+  test("violação corrigida durante a sessão libera o gate sem estado adicional", () => {
+    const documento = documentoExemploMinimo();
+    const geolocalizacaoOriginal = documento.autos.secoes[0].servicos[0].geolocalizacao_volta;
+    documento.autos.secoes[0].servicos[0].geolocalizacao_volta = {
+      latitude: -23.97,
+      longitude: -46.3339,
+    };
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    expect(avaliarGateExportacao(sessao, []).liberado).toBe(false);
+
+    documento.autos.secoes[0].servicos[0].geolocalizacao_volta = geolocalizacaoOriginal;
+    expect(avaliarGateExportacao(sessao, []).liberado).toBe(true);
+  });
+
+  test("[inválido] violações técnicas coexistem com demais pendências bloqueantes", () => {
+    const documento = documentoExemploMinimo();
+    documento.autos.servicos[0].caracteristica_veiculo = "SU";
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+    const itinerarios: ItinerarioAoVivo[] = [
+      {
+        numeroN: documento.autos.servicos[0].numero_n,
+        sentido: "ida",
+        estadoRota: { situacao: "sem-rota", falha: { tipo: "sem-rota" } },
+      },
+    ];
+
+    const resultado = avaliarGateExportacao(sessao, itinerarios);
+
+    expect(resultado.pendenciasBloqueantes.some((item) => item.id.startsWith("rota-ausente"))).toBe(
+      true,
+    );
+    expect(
+      resultado.errosTecnicos.some((item) => item.id.startsWith("tecnico-tipificacao")),
+    ).toBe(true);
+  });
+
+  test("avaliação não altera o documento nem suas UUIDs", () => {
+    const documento = documentoExemploMinimo();
+    const antes = structuredClone(documento);
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+
+    avaliarGateExportacao(sessao, []);
+
+    expect(documento).toEqual(antes);
   });
 });
 

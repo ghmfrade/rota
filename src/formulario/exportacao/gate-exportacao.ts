@@ -12,6 +12,10 @@ import {
 } from "@/formulario/pendencias";
 import type { SessaoFormulario } from "@/formulario/sessao";
 import { rotuloEtapa, type IdEtapa } from "@/formulario/layout/etapas";
+import {
+  coletarAlertasTecnicos,
+  type AlertaTecnico,
+} from "@/shared/checagens-leitor";
 import { montarDocumentoParaExportacao } from "./montar-documento";
 
 // Gate de exportação para a etapa Exportação (TASK-032; RN-078; Spec 04
@@ -257,11 +261,69 @@ function coletarErrosEstruturais(documento: DocumentoOperacao): Pendencia[] {
   });
 }
 
+function mensagemOperacionalAlertaTecnico(
+  documento: DocumentoOperacao,
+  alerta: AlertaTecnico,
+): string {
+  const indiceEntidade = comoIndice(alerta.caminho[2]);
+
+  if (alerta.codigo === "350m_secao") {
+    const secao = indiceEntidade !== undefined ? documento.autos.secoes[indiceEntidade] : undefined;
+    const rotulo = rotuloSecao(secao);
+    return `${rotulo[0].toUpperCase()}${rotulo.slice(1)} tem pontos a mais de 350 m do conjunto. Reposicione os pontos ou crie uma Seção separada antes de exportar.`;
+  }
+
+  if (alerta.codigo === "350m_local") {
+    const servico = indiceEntidade !== undefined ? documento.autos.servicos[indiceEntidade] : undefined;
+    const indiceLocal = comoIndice(alerta.caminho[4]);
+    const local = servico && indiceLocal !== undefined ? servico.locais[indiceLocal] : undefined;
+    const rotuloLocal = local ? `O Local ${local.nome}` : "Um Local";
+    const rotuloServico = servico ? ` do Serviço ${servico.numero_n}` : "";
+    return `${rotuloLocal}${rotuloServico} tem pontos de Ida e Volta a mais de 350 m entre si. Reposicione os pontos ou crie dois Locais distintos antes de exportar.`;
+  }
+
+  const servico =
+    alerta.caminho[1] === "servicos" && indiceEntidade !== undefined
+      ? documento.autos.servicos[indiceEntidade]
+      : undefined;
+  if (servico) {
+    return `A característica de veículo do Serviço ${servico.numero_n} não é compatível com o tipo ${documento.autos.tipo} do Autos. Ajuste a característica antes de exportar.`;
+  }
+  return `As características de veículo dos Serviços não são compatíveis com o tipo ${documento.autos.tipo} do Autos. Revise a identificação e os Serviços antes de exportar.`;
+}
+
+function etapaAlvoAlertaTecnico(alerta: AlertaTecnico): IdEtapa {
+  if (alerta.codigo === "350m_secao" || alerta.codigo === "350m_local") {
+    return "secoes-locais-itinerarios";
+  }
+  return alerta.caminho[1] === "servicos" ? "servicos" : "identificacao";
+}
+
+/**
+ * Eleva os alertas estáticos a bloqueantes somente no momento da exportação
+ * (TASK-082/DEC-067). `coletarAlertasTecnicos` e o pipeline de leitura
+ * permanecem não bloqueantes (RN-091).
+ */
+function coletarErrosTecnicos(documento: DocumentoOperacao): Pendencia[] {
+  return coletarAlertasTecnicos(documento).map((alerta) => ({
+    id: `tecnico-${alerta.codigo}-${alerta.caminho.join("-")}`,
+    severidade: "bloqueante",
+    mensagem: mensagemOperacionalAlertaTecnico(documento, alerta),
+    etapaAlvo: etapaAlvoAlertaTecnico(alerta),
+    diagnostico: montarDiagnostico(alerta.caminho, alerta.mensagem),
+  }));
+}
+
 export interface ResultadoGateExportacao {
   /** `true` quando a exportação está liberada (Spec 04 §11: sem bloqueantes). */
   liberado: boolean;
   /** Pendências bloqueantes ao vivo (rota/descrição/matriz — §11), se houver. */
   pendenciasBloqueantes: Pendencia[];
+  /**
+   * Violações técnicas elevadas a bloqueantes apenas na exportação
+   * (TASK-082/DEC-067), expostas separadamente para a Revisão listá-las.
+   */
+  errosTecnicos: Pendencia[];
   /**
    * Violações estruturais do documento final (forma do schema + Spec 02
    * §14), traduzidas em mensagem operacional (Spec 04 §14) — expostas para a
@@ -284,18 +346,20 @@ export function avaliarGateExportacao(
   sessao: SessaoFormulario,
   itinerariosAoVivo: readonly ItinerarioAoVivo[],
 ): ResultadoGateExportacao {
-  const pendenciasBloqueantes = coletarPendencias(sessao, itinerariosAoVivo).filter(
+  const pendenciasAoVivo = coletarPendencias(sessao, itinerariosAoVivo).filter(
     (pendencia) => pendencia.severidade === "bloqueante",
   );
   const documento = montarDocumentoParaExportacao(sessao);
   if (!documento) {
     return {
       liberado: false,
-      pendenciasBloqueantes,
+      pendenciasBloqueantes: pendenciasAoVivo,
+      errosTecnicos: [],
       errosEstruturais: [],
       documentoIncompleto: true,
     };
   }
+  const errosTecnicos = coletarErrosTecnicos(documento);
   const errosEstruturais = coletarErrosEstruturais(paraChecagemEstrutural(documento));
   if (errosEstruturais.length > 0 && process.env.NODE_ENV !== "production") {
     for (const erro of errosEstruturais) {
@@ -303,8 +367,12 @@ export function avaliarGateExportacao(
     }
   }
   return {
-    liberado: pendenciasBloqueantes.length === 0 && errosEstruturais.length === 0,
-    pendenciasBloqueantes,
+    liberado:
+      pendenciasAoVivo.length === 0 &&
+      errosTecnicos.length === 0 &&
+      errosEstruturais.length === 0,
+    pendenciasBloqueantes: pendenciasAoVivo,
+    errosTecnicos,
     errosEstruturais,
     documentoIncompleto: false,
   };
