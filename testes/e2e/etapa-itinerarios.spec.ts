@@ -497,14 +497,48 @@ test.describe("Etapa Seções, Locais e Itinerários — feedback de montagem in
     await marcadores.first().waitFor();
     await expect(mapa).toBeVisible();
     await mapa.scrollIntoViewIfNeeded();
+
+    // No zoom inicial do Estado inteiro, os 3 marcadores ficam sobrepostos e
+    // cobrem todos os pixels do primeiro segmento. Nesse estado, o clique no
+    // ponto médio acerta o elemento DOM de um marcador, não o canvas do mapa.
+    // Amplia em torno do próprio segmento para expor a linha sem mudar o alvo
+    // geométrico do cenário (clique direito SOBRE a linha).
+    const caixaInicialA = await marcadores.nth(0).boundingBox();
+    const caixaInicialB = await marcadores.nth(1).boundingBox();
+    if (!caixaInicialA || !caixaInicialB) throw new Error("marcador sem bounding box");
+    const meioInicial = {
+      x:
+        (caixaInicialA.x +
+          caixaInicialA.width / 2 +
+          caixaInicialB.x +
+          caixaInicialB.width / 2) /
+        2,
+      y:
+        (caixaInicialA.y +
+          caixaInicialA.height / 2 +
+          caixaInicialB.y +
+          caixaInicialB.height / 2) /
+        2,
+    };
+    await page.mouse.move(meioInicial.x, meioInicial.y);
+    for (let passo = 0; passo < 6; passo += 1) {
+      await page.mouse.wheel(0, -500);
+      await page.waitForTimeout(250);
+    }
+    await page.waitForTimeout(500);
+
     const caixaA = await marcadores.nth(0).boundingBox();
     const caixaB = await marcadores.nth(1).boundingBox();
     if (!caixaA || !caixaB) throw new Error("marcador sem bounding box");
-    const meio = {
-      x: (caixaA.x + caixaA.width / 2 + caixaB.x + caixaB.width / 2) / 2,
-      y: (caixaA.y + caixaA.height / 2 + caixaB.y + caixaB.height / 2) / 2,
+    const centroA = { x: caixaA.x + caixaA.width / 2, y: caixaA.y + caixaA.height / 2 };
+    const centroB = { x: caixaB.x + caixaB.width / 2, y: caixaB.y + caixaB.height / 2 };
+    // 85% do segmento A→B continua exatamente sobre a linha, mas fica fora
+    // dos círculos de 16 px que interceptariam o evento antes do MapLibre.
+    const pontoSobreLinha = {
+      x: centroA.x + (centroB.x - centroA.x) * 0.85,
+      y: centroA.y + (centroB.y - centroA.y) * 0.85,
     };
-    await page.mouse.click(meio.x, meio.y, { button: "right" });
+    await page.mouse.click(pontoSobreLinha.x, pontoSobreLinha.y, { button: "right" });
     await page.getByRole("menuitem", { name: "Local" }).click();
 
     await page.getByTestId("nome-local-input").fill("Novo Local E2E");
