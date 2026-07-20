@@ -23,4 +23,5 @@ export {
   type ResultadoHabilitarPar,
   type ModoSugestaoSeccionamento,
 } from "./edicao-seccionamento";
+export { reconciliarMatrizSeccionamento } from "./reconciliar-matriz-seccionamento";
 export { EtapaMatrizes } from "./etapa-matrizes";

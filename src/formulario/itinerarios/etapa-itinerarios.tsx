@@ -30,7 +30,10 @@ import {
   removerPontoDeRota,
 } from "@/formulario/roteamento";
 import { Botao, Painel, Select, Tabela } from "@/shared/ui";
-import { matrizDistanciasDoServico } from "@/formulario/matrizes";
+import {
+  matrizDistanciasDoServico,
+  reconciliarMatrizSeccionamento,
+} from "@/formulario/matrizes";
 import {
   comServicosDaSessao,
   identidadeDaSessao,
@@ -280,10 +283,10 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
   /**
    * Grava a rota/paradas recalculadas do itinerário de um Serviço já COMPLETO
    * (documento carregado, ou já promovido no modo "novo" — DEC-053; TASK-061)
-   * e, no MESMO commit, reconcilia `matriz_distancias` do Serviço (TASK-026;
-   * RN-054..057, Spec 04 §9.1/§11 — recálculo automático "ao concluir a
-   * edição do itinerário"). Reconciliar aqui, e não como um commit separado,
-   * evita a janela em que o documento teria uma rota nova com a matriz antiga.
+   * e, no MESMO commit, reconcilia `matriz_distancias` (TASK-026; RN-054..057)
+   * e `matriz_seccionamento` (TASK-088; RN-058/059) do Serviço. Reconciliar
+   * aqui, e não como um commit separado, evita a janela em que o documento
+   * teria rota nova com qualquer uma das matrizes antigas.
    */
   function servicosComItinerarioAtualizado(
     base: Servico[],
@@ -309,9 +312,14 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
         return reconciliacao.itinerario;
       });
       const servicoAtualizado = { ...s, itinerarios };
+      const matrizDistancias = matrizDistanciasDoServico(servicoAtualizado);
       return {
         ...servicoAtualizado,
-        matriz_distancias: matrizDistanciasDoServico(servicoAtualizado),
+        matriz_distancias: matrizDistancias,
+        matriz_seccionamento: reconciliarMatrizSeccionamento(
+          s.matriz_seccionamento,
+          matrizDistancias,
+        ),
       };
     });
     return { servicos, uuidsViagensComAncorasDescartadas };

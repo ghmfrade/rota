@@ -4,7 +4,11 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { EtapaItinerarios, chaveItinerario, itinerariosAoVivoDaSessao } from "@/formulario/itinerarios";
 import { coletarPendencias } from "@/formulario/pendencias";
 import type { SessaoFormulario } from "@/formulario/sessao";
-import type { PontoDeRota } from "@/shared/contrato";
+import {
+  coletarViolacoesEstruturais,
+  esquemaDocumentoOperacao,
+  type PontoDeRota,
+} from "@/shared/contrato";
 import { act, renderizar, type ResultadoRenderizacao } from "../shared-ui/_ajuda-render";
 import { documentoExemploMinimo } from "../../fixtures";
 
@@ -185,6 +189,31 @@ describe("EtapaItinerarios — descarte de ponto de rota órfão (TASK-083/DEC-0
       const chave = chaveItinerario(SERVICO_UUID, "ida");
       expect(sessaoAtual.pontosDeRotaEmEdicao?.[chave]).toEqual([]);
       expect(sessaoAtual.estadosRotaViva?.[chave]?.situacao).toBe("recalculada");
+
+      if (sessaoAtual.modo !== "carregado") {
+        throw new Error("a fixture da integração deveria permanecer no modo carregado");
+      }
+      const servicoAtualizado = sessaoAtual.documento.autos.servicos[0];
+      expect(servicoAtualizado.matriz_distancias).toHaveLength(1);
+      expect(servicoAtualizado.matriz_seccionamento).toEqual([
+        indice === 0
+          ? {
+              secao_a_uuid: "6f51076b-aaf8-4546-8530-4da1e489c880",
+              secao_b_uuid: "63344e28-4722-4a8b-ae9d-1862e8daded4",
+              distancia_km: 6,
+            }
+          : {
+              secao_a_uuid: "4da15f36-5bbe-4f4e-90e3-68029097c1b9",
+              secao_b_uuid: "6f51076b-aaf8-4546-8530-4da1e489c880",
+              distancia_km: 8,
+            },
+      ]);
+      expect(
+        coletarViolacoesEstruturais(sessaoAtual.documento).filter(
+          (violacao) => violacao.mensagem.includes("[RN-059]"),
+        ),
+      ).toEqual([]);
+      expect(esquemaDocumentoOperacao.safeParse(sessaoAtual.documento).success).toBe(true);
 
       const bloqueantes = coletarPendencias(
         sessaoAtual,
