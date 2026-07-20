@@ -15,7 +15,14 @@ Implemente a task indicada seguindo o **plano aprovado** na "Análise da Task". 
 - **Preservar o contrato JSON** (Spec 02) e as **UUIDs** em qualquer import/cópia (RN-004, RN-007) — com teste de round-trip quando tocar import/export.
 - **Testes** para toda RN implementada (categorias de `docs-dev/08-TEST_STRATEGY.md`), com casos válidos **e inválidos**; **mock do OSRM sempre** — nenhum teste depende do serviço público.
 - **Nomenclatura oficial das specs** em código, comentários e docs — não traduzir conceitos.
-- Rodar as verificações disponíveis (typecheck, lint, testes — ver seção "Comandos" do `CLAUDE.md`) e **reportar resultados reais** (falha é reportada como falha).
+- Rodar as verificações disponíveis e **reportar resultados reais**; toda falha deve ser corrigida e o comando repetido.
+
+## Ordem das verificações
+
+1. Durante a implementação, rodar **somente os testes direcionados** aos arquivos/regras alterados.
+2. Rodar `lint` e `typecheck`; corrigir todas as falhas antes de avançar.
+3. Rodar a **suíte completa uma única vez, no fim**; se falhar, corrigir e repetir até ficar verde.
+4. Rodar `build` e E2E pesados, quando aplicáveis, **sequencialmente** — nunca em paralelo entre si ou com a suíte completa. Aguardar cada processo terminar para evitar concorrência e locks.
 
 ## Entrega
 
