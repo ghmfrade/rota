@@ -156,7 +156,7 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 ## 5. Tasks a executar — ordem recomendada
 
-20 tasks pendentes. A ordem abaixo respeita as dependências declaradas nas próprias tasks; onde há folga, ela é indicada. A antiga prioridade máxima (TASK-082) foi concluída; a visibilidade dos motivos usa a infraestrutura entregue pelas TASK-085/086. O Grupo A (bug vivo de integridade das matrizes) foi fechado pela **TASK-088**, implementada em `2b27c9a` e aprovada em `docs-dev/14-REVISOES/TASK-088-20260720.md` — não há mais bug bloqueando a exportação após remover uma Seção.
+20 tasks pendentes. A ordem abaixo respeita as dependências declaradas nas próprias tasks; onde há folga, ela é indicada. A antiga prioridade máxima (TASK-082) foi concluída; a visibilidade dos motivos usa a infraestrutura entregue pelas TASK-085/086. O Grupo A (bug vivo de integridade das matrizes) foi fechado pela **TASK-088**, implementada em `2b27c9a` e aprovada em `docs-dev/14-REVISOES/TASK-088-20260720.md` — não há mais bug bloqueando a exportação após remover uma Seção. A **TASK-065** tem código no histórico (`edf0b44`) mas **segue pendente**: a revisão de 2026-07-20 a reprovou por verificação falhando; ciclo só fecha após correção e nova revisão.
 
 ### Grupo B — Ramo do mapa e pontos de rota
 
@@ -164,8 +164,8 @@ Fecha a UX de mapa e interações. Depende só do que já está entregue (060, 0
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 1 | **065** — Inverter gestos: esquerdo = ponto de rota, direito = menu Seção/Local | **3** | Só depende da 063. |
-| 2 | **067** — Inserção posicional: clique direito na linha insere no trecho | **3** | Precisa de 066 (✅) + 065. |
+| 1 | **065** — Inverter gestos: esquerdo = ponto de rota, direito = menu Seção/Local | **3** | Só depende da 063. **Implementada em `edf0b44`, mas REPROVADA** na revisão de 2026-07-20 (`14-REVISOES/TASK-065-20260720.md`): o E2E `etapa-itinerarios.spec.ts:465` (clique direito **sobre a linha** → menu → Local) falha de forma reproduzível. Continua pendente até a correção ser reapresentada e revisada. |
+| 2 | **067** — Inserção posicional: clique direito na linha insere no trecho | **3** | Precisa de 066 (✅) + 065. **Não iniciar antes de a 065 ser aprovada:** a 067 consome o callback `aoClicarDireitoNaLinha`, que é exatamente o caminho cuja falha reprovou a 065. |
 | 3 | **068** — Identidade visual do vértice (ciano) | **1** | Precede a 069 (que reusa o token). |
 | 4 | **069** — Affordance de hover sobre a linha | **2** | Precisa da 068. |
 | 5 | **070** — Clique sobre o vértice remove o ponto de rota | **2** | Independente de 065/067. |
