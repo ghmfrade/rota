@@ -3244,6 +3244,162 @@ dos valores sobreviventes decorre da confirmação explícita da RN-058.
 
 ---
 
+# TASK-089 — E2E `etapa-itinerarios.spec.ts:71` afere ausência de **bloqueante**, não ausência de pendência
+
+## Objetivo
+
+O E2E "mover parada recalcula com sucesso e atualiza a descrição (composer REAL,
+DEC-046)" volta a passar, aferindo o que a RN-078 de fato garante — que um
+recálculo bem-sucedido não deixa pendência **bloqueante** — em vez de exigir
+painel de pendências totalmente vazio, condição que o alerta não bloqueante da
+TASK-081 tornou impossível no fixture usado.
+
+## Contexto
+
+Achado registrado em `docs-dev/19-STATUS_EXECUCAO.md` §6.4, durante a
+reavaliação da TASK-065
+(`docs-dev/14-REVISOES/TASK-065-20260720-reavaliacao.md`, problema 4).
+
+`testes/e2e/etapa-itinerarios.spec.ts:117` exige
+`painel-pendencias → pendencia-item` com contagem **0** após a reordenação. A
+**TASK-081** (`06a7ed4`) passou a emitir o alerta agregado "Serviços 0001-1SU,
+0001-2SU sem grade de feriados — confirme se é intencional"
+(`src/formulario/pendencias/pendencias.ts:184`), e o fixture
+`testes/fixtures/carregar-multi-servico.json` não tem Viagem de feriado em
+nenhum Serviço — então o painel legitimamente exibe 1 item de severidade
+`alerta`, e a asserção falha. Falha **determinística**, 3/3 em `--repeat-each=3`,
+não flakiness.
+
+O comportamento do produto está **correto** pela RN-071 (grade vazia é válida,
+vira alerta) e pela RN-078 (alerta não bloqueia). O defeito é da asserção, que
+confunde "sem pendência bloqueante" com "sem nenhum item no painel". A intenção
+original do teste — provada pelos vizinhos `:116` (`mensagem-sem-rota` ausente)
+e `:134-144` (o caso de falha do OSRM, que exige `data-severidade="bloqueante"`)
+— é que o recálculo bem-sucedido não produza bloqueio.
+
+## Fora de escopo
+
+- **Alterar `testes/fixtures/carregar-multi-servico.json`** para ganhar grade de
+  feriados: fixture canônica compartilhada (TASK-041), consumida por outros
+  testes; mudá-la para calar um alerta é conserto pelo lado errado e arrisca
+  regressão fora desta task.
+- Qualquer mudança em `src/formulario/pendencias/` — o alerta da TASK-081 está
+  correto e permanece exatamente como está (RN-071/RN-078).
+- Rever a granularidade ou o texto do alerta de feriados (decisão do responsável
+  registrada na TASK-081).
+- O outro vermelho histórico dessa suíte: nada a fazer sobre `:465`
+  (clique direito sobre a linha), já verde pela TASK-065.
+- Estabilização geral de E2E (paralelismo, subida do `next dev`) — não é desta
+  task.
+
+## Specs fonte
+
+- Spec 04 §11 (taxonomia de pendências da Revisão: erros bloqueantes × alertas;
+  "tabela de feriados vazia" está entre os **alertas**)
+- Spec 04 §12 (o gate de exportação olha bloqueantes)
+- Spec 03 §9.3 (grade de feriados)
+
+## Regras envolvidas
+
+- RN-078 (alertas **não** bloqueiam; só bloqueantes bloqueiam — é a regra que a
+  asserção nova passa a aferir)
+- RN-071 (grade de feriados vazia é válida, alerta não bloqueante — a razão de o
+  item existir no painel)
+- RN-048 (itinerário sem rota é bloqueante — o que o teste realmente quer negar
+  no caminho de sucesso)
+- RN-052 (editar recalcula — o comportamento sob teste, inalterado)
+
+## Entidades afetadas
+
+- Nenhuma. Nenhum modelo, nenhum campo: a alteração é de asserção de teste.
+
+## Ferramentas afetadas
+
+- [x] Formulário (só a suíte E2E; nenhum arquivo de `src/`)
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] `npx playwright test testes/e2e/etapa-itinerarios.spec.ts --workers=1`
+      passa **9/9**, sem `--repeat-each` e com `--repeat-each=3` no teste
+      corrigido.
+- [ ] A asserção corrigida afere **ausência de pendência bloqueante**
+      (`pendencia-item` filtrado por `data-severidade="bloqueante"`), não
+      contagem total do painel.
+- [ ] O teste continua provando o que provava: descrição recomposta pelo composer
+      REAL ("Via Reordenada 1"), `mensagem-sem-rota` ausente, nova ordem das
+      paradas — nenhuma dessas asserções é removida ou enfraquecida.
+- [ ] O alerta de feriados **não** é silenciado: nem o fixture, nem
+      `src/formulario/pendencias/`, nem o painel são alterados
+      (`git show --stat` da task não contém nenhum arquivo de `src/`).
+- [ ] Nenhuma outra asserção da suíte E2E exige painel de pendências vazio por
+      contagem total — verificado por varredura de `pendencia-item` em
+      `testes/e2e/` e corrigido no mesmo padrão se houver outra ocorrência.
+- [ ] `npm test`, `npm run typecheck` e `npm run lint` permanecem verdes.
+
+## Casos válidos
+
+- Reordenar a primeira parada do itinerário de Volta do Serviço 0001-1SU com o
+  OSRM mockado respondendo `code: "Ok"`: rota recalculada, descrição contendo
+  "Via Reordenada 1", **zero** pendências bloqueantes — e o alerta de feriados
+  presente no painel sem reprovar o teste.
+- O mesmo cenário num documento hipotético **com** grade de feriados: continua
+  verde (a asserção nova não depende da presença ou ausência do alerta).
+
+## Casos inválidos
+
+- OSRM devolvendo `NoRoute` (teste vizinho `:120`): a pendência bloqueante
+  "está sem rota calculada" **aparece** e o filtro por
+  `data-severidade="bloqueante"` a encontra — a asserção nova não pode tornar o
+  caso de falha indistinguível do de sucesso.
+- Substituir a asserção por remoção pura (apagar a linha `:117`) é inválido:
+  perderia a garantia de RN-048/RN-078 no caminho de sucesso.
+- Trocar a contagem total 0 por contagem total 1 (contar o alerta) é inválido:
+  amarraria o teste de recálculo a um alerta de outra área, que volta a quebrar
+  quando qualquer alerta novo entrar.
+
+## Testes esperados
+
+- Unitários: N/A — nenhum código de produção muda.
+- Integração: N/A.
+- E2E: `testes/e2e/etapa-itinerarios.spec.ts:71` corrigido e verde; os outros 8
+  testes da suíte seguem verdes; `formulario-layout.spec.ts` (que já filtra
+  `pendencia-item` por texto e severidade) permanece intocado e verde.
+- Snapshot/contrato JSON: N/A.
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `testes/e2e/etapa-itinerarios.spec.ts` — alterar a asserção `:117` (e só ela,
+  salvo outra ocorrência encontrada na varredura).
+
+## Dependências
+
+- **TASK-081** (entregue) — origem do alerta que expôs a asserção frágil.
+- TASK-019/044/DEC-046 (entregues) — donas do teste e do comportamento aferido.
+
+## Riscos
+
+- **Enfraquecer o teste ao consertá-lo:** filtrar por severidade não pode virar
+  desculpa para deixar de afirmar a ausência de bloqueio; o caso `NoRoute`
+  vizinho é a prova de que o filtro ainda detecta bloqueante.
+- **Corrigir pelo fixture:** dar grade de feriados ao
+  `carregar-multi-servico.json` faria o teste passar, mas mudaria a entrada de
+  todos os outros consumidores da fixture canônica — daí o "Fora de escopo".
+- **Reincidência:** qualquer alerta novo em `coletarPendencias` volta a quebrar
+  qualquer asserção de contagem total; a varredura pedida nos critérios existe
+  para não deixar outra igual para trás.
+
+## Perguntas em aberto
+
+Nenhuma. O comportamento correto está fixado pela RN-071 (alerta) e pela RN-078
+(alerta não bloqueia); a task só realinha a asserção do teste com a regra.
+
+---
+
 ## Ordem recomendada de execução
 
 ```text
@@ -3327,5 +3483,6 @@ ramo do mapa: 064 → 065 → 071 → 066 → 067
 - **TASK-085** (bug) torna **visível** o motivo de qualquer bloqueio de exportação (estrutural/técnico), hoje mudo. Recomendada **antes** da 084 (torna o sintoma diagnosticável de imediato) e **antes/junto da TASK-082** (senão o bloqueio de 350 m/tipificação da 082 também nasceria invisível).
 - **TASK-087** foi absorvida pela **TASK-046**: o caso de remoção é regressão da reconciliação geral de horários (inserir/remover/reordenar) e não deve ser implementado isoladamente.
 - **TASK-088** (bug, 2026-07-20) fecha o caminho **RN-059** da mesma ação: depois de `matriz_distancias` ser recomposta, filtra de `matriz_seccionamento` os pares que deixaram de existir, preservando os valores confirmados dos pares sobreviventes. Depende das **TASK-026/027/084/046**, todas entregues, e é prioridade máxima por bloquear a exportação.
+- **TASK-089** (débito de teste, 2026-07-20) conserta a asserção de contagem total de pendências do E2E `etapa-itinerarios.spec.ts:71`, quebrada desde a **TASK-081** pelo alerta legítimo de grade de feriados vazia (RN-071/RN-078). Não toca `src/`; pode rodar a qualquer momento e mantém a suíte de itinerários verde para as tasks do mapa (067 em diante).
 
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.

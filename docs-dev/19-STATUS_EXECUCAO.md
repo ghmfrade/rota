@@ -157,7 +157,7 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 ## 5. Tasks a executar — ordem recomendada
 
-19 tasks pendentes. A ordem abaixo respeita as dependências declaradas nas próprias tasks; onde há folga, ela é indicada. A antiga prioridade máxima (TASK-082) foi concluída; a visibilidade dos motivos usa a infraestrutura entregue pelas TASK-085/086. O Grupo A (bug vivo de integridade das matrizes) foi fechado pela **TASK-088**, implementada em `2b27c9a` e aprovada em `docs-dev/14-REVISOES/TASK-088-20260720.md` — não há mais bug bloqueando a exportação após remover uma Seção. A **TASK-065** saiu da lista de pendentes: reprovada em 2026-07-20 por E2E vermelho, foi corrigida em `6469a04` e **aprovada com ressalvas** na reavaliação `docs-dev/14-REVISOES/TASK-065-20260720-reavaliacao.md`.
+20 tasks pendentes (19 do backlog original + a TASK-089, criada em 2026-07-20 a partir do achado §6.4). A ordem abaixo respeita as dependências declaradas nas próprias tasks; onde há folga, ela é indicada. A antiga prioridade máxima (TASK-082) foi concluída; a visibilidade dos motivos usa a infraestrutura entregue pelas TASK-085/086. O Grupo A (bug vivo de integridade das matrizes) foi fechado pela **TASK-088**, implementada em `2b27c9a` e aprovada em `docs-dev/14-REVISOES/TASK-088-20260720.md` — não há mais bug bloqueando a exportação após remover uma Seção. A **TASK-065** saiu da lista de pendentes: reprovada em 2026-07-20 por E2E vermelho, foi corrigida em `6469a04` e **aprovada com ressalvas** na reavaliação `docs-dev/14-REVISOES/TASK-065-20260720-reavaliacao.md`.
 
 ### Grupo B — Ramo do mapa e pontos de rota
 
@@ -190,6 +190,7 @@ As próprias tasks pedem rodar **depois** do Grupo B, para não retrabalhar a su
 |:---:|---|:---:|---|
 | 10 | **075** — Identificação: pré-visualização + confirmação explícita | **2** | Encaixe livre — independente de tudo acima. |
 | 11 | **062** — E2E do fluxo "criar do zero" ponta a ponta | **3** | Depois do mapa estabilizado, senão os seletores mudam de novo. |
+| — | **089** — E2E `etapa-itinerarios.spec.ts:71` afere ausência de bloqueante, não painel vazio | **1** | Débito de teste da TASK-081 (ver §6.4). **Encaixe livre, sem dependências** — só `testes/e2e/`, nenhum arquivo de `src/`. Recomendada **antes da 067**, para a suíte de itinerários voltar a ser sinal confiável nas tasks do mapa. |
 
 ### Grupo E — Fases originais restantes (MVP 3 em diante)
 
@@ -248,4 +249,4 @@ Achado na reavaliação da TASK-065 (`14-REVISOES/TASK-065-20260720-reavaliacao.
 
 **Atribuição:** não é da TASK-065 — nenhum dos seus commits toca `src/formulario/pendencias/`. É débito de teste da TASK-081, que acrescentou o alerta sem atualizar o E2E que assume zero pendências nesse fixture.
 
-**Ação pendente:** abrir task própria para decidir entre dar grade de feriados ao fixture ou filtrar a asserção por severidade. Enquanto não for feita, a suíte `etapa-itinerarios.spec.ts` fica em **8 passed / 1 failed** e esse vermelho não deve ser confundido com regressão de tasks novas do mapa.
+**Resolução encaminhada:** virou a **TASK-089** (`06-BACKLOG_INICIAL.md`), que realinha a asserção com a RN-078 (aferir ausência de **bloqueante**, não painel vazio) e proíbe expressamente consertar pelo fixture canônico. Enquanto não for executada, a suíte `etapa-itinerarios.spec.ts` fica em **8 passed / 1 failed**, e esse vermelho não deve ser confundido com regressão de tasks novas do mapa.
