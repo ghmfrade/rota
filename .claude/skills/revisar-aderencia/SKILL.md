@@ -38,9 +38,13 @@ Toda afirmação sobre o que **outra** task faz ou não faz — que arquivo emit
 1. Percorra `docs-dev/07-CHECKLIST_ADERENCIA_SPEC.md` **item a item** (marque `N/A` quando não se aplicar; qualquer item aplicável não atendido → ressalva ou reprovação).
 2. Preencha o `docs-dev/14-REVIEW_REPORT_TEMPLATE.md` completo e **salve-o** em `docs-dev/14-REVISOES/TASK-XXX-<AAAAMMDD>.md` (o template manda arquivar o parecer junto da task). O parecer é sempre um arquivo, nunca só texto na conversa.
 3. Parecer objetivo pelos critérios do template: **aprovado** (escopo exato, RN com testes, checklist limpo), **aprovado com ressalvas** (desvios menores, sem violar RN Alta nem NEG-xxx; ressalvas viram condições explícitas) ou **reprovado** (violação de RN Alta, NEG-xxx, escopo relevante, testes ausentes ou verificações falhando) — com a lista de problemas ordenada por severidade.
+4. Atualize `docs-dev/19-STATUS_EXECUCAO.md` no mesmo movimento da revisão:
+   - se o ciclo foi concluído, mova a task da lista de pendentes para a de executadas e atualize totais, ordem e achados de sequenciamento afetados;
+   - se o parecer reprovar a entrega ou mantiver condição impeditiva, registre o estado real sem marcar a task como concluída;
+   - se a task absorver, substituir ou desbloquear outra, reflita isso explicitamente no status para evitar execução duplicada ou salto silencioso.
 
 ## Commit
 
-Comite o parecer salvo com a mensagem `Registra revisão de aderência da TASK-XXX: <parecer>` (segundo commit da convenção de dois commits por task — `docs-dev/04-AI_IMPLEMENTATION_PROTOCOL.md`). Este commit nunca é vazio: ele contém o arquivo do parecer.
+Comite o parecer salvo e a atualização de `docs-dev/19-STATUS_EXECUCAO.md` com a mensagem `Registra revisão de aderência da TASK-XXX: <parecer>` (segundo commit da convenção de dois commits por task — `docs-dev/04-AI_IMPLEMENTATION_PROTOCOL.md`). Este commit nunca é vazio: ele contém o arquivo do parecer e, quando o status realmente mudar, o status atualizado.
 
 Só depois de revisão aprovada avança-se para a próxima task (`docs-dev/00` §3).
