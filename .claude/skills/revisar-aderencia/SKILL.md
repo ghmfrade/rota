@@ -1,11 +1,19 @@
 ---
 name: revisar-aderencia
-description: Revisa a implementação de uma TASK do ROTA contra as specs e regras RN — percorre o checklist docs-dev/07 item a item e preenche o template de revisão docs-dev/14, com parecer aprovado / com ressalvas / reprovado. Use após toda implementação, antes do merge.
+description: Revisa, em uma nova conversa após a implementação, uma TASK do ROTA contra as specs e regras RN — percorre o checklist docs-dev/07 item a item e preenche o template de revisão docs-dev/14, com parecer aprovado / com ressalvas / reprovado. Use após toda implementação, antes do merge; nunca continue a conversa que implementou a task.
 ---
 
 # Revisar Aderência à Spec
 
 Revise a implementação da task indicada (diff da branch/commit atual, salvo indicação contrária do usuário).
+
+## Fronteira de conversa
+
+Execute esta skill em **uma conversa nova**, separada daquela que implementou a TASK. A
+revisão deve reconstruir suas conclusões a partir dos artefatos persistidos — task, specs,
+código, testes, diff e resultados executados — e não das justificativas ou da memória da
+implementação. Se a implementação acabou de ser feita nesta mesma conversa, pare, não
+revise e oriente o usuário a iniciar outra conversa com `/revisar-aderencia TASK-XXX`.
 
 ## Leitura obrigatória
 

@@ -38,10 +38,13 @@ Specs originais (docs/specs)
 → plano                       (aprovado por humano em modo supervisionado)
 → implementação               (só o escopo da task)
 → testes                      (08-TEST_STRATEGY.md)
+→ encerrar conversa de implementação
+→ nova conversa
 → revisão de aderência        (07-CHECKLIST_ADERENCIA_SPEC.md + 14-REVIEW_REPORT_TEMPLATE.md)
 ```
 
-Só depois da revisão de aderência avança-se para a próxima task.
+A implementação e a revisão formal nunca ocorrem na mesma conversa. Só depois da
+revisão de aderência, feita em uma nova conversa, avança-se para a próxima task.
 
 ## 4. Ordem de leitura
 
@@ -71,10 +74,11 @@ Só depois da revisão de aderência avança-se para a próxima task.
 
 ## 6. Como implementar tasks
 
-Seguir o ciclo por task de `04-AI_IMPLEMENTATION_PROTOCOL.md`: ler → resumir entendimento → apontar ambiguidades → planejar → (aprovação humana) → implementar só o escopo → testar → revisar aderência → resumo final. Nunca implementar duas tasks numa mesma entrega; nunca "aproveitar para melhorar" fora do escopo.
+Seguir o ciclo por task de `04-AI_IMPLEMENTATION_PROTOCOL.md`: ler → resumir entendimento → apontar ambiguidades → planejar → (aprovação humana) → implementar só o escopo → testar → entregar resumo final → encerrar a conversa. Nunca implementar duas tasks numa mesma entrega; nunca "aproveitar para melhorar" fora do escopo. A revisão formal é iniciada depois, em uma nova conversa.
 
 ## 7. Como revisar aderência
 
+- Iniciar uma nova conversa, separada da implementação, e usar `/revisar-aderencia`.
 - Percorrer `07-CHECKLIST_ADERENCIA_SPEC.md` item a item.
 - Verificar que cada regra RN da task tem teste (matriz `03`).
 - Registrar o parecer com `14-REVIEW_REPORT_TEMPLATE.md`: aprovado / aprovado com ressalvas / reprovado.

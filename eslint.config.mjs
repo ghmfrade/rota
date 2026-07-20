@@ -71,6 +71,7 @@ const eslintConfig = defineConfig([
   ...fronteirasDeModulos,
   globalIgnores([
     ".claude/**",
+    ".codex/**",
     "node_modules/**",
     ".next/**",
     "out/**",

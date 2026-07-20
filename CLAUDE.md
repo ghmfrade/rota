@@ -43,13 +43,18 @@ O padrão visual é governado por `docs-dev/18-DESIGN_SYSTEM.md` (vinculante par
 
 Modo supervisionado é o padrão: parar após a "Análise da Task" e aguardar aprovação humana do plano.
 
+Após implementar e entregar a task, encerre a conversa. A revisão de aderência deve ser
+executada com `/revisar-aderencia` em **uma nova conversa**, baseada nos artefatos
+persistidos. Nunca implemente e produza o parecer formal de revisão na mesma conversa,
+inclusive em modo autônomo.
+
 ## Skills
 
 | Skill | Quando usar |
 |---|---|
 | `/analisar-task` | Antes de implementar qualquer task — leitura obrigatória + "Análise da Task"; declara bloqueio se depender de Q-xxx sem decisão. |
-| `/implementar-task` | Após plano aprovado — implementa só o escopo; entrega "Implementação concluída". |
-| `/revisar-aderencia` | Após toda implementação — checklist `docs-dev/07` item a item + parecer no template `docs-dev/14`. |
+| `/implementar-task` | Após plano aprovado — implementa só o escopo, entrega "Implementação concluída" e encerra a conversa. |
+| `/revisar-aderencia` | Em nova conversa após toda implementação — checklist `docs-dev/07` item a item + parecer no template `docs-dev/14`. |
 | `/nova-task` | Para quebrar uma funcionalidade em tasks pequenas com o template `docs-dev/05`. |
 | `/investigar-conflito` | Diante de conflito entre specs — análise estruturada, sem alterar spec, entrega Q-xxx pronta. |
 | `/registrar-decisao` | **Só por decisão explícita do responsável** — move Q-xxx decidida para DEC-xxx em `docs-dev/10` e atualiza `docs-dev/16`. |

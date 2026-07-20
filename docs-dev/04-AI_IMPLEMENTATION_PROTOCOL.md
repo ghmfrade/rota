@@ -16,7 +16,7 @@ Este documento instrui **qualquer IA** (Claude, Codex ou outra) que for implemen
 8. **Planejar antes de codar.** Entregar a "Análise da Task" (formato abaixo) antes de qualquer implementação.
 9. **Criar testes para toda regra RN implementada** (categorias em `08-TEST_STRATEGY.md`), incluindo casos inválidos.
 10. **Informar arquivos alterados** no resumo final, sem omissões.
-11. **Revisar aderência ao final** com `07-CHECKLIST_ADERENCIA_SPEC.md` e reportar o resultado.
+11. **Autoavaliar a aderência ao final da implementação** com `07-CHECKLIST_ADERENCIA_SPEC.md` e reportar o resultado; o parecer formal é feito depois, por `/revisar-aderencia`, em uma nova conversa.
 12. **Usar a nomenclatura oficial das specs** (Autos, Serviço, Seção, Local, Parada, ponto de rota, `numero_n`, `viagem_feriado`…) em código, comentários e docs — não traduzir nem renomear conceitos.
 13. **Marcar inferências.** Qualquer decisão que não esteja literalmente na spec deve ser marcada como *inferência controlada* na análise e na entrega.
 
@@ -37,9 +37,15 @@ Este documento instrui **qualquer IA** (Claude, Codex ou outra) que for implemen
 12. Rodar verificações disponíveis (typecheck, lint, testes).
 13. Entregar resumo final (formato abaixo).
 14. Commit da implementação: `Implementa TASK-XXX: <título>` — só código e testes da task.
-15. Fazer revisão de aderência (07-CHECKLIST_ADERENCIA_SPEC.md).
-16. Salvar o parecer em `docs-dev/14-REVISOES/TASK-XXX-<AAAAMMDD>.md` e comitar: `Registra revisão de aderência da TASK-XXX: <parecer>`.
+15. Encerrar a conversa de implementação.
+16. Em uma nova conversa, executar `/revisar-aderencia` com o checklist `07-CHECKLIST_ADERENCIA_SPEC.md`.
+17. Salvar o parecer em `docs-dev/14-REVISOES/TASK-XXX-<AAAAMMDD>.md` e comitar: `Registra revisão de aderência da TASK-XXX: <parecer>`.
 ```
+
+A separação de conversas é obrigatória inclusive em modo autônomo: a autorização para
+prosseguir sem a parada de aprovação do plano não autoriza emendar a revisão formal à
+implementação. A nova conversa deve revisar os artefatos persistidos, sem depender da
+memória ou das justificativas do implementador.
 
 ## Convenção de commits por task (obrigatória)
 
@@ -116,7 +122,7 @@ O parecer **sempre** é salvo em arquivo; o commit de revisão nunca é vazio.
 
 ## Aderência à spec
 
-(resultado do checklist 07 — itens não aplicáveis marcados como N/A; violações são impeditivas)
+(autoavaliação do implementador pelo checklist 07 — itens não aplicáveis marcados como N/A; violações são impeditivas; não substitui o parecer formal em nova conversa)
 ```
 
 ## Proibições operacionais (resumo executável)
@@ -134,4 +140,4 @@ O parecer **sempre** é salvo em arquivo; o commit de revisão nunca é vazio.
 ## Modo supervisionado × autônomo
 
 - **Supervisionado (padrão):** parar após a "Análise da Task" e aguardar aprovação do plano.
-- **Autônomo (quando explicitamente autorizado):** prosseguir sem parada, mas os dois formatos de resposta continuam obrigatórios, e qualquer ambiguidade nova **interrompe** a task (registra Q-xxx e para).
+- **Autônomo (quando explicitamente autorizado):** prosseguir sem a parada entre análise e implementação, mas os dois formatos de resposta continuam obrigatórios, qualquer ambiguidade nova **interrompe** a task (registra Q-xxx e para) e a conversa sempre termina após a implementação; a revisão formal ocorre em outra conversa.

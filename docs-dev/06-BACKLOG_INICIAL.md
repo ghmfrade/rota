@@ -2999,6 +2999,95 @@ Na TASK-085, `coletarErrosEstruturais` (`src/formulario/exportacao/gate-exportac
 
 ---
 
+## TASK-087 — Remover uma parada (Seção/Local) de um itinerário reconcilia os `horarios_paradas` das Viagens já existentes
+
+## Objetivo
+
+Corrigir um **bug vivo**, irmão da TASK-084: ao remover uma parada de um itinerário que **já tem Viagens** (horários de saída inseridos na grade), os `horarios_paradas[]` de cada Viagem **não são reconciliados** — continuam com um elemento para a parada removida, de modo que a contagem deixa de bater com o novo `paradas.length`. Isso dispara a violação **RN-063** ("`horarios_paradas` deve ter exatamente um elemento por Parada do itinerário — mesmo conjunto de ordem, sem faltar nem sobrar", `validacoes-estruturais.ts:409-415`), bloqueando a exportação. Ao final, o write-back da remoção de parada **reconcilia** os `horarios_paradas[]` de todas as Viagens do itinerário afetado, mantendo o documento estruturalmente válido no mesmo commit.
+
+## Contexto
+
+Reportado pelo responsável (2026-07-18): "ao excluir uma seção de um serviço (após já ter inserido horários de saída no serviço), está retornando essa msg [RN-063]". A TASK-084 fechou o caminho **RN-018** (a Seção órfã em `secao.servicos[]`) da mesma ação de remover parada, mas **não** o caminho **RN-063**: são bugs distintos da **mesma** ação. Diagnóstico: `servicosComItinerarioAtualizado` (`etapa-itinerarios.tsx:276-294`) reescreve apenas `paradas`, `rota` e `matriz_distancias` do itinerário no write-back — **nunca toca `itinerario.viagens[].horarios_paradas`**. Como a rota é recalculada na remoção (os `trechos` mudam), os offsets antigos já ficariam defasados; além disso a **contagem** passa a violar a RN-063 assim que qualquer parada some. As primitivas de recomputação já existem e são puras: `sugerirOffsetsIniciais` (`viagens/sugestao-inicial-offsets.ts`, RN-064) e `recomputarOffsetsComAncoras` (`viagens/redistribuicao-offsets.ts`, RN-065). A reconciliação-alvo é o **reset à sugestão inicial** (RN-066): recomputar `horarios_paradas[]` de cada Viagem pela `sugerirOffsetsIniciais(novasParadas, novosTrechos)`, preservando `uuid`, `horario_saida`, `dia_semana` e `viagem_feriado` (conjunto que a RN-066 já manda preservar). As âncoras manuais são estado efêmero de sessão (DEC-049), não gravado no JSON — não sobrevivem nem a um reload —, então o reset ao baseline é consistente com o modelo e não inventa regra.
+
+## Fora de escopo
+
+- A limpeza de `secao.servicos[]` / descarte de Seção órfã na remoção de parada — é a **TASK-084** (mesma ação, caminho RN-018; entregue). Esta task roda **junto/depois** dela, no mesmo write-back.
+- Tornar o bloqueio de exportação **visível** ao usuário — é a **TASK-085** (entregue). Esta task remove a **causa** RN-063; a 085 já cuida do feedback.
+- Preservar as âncoras manuais das paradas **sobreviventes** ao reconciliar (em vez do reset ao baseline) — refinamento de UX possível, mas exige remapear âncoras por `parada_ordem` deslocada; fica para decisão explícita de sequenciamento na `/analisar-task`, com o reset (RN-066) como padrão seguro e já definido.
+- Reconciliar Viagens diante de **inserir/reordenar** parada — embora seja o **mesmo** ponto de código (o write-back), o gesto reportado é a **remoção**; a `/analisar-task` decide se o critério "reconciliar sempre que `paradas` mudam" já cobre os três de graça (recomendado, pois é a mesma correção) ou se restringe à remoção.
+- Qualquer mudança de contrato JSON, de PDF ou do Comparador.
+
+## Specs fonte
+
+- Spec 02 §11 / §11.1 / §14 (Viagem, `horarios_paradas`, integridade estrutural)
+- Spec 03 §8.1 (sugestão inicial por acúmulo de `duracao_s`) / §8.3 (reset à sugestão inicial)
+- Spec 04 §7.3 (recálculo ao remover parada) / §8 (grade de horários por Serviço × sentido)
+
+## Regras envolvidas
+
+- RN-063 (um `horario_parada` por Parada; monotônico; primeiro `00:00:00`) — a violação que esta task fecha
+- RN-064 (sugestão inicial por acúmulo de durações) — base da recomputação
+- RN-066 (reset à sugestão inicial preservando `uuid`/`horario_saida`/`dia_semana`/`viagem_feriado`) — comportamento-alvo
+- RN-065 (redistribuição por âncoras) — só se a `/analisar-task` optar por preservar âncoras sobreviventes (fora do escopo padrão)
+- RN-004 (UUIDs preservadas — as Viagens mantêm `uuid` na reconciliação; round-trip)
+
+## Entidades afetadas
+
+- Viagem (`horarios_paradas[]`), Parada, Itinerário
+
+## Ferramentas afetadas
+
+- [x] Formulário
+
+## Critérios de aceite
+
+- [ ] Remover uma parada de um itinerário que já tem Viagens reconcilia os `horarios_paradas[]` de **todas** as Viagens daquele itinerário: exatamente um elemento por Parada sobrevivente, na nova `ordem` (RN-063).
+- [ ] Os offsets reconciliados são a sugestão inicial (RN-064) sobre os **novos** `paradas`/`trechos`; o primeiro é `"00:00:00"` e a sequência é não decrescente (RN-063).
+- [ ] `uuid`, `horario_saida`, `dia_semana` e `viagem_feriado` de cada Viagem são preservados (RN-066/RN-004) — round-trip de UUID.
+- [ ] Após a remoção, o documento **não** apresenta a violação RN-063 em `coletarViolacoesEstruturais` (deixa de bloquear a exportação por esse motivo).
+- [ ] Itinerário **sem** Viagens (grade ainda não preenchida) continua funcionando como hoje — a reconciliação é no-op quando `viagens` está vazio.
+- [ ] A reconciliação ocorre no **mesmo commit** do write-back da remoção (junto da limpeza de Seção da TASK-084), sem deixar o documento inválido entre gestos.
+
+## Casos válidos
+
+- Serviço A→B→C→D com Viagens preenchidas (4 `horarios_paradas` por Viagem); remover C → cada Viagem passa a ter 3 `horarios_paradas` (ordem 1..3), offsets re-derivados dos novos trechos, `horario_saida`/`uuid` intactos; exportação deixa de bloquear por RN-063.
+- Itinerário com 2 Viagens (uma comum, uma de feriado); remover uma parada intermediária → **ambas** reconciliadas; nenhuma sobra com a contagem antiga.
+
+## Casos inválidos
+
+- Remover uma parada **sem** reconciliar os `horarios_paradas` (comportamento atual) → RN-063 em `coletarViolacoesEstruturais` — é a regressão que esta task fecha; teste-guarda garante que a violação some.
+- Reconciliação que **altere** `horario_saida`/`dia_semana`/`viagem_feriado`/`uuid` de alguma Viagem → recusada pelos testes de preservação (RN-066/RN-004).
+
+## Testes esperados
+
+- Unitários: a reconciliação pura (recompor `horarios_paradas[]` de uma lista de Viagens contra novos `paradas`/`trechos` via `sugerirOffsetsIniciais`) — contagem = `paradas.length`, primeiro `00:00:00`, não decrescente, campos preservados, no-op para `viagens: []`, não muta a entrada.
+- Integração: remover parada na tabela lateral num itinerário com Viagens → documento resultante passa em `coletarViolacoesEstruturais` (sem RN-063) e em `esquemaDocumentoOperacao`; OSRM mockado.
+- E2E: opcional — inserir horário na grade, voltar, remover Seção e confirmar que a exportação libera (coordenar com a TASK-085 se a visibilidade do gate for exercitada).
+- Snapshot/contrato JSON: documento resultante válido; UUIDs de Viagem preservadas (round-trip RN-004).
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/` (nova função pura de reconciliação, ou reuso direto de `sugerirOffsetsIniciais` mapeada sobre `itinerario.viagens`)
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (`servicosComItinerarioAtualizado` passa a reconciliar `viagens[].horarios_paradas` ao reescrever `paradas`/`rota`)
+- Testes correspondentes em `testes/unitarios/formulario/` e `testes/unitarios/contrato/`
+
+## Dependências
+
+- **TASK-084** (entregue) — fecha o caminho RN-018 da **mesma** ação de remover parada; esta task fecha o caminho RN-063 no mesmo write-back. Coordenar para que ambas as limpezas ocorram no mesmo commit.
+- **TASK-019/TASK-061/TASK-080** (entregues) — write-back de itinerário e promoção de Serviço que esta task estende.
+
+## Riscos
+
+- Reconciliar Viagens de **todos** os itinerários vs. só o editado: a remoção de parada é por sentido, mas a RN-030 mantém o conjunto de Seções espelhado — garantir que a reconciliação atinja o itinerário efetivamente reescrito no write-back (o do sentido corrente) e que o outro sentido, se tocado pelo espelho (TASK-077), também seja reconciliado.
+- Perda das âncoras manuais do usuário no reset (RN-066): é o comportamento-alvo e consistente com DEC-049 (âncoras efêmeras), mas deve ser confirmado na `/analisar-task` antes de implementar preservação de âncoras sobreviventes.
+
+## Perguntas em aberto
+
+- Nenhuma bloqueante (bug de integridade; comportamento-alvo determinado por RN-063 + RN-064/RN-066 e pelo precedente da TASK-084). A escolha entre **reset ao baseline** (padrão) e **preservar âncoras sobreviventes**, e a extensão a inserir/reordenar, são decisões de escopo/sequenciamento a fixar na `/analisar-task` — não dependem de decisão de domínio nova.
+
+---
+
 ## Ordem recomendada de execução
 
 ```text
@@ -3073,12 +3162,13 @@ ramo do mapa: 064 → 065 → 071 → 066 → 067
 **Correções de edição de itinerário e feedback de bloqueio (relatadas pelo responsável em 2026-07-17):**
 
 ```text
-085 → 084
+085 → 084 → 087
 083 (independente)
 ```
 
 - **TASK-083** vem da **DEC-068** (Q-048): ponto de rota órfão na remoção de parada de extremo é descartado com aviso, fechando a ressalva da revisão da TASK-066. Toca só `reancorar-pontos-de-rota.ts` — independente das outras duas, pode rodar a qualquer momento.
 - **TASK-084** (bug) corrige a raiz do "JSON travado após remover uma Seção": a remoção de parada passa a limpar `secao.servicos[]` e descartar a Seção órfã (análogo por-parada da cascata da TASK-080). Coordenar com a **TASK-077** (espelho Ida↔Volta).
 - **TASK-085** (bug) torna **visível** o motivo de qualquer bloqueio de exportação (estrutural/técnico), hoje mudo. Recomendada **antes** da 084 (torna o sintoma diagnosticável de imediato) e **antes/junto da TASK-082** (senão o bloqueio de 350 m/tipificação da 082 também nasceria invisível).
+- **TASK-087** (bug, 2026-07-18) é o **irmão RN-063** da TASK-084: a mesma ação de remover uma Seção/parada deixava os `horarios_paradas[]` das Viagens já preenchidas com contagem estale, violando a RN-063 e travando a exportação. A 084 fechou o caminho RN-018 (Seção órfã), a 087 fecha o RN-063 (Viagens defasadas) no mesmo write-back. Depende da **TASK-084** (mesma ação/commit).
 
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.

@@ -1,0 +1,32 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^(apply_patch|Edit|Write|MultiEdit|NotebookEdit|Bash)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .codex/hooks/protect-specs.js",
+            "commandWindows": "node .codex/hooks/protect-specs.js",
+            "timeout": 10,
+            "statusMessage": "Verificando proteção das specs"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/verificar-rastreabilidade.mjs --hook",
+            "commandWindows": "node scripts/verificar-rastreabilidade.mjs --hook",
+            "timeout": 30,
+            "statusMessage": "Verificando rastreabilidade de Q/DEC"
+          }
+        ]
+      }
+    ]
+  }
+}
+

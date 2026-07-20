@@ -32,4 +32,12 @@ Exatamente o formato **"Implementação concluída"** de `docs-dev/04-AI_IMPLEME
 
 Após a entrega, comite **só o código e os testes desta task** com a mensagem `Implementa TASK-XXX: <título>` (convenção de dois commits por task — `docs-dev/04-AI_IMPLEMENTATION_PROTOCOL.md`). A revisão é um commit à parte, feito por `/revisar-aderencia`.
 
-Depois da entrega, o próximo passo do ciclo é `/revisar-aderencia`.
+## Encerramento obrigatório da conversa
+
+Depois da entrega e do commit da implementação, **encerre esta conversa**. Não invoque
+`/revisar-aderencia`, não produza o parecer formal e não atualize o status de execução na
+mesma conversa, mesmo em modo autônomo ou se ainda houver contexto disponível.
+
+Oriente o usuário a abrir **uma nova conversa** e solicitar `/revisar-aderencia` para a
+mesma TASK. A seção "Aderência à spec" desta entrega é somente a autoavaliação do
+implementador; ela não substitui a revisão independente da conversa seguinte.
