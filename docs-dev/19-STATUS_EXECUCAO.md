@@ -147,6 +147,11 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 
 Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
+- **TASK-083** — implementada no commit `a12db0c`, mas reprovada na revisão
+  `docs-dev/14-REVISOES/TASK-083-20260720.md`: falta teste da exibição/caráter
+  não bloqueante do aviso da DEC-068 e a suíte completa terminou vermelha por
+  falha de resolução `/@fs/C:/Projetos/ROTA` em 19 suítes `.tsx`. Permanece na
+  §5 até correção e nova revisão; não deve ser reimplementada do zero.
 - **TASK-004** — o único commit é `5d0ba4b WIP TASK-004 (interrompida no meio do ciclo): implementa RN-036`, e **não há parecer** em `14-REVISOES/`. Verificação do código, porém, mostra o conteúdo **entregue**: RN-033 (XOR) em `src/shared/contrato/esquema.ts`; RN-034/035/036 em `src/shared/contrato/validacoes-estruturais.ts`; testes em `testes/unitarios/contrato/paradas-itinerarios.test.ts`. **Ação sugerida:** rodar `/revisar-aderencia` na 004 para fechar o ciclo formalmente, ou registrar aqui que foi absorvida pelas tasks seguintes.
 - **TASK-001..012, 041, 042** — implementadas antes de o processo de parecer existir (os pareceres começam em 2026-07-09, com TASK-008/013). Ausência de arquivo em `14-REVISOES/` é esperada e não indica pendência.
 
@@ -171,7 +176,7 @@ Fecha a UX de mapa e interações. Depende só do que já está entregue (060, 0
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 2 | **083** — Descartar ponto de rota órfão na remoção de extremo | **2** | Follow-up da 066 (entregue). |
+| 2 | **083** — Descartar ponto de rota órfão na remoção de extremo | **2** | Implementada em `a12db0c`, revisão de 2026-07-20 reprovada; corrigir testes/verificação e revisar novamente. |
 | 3 | **065** — Inverter gestos: esquerdo = ponto de rota, direito = menu Seção/Local | **3** | Só depende da 063. |
 | 4 | **067** — Inserção posicional: clique direito na linha insere no trecho | **3** | Precisa de 066 (✅) + 065. |
 | 5 | **068** — Identidade visual do vértice (ciano) | **1** | Precede a 069 (que reusa o token). |
