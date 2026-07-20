@@ -1,5 +1,56 @@
 import type { PontoDeRota } from "@/shared/contrato";
 
+export type MudancaSequenciaParadas =
+  | { tipo: "inalterada" }
+  | { tipo: "insercao"; indice: number }
+  | { tipo: "remocao"; indice: number }
+  | { tipo: "reordenacao" }
+  | { tipo: "alteracao-conjunto" };
+
+/**
+ * Classifica a mudança da sequência de Paradas pelas chaves de identidade
+ * antes/depois (TASK-046/TASK-066; DEC-048/DEC-056/DEC-060).
+ * A classificação é compartilhada pela re-ancoragem de pontos de rota e pela
+ * reconciliação dos horários: não se usa posição/rótulo como identidade. A
+ * re-ancoragem exige gesto atômico; a reconciliação também aceita alterações
+ * acumuladas desde o último Itinerário gravado.
+ */
+export function classificarMudancaSequenciaParadas(
+  chavesParadasAntes: readonly string[],
+  chavesParadasDepois: readonly string[],
+): MudancaSequenciaParadas {
+  if (
+    chavesParadasAntes.length === chavesParadasDepois.length &&
+    chavesParadasAntes.every((chave, indice) => chave === chavesParadasDepois[indice])
+  ) {
+    return { tipo: "inalterada" };
+  }
+
+  if (chavesParadasDepois.length === chavesParadasAntes.length + 1) {
+    return {
+      tipo: "insercao",
+      indice: encontrarIndiceInserido(chavesParadasAntes, chavesParadasDepois),
+    };
+  }
+
+  if (chavesParadasDepois.length === chavesParadasAntes.length - 1) {
+    return {
+      tipo: "remocao",
+      indice: encontrarIndiceRemovido(chavesParadasAntes, chavesParadasDepois),
+    };
+  }
+
+  if (chavesParadasDepois.length === chavesParadasAntes.length) {
+    return { tipo: "reordenacao" };
+  }
+
+  // Pode ocorrer entre o último Itinerário gravado e a lista em edição quando
+  // uma tentativa anterior de rota falhou: a UI continuou aceitando gestos
+  // atômicos, mas o documento ficou mais de uma mudança atrás. Para horários,
+  // basta saber que o conjunto mudou e deve ser reconciliado (DEC-048).
+  return { tipo: "alteracao-conjunto" };
+}
+
 // Re-ancoragem de pontos de rota quando o conjunto ou a ordem das paradas
 // muda (TASK-066; DEC-056, atualizada pela DEC-060; Spec 03 §3.6.2 × Spec 02
 // §10.4/RN-042). Função pura, agnóstica de `ParadaEmEdicao` (que pertence a
@@ -46,29 +97,33 @@ export function reancorarPontosDeRota(
   chavesParadasDepois: readonly string[],
   pontos: readonly PontoDeRota[],
 ): PontoDeRota[] {
-  if (chavesParadasDepois.length === chavesParadasAntes.length) {
+  const mudanca = classificarMudancaSequenciaParadas(
+    chavesParadasAntes,
+    chavesParadasDepois,
+  );
+
+  if (mudanca.tipo === "inalterada" || mudanca.tipo === "reordenacao") {
     // Reordenação (DEC-060): mesma contagem ⇒ mesmo `apos_parada_ordem`,
-    // agora referindo-se ao par que ocupa aquela posição na lista nova.
+    // agora referindo-se ao par que ocupa aquela posição na lista nova. Na
+    // sequência inalterada, isto é apenas uma cópia defensiva.
     return pontos.map((ponto) => ({ ...ponto }));
   }
 
-  if (chavesParadasDepois.length === chavesParadasAntes.length + 1) {
-    const indiceInsercao = encontrarIndiceInserido(chavesParadasAntes, chavesParadasDepois);
+  if (mudanca.tipo === "insercao") {
     return pontos.map((ponto) => ({
       ...ponto,
       apos_parada_ordem:
-        ponto.apos_parada_ordem < indiceInsercao
+        ponto.apos_parada_ordem < mudanca.indice
           ? ponto.apos_parada_ordem
           : ponto.apos_parada_ordem + 1,
     }));
   }
 
-  if (chavesParadasDepois.length === chavesParadasAntes.length - 1) {
-    const indiceRemovido = encontrarIndiceRemovido(chavesParadasAntes, chavesParadasDepois);
+  if (mudanca.tipo === "remocao") {
     return pontos.map((ponto) => ({
       ...ponto,
       apos_parada_ordem:
-        ponto.apos_parada_ordem <= indiceRemovido
+        ponto.apos_parada_ordem <= mudanca.indice
           ? ponto.apos_parada_ordem
           : ponto.apos_parada_ordem - 1,
     }));

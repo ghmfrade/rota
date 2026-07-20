@@ -219,6 +219,17 @@ export function ancorasHorarioDaSessao(
   return sessao.ancorasHorario ?? {};
 }
 
+/** Remove somente as âncoras das Viagens indicadas, sem mutar o mapa de
+ * sessão (DEC-048/049). Ausência de UUID é no-op. */
+export function removerAncorasHorarioDeViagens(
+  ancoras: AncorasHorarioPorViagem,
+  viagensUuids: readonly string[],
+): AncorasHorarioPorViagem {
+  const proximas = { ...ancoras };
+  for (const viagemUuid of viagensUuids) delete proximas[viagemUuid];
+  return proximas;
+}
+
 // Identidade corrente da sessão (Spec 04 §5), qualquer que seja o modo: vem de
 // `autos` no carregado e de `identidade` no novo. `undefined` só no novo antes
 // de o usuário selecionar o Autos das listas (RN-016) — quando o cabeçalho

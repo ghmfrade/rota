@@ -29,6 +29,10 @@ export {
   type ResultadoDispararRecalculo,
 } from "./estado-itinerarios";
 export { promoverServico, promoverServicoNaSessao } from "./promocao-servico";
+export {
+  reconciliarHorariosAposMudancaItinerario,
+  type ResultadoReconciliacaoHorariosItinerario,
+} from "./reconciliar-horarios-itinerario";
 export { EtapaItinerarios } from "./etapa-itinerarios";
 export {
   EditorMapaItinerario,

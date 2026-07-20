@@ -4,11 +4,18 @@ import {
   chaveParadaEmEdicao,
   dispararRecalculo,
   itinerariosAoVivoDaSessao,
+  paradasParaContrato,
   pontosDeRotaDoItinerario,
+  reconciliarHorariosAposMudancaItinerario,
 } from "@/formulario/itinerarios";
 import { paradaDeSecao } from "@/formulario/itinerarios";
 import { reancorarPontosDeRota } from "@/formulario/roteamento";
-import { esquemaRota, type DescricaoItinerario } from "@/shared/contrato";
+import {
+  esquemaDocumentoOperacao,
+  esquemaRota,
+  type DescricaoItinerario,
+  type Itinerario,
+} from "@/shared/contrato";
 import type { PontoDeRota, Secao } from "@/shared/contrato";
 import type { SessaoFormulario } from "@/formulario/sessao";
 import { documentoExemploMinimo } from "../../fixtures";
@@ -263,6 +270,92 @@ describe("TASK-066 — re-ancoragem antes de reaplicar (DEC-056/DEC-060), compos
       falha: { tipo: "ponto-de-rota-invalido" },
     });
     expect(fetchFn).not.toHaveBeenCalled();
+  });
+});
+
+describe("TASK-046/TASK-087 — rota recalculada alimenta a reconciliação", () => {
+  test("remoção usa os novos trechos do OSRM mockado e recompõe todas as Viagens", async () => {
+    const base = esquemaDocumentoOperacao.parse(documentoExemploMinimo()).autos.servicos[0]
+      .itinerarios[0];
+    const paradasAntes = [
+      paradaDeSecao(SECAO_A.uuid),
+      paradaDeSecao(SECAO_B.uuid),
+      paradaDeSecao(SECAO_C.uuid),
+    ];
+    const paradasDepois = [paradaDeSecao(SECAO_A.uuid), paradaDeSecao(SECAO_C.uuid)];
+    const anterior: Itinerario = {
+      ...base,
+      paradas: paradasParaContrato(paradasAntes),
+      rota: {
+        ...base.rota,
+        distancia_km: 2,
+        duracao_s: 120,
+        pontos_de_rota: [],
+        trechos: [
+          {
+            parada_origem_ordem: 1,
+            parada_destino_ordem: 2,
+            distancia_km: 1,
+            duracao_s: 60,
+          },
+          {
+            parada_origem_ordem: 2,
+            parada_destino_ordem: 3,
+            distancia_km: 1,
+            duracao_s: 60,
+          },
+        ],
+      },
+      viagens: base.viagens.map((viagem) => ({
+        ...viagem,
+        horarios_paradas: [
+          { parada_ordem: 1, offset_horario: "00:00:00" },
+          { parada_ordem: 2, offset_horario: "00:05:00" },
+          { parada_ordem: 3, offset_horario: "00:10:00" },
+        ],
+      })),
+    };
+    const fetchFn = respostaFetchMock({
+      code: "Ok",
+      routes: [
+        {
+          geometry: {
+            type: "LineString",
+            coordinates: [[-46.33, -23.96], [-46.4, -24.0]],
+          },
+          legs: [{ distance: 1500, duration: 90, steps: [{ name: "Rodovia Nova" }] }],
+        },
+      ],
+    });
+
+    const recalculo = await dispararRecalculo(
+      paradasDepois,
+      [SECAO_A, SECAO_C],
+      [],
+      SERVICO_UUID,
+      "ida",
+      [],
+      { fetchFn },
+    );
+
+    expect(recalculo.ok).toBe(true);
+    if (!recalculo.ok || recalculo.estado.situacao !== "recalculada") {
+      throw new Error("esperava rota recalculada");
+    }
+    const reconciliacao = reconciliarHorariosAposMudancaItinerario(
+      anterior,
+      paradasParaContrato(paradasDepois),
+      recalculo.estado.rota,
+    );
+
+    expect(reconciliacao.mudanca.tipo).toBe("remocao");
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    for (const viagem of reconciliacao.itinerario.viagens) {
+      expect(viagem.horarios_paradas).toEqual([
+        { parada_ordem: 1, offset_horario: "00:00:00" },
+        { parada_ordem: 2, offset_horario: "00:01:30" },
+      ]);
+    }
   });
 });
 

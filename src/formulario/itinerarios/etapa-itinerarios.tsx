@@ -34,6 +34,7 @@ import { matrizDistanciasDoServico } from "@/formulario/matrizes";
 import {
   comServicosDaSessao,
   identidadeDaSessao,
+  removerAncorasHorarioDeViagens,
   secoesDaSessao,
   servicosDaSessao,
   servicosEmConstrucaoDaSessao,
@@ -48,6 +49,7 @@ import {
   pontosDeRotaDoItinerario,
 } from "./estado-itinerarios";
 import { promoverServicoNaSessao } from "./promocao-servico";
+import { reconciliarHorariosAposMudancaItinerario } from "./reconciliar-horarios-itinerario";
 import {
   chaveParadaEmEdicao,
   conjuntoSecoesConsistente,
@@ -100,6 +102,11 @@ const ROTULO_SENTIDO: Record<Sentido, string> = { ida: "Ida", volta: "Volta" };
 interface PropsEtapaItinerarios {
   sessao: SessaoFormulario;
   aoAtualizarSessao: (sessao: SessaoFormulario) => void;
+}
+
+interface ResultadoServicosComItinerarioAtualizado {
+  servicos: Servico[];
+  uuidsViagensComAncorasDescartadas: string[];
 }
 
 export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItinerarios) {
@@ -279,18 +286,30 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     sentido: Sentido,
     paradas: ParadaEmEdicao[],
     rota: Rota,
-  ): Servico[] {
-    return base.map((s) => {
+  ): ResultadoServicosComItinerarioAtualizado {
+    const uuidsViagensComAncorasDescartadas: string[] = [];
+    const novasParadas = paradasParaContrato(paradas);
+    const servicos = base.map((s) => {
       if (s.uuid !== servicoUuid) return s;
-      const itinerarios = s.itinerarios.map((it) =>
-        it.sentido === sentido ? { ...it, paradas: paradasParaContrato(paradas), rota } : it,
-      );
+      const itinerarios = s.itinerarios.map((it) => {
+        if (it.sentido !== sentido) return it;
+        const reconciliacao = reconciliarHorariosAposMudancaItinerario(
+          it,
+          novasParadas,
+          rota,
+        );
+        uuidsViagensComAncorasDescartadas.push(
+          ...reconciliacao.uuidsViagensComAncorasDescartadas,
+        );
+        return reconciliacao.itinerario;
+      });
       const servicoAtualizado = { ...s, itinerarios };
       return {
         ...servicoAtualizado,
         matriz_distancias: matrizDistanciasDoServico(servicoAtualizado),
       };
     });
+    return { servicos, uuidsViagensComAncorasDescartadas };
   }
 
   /**
@@ -378,14 +397,28 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
       // Serviço já completo (documento carregado, ou já promovido — DEC-053):
       // grava a rota+paradas novas e reconcilia a matriz no mesmo commit
       // (RN-054..057).
-      const servicosAtualizados = servicosComItinerarioAtualizado(
+      const atualizacaoServico = servicosComItinerarioAtualizado(
         servicosDaSessao(atual),
         linhaAtual.servicoUuid,
         sentidoSelecionado,
         novasParadas,
         resultado.estado.rota,
       );
+      const servicosAtualizados = atualizacaoServico.servicos;
       proxima = comServicosDaSessao(proxima, servicosAtualizados);
+
+      // DEC-048/049: mudar ordem/conjunto reseta os horários e descarta, no
+      // MESMO update, somente as âncoras efêmeras das Viagens reconciliadas.
+      // Mudança apenas de rota devolve a lista vazia e preserva âncoras/offsets.
+      if (atualizacaoServico.uuidsViagensComAncorasDescartadas.length > 0) {
+        proxima = {
+          ...proxima,
+          ancorasHorario: removerAncorasHorarioDeViagens(
+            proxima.ancorasHorario ?? {},
+            atualizacaoServico.uuidsViagensComAncorasDescartadas,
+          ),
+        };
+      }
 
       // TASK-084 (RN-018): a remoção de parada pode ter deixado de referenciar
       // uma Seção em TODOS os itinerários do Serviço — limpa a contribuição

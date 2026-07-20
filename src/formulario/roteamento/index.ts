@@ -54,4 +54,8 @@ export {
   moverPontoDeRota,
   removerPontoDeRota,
 } from "./posicionar-ponto-de-rota";
-export { reancorarPontosDeRota } from "./reancorar-pontos-de-rota";
+export {
+  classificarMudancaSequenciaParadas,
+  reancorarPontosDeRota,
+  type MudancaSequenciaParadas,
+} from "./reancorar-pontos-de-rota";

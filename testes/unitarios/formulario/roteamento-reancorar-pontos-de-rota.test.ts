@@ -1,5 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { reancorarPontosDeRota } from "@/formulario/roteamento";
+import {
+  classificarMudancaSequenciaParadas,
+  reancorarPontosDeRota,
+} from "@/formulario/roteamento";
 import type { PontoDeRota } from "@/shared/contrato";
 
 // TASK-066 — re-ancoragem de pontos de rota quando o conjunto ou a ordem das
@@ -17,6 +20,34 @@ const p1: PontoDeRota = { apos_parada_ordem: 1, latitude: -23.1, longitude: -46.
 const p2: PontoDeRota = { apos_parada_ordem: 1, latitude: -23.2, longitude: -46.2 };
 const p3: PontoDeRota = { apos_parada_ordem: 1, latitude: -23.3, longitude: -46.3 };
 const p4: PontoDeRota = { apos_parada_ordem: 2, latitude: -23.7, longitude: -46.8 };
+
+describe("classificarMudancaSequenciaParadas (TASK-046/TASK-066)", () => {
+  test("distingue sequência inalterada de reordenação com a mesma contagem", () => {
+    expect(classificarMudancaSequenciaParadas([A, B, C], [A, B, C])).toEqual({
+      tipo: "inalterada",
+    });
+    expect(classificarMudancaSequenciaParadas([A, B, C], [B, A, C])).toEqual({
+      tipo: "reordenacao",
+    });
+  });
+
+  test("classifica inserção e remoção com o índice da diferença", () => {
+    expect(classificarMudancaSequenciaParadas([A, B, C], [A, D, B, C])).toEqual({
+      tipo: "insercao",
+      indice: 1,
+    });
+    expect(classificarMudancaSequenciaParadas([A, B, C], [A, C])).toEqual({
+      tipo: "remocao",
+      indice: 1,
+    });
+  });
+
+  test("mudanças acumuladas após falha de rota são classificadas sem fingir gesto atômico", () => {
+    expect(classificarMudancaSequenciaParadas([A, B], [A, C, D, B])).toEqual({
+      tipo: "alteracao-conjunto",
+    });
+  });
+});
 
 describe("reancorarPontosDeRota — acrescentar ao fim (DEC-056)", () => {
   test("nenhum apos_parada_ordem muda", () => {
