@@ -57,6 +57,11 @@ describe("ancorarPontoNaRota (Spec 03 §3.6 — ancorado entre duas paradas cons
     expect(ancoragem?.aposParadaOrdem).toBe(2);
   });
 
+  it("[borda] clique exatamente sobre B ancora deterministicamente depois de B", () => {
+    const ancoragem = ancorarPontoNaRota(B, LINHA, [A, B, C]);
+    expect(ancoragem?.aposParadaOrdem).toBe(2);
+  });
+
   it("[inválido] clique antes da primeira parada satura em 1, nunca 0 (RN-042)", () => {
     const cliqueAntes: Coordenada = { lng: -46, lat: -22.9 };
     const ancoragem = ancorarPontoNaRota(cliqueAntes, LINHA, [A, B, C]);

@@ -59,11 +59,15 @@ const geolocDoSentido = (local: Local, sentido: Sentido): Ponto | undefined =>
 interface CriacaoPendente {
   tipo: "secao" | "local";
   posicao: Coordenada;
+  /** Presente somente quando o `contextmenu` acertou a linha da rota
+   * (TASK-067/DEC-055). O host converte a coordenada no índice da Parada. */
+  posicaoNaLinha?: Coordenada;
 }
 
 interface MenuCriacaoPendente {
   posicao: Coordenada;
   ancoraTela: AncoraTelaMapa;
+  sobreLinha: boolean;
 }
 
 export interface PropsEditorMapaItinerario {
@@ -76,9 +80,9 @@ export interface PropsEditorMapaItinerario {
   /** Serviço tem os dois itinerários (Ida e Volta) — RN-026. */
   bidirecional: boolean;
   recursosMunicipio: RecursosMunicipio;
-  aoCriarSecao: (secao: Secao) => void;
+  aoCriarSecao: (secao: Secao, posicaoNaLinha?: Coordenada) => void;
   aoAtualizarSecao: (secao: Secao) => void;
-  aoCriarLocal: (local: Local) => void;
+  aoCriarLocal: (local: Local, posicaoNaLinha?: Coordenada) => void;
   aoAtualizarLocal: (local: Local) => void;
   /** Exclusão do ponto de um sentido: o Local (já unidirecional) é devolvido e
    * o host remove a Parada daquele sentido (DEC-045). */
@@ -181,24 +185,36 @@ export function EditorMapaItinerario({
     aoArrastar: (posicao: Coordenada) => aoMoverPontoDeRota?.(indice, posicao),
   }));
 
-  function iniciarCriacao(tipo: "secao" | "local", posicao: Coordenada) {
+  function iniciarCriacao(
+    tipo: "secao" | "local",
+    posicao: Coordenada,
+    posicaoNaLinha?: Coordenada,
+  ) {
     definirMensagemSecao(null);
     definirMensagemLocal(null);
-    definirCriacaoPendente({ tipo, posicao });
+    definirCriacaoPendente({ tipo, posicao, posicaoNaLinha });
     definirNomeNovo("");
   }
 
-  function abrirMenuCriacao(posicao: Coordenada, ancoraTela: AncoraTelaMapa) {
+  function abrirMenuCriacao(
+    posicao: Coordenada,
+    ancoraTela: AncoraTelaMapa,
+    sobreLinha: boolean,
+  ) {
     definirMensagemSecao(null);
     definirMensagemLocal(null);
     definirCriacaoPendente(null);
     definirNomeNovo("");
-    definirMenuCriacao({ posicao, ancoraTela });
+    definirMenuCriacao({ posicao, ancoraTela, sobreLinha });
   }
 
   function escolherTipoCriacao(tipo: "secao" | "local") {
     if (!menuCriacao) return;
-    iniciarCriacao(tipo, menuCriacao.posicao);
+    iniciarCriacao(
+      tipo,
+      menuCriacao.posicao,
+      menuCriacao.sobreLinha ? menuCriacao.posicao : undefined,
+    );
   }
 
   function confirmarCriacao() {
@@ -217,7 +233,7 @@ export function EditorMapaItinerario({
         definirMensagemSecao(MENSAGEM_FORA_DE_SP);
         return;
       }
-      aoCriarSecao(resultado.secao);
+      aoCriarSecao(resultado.secao, criacaoPendente.posicaoNaLinha);
     } else {
       const resultado = criarLocalNoPonto({
         nome: nomeNovo,
@@ -231,7 +247,7 @@ export function EditorMapaItinerario({
         definirMensagemLocal(MENSAGEM_FORA_DE_SP);
         return;
       }
-      aoCriarLocal(resultado.local);
+      aoCriarLocal(resultado.local, criacaoPendente.posicaoNaLinha);
     }
     definirCriacaoPendente(null);
     definirNomeNovo("");
@@ -334,8 +350,12 @@ export function EditorMapaItinerario({
           ]}
           linhas={linhaRota ? [linhaRota] : []}
           aoClicarNaLinha={aoCriarPontoDeRota}
-          aoClicarDireito={abrirMenuCriacao}
-          aoClicarDireitoNaLinha={abrirMenuCriacao}
+          aoClicarDireito={(posicao, ancoraTela) =>
+            abrirMenuCriacao(posicao, ancoraTela, false)
+          }
+          aoClicarDireitoNaLinha={(posicao, ancoraTela) =>
+            abrirMenuCriacao(posicao, ancoraTela, true)
+          }
         />
       </div>
 

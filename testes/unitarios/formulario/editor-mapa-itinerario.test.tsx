@@ -220,6 +220,20 @@ describe("EditorMapaItinerario — roteamento do gesto (DEC-055/TASK-065)", () =
 
     expect(aoCriarSecao).toHaveBeenCalledTimes(1);
     expect(aoCriarSecao.mock.calls[0][0]).toMatchObject({ municipio: "Cidade Demo", nome: "Nova Seção" });
+    expect(aoCriarSecao.mock.calls[0][1]).toBeUndefined();
+    desmontar();
+  });
+
+  it("clique direito SOBRE a linha preserva a posição até confirmar a Seção", () => {
+    const { container, aoCriarSecao, desmontar } = montar();
+    abrirMenuDireito(true);
+    escolherOpcao(container, "Seção");
+
+    const input = container.querySelector('[data-testid="nome-secao-input"]') as HTMLInputElement;
+    digitar(input, "Seção no meio");
+    clicar(container.querySelector('[data-testid="confirmar-criar-secao"]')!);
+
+    expect(aoCriarSecao.mock.calls[0][1]).toEqual(P0_COORD);
     desmontar();
   });
 
@@ -234,6 +248,20 @@ describe("EditorMapaItinerario — roteamento do gesto (DEC-055/TASK-065)", () =
 
     expect(aoCriarLocal).toHaveBeenCalledTimes(1);
     expect(aoCriarLocal.mock.calls[0][0]).toMatchObject({ municipio: "Cidade Demo", nome: "Novo Local" });
+    expect(aoCriarLocal.mock.calls[0][1]).toBeUndefined();
+    desmontar();
+  });
+
+  it("clique direito SOBRE a linha preserva a posição até confirmar o Local", () => {
+    const { container, aoCriarLocal, desmontar } = montar();
+    abrirMenuDireito(true);
+    escolherOpcao(container, "Local");
+
+    const input = container.querySelector('[data-testid="nome-local-input"]') as HTMLInputElement;
+    digitar(input, "Local no meio");
+    clicar(container.querySelector('[data-testid="confirmar-criar-local"]')!);
+
+    expect(aoCriarLocal.mock.calls[0][1]).toEqual(P0_COORD);
     desmontar();
   });
 });

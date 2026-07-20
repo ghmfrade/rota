@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   classificarMudancaSequenciaParadas,
   reancorarPontosDeRota,
+  reancorarPontosDeRotaNaInsercaoPosicional,
 } from "@/formulario/roteamento";
 import type { PontoDeRota } from "@/shared/contrato";
 
@@ -110,6 +111,75 @@ describe("reancorarPontosDeRota — inserir parada no meio (DEC-056)", () => {
   test("acrescentar ao fim é o caso degenerado da inserção (índice == length)", () => {
     const resultado = reancorarPontosDeRota([A, B, C], [A, B, C, D], [p4]);
     expect(resultado).toEqual([p4]);
+  });
+});
+
+describe("reancorarPontosDeRotaNaInsercaoPosicional (TASK-067/DEC-056)", () => {
+  const linha = [
+    { lng: -46, lat: -23 },
+    { lng: -46, lat: -24 },
+  ];
+  const antes = [A, B, C];
+  const depois = [A, B, D, C];
+  const pontoAntes: PontoDeRota = {
+    apos_parada_ordem: 2,
+    latitude: -23.6,
+    longitude: -46,
+  };
+  const pontoIgual: PontoDeRota = {
+    apos_parada_ordem: 2,
+    latitude: -23.7,
+    longitude: -46,
+  };
+  const pontoDepois: PontoDeRota = {
+    apos_parada_ordem: 2,
+    latitude: -23.8,
+    longitude: -46,
+  };
+
+  test("reparte os pontos do trecho partido pela posição ao longo da linha", () => {
+    const resultado = reancorarPontosDeRotaNaInsercaoPosicional(
+      antes,
+      depois,
+      [p1, pontoAntes, pontoDepois],
+      linha,
+      { lng: -46, lat: -23.7 },
+    );
+    expect(resultado.map((ponto) => ponto.apos_parada_ordem)).toEqual([1, 2, 3]);
+  });
+
+  test("[borda] ponto exatamente na posição da nova Parada fica no trecho anterior", () => {
+    const resultado = reancorarPontosDeRotaNaInsercaoPosicional(
+      antes,
+      depois,
+      [pontoIgual],
+      linha,
+      { lng: -46, lat: -23.7 },
+    );
+    expect(resultado[0].apos_parada_ordem).toBe(2);
+  });
+
+  test("[inválido] linha degenerada conserva a re-ancoragem segura da TASK-066", () => {
+    const resultado = reancorarPontosDeRotaNaInsercaoPosicional(
+      antes,
+      depois,
+      [pontoAntes],
+      [],
+      { lng: -46, lat: -23.7 },
+    );
+    expect(resultado[0].apos_parada_ordem).toBe(3);
+  });
+
+  test("[inválido] rejeita chamada sem inserção atômica de uma Parada", () => {
+    expect(() =>
+      reancorarPontosDeRotaNaInsercaoPosicional(
+        antes,
+        antes,
+        [pontoAntes],
+        linha,
+        { lng: -46, lat: -23.7 },
+      ),
+    ).toThrow(/RN-042/);
   });
 });
 

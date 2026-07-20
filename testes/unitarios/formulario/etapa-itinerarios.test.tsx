@@ -4,10 +4,13 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { EtapaItinerarios, chaveItinerario, itinerariosAoVivoDaSessao } from "@/formulario/itinerarios";
 import { coletarPendencias } from "@/formulario/pendencias";
 import type { SessaoFormulario } from "@/formulario/sessao";
+import type { Coordenada } from "@/shared/mapa";
 import {
   coletarViolacoesEstruturais,
   esquemaDocumentoOperacao,
+  type Local,
   type PontoDeRota,
+  type Secao,
 } from "@/shared/contrato";
 import { act, renderizar, type ResultadoRenderizacao } from "../shared-ui/_ajuda-render";
 import { documentoExemploMinimo } from "../../fixtures";
@@ -21,8 +24,20 @@ vi.mock("@/shared/dados-estaticos", () => ({
 
 // MapLibre/WebGL não existe no jsdom e não participa da regra da TASK-083.
 // Mantemos a EtapaItinerarios real e substituímos somente o filho visual.
+interface PropsEditorCapturadas {
+  aoCriarSecao: (secao: Secao, posicaoNaLinha?: Coordenada) => void;
+  aoCriarLocal: (local: Local, posicaoNaLinha?: Coordenada) => void;
+}
+
+const editorCapturado = vi.hoisted<{ props: PropsEditorCapturadas | null }>(() => ({
+  props: null,
+}));
+
 vi.mock("@/formulario/itinerarios/editor-mapa-itinerario", () => ({
-  EditorMapaItinerario: () => null,
+  EditorMapaItinerario: (props: PropsEditorCapturadas) => {
+    editorCapturado.props = props;
+    return null;
+  },
 }));
 
 const SERVICO_UUID = "b3f1c2a0-1e2d-4a3b-9c4d-5e6f7a8b9c0d";
@@ -54,7 +69,10 @@ function respostaOsrmMock(): typeof fetch {
   }) as unknown as typeof fetch;
 }
 
-function sessaoComTresSecoes(aposParadaOrdem: number): SessaoFormulario {
+function sessaoComTresSecoes(
+  aposParadaOrdem: number,
+  latitudePontoDeRota = -23.97,
+): SessaoFormulario {
   const documento = documentoExemploMinimo();
   const servico = documento.autos.servicos[0];
   const ida = servico.itinerarios.find((itinerario) => itinerario.sentido === "ida")!;
@@ -84,7 +102,7 @@ function sessaoComTresSecoes(aposParadaOrdem: number): SessaoFormulario {
     pontos_de_rota: [
       {
         apos_parada_ordem: aposParadaOrdem,
-        latitude: -23.97,
+        latitude: latitudePontoDeRota,
         longitude: -46.38,
       },
     ],
@@ -102,8 +120,11 @@ interface MontagemEtapa {
   resultado: ResultadoRenderizacao;
 }
 
-async function montarEtapa(aposParadaOrdem: number): Promise<MontagemEtapa> {
-  let sessaoAtual = sessaoComTresSecoes(aposParadaOrdem);
+async function montarEtapa(
+  aposParadaOrdem: number,
+  latitudePontoDeRota = -23.97,
+): Promise<MontagemEtapa> {
+  let sessaoAtual = sessaoComTresSecoes(aposParadaOrdem, latitudePontoDeRota);
   const montagem: { resultado?: ResultadoRenderizacao } = {};
 
   const renderizarEtapa = () => (
@@ -243,4 +264,77 @@ describe("EtapaItinerarios — descarte de ponto de rota órfão (TASK-083/DEC-0
 
     resultado.desmontar();
   });
+});
+
+describe("EtapaItinerarios — inserção posicional pelo mapa (TASK-067/DEC-055)", () => {
+  test.each([
+    { caso: "antes", latitudePonto: -23.97, aposEsperado: 2 },
+    { caso: "depois", latitudePonto: -24.0, aposEsperado: 3 },
+  ])(
+    "insere Local no meio, recalcula e mantém ponto de rota $caso da nova Parada no trecho correto",
+    async ({ latitudePonto, aposEsperado }) => {
+      const { obterSessao, resultado } = await montarEtapa(2, latitudePonto);
+      const fetchMock = vi.fn().mockResolvedValue({
+        json: () =>
+          Promise.resolve({
+            code: "Ok",
+            routes: [
+              {
+                geometry: {
+                  type: "LineString",
+                  coordinates: [
+                    [-46.3339, -23.9608],
+                    [-46.36, -23.9631],
+                    [-46.38, -23.98],
+                    [-46.4025, -24.0084],
+                  ],
+                },
+                legs: [
+                  { distance: 4000, duration: 500, steps: [{ name: "Via 1" }] },
+                  { distance: 5000, duration: 600, steps: [{ name: "Via 2" }] },
+                  { distance: 6000, duration: 700, steps: [{ name: "Via 3" }] },
+                ],
+              },
+            ],
+          }),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const local: Local = {
+        uuid: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        nome: "Local intermediário",
+        municipio: "Santos",
+        geolocalizacao_ida: { latitude: -23.98, longitude: -46.38 },
+      };
+      act(() => {
+        editorCapturado.props?.aoCriarLocal(local, { lng: -46.38, lat: -23.98 });
+      });
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      const sessaoAtual = obterSessao();
+      const chave = chaveItinerario(SERVICO_UUID, "ida");
+      expect(sessaoAtual.paradasEmEdicao?.[chave]?.map((parada) => parada.tipo)).toEqual([
+        "secao",
+        "secao",
+        "local",
+        "secao",
+      ]);
+      expect(sessaoAtual.pontosDeRotaEmEdicao?.[chave]?.[0].apos_parada_ordem).toBe(
+        aposEsperado,
+      );
+      expect(sessaoAtual.estadosRotaViva?.[chave]?.situacao).toBe("recalculada");
+      if (sessaoAtual.modo !== "carregado") throw new Error("sessão deveria estar carregada");
+      const itinerario = sessaoAtual.documento.autos.servicos[0].itinerarios[0];
+      expect(itinerario.paradas[2]).toEqual({ ordem: 3, local_uuid: local.uuid });
+      expect(itinerario.rota.trechos).toHaveLength(3);
+      expect(esquemaDocumentoOperacao.safeParse(sessaoAtual.documento).success).toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      resultado.desmontar();
+    },
+  );
 });

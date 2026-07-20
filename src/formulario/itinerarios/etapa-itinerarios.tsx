@@ -27,6 +27,7 @@ import {
   mensagemDeFalha,
   moverPontoDeRota,
   reancorarPontosDeRota,
+  reancorarPontosDeRotaNaInsercaoPosicional,
   removerPontoDeRota,
 } from "@/formulario/roteamento";
 import { Botao, Painel, Select, Tabela } from "@/shared/ui";
@@ -477,32 +478,84 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     void aplicarNovasParadas(paradasAtual);
   }
 
+  function prepararInsercaoDeParada(
+    parada: ParadaEmEdicao,
+    posicaoNaLinha?: Coordenada,
+  ):
+    | { paradas: ParadaEmEdicao[]; pontosDeRota?: readonly PontoDeRota[] }
+    | undefined {
+    if (!posicaoNaLinha) {
+      return { paradas: inserirParada(paradasAtual, parada) };
+    }
+    if (!linhaAtual || !sentidoSelecionado || !linhaRotaAtual) return undefined;
+
+    const resolucao = resolverParadasRota(
+      paradasAtual,
+      secoes,
+      linhaAtual.locais,
+      linhaAtual.servicoUuid,
+      sentidoSelecionado,
+    );
+    if (!resolucao.ok) return undefined;
+
+    const paradasCoordenadas: Coordenada[] = resolucao.paradas.map((ponto) => ({
+      lng: ponto.longitude,
+      lat: ponto.latitude,
+    }));
+    const ancoragem = ancorarPontoNaRota(
+      posicaoNaLinha,
+      linhaRotaAtual.pontos,
+      paradasCoordenadas,
+    );
+    if (!ancoragem) return undefined;
+
+    // `aposParadaOrdem` é 1-based e também é exatamente o índice 0-based em
+    // que a nova Parada deve entrar: trecho 2→3 ⇒ índice 2 ⇒ nova ordem 3.
+    const paradas = inserirParada(paradasAtual, parada, ancoragem.aposParadaOrdem);
+    const pontosDeRota = reancorarPontosDeRotaNaInsercaoPosicional(
+      paradasAtual.map(chaveParadaEmEdicao),
+      paradas.map(chaveParadaEmEdicao),
+      pontosDeRotaAtual,
+      linhaRotaAtual.pontos,
+      posicaoNaLinha,
+    );
+    return { paradas, pontosDeRota };
+  }
+
   // Clicar/reutilizar no editor de Seções insere uma nova parada quando a
   // Seção ainda não está no itinerário corrente; arrastar um ponto já
   // inserido só atualiza a geolocalização (inferência controlada — ambos os
   // gestos chamam `aoAtualizarSecao`; distinguir exigiria mudar a API do
   // `EditorSecoes`, fora do escopo desta task).
-  function aoCriarOuAtualizarSecao(secao: Secao) {
+  function aoCriarOuAtualizarSecao(secao: Secao, posicaoNaLinha?: Coordenada) {
     if (!linhaAtual) return;
     const secoesAtualizadas = secoes.some((s) => s.uuid === secao.uuid)
       ? secoes.map((s) => (s.uuid === secao.uuid ? secao : s))
       : [...secoes, secao];
     const jaEhParada = paradasAtual.some((p) => p.tipo === "secao" && p.secaoUuid === secao.uuid);
+    const insercao = jaEhParada
+      ? { paradas: paradasAtual }
+      : prepararInsercaoDeParada(paradaDeSecao(secao.uuid), posicaoNaLinha);
+    if (!insercao) return;
     void aplicarNovasParadas(
-      jaEhParada ? paradasAtual : inserirParada(paradasAtual, paradaDeSecao(secao.uuid)),
+      insercao.paradas,
       {
         secoesParaResolver: secoesAtualizadas,
         aoComitarBase: (base) => comSecoesAtualizadas(base, secoesAtualizadas),
+        pontosDeRota: insercao.pontosDeRota,
       },
     );
   }
 
-  function aoCriarLocal(local: Local) {
+  function aoCriarLocal(local: Local, posicaoNaLinha?: Coordenada) {
     if (!linhaAtual) return;
     const locaisAtualizados = [...linhaAtual.locais, local];
-    void aplicarNovasParadas(inserirParada(paradasAtual, paradaDeLocal(local.uuid)), {
+    const insercao = prepararInsercaoDeParada(paradaDeLocal(local.uuid), posicaoNaLinha);
+    if (!insercao) return;
+    void aplicarNovasParadas(insercao.paradas, {
       locaisParaResolver: locaisAtualizados,
       aoComitarBase: (base) => comLocaisAtualizados(base, locaisAtualizados),
+      pontosDeRota: insercao.pontosDeRota,
     });
   }
 

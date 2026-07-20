@@ -462,13 +462,12 @@ test.describe("Etapa Seções, Locais e Itinerários — feedback de montagem in
     await expect(page.getByTestId("descricao-texto")).toContainText("Via Remanescente");
   });
 
-  test("criar um Local via mapa no final do itinerário acende o aviso de RN-035; completar a montagem some com o aviso", async ({
+  test("TASK-067: clique direito sobre a linha insere uma Seção entre as Paradas do trecho", async ({
     page,
   }) => {
+    let chamadasOsrm = 0;
     await page.route("https://router.project-osrm.org/**", (rota) => {
-      // Criar o Local (RN-035, extremo inválido) não chama o OSRM; o mock só
-      // serve para o gesto seguinte, que move o Local para o meio e volta a
-      // ser uma montagem válida (dispara o recálculo de verdade).
+      chamadasOsrm += 1;
       return rota.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
@@ -490,8 +489,8 @@ test.describe("Etapa Seções, Locais e Itinerários — feedback de montagem in
     await abrirEtapaVolta(page);
 
     // As 3 Seções já plotadas servem de sinal de que o MapLibre está pronto.
-    // O clique direito é feito SOBRE a linha para provar que a TASK-065 ainda
-    // acrescenta a Parada ao fim (inserção posicional é da TASK-067).
+    // O clique direito é feito SOBRE a linha: o hit-test da TASK-065 agora
+    // escolhe o caminho posicional da TASK-067.
     const mapa = page.getByTestId("mapa-base");
     const marcadores = mapa.locator(".maplibregl-marker");
     await marcadores.first().waitFor();
@@ -539,28 +538,18 @@ test.describe("Etapa Seções, Locais e Itinerários — feedback de montagem in
       y: centroA.y + (centroB.y - centroA.y) * 0.85,
     };
     await page.mouse.click(pontoSobreLinha.x, pontoSobreLinha.y, { button: "right" });
-    await page.getByRole("menuitem", { name: "Local" }).click();
+    await page.getByRole("menuitem", { name: "Seção" }).click();
 
-    await page.getByTestId("nome-local-input").fill("Novo Local E2E");
-    await page.getByTestId("confirmar-criar-local").click();
+    await page.getByTestId("nome-secao-input").fill("Nova Seção Posicional E2E");
+    await page.getByTestId("confirmar-criar-secao").click();
 
-    // O novo Local entra ao final da tabela (RN-035: último precisa ser Seção).
+    // O alvo está no trecho entre a segunda e a terceira Paradas da travessia:
+    // a nova Seção entra diretamente com ordem 3, sem setinhas intermediárias.
     await expect(page.getByTestId("tabela-paradas").getByTestId("parada-item")).toHaveCount(4);
-    await expect(page.getByTestId("tabela-paradas").getByTestId("parada-rotulo").last()).toContainText(
-      "Novo Local E2E",
-    );
-    await expect(page.getByTestId("avisos-montagem-invalida")).toBeVisible();
-    await expect(page.getByTestId("aviso-montagem-invalida")).toContainText(
-      "A última parada do itinerário deve ser uma Seção, nunca um Local",
-    );
-
-    // Move o Local (última posição) para uma posição do meio, restaurando o
-    // extremo como Seção — a montagem volta a ser válida e o aviso some.
-    await page.getByTestId("parada-mover-cima").last().click();
-
     await expect(page.getByTestId("avisos-montagem-invalida")).toHaveCount(0);
     const rotulos = page.getByTestId("tabela-paradas").getByTestId("parada-rotulo");
-    await expect(rotulos.nth(2)).toContainText("Novo Local E2E");
+    await expect(rotulos.nth(2)).toContainText("Nova Seção Posicional E2E");
     await expect(rotulos.last()).toHaveText("Santos - Terminal Santos");
+    expect(chamadasOsrm).toBe(1);
   });
 });

@@ -1,4 +1,6 @@
 import type { PontoDeRota } from "@/shared/contrato";
+import { projetarNaLinha } from "@/shared/mapa/ancoragem";
+import type { Coordenada } from "@/shared/mapa/geometria";
 
 export type MudancaSequenciaParadas =
   | { tipo: "inalterada" }
@@ -144,6 +146,58 @@ export function reancorarPontosDeRota(
       "reordenar UMA parada por chamada — a diferença de tamanho entre as listas " +
       `não corresponde a nenhum desses casos (${chavesParadasAntes.length} → ${chavesParadasDepois.length}).`,
   );
+}
+
+/**
+ * Especialização geométrica da inserção posicional (TASK-067; DEC-055/056).
+ * A re-ancoragem estrutural da TASK-066 põe, por segurança, todos os pontos
+ * do trecho partido no lado posterior. Aqui a posição conhecida do clique
+ * permite repartir esse trecho: pontos projetados antes (ou exatamente na
+ * mesma posição — borda determinística) ficam no trecho anterior; os demais
+ * permanecem no posterior. Não muta os argumentos.
+ */
+export function reancorarPontosDeRotaNaInsercaoPosicional(
+  chavesParadasAntes: readonly string[],
+  chavesParadasDepois: readonly string[],
+  pontos: readonly PontoDeRota[],
+  linhaRota: readonly Coordenada[],
+  posicaoInsercao: Coordenada,
+): PontoDeRota[] {
+  const mudanca = classificarMudancaSequenciaParadas(
+    chavesParadasAntes,
+    chavesParadasDepois,
+  );
+  if (mudanca.tipo !== "insercao") {
+    throw new Error(
+      "[RN-042] a re-ancoragem posicional exige a inserção de exatamente uma Parada.",
+    );
+  }
+
+  const reancorados = reancorarPontosDeRota(
+    chavesParadasAntes,
+    chavesParadasDepois,
+    pontos,
+  );
+  const projecaoInsercao = projetarNaLinha(posicaoInsercao, linhaRota);
+  if (!projecaoInsercao) return reancorados;
+
+  return reancorados.map((pontoReancorado, indice) => {
+    const pontoOriginal = pontos[indice];
+    if (pontoOriginal.apos_parada_ordem !== mudanca.indice) {
+      return pontoReancorado;
+    }
+    const projecaoPonto = projetarNaLinha(
+      { lng: pontoOriginal.longitude, lat: pontoOriginal.latitude },
+      linhaRota,
+    );
+    if (
+      projecaoPonto &&
+      projecaoPonto.distanciaAoLongoM <= projecaoInsercao.distanciaAoLongoM
+    ) {
+      return { ...pontoReancorado, apos_parada_ordem: mudanca.indice };
+    }
+    return pontoReancorado;
+  });
 }
 
 /** Índice (0-based) da chave nova em `depois`, assumindo que `antes` é `depois`

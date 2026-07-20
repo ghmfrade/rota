@@ -57,5 +57,6 @@ export {
 export {
   classificarMudancaSequenciaParadas,
   reancorarPontosDeRota,
+  reancorarPontosDeRotaNaInsercaoPosicional,
   type MudancaSequenciaParadas,
 } from "./reancorar-pontos-de-rota";
