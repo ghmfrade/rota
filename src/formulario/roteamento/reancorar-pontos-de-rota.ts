@@ -74,7 +74,9 @@ export function classificarMudancaSequenciaParadas(
 //   partido é escopo da TASK-067 (clique posicional), que consome esta regra.
 // - **Remover** — os dois trechos adjacentes à parada removida fundem-se; os
 //   pontos de ambos passam a ter o mesmo `apos_parada_ordem` (o do trecho
-//   fundido), preservando a sequência de travessia.
+//   fundido), preservando a sequência de travessia. Se a Parada removida é um
+//   extremo, o trecho terminal deixa de existir e seus pontos órfãos são
+//   descartados (DEC-068).
 // - **Reordenação** (DEC-060, supera a DEC-056 neste caso) — mesmo conjunto,
 //   mesma contagem: `apos_parada_ordem` é posicional por definição (RN-042),
 //   então o valor não muda — ele passa a se referir ao par de paradas que
@@ -83,7 +85,8 @@ export function classificarMudancaSequenciaParadas(
 //
 // Pós-condição em todos os caminhos: `apos_parada_ordem` resultante em
 // `[1, chavesParadasDepois.length - 1]` (RN-042) — nunca `== length` (bug se
-// ocorrer; os testes cobrem os quatro casos e os limites).
+// ocorrer; pontos órfãos de trecho terminal são descartados pela própria
+// função, e os testes cobrem os quatro casos e os limites).
 
 /**
  * Re-ancora `pontos` (cujo `apos_parada_ordem` é relativo a
@@ -120,13 +123,20 @@ export function reancorarPontosDeRota(
   }
 
   if (mudanca.tipo === "remocao") {
-    return pontos.map((ponto) => ({
-      ...ponto,
-      apos_parada_ordem:
-        ponto.apos_parada_ordem <= mudanca.indice
-          ? ponto.apos_parada_ordem
-          : ponto.apos_parada_ordem - 1,
-    }));
+    const limiteSuperiorExclusivo = chavesParadasDepois.length;
+    return pontos
+      .map((ponto) => ({
+        ...ponto,
+        apos_parada_ordem:
+          ponto.apos_parada_ordem <= mudanca.indice
+            ? ponto.apos_parada_ordem
+            : ponto.apos_parada_ordem - 1,
+      }))
+      .filter(
+        (ponto) =>
+          ponto.apos_parada_ordem >= 1 &&
+          ponto.apos_parada_ordem < limiteSuperiorExclusivo,
+      );
   }
 
   throw new Error(

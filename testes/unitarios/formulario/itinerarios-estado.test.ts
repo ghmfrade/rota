@@ -357,6 +357,47 @@ describe("TASK-046/TASK-087 — rota recalculada alimenta a reconciliação", ()
       ]);
     }
   });
+
+  test("TASK-083: remover a última Parada descarta o ponto órfão e recalcula sem sem-rota", async () => {
+    const paradasAntes = [paradaDeSecao(SECAO_A.uuid), paradaDeSecao(SECAO_B.uuid), paradaDeSecao(SECAO_C.uuid)];
+    const paradasDepois = [paradaDeSecao(SECAO_A.uuid), paradaDeSecao(SECAO_B.uuid)];
+    const pontosCrus: PontoDeRota[] = [
+      { apos_parada_ordem: 2, latitude: -23.99, longitude: -46.38 },
+    ];
+    const pontosReancorados = reancorarPontosDeRota(
+      paradasAntes.map(chaveParadaEmEdicao),
+      paradasDepois.map(chaveParadaEmEdicao),
+      pontosCrus,
+    );
+    expect(pontosReancorados).toEqual([]);
+
+    const fetchFn = respostaFetchMock({
+      code: "Ok",
+      routes: [
+        {
+          geometry: {
+            type: "LineString",
+            coordinates: [[-46.33, -23.96], [-46.391, -23.963]],
+          },
+          legs: [{ distance: 1200, duration: 75, steps: [{ name: "Rodovia Nova" }] }],
+        },
+      ],
+    });
+    const resultado = await dispararRecalculo(
+      paradasDepois,
+      [SECAO_A, SECAO_B],
+      [],
+      SERVICO_UUID,
+      "ida",
+      pontosReancorados,
+      { fetchFn },
+    );
+
+    expect(resultado.ok).toBe(true);
+    if (!resultado.ok) throw new Error("esperava ok");
+    expect(resultado.estado.situacao).toBe("recalculada");
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("itinerariosAoVivoDaSessao — TASK-044, obrigação de fiação (docs-dev/06)", () => {

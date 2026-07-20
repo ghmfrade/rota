@@ -122,6 +122,11 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
   const [violacoesMontagemMapa, definirViolacoesMontagemMapa] = useState<
     Record<string, ViolacaoMontagem[]>
   >({});
+  // Aviso efêmero da DEC-068, por Serviço/sentido. Não integra as pendências
+  // fechadas da Spec 04 §11 e nunca é persistido na sessão ou no JSON.
+  const [descartePontoDeRotaMapa, definirDescartePontoDeRotaMapa] = useState<
+    Record<string, boolean>
+  >({});
 
   // "Latest ref" da sessão (padrão para ler o estado mais recente de dentro de
   // uma continuação assíncrona — o `await dispararRecalculo` abaixo atravessa
@@ -347,6 +352,7 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     // (TASK-066): reaplicar `apos_parada_ordem` cru contra a lista de paradas
     // que acabou de mudar é o bug que gerava rejeição não tratada (remoção) ou
     // reancoragem silenciosa ao par errado (inserção/reordenação).
+    const reancoragemAutomatica = opcoes.pontosDeRota === undefined;
     const pontosParaReaplicar =
       opcoes.pontosDeRota ??
       reancorarPontosDeRota(
@@ -354,6 +360,10 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
         novasParadas.map(chaveParadaEmEdicao),
         pontosDeRotaAtual,
       );
+    if (reancoragemAutomatica) {
+      const houveDescarte = pontosParaReaplicar.length < pontosDeRotaAtual.length;
+      definirDescartePontoDeRotaMapa((mapa) => ({ ...mapa, [chave]: houveDescarte }));
+    }
 
     const base = opcoes.aoComitarBase ? opcoes.aoComitarBase(sessao) : sessao;
     const paradasMapa = { ...(base.paradasEmEdicao ?? {}), [chave]: novasParadas };
@@ -675,6 +685,19 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
               {recalculando && (
                 <p data-testid="recalculando-rota" className="text-sm text-cinza-500">
                   Recalculando rota…
+                </p>
+              )}
+
+              {descartePontoDeRotaMapa[
+                chaveItinerario(linhaAtual.servicoUuid, sentidoSelecionado)
+              ] && (
+                <p
+                  role="status"
+                  data-testid="aviso-ponto-de-rota-descartado"
+                  className="text-sm text-alerta"
+                >
+                  Um ou mais pontos de rota foram descartados porque o trecho terminal deixou de
+                  existir.
                 </p>
               )}
 

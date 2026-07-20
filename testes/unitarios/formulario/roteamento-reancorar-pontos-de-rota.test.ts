@@ -67,6 +67,16 @@ describe("reancorarPontosDeRota — remover parada (DEC-056; exemplo §3.6.1)", 
     ]);
   });
 
+  test("remover a última Parada descarta pontos órfãos do trecho terminal e mantém os demais", () => {
+    const resultado = reancorarPontosDeRota([A, B, C], [A, B], [p1, p2, p4]);
+    expect(resultado).toEqual([p1, p2]);
+  });
+
+  test("remover a primeira Parada descarta pontos órfãos do trecho inicial e reancora os demais", () => {
+    const resultado = reancorarPontosDeRota([A, B, C], [B, C], [p1, p2, p4]);
+    expect(resultado).toEqual([{ ...p4, apos_parada_ordem: 1 }]);
+  });
+
   test("remover a última das paradas do meio (4 paradas): trechos antes da removida ficam intactos", () => {
     const antes = [A, B, C, D];
     const depois = [A, B, D];
@@ -121,6 +131,8 @@ describe("reancorarPontosDeRota — pós-condição (RN-042)", () => {
     const casos: Array<[string[], string[], PontoDeRota[]]> = [
       [[A, B, C], [A, B, C, D], [p1, p2, p3, p4]],
       [[A, B, C], [A, C], [p1, p2, p3, p4]],
+      [[A, B, C], [A, B], [p1, p4]],
+      [[A, B, C], [B, C], [p1, p4]],
       [[A, B, C, E], [A, B, D, C, E], [p1, p4]],
       [[A, B, C], [B, A, C], [p1, p4]],
     ];
