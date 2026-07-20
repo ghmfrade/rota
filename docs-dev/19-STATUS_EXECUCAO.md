@@ -39,7 +39,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 
 ## 3. Tasks executadas
 
-66 tasks concluídas. Agrupadas pela fase do backlog.
+67 tasks concluídas. Agrupadas pela fase do backlog.
 
 ### Fases 1–3 — Fundação, contrato JSON e validações de domínio
 
@@ -141,6 +141,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 086 | Diagnóstico técnico de DEV para os erros do gate |
 | 082 | Bloquear exportação com violação de 350 m ou tipificação |
 | 083 | Descartar ponto de rota órfão na remoção de extremo (DEC-068) |
+| 088 | Remover Seção reconcilia `matriz_seccionamento` com `matriz_distancias` (RN-059) |
 
 ---
 
@@ -155,16 +156,7 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 ## 5. Tasks a executar — ordem recomendada
 
-21 tasks pendentes. A ordem abaixo respeita as dependências declaradas nas próprias tasks; onde há folga, ela é indicada. A antiga prioridade máxima (TASK-082) foi concluída; a visibilidade dos motivos usa a infraestrutura entregue pelas TASK-085/086.
-
-### Grupo A — Bug vivo de integridade das matrizes (prioridade máxima)
-
-Bloqueia a exportação depois de remover uma Seção que participa da matriz de
-seccionamento.
-
-| # | Task | Complex. | Observação |
-|:---:|---|:---:|---|
-| 1 | **088** — Remover Seção reconcilia `matriz_seccionamento` com `matriz_distancias` | **2** | Fecha a RN-059 no mesmo write-back das TASK-084/046; depende de 026/027, todas entregues. |
+20 tasks pendentes. A ordem abaixo respeita as dependências declaradas nas próprias tasks; onde há folga, ela é indicada. A antiga prioridade máxima (TASK-082) foi concluída; a visibilidade dos motivos usa a infraestrutura entregue pelas TASK-085/086. O Grupo A (bug vivo de integridade das matrizes) foi fechado pela **TASK-088**, implementada em `2b27c9a` e aprovada em `docs-dev/14-REVISOES/TASK-088-20260720.md` — não há mais bug bloqueando a exportação após remover uma Seção.
 
 ### Grupo B — Ramo do mapa e pontos de rota
 
@@ -172,13 +164,13 @@ Fecha a UX de mapa e interações. Depende só do que já está entregue (060, 0
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 2 | **065** — Inverter gestos: esquerdo = ponto de rota, direito = menu Seção/Local | **3** | Só depende da 063. |
-| 3 | **067** — Inserção posicional: clique direito na linha insere no trecho | **3** | Precisa de 066 (✅) + 065. |
-| 4 | **068** — Identidade visual do vértice (ciano) | **1** | Precede a 069 (que reusa o token). |
-| 5 | **069** — Affordance de hover sobre a linha | **2** | Precisa da 068. |
-| 6 | **070** — Clique sobre o vértice remove o ponto de rota | **2** | Independente de 065/067. |
-| 7 | **079** — Pontos de rota na lista lateral intercalados | **4** | Desbloqueada por 066 + 071. |
-| 8 | **064** — Sincronização de seleção tabela↔mapa | **3** | Depois da 079, para projetar sobre a lista unificada. |
+| 1 | **065** — Inverter gestos: esquerdo = ponto de rota, direito = menu Seção/Local | **3** | Só depende da 063. |
+| 2 | **067** — Inserção posicional: clique direito na linha insere no trecho | **3** | Precisa de 066 (✅) + 065. |
+| 3 | **068** — Identidade visual do vértice (ciano) | **1** | Precede a 069 (que reusa o token). |
+| 4 | **069** — Affordance de hover sobre a linha | **2** | Precisa da 068. |
+| 5 | **070** — Clique sobre o vértice remove o ponto de rota | **2** | Independente de 065/067. |
+| 6 | **079** — Pontos de rota na lista lateral intercalados | **4** | Desbloqueada por 066 + 071. |
+| 7 | **064** — Sincronização de seleção tabela↔mapa | **3** | Depois da 079, para projetar sobre a lista unificada. |
 
 Travas rígidas: `068 → 069` e `079 → 064`. As demais têm folga entre si.
 
@@ -188,16 +180,16 @@ As próprias tasks pedem rodar **depois** do Grupo B, para não retrabalhar a su
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 9 | **077** — Volta espelhada (ordem inversa como regra dura) | **4** | Antes da 076 (que assume Volta derivada). **Herda a obrigação** de manter corretas a limpeza de Seção (084, entregue), a reconciliação de horários (046) e a reconciliação das matrizes (088) quando o espelho refletir a remoção nos dois sentidos. |
-| 10 | **076** — Ida e Volta no mesmo mapa (abas, tracejado, dois painéis) | **5** | A mais cara do backlog pendente. Deixar por último do grupo. |
-| 11 | **078** — Realocação de Seção inteira (translação rígida) | **4** | Cascata de recálculo multi-Serviço — caminho novo. |
+| 8 | **077** — Volta espelhada (ordem inversa como regra dura) | **4** | Antes da 076 (que assume Volta derivada). **Herda a obrigação** de manter corretas a limpeza de Seção (084, entregue), a reconciliação de horários (046) e a reconciliação das matrizes (088) quando o espelho refletir a remoção nos dois sentidos. |
+| 9 | **076** — Ida e Volta no mesmo mapa (abas, tracejado, dois painéis) | **5** | A mais cara do backlog pendente. Deixar por último do grupo. |
+| 10 | **078** — Realocação de Seção inteira (translação rígida) | **4** | Cascata de recálculo multi-Serviço — caminho novo. |
 
 ### Grupo D — UX restante e qualidade
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 12 | **075** — Identificação: pré-visualização + confirmação explícita | **2** | Encaixe livre — independente de tudo acima. |
-| 13 | **062** — E2E do fluxo "criar do zero" ponta a ponta | **3** | Depois do mapa estabilizado, senão os seletores mudam de novo. |
+| 11 | **075** — Identificação: pré-visualização + confirmação explícita | **2** | Encaixe livre — independente de tudo acima. |
+| 12 | **062** — E2E do fluxo "criar do zero" ponta a ponta | **3** | Depois do mapa estabilizado, senão os seletores mudam de novo. |
 
 ### Grupo E — Fases originais restantes (MVP 3 em diante)
 
@@ -205,13 +197,13 @@ Independentes do ramo do mapa: nada aqui bloqueia ou é bloqueado por ele.
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 14 | **033** — PDF operacional: estrutura e identificação | **4** | Subsistema novo (@react-pdf) + captura do mapa. |
-| 15 | **034** — PDF operacional: tabelas horárias e matrizes | **3** | Sobre a 033. |
-| 16 | **035** — Comparador: carregamento e validação dos dois arquivos | **3** | |
-| 17 | **036** — Motor de diff por UUID + taxonomia | **5** | Núcleo do Comparador; casamento por UUID e por contexto. |
-| 18 | **037** — Telas de comparação | **4** | Superfície ampla (5 visões/abas). |
-| 19 | **038** — Mapa comparativo | **3** | Bloqueio parcial: Q-004 (tolerância). |
-| 20 | **039** — PDF comparativo completo | **4** | |
+| 13 | **033** — PDF operacional: estrutura e identificação | **4** | Subsistema novo (@react-pdf) + captura do mapa. |
+| 14 | **034** — PDF operacional: tabelas horárias e matrizes | **3** | Sobre a 033. |
+| 15 | **035** — Comparador: carregamento e validação dos dois arquivos | **3** | |
+| 16 | **036** — Motor de diff por UUID + taxonomia | **5** | Núcleo do Comparador; casamento por UUID e por contexto. |
+| 17 | **037** — Telas de comparação | **4** | Superfície ampla (5 visões/abas). |
+| 18 | **038** — Mapa comparativo | **3** | Bloqueio parcial: Q-004 (tolerância). |
+| 19 | **039** — PDF comparativo completo | **4** | |
 
 ### Grupo F — Bloqueada
 
