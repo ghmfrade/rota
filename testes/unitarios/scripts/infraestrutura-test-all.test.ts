@@ -10,6 +10,7 @@ import {
   encerrarArvoreProcesso,
   executarProcesso,
   lerInteiroPositivo,
+  obterIdentidadeWorkingTree,
   verificarPortaLivre,
 } from "../../../scripts/infraestrutura-test-all.mjs";
 import {
@@ -36,11 +37,12 @@ async function criarProjetoTemporario() {
   return raiz;
 }
 
-function montarLogAprovado(fingerprint: string) {
+function montarLogAprovado(fingerprint: string, identidadeWorkingTree: string) {
   return [
     "ROTA — evidência canônica da suíte completa",
-    "Versão do formato: 1",
+    "Versão do formato: 2",
     "Executor: Codex",
+    `Identidade working tree SHA-256: ${identidadeWorkingTree}`,
     `Fingerprint SHA-256: ${fingerprint}`,
     "Código Testes unitários: 0",
     "Código Testes E2E: 0",
@@ -76,8 +78,12 @@ describe("verificador do log", () => {
   test("aceita resultado completo, verde e do conteúdo atual", async () => {
     const raiz = await criarProjetoTemporario();
     const fingerprint = await calcularFingerprint(raiz);
+    const identidadeWorkingTree = await obterIdentidadeWorkingTree(raiz);
     const caminhoLog = join(raiz, "ultimo-test-all.log");
-    await writeFile(caminhoLog, montarLogAprovado(fingerprint.sha256));
+    await writeFile(
+      caminhoLog,
+      montarLogAprovado(fingerprint.sha256, identidadeWorkingTree.sha256),
+    );
 
     await expect(verificarLog({ raizProjeto: raiz, caminhoLog })).resolves.toMatchObject({
       valido: true,
@@ -89,11 +95,36 @@ describe("verificador do log", () => {
     ["truncado", (log: string) => log.replace(`${MARCADOR_FIM_LOG}\n`, "")],
     ["vermelho", (log: string) => log.replace("Código Testes E2E: 0", "Código Testes E2E: 1")],
     ["sem executor", (log: string) => log.replace("Executor: Codex\n", "")],
+    ["com formato antigo", (log: string) => log.replace("Versão do formato: 2", "Versão do formato: 1")],
     ["conteúdo diferente", (log: string) => log.replace(/Fingerprint SHA-256: .+/, "Fingerprint SHA-256: outro")],
+    ["sem working tree", (log: string) => log.replace(/Identidade working tree SHA-256: .+\n/, "")],
   ])("rejeita log %s", async (_, alterar) => {
-    const resultado = analisarConteudoLog(alterar(montarLogAprovado("atual")), "atual");
+    const resultado = analisarConteudoLog(
+      alterar(montarLogAprovado("atual", "working-tree-atual")),
+      "atual",
+      "working-tree-atual",
+    );
     expect(resultado.valido).toBe(false);
     expect(resultado.motivos.length).toBeGreaterThan(0);
+  });
+
+  test("rejeita log copiado de outro working tree com conteúdo idêntico", async () => {
+    const origem = await criarProjetoTemporario();
+    const destino = await criarProjetoTemporario();
+    const fingerprintOrigem = await calcularFingerprint(origem);
+    const fingerprintDestino = await calcularFingerprint(destino);
+    const identidadeOrigem = await obterIdentidadeWorkingTree(origem);
+    const caminhoLogDestino = join(destino, "ultimo-test-all.log");
+
+    expect(fingerprintDestino.sha256).toBe(fingerprintOrigem.sha256);
+    await writeFile(
+      caminhoLogDestino,
+      montarLogAprovado(fingerprintOrigem.sha256, identidadeOrigem.sha256),
+    );
+
+    const resultado = await verificarLog({ raizProjeto: destino, caminhoLog: caminhoLogDestino });
+    expect(resultado.valido).toBe(false);
+    expect(resultado.motivos).toContain("log pertence a outro working tree");
   });
 
   test("rejeita log ausente com motivo operacional", async () => {

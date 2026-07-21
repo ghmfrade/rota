@@ -36,8 +36,8 @@ revise e oriente o usuário a iniciar outra conversa com `/revisar-aderencia TAS
 ## Evidência canônica da suíte
 
 1. Antes de executar a suíte pesada, rode `npm run test:all:verificar`.
-2. Se `ultimo-test-all.log` estiver aprovado e o fingerprint coincidir, **não repita** a suíte: registre no parecer o executor e o fingerprint informados pelo verificador.
-3. Se o log estiver ausente, truncado, vermelho ou desatualizado, rode **uma única vez** `npm run test:all:log -- --executor=Codex-revisao`, sequencialmente e sem outro build/E2E em paralelo; depois exija que `npm run test:all:verificar` fique verde.
+2. Se `ultimo-test-all.log` estiver aprovado, o fingerprint coincidir e a identidade corresponder ao mesmo working tree, **não repita** a suíte: registre no parecer o executor, o fingerprint e a identidade informados pelo verificador.
+3. Se o log estiver ausente, truncado, vermelho, desatualizado ou tiver sido produzido em outro working tree, rode **uma única vez** `npm run test:all:log -- --executor=Codex-revisao`, sequencialmente e sem outro build/E2E em paralelo; depois exija que `npm run test:all:verificar` fique verde.
 4. Falha real é reportada como falha. Não reutilize log inválido, não converta vermelho em ressalva e não versione `ultimo-test-all.log`.
 
 ## Regra de afirmação sobre outras tasks (anti-alucinação)

@@ -7,7 +7,7 @@
 - Fixtures canônicas versionadas (TASK-041), começando pelo exemplo mínimo da Spec 02 §15.
 - Caso inválido é obrigatório em toda regra de validação.
 - A evidência final da implementação/revisão é produzida por `npm run test:all:log -- --executor=<quem>`: Vitest e Playwright sequenciais, servidor Next próprio em porta dedicada, timeout e cleanup por PID. Processos pesados nunca rodam em paralelo.
-- `npm run test:all:verificar` permite reutilizar `ultimo-test-all.log` somente quando o marcador final está aprovado, os dois códigos são 0 e o fingerprint SHA-256 coincide com o conteúdo atual. Log ausente, truncado, vermelho ou desatualizado é rejeitado.
+- `npm run test:all:verificar` permite reutilizar `ultimo-test-all.log` somente quando o marcador final está aprovado, os dois códigos são 0, o fingerprint SHA-256 coincide com o conteúdo atual e a identidade SHA-256 corresponde ao mesmo working tree. Log ausente, truncado, vermelho, desatualizado ou copiado de outro working tree é rejeitado.
 
 **Ferramentas recomendadas** (decisão de engenharia — confirmar em Q-003): Vitest (unitário/integração), Testing Library (componentes), Playwright (E2E), MSW ou stub injetado (mock OSRM), validação de schema com zod + snapshots de contrato.
 
@@ -89,8 +89,8 @@
 ## 11. Testes da infraestrutura canônica
 
 **Objetivo:** garantir que a evidência da suíte não produza falso verde, não reutilize servidor desconhecido e não deixe processos órfãos.
-**Unitários:** fingerprint determinístico e sensível a mudança; parser/verificador de log; códigos 0/não zero; executor obrigatório; log truncado e fingerprint divergente.
-**Integração:** health check; porta ocupada; timeout de boot/total; cleanup da árvore do PID próprio com segundo processo testemunha intacto.
+**Unitários:** fingerprint determinístico e sensível a mudança; identidade canônica do working tree; parser/verificador de log; códigos 0/não zero; executor obrigatório; log truncado, fingerprint divergente e log copiado de outro working tree.
+**Integração:** orquestradores reais sob Vitest/Playwright vermelho, timeout, `SIGINT`, `SIGTERM` e exceção; health check; porta ocupada; cleanup da árvore do PID próprio com segundo processo testemunha intacto; interrupção não promove log temporário.
 **Execução real:** `npm run test:all:log -- --executor=<quem>` termina sem intervenção, publica o log final, libera a porta e deixa o verificador verde. OSRM e tiles permanecem mockados na borda de rede.
 
 ---

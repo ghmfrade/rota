@@ -4,6 +4,7 @@ import {
   mkdir,
   readFile,
   readdir,
+  realpath,
   stat,
 } from "node:fs/promises";
 import { constants as constantesFs } from "node:fs";
@@ -11,7 +12,7 @@ import { createServer } from "node:net";
 import { relative, resolve, sep } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 
-export const FORMATO_LOG_TEST_ALL = "1";
+export const FORMATO_LOG_TEST_ALL = "2";
 export const PORTA_E2E_PADRAO = 3100;
 export const TIMEOUT_BOOT_PADRAO_MS = 60_000;
 export const TIMEOUT_TOTAL_PADRAO_MS = 10 * 60_000;
@@ -95,6 +96,18 @@ export async function calcularFingerprint(raizProjeto) {
     algoritmo: "sha256",
     arquivos,
     sha256: hash.digest("hex"),
+  };
+}
+
+export async function obterIdentidadeWorkingTree(raizProjeto) {
+  const caminhoCanonico = normalizarCaminho(await realpath(raizProjeto));
+  const caminhoParaHash = process.platform === "win32"
+    ? caminhoCanonico.toLocaleLowerCase("en-US")
+    : caminhoCanonico;
+
+  return {
+    caminhoCanonico,
+    sha256: createHash("sha256").update(caminhoParaHash, "utf8").digest("hex"),
   };
 }
 
@@ -200,12 +213,32 @@ export async function encerrarArvoreProcesso(pid) {
       encoding: "utf8",
       windowsHide: true,
     });
-    const encerrado = await aguardarEncerramento(pid);
+    let encerrado = await aguardarEncerramento(pid);
+    if (!encerrado) {
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch (erro) {
+        if (erro?.code !== "ESRCH") {
+          return {
+            encerrado: false,
+            detalhe: `taskkill falhou e o fallback direto não encerrou o PID próprio ${pid}: ${erro.message}`,
+          };
+        }
+      }
+      encerrado = await aguardarEncerramento(pid);
+    }
     return {
       encerrado,
-      detalhe: encerrado
-        ? `árvore do PID próprio ${pid} encerrada com taskkill /PID ${pid} /T /F`
-        : `taskkill falhou para o PID próprio ${pid}: ${resultado.stderr || resultado.stdout}`,
+      detalhe:
+        resultado.status === 0
+          ? `árvore do PID próprio ${pid} encerrada com taskkill /PID ${pid} /T /F`
+          : encerrado
+            ? `PID próprio ${pid} encerrado diretamente após indisponibilidade de taskkill: ${
+                resultado.stderr || resultado.stdout
+              }`
+            : `taskkill e fallback direto falharam para o PID próprio ${pid}: ${
+                resultado.stderr || resultado.stdout
+              }`,
     };
   }
 

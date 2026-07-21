@@ -50,9 +50,9 @@ memória ou das justificativas do implementador.
 ## Evidência canônica de testes
 
 - `npm run test:all:log -- --executor=Codex` (ou `--executor=humano`) é o único caminho canônico da suíte completa: Vitest e Playwright sequenciais, servidor Next próprio em porta dedicada, timeout e cleanup somente da árvore do PID criado.
-- O comando escreve `ultimo-test-all.log` primeiro como temporário e só publica o marcador final depois de ambas as etapas fecharem. O log registra executor, ambiente, Git, comandos, porta/PIDs, códigos/sinais, tempos, limpeza e fingerprint SHA-256 do conteúdo testado.
+- O comando escreve `ultimo-test-all.log` primeiro como temporário e só publica o marcador final depois de ambas as etapas fecharem. O log registra executor, ambiente, Git, identidade SHA-256 do caminho canônico do working tree, comandos, porta/PIDs, códigos/sinais, tempos, limpeza e fingerprint SHA-256 do conteúdo testado.
 - Implementação: testes direcionados durante a edição; lint/typecheck; build quando aplicável; **uma única** execução final de `test:all:log`. Se falhar, corrigir e repetir o mesmo comando. Processos pesados nunca rodam em paralelo.
-- Revisão: rodar primeiro `npm run test:all:verificar`. Log aprovado com fingerprint coincidente é reutilizado, registrando executor/fingerprint no parecer e sem repetir a suíte. Log ausente, truncado, vermelho ou desatualizado exige uma execução de `test:all:log` pela revisão.
+- Revisão: rodar primeiro `npm run test:all:verificar`. Log aprovado com fingerprint coincidente e identidade do mesmo working tree é reutilizado, registrando executor/fingerprint/working tree no parecer e sem repetir a suíte. Log ausente, truncado, vermelho, desatualizado ou copiado de outro working tree exige uma execução de `test:all:log` pela revisão.
 - `ultimo-test-all.log` é artefato efêmero ignorado pelo Git, não fonte de verdade de negócio. `npm test` continua disponível para testes direcionados; `npm run test:e2e` continua disponível para diagnóstico isolado, mas não substitui a evidência canônica.
 
 ## Convenção de commits por task (obrigatória)

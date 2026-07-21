@@ -25,7 +25,7 @@ Implemente a task indicada seguindo o **plano aprovado** na "Análise da Task". 
 4. Rodar a **suíte completa uma única vez, no fim**, exclusivamente com `npm run test:all:log -- --executor=Codex`. O comando executa Vitest + Playwright sequencialmente, controla o servidor Next e preserva `ultimo-test-all.log` para a revisão.
 5. Se a suíte falhar, corrigir e repetir o mesmo comando até ficar verde. Não rodar E2E separado depois do log canônico e nunca executar processos pesados em paralelo.
 
-Antes de reportar sucesso, rode `npm run test:all:verificar`. O verificador precisa aceitar o marcador final, os dois códigos 0 e o fingerprint atual. Log ausente, truncado, vermelho ou desatualizado é falha, nunca evidência reutilizável.
+Antes de reportar sucesso, rode `npm run test:all:verificar`. O verificador precisa aceitar o marcador final, os dois códigos 0, o fingerprint atual e a identidade do mesmo working tree. Log ausente, truncado, vermelho, desatualizado ou copiado de outro working tree é falha, nunca evidência reutilizável.
 
 ## Entrega
 

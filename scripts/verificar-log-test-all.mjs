@@ -5,6 +5,7 @@ import {
   calcularFingerprint,
   FORMATO_LOG_TEST_ALL,
   lerOpcao,
+  obterIdentidadeWorkingTree,
 } from "./infraestrutura-test-all.mjs";
 
 export const MARCADOR_FIM_LOG = "FIM DO LOG CANÔNICO";
@@ -14,11 +15,15 @@ function capturar(texto, rotulo) {
   return texto.match(expressao)?.[1]?.trim();
 }
 
-export function analisarConteudoLog(conteudo, fingerprintAtual) {
+export function analisarConteudoLog(conteudo, fingerprintAtual, identidadeWorkingTreeAtual) {
   const motivos = [];
   const formato = capturar(conteudo, "Versão do formato");
   const executor = capturar(conteudo, "Executor");
   const fingerprintRegistrado = capturar(conteudo, "Fingerprint SHA-256");
+  const identidadeWorkingTreeRegistrada = capturar(
+    conteudo,
+    "Identidade working tree SHA-256",
+  );
   const codigoUnitarios = capturar(conteudo, "Código Testes unitários");
   const codigoE2e = capturar(conteudo, "Código Testes E2E");
   const resultadoGeral = capturar(conteudo, "Resultado geral");
@@ -47,12 +52,18 @@ export function analisarConteudoLog(conteudo, fingerprintAtual) {
   } else if (fingerprintRegistrado !== fingerprintAtual) {
     motivos.push("fingerprint diverge do conteúdo atual");
   }
+  if (!identidadeWorkingTreeRegistrada) {
+    motivos.push("identidade do working tree ausente");
+  } else if (identidadeWorkingTreeRegistrada !== identidadeWorkingTreeAtual) {
+    motivos.push("log pertence a outro working tree");
+  }
 
   return {
     valido: motivos.length === 0,
     motivos,
     executor: executor || null,
     fingerprint: fingerprintRegistrado || null,
+    identidadeWorkingTree: identidadeWorkingTreeRegistrada || null,
   };
 }
 
@@ -67,13 +78,19 @@ export async function verificarLog({ raizProjeto, caminhoLog }) {
         motivos: [`log ausente em ${caminhoLog}`],
         executor: null,
         fingerprint: null,
+        identidadeWorkingTree: null,
       };
     }
     throw erro;
   }
 
   const fingerprintAtual = await calcularFingerprint(raizProjeto);
-  return analisarConteudoLog(conteudo, fingerprintAtual.sha256);
+  const identidadeWorkingTreeAtual = await obterIdentidadeWorkingTree(raizProjeto);
+  return analisarConteudoLog(
+    conteudo,
+    fingerprintAtual.sha256,
+    identidadeWorkingTreeAtual.sha256,
+  );
 }
 
 async function principal() {
@@ -86,7 +103,7 @@ async function principal() {
 
   if (resultado.valido) {
     process.stdout.write(
-      `Log canônico válido. Executor: ${resultado.executor}. Fingerprint: ${resultado.fingerprint}.\n`,
+      `Log canônico válido. Executor: ${resultado.executor}. Fingerprint: ${resultado.fingerprint}. Working tree: ${resultado.identidadeWorkingTree}.\n`,
     );
     return;
   }
