@@ -38,6 +38,7 @@ import { EditorMapaItinerario } from "@/formulario/itinerarios";
 
 const COR_SECAO = "#1d4ed8";
 const COR_LOCAL = "#16a34a";
+const COR_PONTO_DE_ROTA = "var(--color-ciano-500)";
 
 const SERVICO = "11111111-1111-4111-8111-111111111111";
 const SERVICO_OUTRO = "22222222-2222-4222-8222-222222222222";
@@ -162,14 +163,16 @@ function escolherOpcao(container: HTMLElement, rotulo: "Seção" | "Local") {
 }
 
 describe("EditorMapaItinerario — marcadores de Seção e Local no mesmo mapa", () => {
-  it("monta ambos os marcadores, circulares e com cores distintas por tipo", () => {
+  it("aplica o vocabulário forma/tamanho da DEC-069", () => {
     const { desmontar } = montar();
     const marcadores = capturado.props?.marcadores ?? [];
     const secao = marcadores.find((m) => m.id === `secao-${SECAO_DUPLA.uuid}`);
     const local = marcadores.find((m) => m.id === `local-${LOCAL_BI.uuid}`);
 
-    expect(secao?.forma).toBe("circulo");
+    expect(secao?.forma).toBe("quadrado");
+    expect(secao?.tamanho).toBeUndefined();
     expect(local?.forma).toBe("circulo");
+    expect(local?.tamanho).toBe("medio");
     expect(secao?.cor).toBe(COR_SECAO);
     expect(local?.cor).toBe(COR_LOCAL);
     expect(secao?.cor).not.toBe(local?.cor);
@@ -206,6 +209,22 @@ describe("EditorMapaItinerario — roteamento do gesto (DEC-055/TASK-065)", () =
     escolherOpcao(container, "Local");
     expect(container.querySelector('[data-testid="form-criar-local"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="form-criar-secao"]')).toBeNull();
+    desmontar();
+  });
+
+  it("marca somente o Local inválido sem trocar forma, tamanho ou preenchimento", () => {
+    const { desmontar } = montar({ locaisInvalidos: [LOCAL_BI.uuid] });
+    const marcadores = capturado.props?.marcadores ?? [];
+    const local = marcadores.find((m) => m.id === `local-${LOCAL_BI.uuid}`);
+    const secao = marcadores.find((m) => m.id === `secao-${SECAO_DUPLA.uuid}`);
+
+    expect(local).toMatchObject({
+      forma: "circulo",
+      tamanho: "medio",
+      cor: COR_LOCAL,
+      invalido: true,
+    });
+    expect(secao?.invalido).not.toBe(true);
     desmontar();
   });
 
@@ -345,6 +364,7 @@ describe("EditorMapaItinerario — gesto de ponto de rota (TASK-063; Spec 04 §7
 
     expect(vertice0?.forma).toBe("circulo");
     expect(vertice0?.tamanho).toBe("pequeno");
+    expect(vertice0?.cor).toBe(COR_PONTO_DE_ROTA);
     expect(vertice0?.cor).not.toBe(COR_SECAO);
     expect(vertice0?.cor).not.toBe(COR_LOCAL);
     expect(vertice0?.arrastavel).toBe(true);

@@ -27,6 +27,7 @@ vi.mock("@/shared/dados-estaticos", () => ({
 interface PropsEditorCapturadas {
   aoCriarSecao: (secao: Secao, posicaoNaLinha?: Coordenada) => void;
   aoCriarLocal: (local: Local, posicaoNaLinha?: Coordenada) => void;
+  locaisInvalidos?: readonly string[];
 }
 
 const editorCapturado = vi.hoisted<{ props: PropsEditorCapturadas | null }>(() => ({
@@ -337,4 +338,57 @@ describe("EtapaItinerarios — inserção posicional pelo mapa (TASK-067/DEC-055
       resultado.desmontar();
     },
   );
+
+  test("[inválido] sem ancoragem acrescenta Local ao fim, sinaliza RN-035 e não chama OSRM", async () => {
+    const { obterSessao, resultado } = await montarEtapa(2);
+
+    // 3 → 2 Paradas ainda recalcula; 2 → 1 é recusado antes do OSRM e mantém
+    // a última linha válida desenhada, cenário que antes descartava o gesto.
+    await removerParada(resultado, 0);
+    await removerParada(resultado, 0);
+    const chamadasAntesDaInsercao = vi.mocked(fetch).mock.calls.length;
+
+    const local: Local = {
+      uuid: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      nome: "Local no fim",
+      municipio: "Santos",
+      geolocalizacao_ida: { latitude: -23.98, longitude: -46.38 },
+    };
+    act(() => {
+      editorCapturado.props?.aoCriarLocal(local, { lng: -46.38, lat: -23.98 });
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const chave = chaveItinerario(SERVICO_UUID, "ida");
+    expect(obterSessao().paradasEmEdicao?.[chave]?.map((parada) => parada.tipo)).toEqual([
+      "secao",
+      "local",
+    ]);
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(chamadasAntesDaInsercao);
+    expect(editorCapturado.props?.locaisInvalidos).toEqual([local.uuid]);
+    expect(
+      resultado.container.querySelector('[data-testid="avisos-montagem-invalida"]'),
+    ).not.toBeNull();
+    const linhaInvalida = resultado.container.querySelector(
+      '[data-testid="parada-item"][data-estado="local-extremo"]',
+    );
+    expect(linhaInvalida).not.toBeNull();
+    expect(
+      linhaInvalida?.querySelector('[data-testid="parada-local-extremo"]')?.getAttribute(
+        "aria-invalid",
+      ),
+    ).toBe("true");
+
+    const bloqueantes = coletarPendencias(
+      obterSessao(),
+      itinerariosAoVivoDaSessao(obterSessao()),
+    ).filter((pendencia) => pendencia.severidade === "bloqueante");
+    expect(bloqueantes.some((pendencia) => pendencia.id.startsWith("local-extremo-"))).toBe(
+      true,
+    );
+    resultado.desmontar();
+  });
 });

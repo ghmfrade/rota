@@ -146,4 +146,30 @@ describe("Tooltip", () => {
     expect(balao.getAttribute("aria-hidden")).toBe("true");
     desmontar();
   });
+
+  it("exibe no foco e associa a descrição acessível ao alvo", () => {
+    const { container, desmontar } = renderizar(
+      <Tooltip
+        rotulo="Local no fim"
+        descricaoAcessivel="A última Parada deve ser uma Seção."
+        tabIndex={0}
+      >
+        <span>Local X</span>
+      </Tooltip>,
+    );
+    const alvo = container.querySelector('[tabindex="0"]') as HTMLSpanElement;
+
+    act(() => alvo.focus());
+
+    expect(balaoDe(container).className).toContain("opacity-100");
+    const idDescricao = alvo.getAttribute("aria-describedby");
+    expect(idDescricao).toBeTruthy();
+    expect(document.getElementById(idDescricao!)?.textContent).toBe(
+      "A última Parada deve ser uma Seção.",
+    );
+
+    act(() => alvo.blur());
+    expect(balaoDe(container).className).toContain("opacity-0");
+    desmontar();
+  });
 });

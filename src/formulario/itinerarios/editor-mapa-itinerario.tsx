@@ -42,13 +42,13 @@ import { ALTURA_MAPA_CLASSE } from "./altura-mapa";
 // tabela↔mapa (TASK-064) também permanece fora deste escopo.
 
 // Cores dos marcadores (tokens do doc 18): Seção azul-700, Local sucesso,
-// ponto pendente alerta, ponto de rota cinza-700 — inferência controlada (a
-// spec só fixa o visual do ponto de rota como "vértice pequeno, sem rótulo";
-// a distinção Seção×Local×ponto-de-rota é design sob DEC-050).
+// ponto pendente alerta e ponto de rota ciano-500 (DEC-057/069). A spec fixa
+// o ponto de rota como "vértice pequeno, sem rótulo"; forma/tamanho/cor são
+// governados pela DEC-050 e pelo doc 18.
 const COR_MARCADOR_SECAO = "#1d4ed8";
 const COR_MARCADOR_LOCAL = "#16a34a";
 const COR_MARCADOR_PENDENTE = "#d97706";
-const COR_MARCADOR_PONTO_DE_ROTA = "#334155";
+const COR_MARCADOR_PONTO_DE_ROTA = "var(--color-ciano-500)";
 
 const paraCoordenada = (p: Ponto): Coordenada => ({ lng: p.longitude, lat: p.latitude });
 const paraPonto = (c: Coordenada): Ponto => ({ latitude: c.lat, longitude: c.lng });
@@ -75,6 +75,8 @@ export interface PropsEditorMapaItinerario {
   secoes: readonly Secao[];
   /** Locais do Serviço corrente (Spec 02 §7) — não compartilhados (RN-031). */
   locais: readonly Local[];
+  /** UUIDs de Locais cuja ocorrência é extrema neste itinerário/sentido. */
+  locaisInvalidos?: readonly string[];
   servicoUuid: string;
   sentido: Sentido;
   /** Serviço tem os dois itinerários (Ida e Volta) — RN-026. */
@@ -110,6 +112,7 @@ export interface PropsEditorMapaItinerario {
 export function EditorMapaItinerario({
   secoes,
   locais,
+  locaisInvalidos = [],
   servicoUuid,
   sentido,
   bidirecional,
@@ -140,7 +143,7 @@ export function EditorMapaItinerario({
       {
         id: `secao-${secao.uuid}`,
         posicao: paraCoordenada(ponto),
-        forma: "circulo",
+        forma: "quadrado",
         cor: COR_MARCADOR_SECAO,
         arrastavel: true,
         aoArrastar: (posicao: Coordenada) => lidarArrastoSecao(secao, posicao),
@@ -150,12 +153,15 @@ export function EditorMapaItinerario({
 
   const locaisDoSentido = locais.filter((local) => geolocDoSentido(local, sentido));
 
+  const uuidsLocaisInvalidos = new Set(locaisInvalidos);
   const marcadoresLocais: MarcadorMapa[] = locaisDoSentido.map((local) => ({
     id: `local-${local.uuid}`,
     // filtrado acima: geoloc do sentido existe.
     posicao: paraCoordenada(geolocDoSentido(local, sentido)!),
     forma: "circulo",
+    tamanho: "medio",
     cor: COR_MARCADOR_LOCAL,
+    invalido: uuidsLocaisInvalidos.has(local.uuid),
     arrastavel: true,
     aoArrastar: (posicao: Coordenada) => lidarArrastoLocal(local, posicao),
   }));

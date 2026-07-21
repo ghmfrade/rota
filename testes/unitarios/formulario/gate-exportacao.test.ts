@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { avaliarGateExportacao } from "@/formulario/exportacao";
+import { chaveItinerario, paradasEmEdicaoDeContrato } from "@/formulario/itinerarios";
 import type { SessaoFormulario } from "@/formulario/sessao";
 import type { ItinerarioAoVivo } from "@/formulario/pendencias";
 import { documentoExemploMinimo } from "../../fixtures";
@@ -74,6 +75,29 @@ describe("avaliarGateExportacao — casos bloqueantes (RN-078)", () => {
     expect(resultado.liberado).toBe(false);
     expect(resultado.pendenciasBloqueantes).toHaveLength(1);
     expect(resultado.documentoIncompleto).toBe(false);
+  });
+
+  test("[inválido] Local extremo em edição bloqueia apesar da última rota/documento válido", () => {
+    const documento = documentoExemploMinimo();
+    const servico = documento.autos.servicos[0];
+    const itinerario = servico.itinerarios[0];
+    const paradas = paradasEmEdicaoDeContrato(itinerario.paradas);
+    const local = paradas.find((parada) => parada.tipo === "local")!;
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+      paradasEmEdicao: {
+        [chaveItinerario(servico.uuid, itinerario.sentido)]: [paradas[0], local],
+      },
+    };
+
+    const resultado = avaliarGateExportacao(sessao, []);
+
+    expect(resultado.liberado).toBe(false);
+    expect(resultado.pendenciasBloqueantes).toHaveLength(1);
+    expect(resultado.pendenciasBloqueantes[0].id).toContain("local-extremo-");
+    expect(resultado.errosEstruturais).toHaveLength(0);
   });
 
   test("[inválido] documento estruturalmente inválido (itinerário sem viagem, §11/RN-039) bloqueia", () => {

@@ -114,7 +114,13 @@ test.describe("Etapa Seções, Locais e Itinerários — reordenar dispara recá
     // composer REAL (TASK-025) foi injetado, não um placeholder (DEC-046).
     await expect(page.getByTestId("descricao-texto")).toContainText("Via Reordenada 1");
     await expect(page.getByTestId("mensagem-sem-rota")).toHaveCount(0);
-    await expect(page.getByTestId("painel-pendencias").getByTestId("pendencia-item")).toHaveCount(0);
+    // O alerta agregado de grade de feriados pode existir (TASK-081); o que
+    // este fluxo prova é que o recálculo não deixou bloqueante de rota.
+    await expect(
+      page.locator(
+        '[data-testid="painel-pendencias"] [data-testid="pendencia-item"][data-severidade="bloqueante"]',
+      ),
+    ).toHaveCount(0);
   });
 
   test("falha do OSRM (NoRoute, mockado) acende a pendência bloqueante no painel (TASK-044)", async ({
@@ -222,6 +228,122 @@ test.describe("Etapa Seções, Locais e Itinerários — criar Seção via mapa 
     expect(ultimaUrlOsrm).not.toBeNull();
     expect((ultimaUrlOsrm as unknown as string).split(";").length).toBe(4);
     await expect(page.getByTestId("descricao-texto")).toContainText("Via 3");
+  });
+});
+
+test.describe("TASK-068 — vocabulário visual e Local extremo contextual", () => {
+  test("Local ao fim bloqueia e fica em erro; acrescentar Seção recupera a montagem", async ({
+    page,
+  }) => {
+    let chamadasOsrm = 0;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamadasOsrm += 1;
+      return rota.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          code: "Ok",
+          routes: [
+            {
+              geometry: {
+                type: "LineString",
+                coordinates: [
+                  [-46.402, -24.0081],
+                  [-46.3919, -23.9631],
+                  [-46.3339, -23.9608],
+                  [-48.5, -22.2],
+                  [-48.49, -22.19],
+                ],
+              },
+              legs: [
+                { distance: 6100, duration: 750, steps: [{ name: "Via 1" }] },
+                { distance: 8000, duration: 1080, steps: [{ name: "Via 2" }] },
+                { distance: 90000, duration: 5400, steps: [{ name: "Via 3" }] },
+                { distance: 1200, duration: 180, steps: [{ name: "Via 4" }] },
+              ],
+            },
+          ],
+        }),
+      });
+    });
+
+    await abrirEtapaVolta(page);
+    const mapa = page.getByTestId("mapa-base");
+    await mapa.locator(".maplibregl-marker").first().waitFor();
+    const caixa = await mapa.boundingBox();
+    if (!caixa) throw new Error("mapa sem bounding box");
+
+    const tamanhos = await page.evaluate(() => {
+      const estilo = getComputedStyle(document.documentElement);
+      return {
+        secao: Number.parseFloat(estilo.getPropertyValue("--spacing-marcador-secao")),
+        local: Number.parseFloat(estilo.getPropertyValue("--spacing-marcador-local")),
+        pontoRota: Number.parseFloat(
+          estilo.getPropertyValue("--spacing-marcador-ponto-rota"),
+        ),
+      };
+    });
+    expect(tamanhos.pontoRota).toBeLessThan(tamanhos.local);
+    expect(tamanhos.local).toBeLessThan(tamanhos.secao);
+    await expect(mapa.locator(".marcador-mapa-quadrado")).toHaveCount(3);
+
+    // Centro do mapa cai em Jaú e fora da rota congelada. Clique direito
+    // acrescenta o Local ao fim; RN-035 recusa antes de chamar o OSRM.
+    await mapa.click({
+      button: "right",
+      position: { x: caixa.width / 2, y: caixa.height / 2 },
+    });
+    await page.getByRole("menuitem", { name: "Local" }).click();
+    await page.getByTestId("nome-local-input").fill("Local extremo E2E");
+    await page.getByTestId("confirmar-criar-local").click();
+
+    expect(chamadasOsrm).toBe(0);
+    await expect(page.getByTestId("avisos-montagem-invalida")).toBeVisible();
+    const linhaInvalida = page.locator(
+      '[data-testid="parada-item"][data-estado="local-extremo"]',
+    );
+    await expect(linhaInvalida).toContainText("Jaú - Local extremo E2E");
+    const alvoErro = linhaInvalida.getByTestId("parada-local-extremo");
+    await expect(alvoErro).toHaveAttribute("aria-invalid", "true");
+    await alvoErro.focus();
+    await expect(linhaInvalida.getByTestId("tooltip-balao")).toContainText(
+      "a última Parada deve ser uma Seção",
+    );
+    const marcadorLocal = mapa.locator(".marcador-mapa-circulo.marcador-mapa--medio");
+    await expect(marcadorLocal).toHaveCount(1);
+    await expect(marcadorLocal).toHaveClass(/marcador-mapa--invalido/);
+    await expect(marcadorLocal).toHaveCSS("background-color", "rgb(22, 163, 74)");
+    await expect(marcadorLocal).toHaveCSS("border-color", "rgb(220, 38, 38)");
+
+    await page.locator('[data-testid="etapa-botao"][data-etapa="exportacao"]').click();
+    await expect(page.getByTestId("botao-exportar-proposta")).toBeDisabled();
+    await expect(page.getByTestId("exportacao-motivos-bloqueio")).toContainText(
+      "Local ocupando a última Parada",
+    );
+
+    // Retorna à ocorrência e acrescenta uma Seção em outro ponto de Jaú. O
+    // Local passa a intermediário, os realces somem e o OSRM mockado calcula.
+    await page
+      .locator('[data-testid="etapa-botao"][data-etapa="secoes-locais-itinerarios"]')
+      .click();
+    await page.getByTestId("select-servico-itinerario").selectOption({ label: "0001-1SU" });
+    await page.locator('[data-testid="botao-sentido"][data-sentido="volta"]').click();
+    const mapaRetorno = page.getByTestId("mapa-base");
+    await mapaRetorno.locator(".maplibregl-marker").first().waitFor();
+    const caixaRetorno = await mapaRetorno.boundingBox();
+    if (!caixaRetorno) throw new Error("mapa sem bounding box no retorno");
+    await mapaRetorno.click({
+      button: "right",
+      position: { x: caixaRetorno.width / 2 + 30, y: caixaRetorno.height / 2 },
+    });
+    await page.getByRole("menuitem", { name: "Seção" }).click();
+    await page.getByTestId("nome-secao-input").fill("Seção final E2E");
+    await page.getByTestId("confirmar-criar-secao").click();
+
+    await expect(page.getByTestId("recalculando-rota")).toHaveCount(0);
+    expect(chamadasOsrm).toBe(1);
+    await expect(page.locator('[data-testid="parada-item"][data-estado="local-extremo"]')).toHaveCount(0);
+    await expect(mapaRetorno.locator(".marcador-mapa--invalido")).toHaveCount(0);
+    await expect(page.getByTestId("avisos-montagem-invalida")).toHaveCount(0);
   });
 });
 

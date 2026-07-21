@@ -7,7 +7,14 @@
 // `style=` inline autorizado (posição calculada em runtime a partir do
 // mouse — doc 18 §6.1).
 
-import { useRef, useState, type ComponentPropsWithoutRef, type MouseEvent } from "react";
+import {
+  useId,
+  useRef,
+  useState,
+  type ComponentPropsWithoutRef,
+  type FocusEvent,
+  type MouseEvent,
+} from "react";
 
 const ATRASO_EXIBICAO_MS = 300;
 const OFFSET_CURSOR_PX = 12;
@@ -15,6 +22,8 @@ const OFFSET_CURSOR_PX = 12;
 export interface TooltipProps extends ComponentPropsWithoutRef<"span"> {
   /** Conteúdo do balão. Não substitui o rótulo acessível do filho. */
   rotulo: string;
+  /** Descrição associada ao alvo por `aria-describedby`, quando necessária. */
+  descricaoAcessivel?: string;
 }
 
 interface PosicaoBalao {
@@ -30,8 +39,13 @@ export function Tooltip({
   onMouseEnter,
   onMouseMove,
   onMouseLeave,
+  onFocus,
+  onBlur,
+  descricaoAcessivel,
+  "aria-describedby": ariaDescribedby,
   ...outros
 }: TooltipProps) {
+  const idDescricao = useId();
   const [visivel, setVisivel] = useState(false);
   const [posicao, setPosicao] = useState<PosicaoBalao>({ left: 0, top: 0 });
   const temporizadorRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,6 +84,20 @@ export function Tooltip({
     onMouseLeave?.(evento);
   }
 
+  function aoReceberFoco(evento: FocusEvent<HTMLSpanElement>) {
+    limparTemporizador();
+    const caixa = evento.currentTarget.getBoundingClientRect();
+    setPosicao({ left: caixa.left, top: caixa.bottom + OFFSET_CURSOR_PX });
+    setVisivel(true);
+    onFocus?.(evento);
+  }
+
+  function aoPerderFoco(evento: FocusEvent<HTMLSpanElement>) {
+    limparTemporizador();
+    setVisivel(false);
+    onBlur?.(evento);
+  }
+
   const classesWrapper = ["inline-block", className].filter(Boolean).join(" ");
 
   return (
@@ -78,9 +106,21 @@ export function Tooltip({
       onMouseEnter={aoEntrarMouse}
       onMouseMove={aoMoverMouse}
       onMouseLeave={aoSairMouse}
+      onFocus={aoReceberFoco}
+      onBlur={aoPerderFoco}
+      aria-describedby={
+        [ariaDescribedby, descricaoAcessivel ? idDescricao : undefined]
+          .filter(Boolean)
+          .join(" ") || undefined
+      }
       {...outros}
     >
       {children}
+      {descricaoAcessivel && (
+        <span id={idDescricao} className="sr-only">
+          {descricaoAcessivel}
+        </span>
+      )}
       <span
         aria-hidden="true"
         data-testid="tooltip-balao"

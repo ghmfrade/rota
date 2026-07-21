@@ -89,6 +89,44 @@ export function removerParadasDeLocal(
   return paradas.filter((p) => !(p.tipo === "local" && p.localUuid === localUuid));
 }
 
+export type PosicaoExtrema = "inicio" | "fim";
+
+export interface OcorrenciaLocalExtremo {
+  indice: number;
+  localUuid: string;
+  posicoes: PosicaoExtrema[];
+}
+
+/**
+ * Deriva as ocorrências que violam RN-035 na lista de edição. O resultado é
+ * por índice (ocorrência), não pela entidade Local globalmente (DEC-070). Uma
+ * lista de um único Local devolve uma ocorrência com início e fim.
+ */
+export function ocorrenciasLocaisEmExtremo(
+  paradas: readonly ParadaEmEdicao[],
+): OcorrenciaLocalExtremo[] {
+  const porIndice = new Map<number, OcorrenciaLocalExtremo>();
+
+  function registrar(indice: number, posicao: PosicaoExtrema) {
+    const parada = paradas[indice];
+    if (!parada || parada.tipo !== "local") return;
+    const existente = porIndice.get(indice);
+    if (existente) {
+      existente.posicoes.push(posicao);
+      return;
+    }
+    porIndice.set(indice, {
+      indice,
+      localUuid: parada.localUuid,
+      posicoes: [posicao],
+    });
+  }
+
+  registrar(0, "inicio");
+  registrar(paradas.length - 1, "fim");
+  return [...porIndice.values()];
+}
+
 /** Converte para o formato do contrato (Spec 02 §10.1), atribuindo `ordem`
  * 1-based pela posição no array (RN-034 satisfeita por construção). */
 export function paradasParaContrato(paradas: readonly ParadaEmEdicao[]): Parada[] {

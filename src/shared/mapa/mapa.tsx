@@ -43,19 +43,20 @@ export interface MarcadorMapa {
   arrastavel?: boolean;
   cor?: string;
   /**
-   * Forma do marcador: `"pino"` (default, o pino teardrop do MapLibre) ou
-   * `"circulo"` (ponto circular colorido por `cor`). O mapa único de
-   * itinerários (TASK-060/DEC-054) usa `"circulo"` para Seção e Local; os
+   * Forma do marcador: `"pino"` (default, o pino teardrop do MapLibre),
+   * `"circulo"` ou `"quadrado"`. O mapa único de itinerários usa o quadrado
+   * para Seção e o círculo para Local/ponto de rota (TASK-068/DEC-069); os
    * demais consumidores mantêm o pino sem alteração (extensão opt-in).
    */
-  forma?: "pino" | "circulo";
+  forma?: "pino" | "circulo" | "quadrado";
   /**
-   * Tamanho do marcador `"circulo"` (default `"normal"`). `"pequeno"` é o
-   * vértice de ponto de rota (Spec 04 §7.3: "vértice pequeno sobre a linha,
-   * sem rótulo") — visualmente distinto de Seção/Local sem inventar uma
-   * terceira `forma`.
+   * Tamanho do marcador customizado (default `"normal"`): `"medio"` identifica
+   * o Local e `"pequeno"` o vértice de ponto de rota (DEC-069). A hierarquia
+   * visual é definida por tokens CSS, não por valores repetidos no componente.
    */
-  tamanho?: "normal" | "pequeno";
+  tamanho?: "normal" | "medio" | "pequeno";
+  /** Estado visual aditivo de erro da ocorrência, sem trocar forma/preenchimento. */
+  invalido?: boolean;
   aoArrastar?: (posicao: Coordenada) => void;
 }
 
@@ -106,17 +107,45 @@ export interface MapaHandle {
 const ID_FONTE_LINHAS = "linhas-mapa";
 const ID_CAMADA_LINHAS = "linhas-mapa-camada";
 
-// Elemento DOM de um marcador circular (`forma: "circulo"`). A forma (tamanho,
-// borda, sombra) vem da classe `.marcador-mapa-circulo` (globals.css); só a cor
-// é data-driven, aplicada imperativamente — não é um `style=` de componente
-// React (doc 18), e sim o elemento imperativo que o MapLibre recebe.
-function criarElementoCirculo(cor?: string, tamanho?: "normal" | "pequeno"): HTMLElement {
+type FormaCustomizada = Exclude<NonNullable<MarcadorMapa["forma"]>, "pino">;
+
+function classesMarcadorCustomizado(
+  forma: FormaCustomizada,
+  tamanho: MarcadorMapa["tamanho"],
+  invalido: boolean,
+): string {
+  return [
+    `marcador-mapa-${forma}`,
+    tamanho === "medio" ? "marcador-mapa--medio" : "",
+    tamanho === "pequeno" ? "marcador-mapa--pequeno" : "",
+    invalido ? "marcador-mapa--invalido" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+// Elemento DOM customizado recebido imperativamente pelo MapLibre. Forma,
+// tamanho, borda e sombra vêm dos tokens/classes de `globals.css`; somente a
+// cor de preenchimento é data-driven (doc 18 §6.1).
+function atualizarElementoCustomizado(
+  elemento: HTMLElement,
+  forma: FormaCustomizada,
+  cor: string | undefined,
+  tamanho: MarcadorMapa["tamanho"],
+  invalido: boolean,
+) {
+  elemento.className = classesMarcadorCustomizado(forma, tamanho, invalido);
+  elemento.style.backgroundColor = cor ?? "";
+}
+
+function criarElementoCustomizado(
+  forma: FormaCustomizada,
+  cor?: string,
+  tamanho?: MarcadorMapa["tamanho"],
+  invalido = false,
+): HTMLElement {
   const elemento = document.createElement("div");
-  elemento.className =
-    tamanho === "pequeno"
-      ? "marcador-mapa-circulo marcador-mapa-circulo--pequeno"
-      : "marcador-mapa-circulo";
-  if (cor) elemento.style.backgroundColor = cor;
+  atualizarElementoCustomizado(elemento, forma, cor, tamanho, invalido);
   return elemento;
 }
 
@@ -314,12 +343,26 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
       if (existente) {
         existente.setDraggable(spec.arrastavel ?? false);
         existente.setLngLat([spec.posicao.lng, spec.posicao.lat]);
+        if (spec.forma === "circulo" || spec.forma === "quadrado") {
+          atualizarElementoCustomizado(
+            existente.getElement(),
+            spec.forma,
+            spec.cor,
+            spec.tamanho,
+            spec.invalido ?? false,
+          );
+        }
         continue;
       }
       const marcador =
-        spec.forma === "circulo"
+        spec.forma === "circulo" || spec.forma === "quadrado"
           ? new maplibregl.Marker({
-              element: criarElementoCirculo(spec.cor, spec.tamanho),
+              element: criarElementoCustomizado(
+                spec.forma,
+                spec.cor,
+                spec.tamanho,
+                spec.invalido,
+              ),
               draggable: spec.arrastavel ?? false,
             })
           : new maplibregl.Marker({

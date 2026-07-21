@@ -8,6 +8,13 @@ const dublê = vi.hoisted(() => ({
     acertos: unknown[];
     queryRenderedFeatures: ReturnType<typeof vi.fn>;
   },
+  marcadores: [] as Array<{
+    elemento: HTMLElement;
+    arrastavel: boolean;
+    setDraggable: (valor: boolean) => void;
+    setLngLat: (valor: [number, number]) => unknown;
+    getElement: () => HTMLElement;
+  }>,
 }));
 
 interface EventoMapa {
@@ -34,12 +41,47 @@ vi.mock("maplibre-gl", () => ({
       return { id: "linhas-mapa-camada" };
     }
 
+    getSource() {
+      return undefined;
+    }
+
+    addSource() {}
+    addLayer() {}
+
     remove() {}
   },
-  Marker: class {},
+  Marker: class {
+    elemento: HTMLElement;
+    arrastavel: boolean;
+
+    constructor(opcoes: { element?: HTMLElement; draggable?: boolean } = {}) {
+      this.elemento = opcoes.element ?? document.createElement("div");
+      this.arrastavel = opcoes.draggable ?? false;
+      dublê.marcadores.push(this);
+    }
+
+    setDraggable(valor: boolean) {
+      this.arrastavel = valor;
+    }
+
+    setLngLat() {
+      return this;
+    }
+
+    addTo() {
+      return this;
+    }
+
+    on() {}
+    remove() {}
+
+    getElement() {
+      return this.elemento;
+    }
+  },
 }));
 
-import { Mapa } from "@/shared/mapa";
+import { Mapa, type MarcadorMapa } from "@/shared/mapa";
 
 const EVENTO: EventoMapa = {
   lngLat: { lng: -46.4, lat: -23.9 },
@@ -98,5 +140,59 @@ describe("Mapa — hit-test do clique direito (TASK-065/067; DEC-055)", () => {
     );
     expect(montagem.aoClicarDireitoNaLinha).not.toHaveBeenCalled();
     montagem.resultado.desmontar();
+  });
+});
+
+describe("Mapa — vocabulário visual dos marcadores (TASK-068/DEC-069/070)", () => {
+  test("cria quadrado, círculo médio e círculo pequeno com classes semânticas", async () => {
+    dublê.marcadores.length = 0;
+    const marcadores: MarcadorMapa[] = [
+      { id: "secao", posicao: { lng: 1, lat: 1 }, forma: "quadrado" },
+      { id: "local", posicao: { lng: 2, lat: 2 }, forma: "circulo", tamanho: "medio" },
+      { id: "rota", posicao: { lng: 3, lat: 3 }, forma: "circulo", tamanho: "pequeno" },
+    ];
+    const resultado = renderizar(<Mapa marcadores={marcadores} />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    act(() => dublê.instancia?.handlers.get("load")?.(EVENTO));
+
+    expect(dublê.marcadores.map((m) => m.elemento.className)).toEqual([
+      "marcador-mapa-quadrado",
+      "marcador-mapa-circulo marcador-mapa--medio",
+      "marcador-mapa-circulo marcador-mapa--pequeno",
+    ]);
+    resultado.desmontar();
+  });
+
+  test("estado inválido é aditivo e atualiza um marcador já existente", async () => {
+    dublê.marcadores.length = 0;
+    const base: MarcadorMapa = {
+      id: "local",
+      posicao: { lng: 2, lat: 2 },
+      forma: "circulo",
+      tamanho: "medio",
+      cor: "#16a34a",
+    };
+    const resultado = renderizar(<Mapa marcadores={[base]} />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    act(() => dublê.instancia?.handlers.get("load")?.(EVENTO));
+    const elemento = dublê.marcadores[0].elemento;
+
+    resultado.rerenderizar(<Mapa marcadores={[{ ...base, invalido: true }]} />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(dublê.marcadores).toHaveLength(1);
+    expect(elemento.className).toContain("marcador-mapa--invalido");
+    expect(elemento.className).toContain("marcador-mapa--medio");
+    expect(elemento.style.backgroundColor).toBe("rgb(22, 163, 74)");
+    resultado.desmontar();
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   conjuntoSecoesConsistente,
   inserirParada,
+  ocorrenciasLocaisEmExtremo,
   paradaDeLocal,
   paradaDeSecao,
   paradasEmEdicaoDeContrato,
@@ -127,6 +128,38 @@ describe("paradasParaContrato / paradasEmEdicaoDeContrato — conversão com o c
     expect(paradasEmEdicaoDeContrato(doContrato)).toEqual([
       paradaDeSecao(SECAO_A.uuid),
       paradaDeLocal(LOCAL_X.uuid),
+    ]);
+  });
+});
+
+describe("ocorrenciasLocaisEmExtremo — RN-035/DEC-070", () => {
+  test("lista válida não produz estado contextual", () => {
+    expect(
+      ocorrenciasLocaisEmExtremo([
+        paradaDeSecao(SECAO_A.uuid),
+        paradaDeLocal(LOCAL_X.uuid),
+        paradaDeSecao(SECAO_B.uuid),
+      ]),
+    ).toEqual([]);
+  });
+
+  test("[inválido] identifica início e fim por ocorrência", () => {
+    const outroLocal = "55555555-5555-4555-8555-555555555555";
+    expect(
+      ocorrenciasLocaisEmExtremo([
+        paradaDeLocal(LOCAL_X.uuid),
+        paradaDeSecao(SECAO_A.uuid),
+        paradaDeLocal(outroLocal),
+      ]),
+    ).toEqual([
+      { indice: 0, localUuid: LOCAL_X.uuid, posicoes: ["inicio"] },
+      { indice: 2, localUuid: outroLocal, posicoes: ["fim"] },
+    ]);
+  });
+
+  test("[inválido] um único Local é uma ocorrência nos dois extremos", () => {
+    expect(ocorrenciasLocaisEmExtremo([paradaDeLocal(LOCAL_X.uuid)])).toEqual([
+      { indice: 0, localUuid: LOCAL_X.uuid, posicoes: ["inicio", "fim"] },
     ]);
   });
 });

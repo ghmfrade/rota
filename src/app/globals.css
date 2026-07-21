@@ -9,6 +9,9 @@
   --color-azul-700: #1d4ed8;
   --color-azul-900: #1e3a5f;
 
+  /* Ciano — identidade do ponto de rota (TASK-068/DEC-057/069) */
+  --color-ciano-500: #06b6d4;
+
   /* Cores — paleta cinza */
   --color-cinza-50: #f8fafc;
   --color-cinza-100: #f1f5f9;
@@ -26,6 +29,12 @@
   /* Raios */
   --radius-painel: 12px;
   --radius-controle: 8px;
+  --radius-marcador-secao: 2px;
+
+  /* Hierarquia visual dos marcadores do mapa (DEC-069) */
+  --spacing-marcador-secao: 16px;
+  --spacing-marcador-local: 12px;
+  --spacing-marcador-ponto-rota: 9px;
 
   /* Sombras */
   --shadow-sombra-1: 0 1px 2px rgb(15 23 42 / 0.06);
@@ -52,25 +61,44 @@
   }
 }
 
-/* Marcador circular do mapa único de itinerários (TASK-060/DEC-054). A forma
-   é fixa; a cor (Seção × Local) é aplicada imperativamente por `cor`. */
-.marcador-mapa-circulo {
+/* Vocabulário dos marcadores do mapa único (TASK-068/DEC-069). A cor é
+   aplicada imperativamente por `cor`; forma e tamanho vêm destes tokens. */
+.marcador-mapa-circulo,
+.marcador-mapa-quadrado {
   box-sizing: border-box;
-  width: 16px;
-  height: 16px;
-  border-radius: 9999px;
+  width: var(--spacing-marcador-secao);
+  height: var(--spacing-marcador-secao);
   border: 2px solid #fff;
   box-shadow: var(--shadow-sombra-2);
   cursor: pointer;
 }
 
-/* Vértice de ponto de rota (TASK-063; Spec 04 §7.3 — "vértice pequeno sobre
-   a linha, sem rótulo"): mesmo marcador circular, menor, sem sombra elevada. */
-.marcador-mapa-circulo--pequeno {
-  width: 9px;
-  height: 9px;
+.marcador-mapa-circulo {
+  border-radius: 9999px;
+}
+
+.marcador-mapa-quadrado {
+  border-radius: var(--radius-marcador-secao);
+}
+
+.marcador-mapa--medio {
+  width: var(--spacing-marcador-local);
+  height: var(--spacing-marcador-local);
   border-width: 1.5px;
   box-shadow: var(--shadow-sombra-1);
+}
+
+/* Vértice pequeno, sem rótulo (Spec 04 §7.3). */
+.marcador-mapa--pequeno {
+  width: var(--spacing-marcador-ponto-rota);
+  height: var(--spacing-marcador-ponto-rota);
+  border-width: 1.5px;
+  box-shadow: var(--shadow-sombra-1);
+}
+
+/* Erro contextual aditivo: preserva forma e preenchimento do Local. */
+.marcador-mapa--invalido {
+  border-color: var(--color-erro);
 }
 
 @media (prefers-reduced-motion: reduce) {

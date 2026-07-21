@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { coletarPendencias, type ItinerarioAoVivo } from "@/formulario/pendencias";
+import { chaveItinerario, paradasEmEdicaoDeContrato } from "@/formulario/itinerarios";
 import { ETAPAS, rotuloEtapa, type IdEtapa } from "@/formulario/layout/etapas";
 import type { SessaoFormulario } from "@/formulario/sessao";
 import {
@@ -63,6 +64,57 @@ describe("coletarPendencias (Spec 04 §11; RN-078)", () => {
     expect(segunda).toHaveLength(primeira.length);
     // Instâncias novas a cada chamada (recomputado, não memorizado).
     expect(segunda).not.toBe(primeira);
+  });
+});
+
+describe("coletarPendencias — Local extremo ao vivo (TASK-068/DEC-070; RN-035/078)", () => {
+  test("[inválido] bloqueia a ocorrência em edição mesmo com documento anterior válido", () => {
+    const documento = documentoExemploMinimo();
+    const servico = documento.autos.servicos[0];
+    const itinerario = servico.itinerarios[0];
+    const paradas = paradasEmEdicaoDeContrato(itinerario.paradas);
+    const local = paradas.find((parada) => parada.tipo === "local")!;
+    const chave = chaveItinerario(servico.uuid, itinerario.sentido);
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+      paradasEmEdicao: { [chave]: [paradas[0], paradas[1], local] },
+    };
+
+    const pendencia = coletarPendencias(sessao).find((item) =>
+      item.id.startsWith("local-extremo-"),
+    );
+    expect(pendencia).toMatchObject({
+      severidade: "bloqueante",
+      etapaAlvo: "secoes-locais-itinerarios",
+    });
+    expect(pendencia?.mensagem).toContain("última Parada");
+  });
+
+  test("corrigir a ordem remove o bloqueio e não contamina outro sentido", () => {
+    const documento = documentoExemploMinimo();
+    const servico = documento.autos.servicos[0];
+    const itinerario = servico.itinerarios[0];
+    const paradas = paradasEmEdicaoDeContrato(itinerario.paradas);
+    const chaveIda = chaveItinerario(servico.uuid, "ida");
+    const chaveVolta = chaveItinerario(servico.uuid, "volta");
+    const local = paradas.find((parada) => parada.tipo === "local")!;
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+      paradasEmEdicao: {
+        [chaveIda]: [paradas[0], local, paradas[paradas.length - 1]],
+        [chaveVolta]: [local, paradas[0]],
+      },
+    };
+
+    const pendencias = coletarPendencias(sessao).filter((item) =>
+      item.id.startsWith("local-extremo-"),
+    );
+    expect(pendencias).toHaveLength(1);
+    expect(pendencias[0].id).toContain(chaveVolta);
   });
 });
 

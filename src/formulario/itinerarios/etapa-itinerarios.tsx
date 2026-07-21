@@ -30,7 +30,7 @@ import {
   reancorarPontosDeRotaNaInsercaoPosicional,
   removerPontoDeRota,
 } from "@/formulario/roteamento";
-import { Botao, Painel, Select, Tabela } from "@/shared/ui";
+import { Botao, Painel, Select, Tabela, Tooltip } from "@/shared/ui";
 import {
   matrizDistanciasDoServico,
   reconciliarMatrizSeccionamento,
@@ -58,6 +58,7 @@ import {
   chaveParadaEmEdicao,
   conjuntoSecoesConsistente,
   inserirParada,
+  ocorrenciasLocaisEmExtremo,
   paradaDeLocal,
   paradaDeSecao,
   paradasEmEdicaoDeContrato,
@@ -102,6 +103,16 @@ function sentidosDeDirecionalidade(direcionalidade: Direcionalidade): Sentido[] 
 }
 
 const ROTULO_SENTIDO: Record<Sentido, string> = { ida: "Ida", volta: "Volta" };
+
+function mensagemLocalExtremo(posicoes: readonly ("inicio" | "fim")[]): string {
+  if (posicoes.length === 2) {
+    return "Este Local ocupa a primeira e a última Parada. Locais (pontos de parada) só podem ocupar posições intermediárias; os extremos devem ser Seções.";
+  }
+  if (posicoes[0] === "inicio") {
+    return "Este Local está no início do itinerário. Locais (pontos de parada) só podem ocupar posições intermediárias; a primeira Parada deve ser uma Seção.";
+  }
+  return "Este Local está no fim do itinerário. Locais (pontos de parada) só podem ocupar posições intermediárias; a última Parada deve ser uma Seção.";
+}
 
 interface PropsEtapaItinerarios {
   sessao: SessaoFormulario;
@@ -218,6 +229,10 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     linhaAtual && sentidoSelecionado
       ? (violacoesMontagemMapa[chaveItinerario(linhaAtual.servicoUuid, sentidoSelecionado)] ?? [])
       : [];
+  const locaisExtremosAtual = ocorrenciasLocaisEmExtremo(paradasAtual);
+  const localExtremoPorIndice = new Map(
+    locaisExtremosAtual.map((ocorrencia) => [ocorrencia.indice, ocorrencia]),
+  );
   // Pontos de rota do itinerário em edição (TASK-071; DEC-058): vivem em
   // estado de sessão PRÓPRIO, que sobrevive à transição para `sem-rota`
   // (RN-048) — não são mais derivados de `estadoAtual.rota`, que deixa de
@@ -487,7 +502,9 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     if (!posicaoNaLinha) {
       return { paradas: inserirParada(paradasAtual, parada) };
     }
-    if (!linhaAtual || !sentidoSelecionado || !linhaRotaAtual) return undefined;
+    if (!linhaAtual || !sentidoSelecionado || !linhaRotaAtual) {
+      return { paradas: inserirParada(paradasAtual, parada) };
+    }
 
     const resolucao = resolverParadasRota(
       paradasAtual,
@@ -496,7 +513,9 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
       linhaAtual.servicoUuid,
       sentidoSelecionado,
     );
-    if (!resolucao.ok) return undefined;
+    if (!resolucao.ok) {
+      return { paradas: inserirParada(paradasAtual, parada) };
+    }
 
     const paradasCoordenadas: Coordenada[] = resolucao.paradas.map((ponto) => ({
       lng: ponto.longitude,
@@ -507,7 +526,9 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
       linhaRotaAtual.pontos,
       paradasCoordenadas,
     );
-    if (!ancoragem) return undefined;
+    if (!ancoragem) {
+      return { paradas: inserirParada(paradasAtual, parada) };
+    }
 
     // `aposParadaOrdem` é 1-based e também é exatamente o índice 0-based em
     // que a nova Parada deve entrar: trecho 2→3 ⇒ índice 2 ⇒ nova ordem 3.
@@ -707,6 +728,7 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
             <EditorMapaItinerario
               secoes={secoes}
               locais={linhaAtual.locais}
+              locaisInvalidos={locaisExtremosAtual.map((ocorrencia) => ocorrencia.localUuid)}
               servicoUuid={linhaAtual.servicoUuid}
               sentido={sentidoSelecionado}
               bidirecional={bidirecional}
@@ -791,6 +813,10 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
                   </thead>
                   <tbody>
                     {paradasAtual.map((parada, indice) => {
+                      const localExtremo = localExtremoPorIndice.get(indice);
+                      const mensagemErro = localExtremo
+                        ? mensagemLocalExtremo(localExtremo.posicoes)
+                        : undefined;
                       const rotulo =
                         parada.tipo === "secao"
                           ? (() => {
@@ -802,9 +828,30 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
                               return local ? nomeExibicaoLocal(local) : parada.localUuid;
                             })();
                       return (
-                        <tr key={`${parada.tipo}-${indice}`} data-testid="parada-item">
+                        <tr
+                          key={`${parada.tipo}-${indice}`}
+                          data-testid="parada-item"
+                          data-estado={localExtremo ? "local-extremo" : undefined}
+                          className={
+                            localExtremo
+                              ? "text-erro [&>td]:border-y [&>td]:border-erro [&>td:first-child]:border-l [&>td:last-child]:border-r"
+                              : undefined
+                          }
+                        >
                           <td>
-                            <span data-testid="parada-rotulo">{rotulo}</span>
+                            {mensagemErro ? (
+                              <Tooltip
+                                rotulo={mensagemErro}
+                                descricaoAcessivel={mensagemErro}
+                                tabIndex={0}
+                                aria-invalid="true"
+                                data-testid="parada-local-extremo"
+                              >
+                                <span data-testid="parada-rotulo">{rotulo}</span>
+                              </Tooltip>
+                            ) : (
+                              <span data-testid="parada-rotulo">{rotulo}</span>
+                            )}
                           </td>
                           <td>
                             <div className="flex flex-wrap gap-2">

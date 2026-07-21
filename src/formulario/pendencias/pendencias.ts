@@ -1,4 +1,9 @@
-import { servicosDaSessao, type SessaoFormulario } from "@/formulario/sessao";
+import {
+  servicosDaSessao,
+  servicosEmConstrucaoDaSessao,
+  type SessaoFormulario,
+} from "@/formulario/sessao";
+import { ocorrenciasLocaisEmExtremo } from "@/formulario/itinerarios/motor-montagem";
 import type { IdEtapa } from "@/formulario/layout/etapas";
 import type { EstadoRotaViva } from "@/formulario/roteamento";
 import { matrizDistanciasDesatualizada } from "@/formulario/matrizes";
@@ -107,6 +112,39 @@ export function coletarPendencias(
         "Documento criado do zero: sem preservação de identidade das entidades para comparação entre versões (o Comparador tratará tudo como novo).",
       etapaAlvo: "revisao",
     });
+  }
+
+  // RN-035/DEC-070: a lista em edição pode estar temporariamente inválida
+  // enquanto o documento/última rota válida permanece congelado. A pendência
+  // nasce diretamente desse estado efêmero e nunca é persistida no JSON
+  // (NEG-004); assim o gate não é enganado pelo documento anterior válido.
+  const numerosPorUuid = new Map([
+    ...servicosDaSessao(sessao).map((servico) => [servico.uuid, servico.numero_n] as const),
+    ...servicosEmConstrucaoDaSessao(sessao).map(
+      (servico) => [servico.uuid, servico.numero_n] as const,
+    ),
+  ]);
+  for (const [chave, paradas] of Object.entries(sessao.paradasEmEdicao ?? {})) {
+    const sentido = chave.endsWith("-volta") ? "volta" : "ida";
+    const sufixo = `-${sentido}`;
+    const servicoUuid = chave.slice(0, -sufixo.length);
+    const numeroN = numerosPorUuid.get(servicoUuid) ?? "não identificado";
+    const rotuloSentido = ROTULO_SENTIDO[sentido];
+
+    for (const ocorrencia of ocorrenciasLocaisEmExtremo(paradas)) {
+      const posicao =
+        ocorrencia.posicoes.length === 2
+          ? "a primeira e a última Parada"
+          : ocorrencia.posicoes[0] === "inicio"
+            ? "a primeira Parada"
+            : "a última Parada";
+      pendencias.push({
+        id: `local-extremo-${chave}-${ocorrencia.indice}`,
+        severidade: "bloqueante",
+        mensagem: `O itinerário de ${rotuloSentido} do Serviço ${numeroN} tem um Local ocupando ${posicao}. Locais só podem ocupar posições intermediárias; os extremos devem ser Seções.`,
+        etapaAlvo: "secoes-locais-itinerarios",
+      });
+    }
   }
 
   // Bloqueantes de §11/§14 por itinerário: "sem rota válida" (RN-048/078,
