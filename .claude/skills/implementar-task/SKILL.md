@@ -19,11 +19,12 @@ Implemente a task indicada seguindo o **plano aprovado** na "Análise da Task". 
 
 ## Ordem das verificações
 
-1. Durante a implementação, rodar **somente os testes direcionados** aos arquivos/regras alterados.
-2. Rodar `lint` e `typecheck`; corrigir todas as falhas antes de avançar.
-3. Rodar `build` quando aplicável e corrigir todas as falhas antes da evidência final.
-4. Rodar a **suíte completa uma única vez, no fim**, exclusivamente com `npm run test:all:log -- --executor=Codex`. O comando executa Vitest + Playwright sequencialmente, controla o servidor Next e preserva `ultimo-test-all.log` para a revisão.
-5. Se a suíte falhar, corrigir e repetir o mesmo comando até ficar verde. Não rodar E2E separado depois do log canônico e nunca executar processos pesados em paralelo.
+1. Durante a implementação, usar Vitest direcionado para feedback rápido: `npm test -- <arquivo.test.ts>` ou `npm test -- -t "<nome do teste>"`. Rodar somente os arquivos/regras alterados nessa fase.
+2. Não usar `npm run test:e2e` no Windows e não criar/configurar um executor E2E isolado por cenário. Por padrão, deixar a cobertura E2E para a suíte completa final. Se for necessário diagnosticar uma falha E2E antes dela, rodar todos os E2E com `npm run test:e2e:controlado`.
+3. Rodar `lint` e `typecheck`; corrigir todas as falhas antes de avançar.
+4. Rodar `build` quando aplicável e corrigir todas as falhas antes da evidência final.
+5. Rodar a **suíte completa uma única vez, no fim**, exclusivamente com `npm run test:all:log -- --executor=<quem executa>` — por exemplo, `Codex`, `Claude` ou `humano`. Informar o executor real; o comando executa Vitest + Playwright sequencialmente, controla o servidor Next e preserva `ultimo-test-all.log` para a revisão.
+6. Se a suíte falhar, corrigir e repetir o mesmo comando até ficar verde. Não rodar E2E separado depois do log canônico e nunca executar processos pesados em paralelo.
 
 Antes de reportar sucesso, rode `npm run test:all:verificar`. O verificador precisa aceitar o marcador final, os dois códigos 0, o fingerprint atual e a identidade do mesmo working tree. Log ausente, truncado, vermelho, desatualizado ou copiado de outro working tree é falha, nunca evidência reutilizável.
 
