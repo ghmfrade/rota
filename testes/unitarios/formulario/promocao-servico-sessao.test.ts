@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { z } from "zod";
 import {
   chaveItinerario,
+  paradaDeLocal,
   paradaDeSecao,
   promoverServicoNaSessao,
 } from "@/formulario/itinerarios";
@@ -26,6 +27,7 @@ type Rota = z.infer<typeof esquemaRota>;
 const SECAO_A_UUID = "4da15f36-5bbe-4f4e-90e3-68029097c1b9";
 const SECAO_B_UUID = "6f51076b-aaf8-4546-8530-4da1e489c880";
 const SERVICO_B_UUID = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
+const LOCAL_UUID = "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb";
 
 const ROTA_IDA: Rota = {
   geometria: { type: "LineString", coordinates: [[-46.3339, -23.9608], [-46.3919, -23.9631]] },
@@ -189,5 +191,22 @@ describe("promoverServicoNaSessao — modo novo (paridade com o comportamento pr
     const servicos = servicosDaSessao(proxima);
     expect(servicos).toHaveLength(1);
     expect(servicos[0].uuid).toBe(SERVICO_B_UUID);
+  });
+
+  test("[inválido] Local na primeira Parada não promove o Serviço mesmo com rota anterior válida (RN-035/DEC-070)", () => {
+    const sessao = sessaoNovaComEmConstrucao("ida");
+    const chave = chaveItinerario(SERVICO_B_UUID, "ida");
+    const comEstado: SessaoFormulario = {
+      ...sessao,
+      paradasEmEdicao: {
+        [chave]: [paradaDeLocal(LOCAL_UUID), paradaDeSecao(SECAO_B_UUID)],
+      },
+      estadosRotaViva: { [chave]: ESTADO_RECALCULADA_IDA },
+    };
+
+    const proxima = promoverServicoNaSessao(comEstado, SERVICO_B_UUID);
+
+    expect(servicosEmConstrucaoDaSessao(proxima)).toHaveLength(1);
+    expect(servicosDaSessao(proxima)).toHaveLength(0);
   });
 });

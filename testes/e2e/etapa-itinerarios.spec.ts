@@ -344,6 +344,43 @@ test.describe("TASK-068 — vocabulário visual e Local extremo contextual", () 
     await expect(page.locator('[data-testid="parada-item"][data-estado="local-extremo"]')).toHaveCount(0);
     await expect(mapaRetorno.locator(".marcador-mapa--invalido")).toHaveCount(0);
     await expect(page.getByTestId("avisos-montagem-invalida")).toHaveCount(0);
+
+    // Move o mesmo Local válido até a primeira posição. Os dois primeiros
+    // movimentos ainda o deixam intermediário e recalculam; o terceiro viola
+    // RN-035 e é recusado antes do OSRM.
+    const linhaLocal = page
+      .locator('[data-testid="parada-item"]')
+      .filter({ hasText: "Jaú - Local extremo E2E" });
+    await linhaLocal.getByTestId("parada-mover-cima").click();
+    await expect.poll(() => chamadasOsrm).toBe(2);
+    await linhaLocal.getByTestId("parada-mover-cima").click();
+    await expect.poll(() => chamadasOsrm).toBe(3);
+    await linhaLocal.getByTestId("parada-mover-cima").click();
+
+    await expect(linhaLocal).toHaveAttribute("data-estado", "local-extremo");
+    const alvoErroInicial = linhaLocal.getByTestId("parada-local-extremo");
+    await expect(alvoErroInicial).toHaveAttribute("aria-invalid", "true");
+    await alvoErroInicial.focus();
+    await expect(linhaLocal.getByTestId("tooltip-balao")).toContainText(
+      "a primeira Parada deve ser uma Seção",
+    );
+    await expect(mapaRetorno.locator(".marcador-mapa--invalido")).toHaveCount(1);
+    expect(chamadasOsrm).toBe(3);
+
+    // O erro pertence à ocorrência da Volta: a Ida do mesmo Serviço não
+    // herda a borda nem a linha inválida.
+    await page.locator('[data-testid="botao-sentido"][data-sentido="ida"]').click();
+    await expect(
+      page.locator('[data-testid="parada-item"][data-estado="local-extremo"]'),
+    ).toHaveCount(0);
+    await expect(mapaRetorno.locator(".marcador-mapa--invalido")).toHaveCount(0);
+
+    await page.locator('[data-testid="botao-sentido"][data-sentido="volta"]').click();
+    await expect(linhaLocal).toHaveAttribute("data-estado", "local-extremo");
+    await linhaLocal.getByTestId("parada-mover-baixo").click();
+    await expect.poll(() => chamadasOsrm).toBe(4);
+    await expect(linhaLocal).not.toHaveAttribute("data-estado", "local-extremo");
+    await expect(mapaRetorno.locator(".marcador-mapa--invalido")).toHaveCount(0);
   });
 });
 

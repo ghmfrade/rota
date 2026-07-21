@@ -11,7 +11,11 @@ import {
   type ServicoEmConstrucao,
 } from "@/formulario/sessao";
 import { chaveItinerario } from "./estado-itinerarios";
-import { paradasParaContrato, type ParadaEmEdicao } from "./motor-montagem";
+import {
+  ocorrenciasLocaisEmExtremo,
+  paradasParaContrato,
+  type ParadaEmEdicao,
+} from "./motor-montagem";
 
 // Promoção `ServicoEmConstrucao → Servico` completo (DEC-053; TASK-061;
 // generalizada aos dois modos pela TASK-080): ao concluir a edição do
@@ -49,6 +53,10 @@ export function promoverServico(
     const paradas = paradasPorSentido[sentido];
     const estado = estadosPorSentido[sentido];
     if (!paradas || paradas.length < 2) return null;
+    // Defesa na fronteira de promoção (TASK-068/DEC-070): a etapa já recusa
+    // RN-035 antes do OSRM, mas uma rota válida anterior não pode autorizar a
+    // promoção quando a lista de edição corrente tem Local em um extremo.
+    if (ocorrenciasLocaisEmExtremo(paradas).length > 0) return null;
     if (!estado || (estado.situacao !== "congelada" && estado.situacao !== "recalculada")) {
       return null;
     }

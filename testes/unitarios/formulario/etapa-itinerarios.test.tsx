@@ -1,9 +1,16 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-import { EtapaItinerarios, chaveItinerario, itinerariosAoVivoDaSessao } from "@/formulario/itinerarios";
+import {
+  EtapaItinerarios,
+  chaveItinerario,
+  itinerariosAoVivoDaSessao,
+  paradaDeLocal,
+  paradaDeSecao,
+} from "@/formulario/itinerarios";
 import { coletarPendencias } from "@/formulario/pendencias";
 import type { SessaoFormulario } from "@/formulario/sessao";
+import * as mapa from "@/shared/mapa";
 import type { Coordenada } from "@/shared/mapa";
 import {
   coletarViolacoesEstruturais,
@@ -121,11 +128,12 @@ interface MontagemEtapa {
   resultado: ResultadoRenderizacao;
 }
 
-async function montarEtapa(
-  aposParadaOrdem: number,
-  latitudePontoDeRota = -23.97,
+async function montarSessaoNaEtapa(
+  sessaoInicial: SessaoFormulario,
+  servicoUuid: string,
+  sentido: "ida" | "volta",
 ): Promise<MontagemEtapa> {
-  let sessaoAtual = sessaoComTresSecoes(aposParadaOrdem, latitudePontoDeRota);
+  let sessaoAtual = sessaoInicial;
   const montagem: { resultado?: ResultadoRenderizacao } = {};
 
   const renderizarEtapa = () => (
@@ -153,18 +161,29 @@ async function montarEtapa(
     "value",
   )!.set!;
   act(() => {
-    definirValorSelect.call(select, SERVICO_UUID);
+    definirValorSelect.call(select, servicoUuid);
     select.dispatchEvent(new Event("change", { bubbles: true }));
   });
   act(() => {
     (
       resultado.container.querySelector(
-        '[data-testid="botao-sentido"][data-sentido="ida"]',
+        `[data-testid="botao-sentido"][data-sentido="${sentido}"]`,
       ) as HTMLButtonElement
     ).click();
   });
 
   return { obterSessao: () => sessaoAtual, resultado };
+}
+
+async function montarEtapa(
+  aposParadaOrdem: number,
+  latitudePontoDeRota = -23.97,
+): Promise<MontagemEtapa> {
+  return montarSessaoNaEtapa(
+    sessaoComTresSecoes(aposParadaOrdem, latitudePontoDeRota),
+    SERVICO_UUID,
+    "ida",
+  );
 }
 
 async function removerParada(resultado: ResultadoRenderizacao, indice: number) {
@@ -185,6 +204,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -389,6 +409,152 @@ describe("EtapaItinerarios — inserção posicional pelo mapa (TASK-067/DEC-055
     expect(bloqueantes.some((pendencia) => pendencia.id.startsWith("local-extremo-"))).toBe(
       true,
     );
+    resultado.desmontar();
+  });
+
+  test("[inválido] falha geométrica de ancoragem acrescenta Local ao fim em vez de descartar o gesto", async () => {
+    const { obterSessao, resultado } = await montarEtapa(2);
+    const ancoragem = vi.spyOn(mapa, "ancorarPontoNaRota").mockReturnValueOnce(undefined);
+    const chamadasAntesDaInsercao = vi.mocked(fetch).mock.calls.length;
+
+    const local: Local = {
+      uuid: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      nome: "Local sem ancoragem geométrica",
+      municipio: "Santos",
+      geolocalizacao_ida: { latitude: -23.98, longitude: -46.38 },
+    };
+    act(() => {
+      editorCapturado.props?.aoCriarLocal(local, { lng: -46.38, lat: -23.98 });
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const chave = chaveItinerario(SERVICO_UUID, "ida");
+    expect(ancoragem).toHaveBeenCalledOnce();
+    expect(obterSessao().paradasEmEdicao?.[chave]?.map((parada) => parada.tipo)).toEqual([
+      "secao",
+      "secao",
+      "secao",
+      "local",
+    ]);
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(chamadasAntesDaInsercao);
+    expect(editorCapturado.props?.locaisInvalidos).toEqual([local.uuid]);
+    expect(
+      resultado.container.querySelector(
+        '[data-testid="parada-item"][data-estado="local-extremo"]',
+      ),
+    ).not.toBeNull();
+
+    resultado.desmontar();
+  });
+});
+
+describe("EtapaItinerarios — Local extremo contextual (TASK-068/DEC-070)", () => {
+  test("[inválido] Local na primeira Parada marca só a ocorrência da Ida e a correção remove o estado", async () => {
+    const documento = documentoExemploMinimo();
+    const servico = documento.autos.servicos[0];
+    const local = servico.locais[0];
+    const [secaoA, secaoB] = documento.autos.secoes;
+    local.geolocalizacao_volta = { latitude: -24.005, longitude: -46.398 };
+
+    const chaveIda = chaveItinerario(servico.uuid, "ida");
+    const chaveVolta = chaveItinerario(servico.uuid, "volta");
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+      paradasEmEdicao: {
+        [chaveIda]: [
+          paradaDeLocal(local.uuid),
+          paradaDeSecao(secaoA.uuid),
+          paradaDeSecao(secaoB.uuid),
+        ],
+        [chaveVolta]: [
+          paradaDeSecao(secaoB.uuid),
+          paradaDeLocal(local.uuid),
+          paradaDeSecao(secaoA.uuid),
+        ],
+      },
+    };
+    const { resultado } = await montarSessaoNaEtapa(sessao, servico.uuid, "ida");
+
+    const linhaInvalida = resultado.container.querySelector(
+      '[data-testid="parada-item"][data-estado="local-extremo"]',
+    );
+    const alvoErro = linhaInvalida?.querySelector('[data-testid="parada-local-extremo"]');
+    expect(linhaInvalida).not.toBeNull();
+    expect(alvoErro?.getAttribute("aria-invalid")).toBe("true");
+    expect(alvoErro?.getAttribute("aria-describedby")).toBeTruthy();
+    expect(linhaInvalida?.textContent).toContain("a primeira Parada deve ser uma Seção");
+    expect(editorCapturado.props?.locaisInvalidos).toEqual([local.uuid]);
+
+    act(() => {
+      (
+        resultado.container.querySelector(
+          '[data-testid="botao-sentido"][data-sentido="volta"]',
+        ) as HTMLButtonElement
+      ).click();
+    });
+    expect(
+      resultado.container.querySelector(
+        '[data-testid="parada-item"][data-estado="local-extremo"]',
+      ),
+    ).toBeNull();
+    expect(editorCapturado.props?.locaisInvalidos).toEqual([]);
+
+    act(() => {
+      (
+        resultado.container.querySelector(
+          '[data-testid="botao-sentido"][data-sentido="ida"]',
+        ) as HTMLButtonElement
+      ).click();
+    });
+    const fetchMock = vi.fn().mockResolvedValue({
+      json: () =>
+        Promise.resolve({
+          code: "Ok",
+          routes: [
+            {
+              geometry: {
+                type: "LineString",
+                coordinates: [
+                  [-46.3339, -23.9608],
+                  [-46.398, -24.005],
+                  [-46.3919, -23.9631],
+                ],
+              },
+              legs: [
+                { distance: 4000, duration: 500, steps: [{ name: "Via 1" }] },
+                { distance: 5000, duration: 600, steps: [{ name: "Via 2" }] },
+              ],
+            },
+          ],
+        }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    act(() => {
+      (
+        resultado.container.querySelector(
+          '[data-testid="parada-item"] [data-testid="parada-mover-baixo"]',
+        ) as HTMLButtonElement
+      ).click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(
+      resultado.container.querySelector(
+        '[data-testid="parada-item"][data-estado="local-extremo"]',
+      ),
+    ).toBeNull();
+    expect(editorCapturado.props?.locaisInvalidos).toEqual([]);
+
     resultado.desmontar();
   });
 });
