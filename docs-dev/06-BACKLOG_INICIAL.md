@@ -1439,37 +1439,55 @@ Hoje toda parada criada pelo mapa vai para o **fim** da lista, obrigando o usuá
 
 ---
 
-## TASK-068 — Identidade visual do vértice de ponto de rota (ciano, tamanho intermediário)
+## TASK-068 — Vocabulário visual dos marcadores do mapa (vértice ciano, Seção quadrada, Local menor) + degradação do clique posicional sem ancoragem
 
 ## Objetivo
 
-O vértice de ponto de rota ganha **cor própria (ciano) com mais destaque** e **tamanho intermediário** — maior que os 9 px de hoje, sempre menor que o marcador de Seção/Local (16 px) —, substituindo o cinza `#334155` que a TASK-063 escolheu por inferência controlada. A hierarquia visual "parada > ponto de rota" fica explícita e o token entra na paleta oficial.
+Fechar o **vocabulário visual dos três marcadores** do mapa único de itinerários, hoje indistinguíveis por forma e tamanho (tudo círculo de 16 px, exceto o vértice de 9 px), e corrigir a **ressalva de merge aberta pela TASK-067**:
+
+- **A. Vértice de ponto de rota** — cor própria **ciano** com mais destaque e **tamanho intermediário**, substituindo o cinza `#334155` que a TASK-063 escolheu por inferência controlada (DEC-057).
+- **B. Marcador de Seção** — passa de **círculo azul** para **quadrado azul**; a cor não muda.
+- **C. Marcador de Local** — continua **círculo verde**, **30% menor** que hoje (16 px → ~11 px).
+- **D. Clique direito sobre a linha quando não há como ancorar** — deixa de descartar o gesto em silêncio e volta a **acrescentar a parada ao fim**, como manda a DEC-055.
+
+Depois desta task, forma, cor e tamanho carregam significado independente: **quadrado = Seção**, **círculo grande verde = Local**, **círculo pequeno ciano = ponto de rota** — legível mesmo por quem não distingue azul de verde.
 
 ## Contexto
 
-A Spec 04 §7.3 fixa "visual distinto — vértice pequeno sobre a linha, sem rótulo" e nada mais sobre aparência; a TASK-063 preencheu a lacuna com cinza `#334155` (que é o token de **texto padrão** do doc 18, não uma cor de marcador) e 9 px, marcando ambos como **inferência controlada** em [`editor-mapa-itinerario.tsx`](../../src/formulario/itinerarios/editor-mapa-itinerario.tsx). O responsável pelo domínio decidiu o visual definitivo na conversa da `/revisar-aderencia` da TASK-063 (**DEC-057**): ciano, com mais destaque, e tamanho entre o vértice atual e o marcador de parada. A paleta do doc 18 §2 **não tem família ciano** — o token é novo. O cinza atual some sobre o traçado da rota, que é justamente onde o vértice vive.
+A Spec 04 §7.3 fixa "visual distinto — vértice pequeno sobre a linha, sem rótulo" e nada mais sobre aparência; a TASK-063 preencheu a lacuna com cinza `#334155` (que é o token de **texto padrão** do doc 18, não uma cor de marcador) e 9 px, marcando ambos como **inferência controlada** em [`editor-mapa-itinerario.tsx`](../../src/formulario/itinerarios/editor-mapa-itinerario.tsx). O responsável pelo domínio decidiu o visual do vértice na conversa da `/revisar-aderencia` da TASK-063 (**DEC-057**): ciano, com mais destaque, e tamanho entre o vértice atual e o marcador de parada. A paleta do doc 18 §2 **não tem família ciano** — o token é novo. O cinza atual some sobre o traçado da rota, que é justamente onde o vértice vive.
+
+Os itens **B** e **C** vêm de decisão do responsável pelo domínio em **2026-07-21**, e **superam em parte a DEC-054**, que fixou "marcadores **circulares** para ambos, com diferenciação visual entre Seção e Local (cor/preenchimento)". Diferenciar só por cor é o ponto fraco daquela decisão: azul e verde de mesma forma e mesmo tamanho se confundem sobre o mapa e são indistinguíveis para daltonismo do tipo deuteranopia/protanopia. Forma e tamanho passam a ser os canais primários, com a cor de reforço. **Nada disso toca o modelo, o contrato JSON ou a Spec 02** — aparência é governada pelo doc 18 sob DEC-050. Como a DEC-054 continua no `10-DECISION_LOG.md` dizendo "circulares para ambos", esta task **exige o registro prévio da decisão** (ver "Dependências").
+
+O item **D** é a condição de merge registrada em [`14-REVISOES/TASK-067-20260720.md`](../14-REVISOES/TASK-067-20260720.md) (problema 1): com a montagem inválida e a última rota válida ainda desenhada, `prepararInsercaoDeParada` devolve `undefined` (`etapa-itinerarios.tsx:490,499,510`) e os chamadores só retornam — a Seção/Local que o usuário acabou de nomear some sem mensagem, justamente no estado em que criar uma Seção seria a saída. Entra aqui por decisão do responsável (2026-07-21), por ser correção pequena, no mesmo ramo do mapa, e sem task própria que a cubra. **Não é regra nova:** a DEC-055 já fixa "fora da linha → acrescenta ao FIM", e os "Casos inválidos" da TASK-067 já mandam tratar `sem-rota` assim — aqui apenas se estende a mesma degradação ao caso vizinho "há linha desenhada, mas não há como ancorar".
 
 ## Fora de escopo
 
 - **Affordance de hover** sobre a linha (cursor + fantasma) — é a **TASK-069**.
 - **Clique para remover** o vértice — é a **TASK-070**.
 - Qualquer mudança no **contrato JSON**, no ancorador geométrico ou no motor de roteamento.
-- Cor/forma/tamanho dos marcadores de **Seção e Local** — inalterados (DEC-054).
+- **Cor** do marcador de Seção (segue azul) e **cor** do de Local (segue verde) — só forma e tamanho mudam.
+- Marcador **pendente** (âmbar, `COR_MARCADOR_PENDENTE`) e o `forma: "pino"` usado fora do mapa de itinerários — inalterados.
 - Rótulo, popup ou entrada na tabela de paradas para o ponto de rota — proibido por Spec 04 §7.3.
+- Qualquer outra mudança de comportamento do clique posicional além da degradação do item D — a lógica de cálculo do índice, a re-ancoragem e o recálculo ficam como a TASK-067 os entregou.
+- Os follow-ups menores 2 a 4 do parecer da TASK-067 (aviso de descarte preso, cobertura E2E de RN-035, comentário de acoplamento) — **não** entram; seguem como follow-up livre.
 
 ## Specs fonte
 
-- Spec 04 §7.3 (regra "Ponto de rota não é Seção, Local nem Parada — visual distinto, vértice pequeno sobre a linha, sem rótulo, sem nome, sem município")
+- Spec 04 §7.3 (regra "Ponto de rota não é Seção, Local nem Parada — visual distinto, vértice pequeno sobre a linha, sem rótulo, sem nome, sem município"; item 2, "insere Seções e Locais em ordem")
+- Spec 04 §7 (mapa único com os três tipos; a spec não fixa aparência nem gesto)
 - Spec 03 §3.6 (ponto de rota: definição e propósito único)
 
 ## Regras envolvidas
 
 - RN-042 (ponto de rota sem identidade — sem rótulo, sem nome, sem município)
 - RN-076 (padrão de exibição — o vértice **não** recebe rótulo `Cidade - Nome`, ao contrário da Seção)
+- RN-025/031 (Seção e Local são entidades distintas — a distinção visual por forma reforça, não cria, essa separação)
+- RN-052 (a degradação do item D volta a disparar o recálculo que o aborto silencioso suprimia)
+- RN-035 (a parada acrescentada ao fim pode violar o extremo-Seção; o aviso de montagem existente é quem trata — não inventar bloqueio novo)
 
 ## Entidades afetadas
 
-- ponto de rota (só aparência; nem o modelo nem o contrato mudam)
+- Seção, Local, ponto de rota (só aparência; nem o modelo nem o contrato mudam) — e o gesto de criação pelo mapa, no item D
 
 ## Ferramentas afetadas
 
@@ -1482,44 +1500,60 @@ A Spec 04 §7.3 fixa "visual distinto — vértice pequeno sobre a linha, sem r�
 ## Critérios de aceite
 
 - [ ] O vértice de ponto de rota é **ciano**, com token novo registrado em `docs-dev/18-DESIGN_SYSTEM.md` §2 (Cores) — não um hex solto no componente.
-- [ ] O vértice é **maior que 9 px** e **estritamente menor** que o marcador de Seção/Local (16 px) — hierarquia verificada por teste, não por inspeção visual.
-- [ ] A cor do vértice continua **distinta** da de Seção (azul) e da de Local (verde), e não colide com `erro` (vermelho) nem `alerta` (âmbar).
+- [ ] O marcador de **Seção** é **quadrado** e azul; `forma: "quadrado"` é valor novo do `Mapa` de `shared/mapa`, aditivo (consumidores sem ele não mudam).
+- [ ] O marcador de **Local** é **círculo verde de ~11 px** (16 px − 30%, arredondado), com a borda/sombra proporcionais.
+- [ ] **Hierarquia de tamanho verificada por teste**, não por inspeção visual: `vértice < Local ≤ Seção`, com o vértice **estritamente maior que 9 px** e **estritamente menor que o Local** (ver "Riscos" — a folga ficou estreita).
+- [ ] As três formas são distinguíveis **sem depender da cor** (quadrado × círculo grande × círculo pequeno).
 - [ ] O vértice segue **sem rótulo, sem nome, sem município e fora da tabela de paradas** (Spec 04 §7.3, RN-042) — inalterado.
+- [ ] Clique direito **sobre a linha** num itinerário cuja montagem está inválida (rota antiga ainda desenhada): a Seção/Local criada **entra ao fim da lista**, o recálculo é disparado e a violação de montagem aparece na etapa — **nunca** um descarte silencioso.
+- [ ] Clique direito sobre a linha com montagem **válida**: continua inserindo **na posição do trecho** (TASK-067 intacta).
 - [ ] Nenhum `data-testid`/`aria-*` alterado; E2E existentes verdes (DEC-050).
 - [ ] Zero alteração no contrato JSON, no ancorador ou no motor de roteamento.
 
 ## Casos válidos
 
-- Itinerário com rota calculada e 2 pontos de rota: os vértices aparecem ciano, arrastáveis, menores que os 3 marcadores de Seção e maiores que o vértice de 9 px anterior.
+- Itinerário com rota calculada, 3 Seções, 1 Local e 2 pontos de rota: quadrados azuis nas Seções, círculo verde menor no Local, vértices ciano pequenos sobre a linha — as três famílias distinguíveis em escala de cinza.
+- Montagem válida + clique direito sobre a linha entre as paradas 2 e 3 → parada nova com `ordem` 3 (comportamento da TASK-067, preservado).
 
 ## Casos inválidos
 
 - Vértice com rótulo/popup/nome: proibido (Spec 04 §7.3) — o teste que garante a ausência de rótulo continua verde.
 - Vértice do tamanho do marcador de parada (ou maior): viola "vértice **pequeno**" (§7.3) e a hierarquia da DEC-057.
+- Montagem inválida (ex.: 1 parada só, ou extremo Local) + clique direito sobre a linha ainda desenhada → **não pode** sumir com a entidade criada; acrescenta ao fim e a etapa exibe o motivo da recusa.
+- Itinerário sem rota (`sem-rota`) → não há linha, o gesto cai no caminho "fora da linha" como já cai hoje.
 
 ## Testes esperados
 
-- Unitários: o marcador do ponto de rota tem `forma: "circulo"`, o `tamanho` decidido, e cor `!==` das de Seção/Local (estender `editor-mapa-itinerario.test.tsx`, que já asserta essas três coisas).
-- Integração: N/A (sem mudança de comportamento).
-- E2E: N/A — os specs existentes seguem verdes sem tocar seletores.
+- Unitários: `forma`/`tamanho`/`cor` dos três marcadores em `editor-mapa-itinerario.test.tsx` (que já asserta `forma` para Seção, Local e vértice — as asserções de `"circulo"` da Seção mudam para `"quadrado"`); render do `Mapa` com `forma: "quadrado"` produzindo a classe CSS correspondente; hierarquia de tamanho aferida a partir dos tokens, não de números repetidos no teste.
+- Integração: o caso D — montar a etapa com montagem inválida e linha desenhada, disparar `aoCriarLocal`/`aoCriarSecao` **com** `posicaoNaLinha`, e afirmar que a parada foi acrescentada ao fim, que o recálculo ocorreu e que nada foi descartado em silêncio (OSRM mockado). Cobre os três `return undefined` de `prepararInsercaoDeParada`.
+- E2E: N/A para o visual (specs existentes seguem verdes sem tocar seletores). Opcional para o caso D, se couber sem alongar a suíte.
 - Snapshot/contrato JSON: N/A (não toca contrato).
 - PDF: N/A.
 
 ## Arquivos prováveis
 
-- `docs-dev/18-DESIGN_SYSTEM.md` (§2 Cores — token ciano novo; especificação do vértice) — **vinculante, entra junto com o código** (DEC-050)
-- `src/app/globals.css` (`@theme` do token; `.marcador-mapa-circulo--pequeno`)
-- `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (`COR_MARCADOR_PONTO_DE_ROTA`)
-- `testes/unitarios/formulario/editor-mapa-itinerario.test.tsx`
+- `docs-dev/18-DESIGN_SYSTEM.md` (§2 Cores — token ciano novo; especificação das três formas de marcador) — **vinculante, entra junto com o código** (DEC-050)
+- `src/app/globals.css` (`@theme` do token; `.marcador-mapa-circulo--pequeno`, tamanho do círculo de Local, classe nova do quadrado)
+- `src/shared/mapa/mapa.tsx` (`forma?: "pino" | "circulo" | "quadrado"` e o criador de elemento correspondente)
+- `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (`COR_MARCADOR_PONTO_DE_ROTA`, `forma`/`tamanho` de Seção e Local)
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (item D: `prepararInsercaoDeParada` degrada para `inserirParada(paradasAtual, parada)` em vez de devolver `undefined`)
+- `testes/unitarios/formulario/editor-mapa-itinerario.test.tsx`, `testes/unitarios/mapa/mapa.test.tsx`, `testes/unitarios/formulario/etapa-itinerarios.test.tsx`
 
 ## Riscos
 
+- **Folga de tamanho ficou estreita.** A DEC-057 manda o vértice ser maior que 9 px e menor que o marcador de parada; encolhendo o Local para ~11 px, a faixa livre vira `(9, 11)` — na prática **10 px**. Se o design concluir que 10 px não dá o "mais destaque" que a DEC-057 pede, o conflito é real e volta ao responsável (encolher menos o Local, ou aceitar o vértice em 10 px com destaque vindo da cor, não do tamanho). **Não decidir isso sozinho.**
 - Ciano claro sobre a linha da rota (azul) pode ter contraste insuficiente — escolher tom que se destaque **do traçado**, não só do fundo do mapa.
-- Aumentar o vértice o aproxima do marcador de parada: manter a diferença de tamanho legível, sob pena de reintroduzir a confusão que a DEC-057 quer eliminar.
+- Quadrado e círculo de mesmo lado/diâmetro parecem tamanhos diferentes ao olho (o quadrado "pesa" mais); ajustar por área percebida, não por número igual.
+- O item D é a única parte com risco de comportamento: cuidado para **não** reintroduzir o append ao fim no caminho em que a ancoragem **funciona** — a TASK-067 tem testes que pegam isso, mantê-los verdes.
+
+## Dependências
+
+- **Registro da decisão de 2026-07-21 como DEC-069** (marcadores: Seção quadrada, Local 30% menor; e a absorção da ressalva D nesta task), superando em parte a **DEC-054**. Enquanto a DEC-054 disser "marcadores **circulares** para ambos" sem ressalva, esta task **contradiz decisão vigente** e nasce bloqueada: rodar `/registrar-decisao` antes de `/analisar-task`.
+- TASK-067 (✅ implementada em `b2b3ab7`, aprovada com ressalvas) — o item D é a condição de merge dela.
 
 ## Perguntas em aberto
 
-- Nenhuma (visual fixado pela DEC-057; o tom exato do ciano é escolha de design sob DEC-050/doc 18).
+- Nenhuma de regra de negócio. O visual está fixado pela DEC-057 (vértice) e pela decisão de 2026-07-21 (Seção/Local); o tom exato do ciano e o raio de canto do quadrado são escolha de design sob DEC-050/doc 18. A tensão de tamanho descrita em "Riscos" só vira pergunta **se** o design não achar solução dentro da faixa.
 
 ---
 

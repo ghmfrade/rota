@@ -166,7 +166,7 @@ Fecha a UX de mapa e interações. Depende só do que já está entregue (060, 0
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 1 | **068** — Identidade visual do vértice (ciano) | **1** | Precede a 069 (que reusa o token). |
+| 1 | **068** — Vocabulário visual dos marcadores (vértice ciano, Seção quadrada, Local −30%) + degradação do clique posicional | **2** | Precede a 069 (que reusa o token). Ampliada em 2026-07-21: absorve a **condição de merge da TASK-067** (item D) e a mudança de forma/tamanho de Seção e Local. **Nasce bloqueada** até a decisão de 2026-07-21 virar **DEC-069** — a DEC-054 vigente ainda diz "marcadores circulares para ambos". |
 | 2 | **069** — Affordance de hover sobre a linha | **2** | Precisa da 068. |
 | 3 | **070** — Clique sobre o vértice remove o ponto de rota | **2** | Independente de 067 (✅). |
 | 4 | **079** — Pontos de rota na lista lateral intercalados | **4** | Desbloqueada por 066 + 071. |
@@ -177,7 +177,8 @@ montagem inválida e a última rota válida ainda desenhada, o clique direito **
 a Seção/Local criada **sem mensagem** — `prepararInsercaoDeParada` devolve `undefined`
 (`src/formulario/itinerarios/etapa-itinerarios.tsx:490,499,510`) e os chamadores só retornam. A
 correção prescrita pela DEC-055 é degradar para o caminho "fora da linha" (acrescentar ao fim), com
-teste do caso "montagem inválida + linha desenhada". Não exige Q-xxx e não bloqueia as tasks 068/069/070.
+teste do caso "montagem inválida + linha desenhada". Não exige Q-xxx. **Encaminhada em 2026-07-21:**
+por decisão do responsável, virou o **item D da TASK-068** — não há task própria para ela.
 
 Travas rígidas: `068 → 069` e `079 → 064`. As demais têm folga entre si.
 
