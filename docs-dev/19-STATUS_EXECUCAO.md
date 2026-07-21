@@ -4,7 +4,7 @@
 
 **O que este documento NÃO é:** não é fonte de verdade sobre o conteúdo, escopo ou regras de nenhuma task — isso continua sendo o `06-BACKLOG_INICIAL.md` (e, acima dele, as specs e o `01-RULE_INDEX.md`, conforme a hierarquia do `00-README-SPEC-DRIVEN.md`). Aqui só se registra **status e sequenciamento**. Em caso de divergência sobre escopo, o backlog vence.
 
-**Última atualização:** 2026-07-21 (branch `redesign`) — TASK-090 revisada e reprovada; permanece pendente.
+**Última atualização:** 2026-07-21 (branch `redesign`) — TASK-090 corrigida e aprovada na reavaliação; ciclo concluído.
 
 ---
 
@@ -39,7 +39,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 
 ## 3. Tasks executadas
 
-68 tasks concluídas. Agrupadas pela fase do backlog.
+69 tasks concluídas. Agrupadas pela fase do backlog.
 
 ### Fases 1–3 — Fundação, contrato JSON e validações de domínio
 
@@ -144,6 +144,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 088 | Remover Seção reconcilia `matriz_seccionamento` com `matriz_distancias` (RN-059) |
 | 065 | Inverter os gestos do mapa único: esquerdo = ponto de rota, direito = menu Seção/Local |
 | 067 | Inserção posicional: clique direito sobre a linha insere a parada entre as paradas do trecho |
+| 090 | Executor canônico e controlado da suíte completa |
 
 ---
 
@@ -158,7 +159,7 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 ## 5. Tasks a executar — ordem recomendada
 
-20 tasks pendentes (18 do backlog original + as TASK-089/090). A **TASK-090**, criada em 2026-07-21 e implementada em `735c992`, foi **reprovada na revisão de 2026-07-21** (`14-REVISOES/TASK-090-20260721.md`): o verificador ainda aceita log de outro working tree com conteúdo idêntico e faltam testes dos caminhos negativos do orquestrador real. Permanece como próxima prioridade operacional até a correção. A ordem abaixo respeita as dependências declaradas nas próprias tasks; onde há folga, ela é indicada. A antiga prioridade máxima (TASK-082) foi concluída; a visibilidade dos motivos usa a infraestrutura entregue pelas TASK-085/086. O Grupo A (bug vivo de integridade das matrizes) foi fechado pela **TASK-088**, implementada em `2b27c9a` e aprovada em `docs-dev/14-REVISOES/TASK-088-20260720.md` — não há mais bug bloqueando a exportação após remover uma Seção. A **TASK-065** saiu da lista de pendentes: reprovada em 2026-07-20 por E2E vermelho, foi corrigida em `6469a04` e **aprovada com ressalvas** na reavaliação `docs-dev/14-REVISOES/TASK-065-20260720-reavaliacao.md`. A **TASK-067** também saiu: implementada em `b2b3ab7` e **aprovada com ressalvas** em `docs-dev/14-REVISOES/TASK-067-20260720.md` — a condição de entrada herdada da 065 (teste do hit-test de `contextmenu`) foi cumprida por `testes/unitarios/mapa/mapa.test.tsx`, e resta a **condição de merge** descrita abaixo.
+19 tasks pendentes (18 do backlog original + a TASK-089). A **TASK-090** saiu da lista: a entrega inicial `735c992` foi reprovada em `14-REVISOES/TASK-090-20260721.md`, corrigida em `aa79302` e **aprovada** em `14-REVISOES/TASK-090-20260721-reavaliacao.md`; o executor canônico agora rejeita log de outro working tree e cobre os caminhos negativos reais. A ordem abaixo respeita as dependências declaradas nas próprias tasks; onde há folga, ela é indicada. A antiga prioridade máxima (TASK-082) foi concluída; a visibilidade dos motivos usa a infraestrutura entregue pelas TASK-085/086. O Grupo A (bug vivo de integridade das matrizes) foi fechado pela **TASK-088**, implementada em `2b27c9a` e aprovada em `docs-dev/14-REVISOES/TASK-088-20260720.md` — não há mais bug bloqueando a exportação após remover uma Seção. A **TASK-065** saiu da lista de pendentes: reprovada em 2026-07-20 por E2E vermelho, foi corrigida em `6469a04` e **aprovada com ressalvas** na reavaliação `docs-dev/14-REVISOES/TASK-065-20260720-reavaliacao.md`. A **TASK-067** também saiu: implementada em `b2b3ab7` e **aprovada com ressalvas** em `docs-dev/14-REVISOES/TASK-067-20260720.md` — a condição de entrada herdada da 065 (teste do hit-test de `contextmenu`) foi cumprida por `testes/unitarios/mapa/mapa.test.tsx`, e resta a **condição de merge** descrita abaixo.
 
 ### Grupo B — Ramo do mapa e pontos de rota
 
@@ -196,7 +197,6 @@ As próprias tasks pedem rodar **depois** do Grupo B, para não retrabalhar a su
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| — | **090** — Executor canônico/controlado da suíte completa | **2** | **Reprovada em 2026-07-21** (`14-REVISOES/TASK-090-20260721.md`); permanece como próxima prioridade, sem dependências. Corrigir a vinculação do log ao working tree e cobrir falhas/sinais/exceções do orquestrador real. |
 | 10 | **075** — Identificação: pré-visualização + confirmação explícita | **2** | Encaixe livre — independente de tudo acima. |
 | 11 | **062** — E2E do fluxo "criar do zero" ponta a ponta | **3** | Depois do mapa estabilizado, senão os seletores mudam de novo. |
 | — | **089** — E2E `etapa-itinerarios.spec.ts:71` afere ausência de bloqueante, não painel vazio | **1** | Débito de teste da TASK-081 (ver §6.4). **Encaixe livre, sem dependências** — só `testes/e2e/`, nenhum arquivo de `src/`. A 067 rodou antes dela e a revisão confirmou o estado documentado (**8 passed / 1 failed**, a falha sendo exatamente esta); executar agora, para a suíte de itinerários voltar a ser sinal confiável nas tasks do mapa restantes. |
