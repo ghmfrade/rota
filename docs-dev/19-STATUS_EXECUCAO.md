@@ -4,7 +4,7 @@
 
 **O que este documento NÃO é:** não é fonte de verdade sobre o conteúdo, escopo ou regras de nenhuma task — isso continua sendo o `06-BACKLOG_INICIAL.md` (e, acima dele, as specs e o `01-RULE_INDEX.md`, conforme a hierarquia do `00-README-SPEC-DRIVEN.md`). Aqui só se registra **status e sequenciamento**. Em caso de divergência sobre escopo, o backlog vence.
 
-**Última atualização:** 2026-07-21 (branch `redesign`) — TASK-090 corrigida e aprovada na reavaliação; ciclo concluído.
+**Última atualização:** 2026-07-21 (branch `redesign`) — TASK-068 corrigida e aprovada na reavaliação; ciclo concluído. Q-049 decidida pela DEC-070; TASK-079/064/076 alinhadas ao estado contextual de Local em extremo.
 
 ---
 
@@ -39,7 +39,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 
 ## 3. Tasks executadas
 
-69 tasks concluídas. Agrupadas pela fase do backlog.
+70 tasks concluídas. Agrupadas pela fase do backlog.
 
 ### Fases 1–3 — Fundação, contrato JSON e validações de domínio
 
@@ -144,6 +144,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 088 | Remover Seção reconcilia `matriz_seccionamento` com `matriz_distancias` (RN-059) |
 | 065 | Inverter os gestos do mapa único: esquerdo = ponto de rota, direito = menu Seção/Local |
 | 067 | Inserção posicional: clique direito sobre a linha insere a parada entre as paradas do trecho |
+| 068 | Vocabulário visual + degradação do clique + erro contextual de Local em extremo |
 | 090 | Executor canônico e controlado da suíte completa |
 
 ---
@@ -159,7 +160,7 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 ## 5. Tasks a executar — ordem recomendada
 
-19 tasks pendentes (18 do backlog original + a TASK-089). A **TASK-090** saiu da lista: a entrega inicial `735c992` foi reprovada em `14-REVISOES/TASK-090-20260721.md`, corrigida em `aa79302` e **aprovada** em `14-REVISOES/TASK-090-20260721-reavaliacao.md`; o executor canônico agora rejeita log de outro working tree e cobre os caminhos negativos reais. A ordem abaixo respeita as dependências declaradas nas próprias tasks; onde há folga, ela é indicada. A antiga prioridade máxima (TASK-082) foi concluída; a visibilidade dos motivos usa a infraestrutura entregue pelas TASK-085/086. O Grupo A (bug vivo de integridade das matrizes) foi fechado pela **TASK-088**, implementada em `2b27c9a` e aprovada em `docs-dev/14-REVISOES/TASK-088-20260720.md` — não há mais bug bloqueando a exportação após remover uma Seção. A **TASK-065** saiu da lista de pendentes: reprovada em 2026-07-20 por E2E vermelho, foi corrigida em `6469a04` e **aprovada com ressalvas** na reavaliação `docs-dev/14-REVISOES/TASK-065-20260720-reavaliacao.md`. A **TASK-067** também saiu: implementada em `b2b3ab7` e **aprovada com ressalvas** em `docs-dev/14-REVISOES/TASK-067-20260720.md` — a condição de entrada herdada da 065 (teste do hit-test de `contextmenu`) foi cumprida por `testes/unitarios/mapa/mapa.test.tsx`, e resta a **condição de merge** descrita abaixo.
+18 tasks pendentes (17 do backlog original + a TASK-089). A **TASK-068** saiu da lista: a entrega inicial `37502b4` foi reprovada em `14-REVISOES/TASK-068-20260721.md`, corrigida em `861b5a4` e **aprovada** em `14-REVISOES/TASK-068-20260721-reavaliacao.md`; a correção completou a cobertura de RN-035/fallback, impediu a promoção do Serviço com Local extremo e a suíte canônica terminou verde. A **TASK-090** também saiu da lista: a entrega inicial `735c992` foi reprovada em `14-REVISOES/TASK-090-20260721.md`, corrigida em `aa79302` e **aprovada** em `14-REVISOES/TASK-090-20260721-reavaliacao.md`; o executor canônico agora rejeita log de outro working tree e cobre os caminhos negativos reais. A ordem abaixo respeita as dependências declaradas nas próprias tasks; onde há folga, ela é indicada. A antiga prioridade máxima (TASK-082) foi concluída; a visibilidade dos motivos usa a infraestrutura entregue pelas TASK-085/086. O Grupo A (bug vivo de integridade das matrizes) foi fechado pela **TASK-088**, implementada em `2b27c9a` e aprovada em `docs-dev/14-REVISOES/TASK-088-20260720.md` — não há mais bug bloqueando a exportação após remover uma Seção. A **TASK-065** saiu da lista de pendentes: reprovada em 2026-07-20 por E2E vermelho, foi corrigida em `6469a04` e **aprovada com ressalvas** na reavaliação `docs-dev/14-REVISOES/TASK-065-20260720-reavaliacao.md`. A **TASK-067** também saiu: implementada em `b2b3ab7` e **aprovada com ressalvas** em `docs-dev/14-REVISOES/TASK-067-20260720.md` — a condição de entrada herdada da 065 (teste do hit-test de `contextmenu`) foi cumprida por `testes/unitarios/mapa/mapa.test.tsx`, e sua condição de merge foi absorvida e concluída pela TASK-068.
 
 ### Grupo B — Ramo do mapa e pontos de rota
 
@@ -167,21 +168,26 @@ Fecha a UX de mapa e interações. Depende só do que já está entregue (060, 0
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 1 | **068** — Vocabulário visual dos marcadores (Seção quadrada 16 px, Local 12 px, vértice ciano 9 px) + degradação do clique posicional | **2** | **Reprovada na revisão de 2026-07-21** (`14-REVISOES/TASK-068-20260721.md`): permanece pendente por E2E oficial sem término verde e lacunas de cobertura de RN-035/fallback. Precede a 069 (que reusa o token). Ampliada em 2026-07-21: absorve a **condição de merge da TASK-067** (item D) e a mudança de forma/tamanho de Seção e Local. Desbloqueada pela **DEC-069** (registrada em 2026-07-21), que supera em parte a DEC-054 (marcadores circulares para ambos) e a DEC-057 (vértice maior que 9 px). |
-| 2 | **069** — Affordance de hover sobre a linha | **2** | Precisa da 068. |
-| 3 | **070** — Clique sobre o vértice remove o ponto de rota | **2** | Independente de 067 (✅). |
-| 4 | **079** — Pontos de rota na lista lateral intercalados | **4** | Desbloqueada por 066 + 071. |
-| 5 | **064** — Sincronização de seleção tabela↔mapa | **3** | Depois da 079, para projetar sobre a lista unificada. |
+| 1 | **069** — Affordance de hover sobre a linha | **2** | Desbloqueada pela conclusão da 068. |
+| 2 | **070** — Clique sobre o vértice remove o ponto de rota | **2** | Independente de 067 (✅). |
+| 3 | **079** — Pontos de rota na lista lateral intercalados | **4** | Ao reconstruir a lista, preserva o estado vermelho/descrição do Local extremo (DEC-070). Desbloqueada por 068 + 066 + 071. |
+| 4 | **064** — Sincronização de seleção tabela↔mapa | **3** | Depois da 079; seleção usa canal distinto e não mascara linha/borda vermelha de RN-035 (DEC-070). |
 
-**Condição de merge aberta na TASK-067** (parecer `14-REVISOES/TASK-067-20260720.md`, problema 1): com
+**Condição de merge da TASK-067 concluída pela TASK-068** (parecer `14-REVISOES/TASK-067-20260720.md`, problema 1): com
 montagem inválida e a última rota válida ainda desenhada, o clique direito **sobre a linha** descarta
 a Seção/Local criada **sem mensagem** — `prepararInsercaoDeParada` devolve `undefined`
 (`src/formulario/itinerarios/etapa-itinerarios.tsx:490,499,510`) e os chamadores só retornam. A
 correção prescrita pela DEC-055 é degradar para o caminho "fora da linha" (acrescentar ao fim), com
 teste do caso "montagem inválida + linha desenhada". Não exige Q-xxx. **Encaminhada em 2026-07-21:**
-por decisão do responsável, virou o **item D da TASK-068** — não há task própria para ela.
+por decisão do responsável, virou o **item D da TASK-068** — concluído e coberto por testes; não há task própria para ela.
 
-Travas rígidas: `068 → 069` e `079 → 064`. As demais têm folga entre si.
+**Feedback contextual do Local em extremo (Q-049/DEC-070, 2026-07-21):** o fallback mantém o Local
+na lista de edição, mas a ocorrência no primeiro/último lugar fica inválida: linha correspondente da
+tabela em vermelho com explicação no hover/foco, marcador circular verde com borda vermelha, aviso
+geral da TASK-047 preservado e zero OSRM/conclusão/exportação enquanto RN-035 persistir. A TASK-068
+implementou; TASK-079/064/076 têm obrigação explícita de preservar/compor o estado.
+
+Travas rígidas: `068 → 069`, `068 → 079 → 064` e `068 → 076` (preservação da DEC-070). As demais têm folga entre si.
 
 ### Grupo C — Grandes refactors de sentido e Seção
 
@@ -189,16 +195,16 @@ As próprias tasks pedem rodar **depois** do Grupo B, para não retrabalhar a su
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 7 | **077** — Volta espelhada (ordem inversa como regra dura) | **4** | Antes da 076 (que assume Volta derivada). **Herda a obrigação** de manter corretas a limpeza de Seção (084, entregue), a reconciliação de horários (046) e a reconciliação das matrizes (088) quando o espelho refletir a remoção nos dois sentidos. |
-| 8 | **076** — Ida e Volta no mesmo mapa (abas, tracejado, dois painéis) | **5** | A mais cara do backlog pendente. Deixar por último do grupo. |
-| 9 | **078** — Realocação de Seção inteira (translação rígida) | **4** | Cascata de recálculo multi-Serviço — caminho novo. |
+| 5 | **077** — Volta espelhada (ordem inversa como regra dura) | **4** | Antes da 076 (que assume Volta derivada). **Herda a obrigação** de manter corretas a limpeza de Seção (084, entregue), a reconciliação de horários (046) e a reconciliação das matrizes (088) quando o espelho refletir a remoção nos dois sentidos. |
+| 6 | **076** — Ida e Volta no mesmo mapa (abas, tracejado, dois painéis) | **5** | A mais cara do backlog pendente. Deixar por último do grupo; preserva erro de Local extremo por sentido, sem contaminar a ocorrência válida no outro (DEC-070). |
+| 7 | **078** — Realocação de Seção inteira (translação rígida) | **4** | Cascata de recálculo multi-Serviço — caminho novo. |
 
 ### Grupo D — UX restante e qualidade
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 10 | **075** — Identificação: pré-visualização + confirmação explícita | **2** | Encaixe livre — independente de tudo acima. |
-| 11 | **062** — E2E do fluxo "criar do zero" ponta a ponta | **3** | Depois do mapa estabilizado, senão os seletores mudam de novo. |
+| 8 | **075** — Identificação: pré-visualização + confirmação explícita | **2** | Encaixe livre — independente de tudo acima. |
+| 9 | **062** — E2E do fluxo "criar do zero" ponta a ponta | **3** | Depois do mapa estabilizado, senão os seletores mudam de novo. |
 | — | **089** — E2E `etapa-itinerarios.spec.ts:71` afere ausência de bloqueante, não painel vazio | **1** | Débito de teste da TASK-081 (ver §6.4). **Encaixe livre, sem dependências** — só `testes/e2e/`, nenhum arquivo de `src/`. A 067 rodou antes dela e a revisão confirmou o estado documentado (**8 passed / 1 failed**, a falha sendo exatamente esta); executar agora, para a suíte de itinerários voltar a ser sinal confiável nas tasks do mapa restantes. |
 
 ### Grupo E — Fases originais restantes (MVP 3 em diante)
@@ -207,13 +213,13 @@ Independentes do ramo do mapa: nada aqui bloqueia ou é bloqueado por ele.
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 12 | **033** — PDF operacional: estrutura e identificação | **4** | Subsistema novo (@react-pdf) + captura do mapa. |
-| 13 | **034** — PDF operacional: tabelas horárias e matrizes | **3** | Sobre a 033. |
-| 14 | **035** — Comparador: carregamento e validação dos dois arquivos | **3** | |
-| 15 | **036** — Motor de diff por UUID + taxonomia | **5** | Núcleo do Comparador; casamento por UUID e por contexto. |
-| 16 | **037** — Telas de comparação | **4** | Superfície ampla (5 visões/abas). |
-| 17 | **038** — Mapa comparativo | **3** | Bloqueio parcial: Q-004 (tolerância). |
-| 18 | **039** — PDF comparativo completo | **4** | |
+| 10 | **033** — PDF operacional: estrutura e identificação | **4** | Subsistema novo (@react-pdf) + captura do mapa. |
+| 11 | **034** — PDF operacional: tabelas horárias e matrizes | **3** | Sobre a 033. |
+| 12 | **035** — Comparador: carregamento e validação dos dois arquivos | **3** | |
+| 13 | **036** — Motor de diff por UUID + taxonomia | **5** | Núcleo do Comparador; casamento por UUID e por contexto. |
+| 14 | **037** — Telas de comparação | **4** | Superfície ampla (5 visões/abas). |
+| 15 | **038** — Mapa comparativo | **3** | Bloqueio parcial: Q-004 (tolerância). |
+| 16 | **039** — PDF comparativo completo | **4** | |
 
 ### Grupo F — Bloqueada
 
