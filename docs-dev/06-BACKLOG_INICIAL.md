@@ -3436,6 +3436,232 @@ Nenhuma. O comportamento correto está fixado pela RN-071 (alerta) e pela RN-078
 
 ---
 
+# TASK-090 — Executor canônico e controlado da suíte completa para implementação e revisão
+
+## Objetivo
+
+Criar um único executor canônico para os testes unitários e E2E do ROTA, com
+log verificável, servidor Next em porta dedicada e ciclo de vida controlado. A
+implementação de qualquer task passa a produzir esse artefato uma única vez no
+fim; a revisão reutiliza o log quando o conteúdo testado ainda coincide, sem
+repetir desnecessariamente a suíte pesada.
+
+## Contexto
+
+Execuções do Playwright iniciadas por agentes têm repetidamente concluído os
+casos mas permanecido presas no teardown do `next dev`; processos órfãos e a
+reutilização da porta 3000 contaminam a execução seguinte com timeouts
+artificiais. Na mesma máquina, a execução humana registrada em
+`ultimo-test-all.log` terminou normalmente em menos de dois minutos (1.051
+unitários e 58 E2E, ambos com código 0), demonstrando que o gargalo não é a
+suíte nem seus quatro workers, mas o ownership do servidor/processos no caminho
+automatizado.
+
+Já existe no working tree um rascunho não commitado,
+`scripts/executar-test-all-log.mjs`, e scripts preliminares em `package.json`.
+Eles são insumo desta task, não entrega aceita de antemão: hoje agregam os dois
+comandos e escrevem o log, mas ainda não possuem porta exclusiva, health check,
+timeout global, fingerprint do conteúdo testado nem limpeza explícita da árvore
+de processos.
+
+A skill `implementar-task` já exige testes direcionados durante o trabalho e,
+ao fim, lint/typecheck, uma única suíte completa e E2E/build sequenciais. Falta
+canonizar **qual comando** produz a evidência final e como a conversa de
+`revisar-aderencia` valida/reutiliza essa evidência.
+
+## Fora de escopo
+
+- Alterar regras de negócio, componentes de produção, contrato JSON, fixtures
+  canônicas ou asserções funcionais dos testes existentes.
+- Reduzir workers, pular testes, aumentar timeouts de casos para mascarar
+  lentidão ou converter falha em aviso.
+- Matar todos os processos `node`, limpar portas de forma ampla ou encerrar
+  processo que não tenha sido criado pelo executor corrente.
+- Depender de OSRM, tiles ou qualquer serviço externo real; os mocks atuais
+  permanecem obrigatórios.
+- Transformar logs em artefatos versionados ou fonte de verdade de negócio.
+- Executar implementação e revisão formal na mesma conversa; a fronteira entre
+  as skills permanece intacta.
+- Corrigir as lacunas funcionais/coberturas da TASK-068 ou executar a TASK-089.
+
+## Specs fonte
+
+- Spec 01 §5/§6 — operação client-side e identidade preservada, protegidas pela
+  regressão completa de importação/exportação.
+- Spec 02 §10.1/§12 — extremos-Seção e UUIDs, invariantes da suíte fixa.
+- Spec 03 §3.5/§3.6.2 — falha bloqueante do OSRM e abertura sem recálculo,
+  cenários que exigem E2E determinístico com rede mockada.
+- Spec 04 §11/§12/§14 — pendências, gate de exportação e estados de erro
+  verificados pela suíte completa.
+
+## Regras envolvidas
+
+- RN-004 (round-trip preserva UUIDs)
+- RN-010/013 (schema fechado, sem workflow e sem R$)
+- RN-035 (extremos do itinerário são Seções)
+- RN-041/042 (ponto de rota não cria Parada nem trecho)
+- RN-048 (falha do OSRM bloqueia)
+- RN-052 (abrir não chama OSRM; editar recalcula)
+- RN-069 (feriado não altera contagens)
+- RN-078 (pendências bloqueantes impedem exportação)
+- RN-080 (Comparador permanece offline e somente-leitura)
+
+Estas RN não ganham comportamento novo nesta task; são o conjunto crítico cuja
+evidência não pode ser perdida, pulada ou falsamente marcada como verde pelo
+executor.
+
+## Entidades afetadas
+
+- Nenhuma entidade de domínio. Afeta somente infraestrutura de testes, processo
+  de implementação/revisão e seus artefatos efêmeros.
+
+## Ferramentas afetadas
+
+- [ ] Formulário (nenhum código de produção)
+- [ ] Comparador (nenhum código de produção)
+- [ ] Ingestor
+- [ ] PDF (nenhum código de produção)
+- [ ] JSON (contrato)
+- Infraestrutura transversal: Vitest, Playwright, servidor Next de teste,
+  scripts npm e skills operacionais.
+
+## Critérios de aceite
+
+- [ ] `npm run test:all:log` é o comando canônico único para a suíte completa
+      (Vitest + Playwright), executa as etapas sequencialmente e devolve código
+      0 somente se ambas terminarem verdes.
+- [ ] O executor E2E é dono do servidor Next usado no teste: utiliza porta
+      dedicada/configurável diferente de 3000, recusa porta já ocupada, inicia
+      o servidor, aguarda health check e só então chama o Playwright.
+- [ ] No caminho canônico, o Playwright não inicia nem reutiliza outro
+      `webServer`; `reuseExistingServer` não permite executar contra servidor
+      desconhecido.
+- [ ] Sucesso, falha de teste, timeout, `SIGINT`, `SIGTERM` e exceção passam por
+      `finally` que encerra **somente** a árvore do PID criado pelo executor.
+      No Windows, eventual `taskkill /PID <pid> /T /F` usa o PID explícito do
+      processo próprio; nunca há busca/kill amplo por nome.
+- [ ] Há timeout configurável para boot e para a execução completa. Timeout
+      termina com código não zero, registra a etapa e limpa o processo próprio.
+- [ ] O log é escrito primeiro em arquivo temporário e só recebe marcador final
+      `Resultado geral`/fim após todas as etapas fecharem. Log interrompido não
+      pode parecer aprovado.
+- [ ] O log registra: executor informado (`humano`, `Codex` ou equivalente),
+      início/fim, Node/npm, branch/commit, estado sujo, comandos, porta, PID,
+      códigos/sinais, tempos, limpeza e SHA-256 de um fingerprint determinístico
+      dos arquivos relevantes (`src/`, `testes/`, configurações e manifests).
+- [ ] Um verificador lê o log e retorna válido somente quando: marcador final
+      aprovado existe, os dois códigos são 0 e o fingerprint atual coincide.
+      Log ausente, truncado, vermelho ou de conteúdo diferente é rejeitado com
+      motivo operacional legível.
+- [ ] `implementar-task` passa a exigir: testes direcionados durante a edição;
+      lint/typecheck; build quando aplicável; e **uma única** execução final de
+      `npm run test:all:log`, preservando o log para a revisão. Falha é corrigida
+      e repetida; processos pesados nunca rodam em paralelo.
+- [ ] `revisar-aderencia` valida primeiro o log canônico. Se estiver aprovado e
+      o fingerprint coincidir, registra quem executou e **não repete** a suíte;
+      se estiver ausente/inválido/desatualizado, executa o comando uma única vez.
+- [ ] `CLAUDE.md`, `docs-dev/04-AI_IMPLEMENTATION_PROTOCOL.md`,
+      `docs-dev/07-CHECKLIST_ADERENCIA_SPEC.md` e
+      `docs-dev/08-TEST_STRATEGY.md` documentam o mesmo protocolo, comando e
+      critério de reutilização, sem instruções concorrentes.
+- [ ] A execução canônica real termina por conta própria, sem intervenção
+      manual, com 1.051+ testes unitários e 58+ E2E verdes no baseline atual;
+      ao final, a porta dedicada está livre e nenhum processo criado permanece.
+- [ ] O comando direto `npm test` continua disponível para testes direcionados;
+      o caminho canônico não altera as asserções nem a quantidade da suíte.
+
+## Casos válidos
+
+- Execução humana limpa: `npm run test:all:log -- --executor=humano` inicia o
+  servidor na porta dedicada, conclui unitários/E2E, limpa o PID, grava códigos
+  0 e gera log aceito pelo verificador.
+- Implementação executada pelo Codex antes do commit: após o commit, a revisão
+  aceita o log porque o fingerprint de conteúdo coincide, mesmo que o hash do
+  commit tenha mudado apenas para registrar aqueles mesmos arquivos.
+- Revisão com log válido produzido pelo responsável: atribui a execução ao
+  humano, registra a evidência no parecer e não roda a suíte outra vez.
+- Duas execuções legítimas em momentos distintos: a segunda começa com a porta
+  livre e não encontra processo órfão da primeira.
+
+## Casos inválidos
+
+- Porta dedicada já ocupada antes do início → falha rápida, informa porta/PID
+  quando identificável e não reutiliza o servidor existente.
+- E2E trava além do timeout → código não zero, log marcado como falha/timeout e
+  árvore do processo próprio encerrada.
+- Vitest ou Playwright retorna código não zero → resultado geral falha; nenhuma
+  etapa vermelha é convertida em aprovada.
+- Processo interrompido antes do resumo → arquivo sem marcador final é rejeitado
+  pelo verificador.
+- Código/teste/configuração muda depois do log → fingerprint diverge; revisão
+  rejeita o artefato e executa a suíte uma única vez.
+- Log aprovado de outro working tree ou sem identificação de executor → não é
+  evidência reutilizável.
+- Servidor externo já ativo na porta 3000 → irrelevante para o executor; ele não
+  reutiliza nem encerra esse processo.
+
+## Testes esperados
+
+- Unitários: parser/verificador do log; fingerprint estável e sensível a mudança;
+  composição do resumo; códigos 0/não zero; timeout; log truncado; validação do
+  executor informado.
+- Integração: processo HTTP descartável em porta dedicada para provar health
+  check, detecção de porta ocupada, timeout e limpeza por PID sem atingir um
+  segundo processo testemunha.
+- E2E: executar `npm run test:all:log` no baseline real e comprovar códigos 0,
+  marcador final, fingerprint aceito, porta livre e ausência do PID após saída.
+- Snapshot/contrato JSON: N/A — contrato não muda.
+- PDF: N/A — conteúdo/geração não mudam.
+
+## Arquivos prováveis
+
+- `package.json` — comandos canônicos (aproveitar/revisar o rascunho existente).
+- `scripts/executar-test-all-log.mjs` — orquestração, log e resultado geral.
+- `scripts/executar-e2e-controlado.mjs` — ownership do Next/Playwright, health
+  check, timeout e cleanup por PID (ou módulo equivalente pequeno).
+- `scripts/verificar-log-test-all.mjs` — validação/fingerprint reutilizável (ou
+  módulo equivalente compartilhado).
+- `playwright.config.ts` — base URL/porta externa no caminho canônico, sem reuso
+  de servidor desconhecido.
+- `testes/unitarios/scripts/` — testes dos módulos de infraestrutura.
+- `CLAUDE.md`
+- `.claude/skills/implementar-task/SKILL.md`
+- `.claude/skills/revisar-aderencia/SKILL.md`
+- `docs-dev/04-AI_IMPLEMENTATION_PROTOCOL.md`
+- `docs-dev/07-CHECKLIST_ADERENCIA_SPEC.md`
+- `docs-dev/08-TEST_STRATEGY.md`
+
+## Dependências
+
+- Nenhuma Q-xxx pendente. Decisão explícita do responsável em 2026-07-21:
+  canonizar o executor na implementação e na revisão, com ownership/cleanup e
+  reutilização do log humano válido.
+- Recomendada como **próxima task operacional**, antes de novas implementações
+  ou revisões pesadas, para interromper o desperdício recorrente.
+
+## Riscos
+
+- Encerrar processo alheio: mitigado por porta exclusiva e PID capturado no
+  `spawn`; cleanup amplo por nome é proibido.
+- Falso verde por log antigo: mitigado por marcador final, códigos e fingerprint
+  do conteúdo testado.
+- Falso vermelho por commit posterior ao teste: fingerprint é de conteúdo, não
+  apenas do hash Git.
+- Duplicar a suíte entre implementação e revisão: mitigado pela validação do
+  log antes de qualquer execução na revisão.
+- Complexidade cross-platform: separar lifecycle, fingerprint e parser em
+  módulos pequenos e testar Windows/POSIX sem adicionar dependência de servidor.
+- Working tree já contém rascunhos do executor; a implementação deve preservar
+  e avaliar essas mudanças, não sobrescrevê-las cegamente.
+
+## Perguntas em aberto
+
+Nenhuma. O responsável aprovou explicitamente as propostas de porta dedicada,
+ownership do servidor, timeout, cleanup, log canônico e uso tanto por
+`implementar-task` quanto por `revisar-aderencia`.
+
+---
+
 ## Ordem recomendada de execução
 
 ```text
@@ -3520,5 +3746,10 @@ ramo do mapa: 064 → 065 → 071 → 066 → 067
 - **TASK-087** foi absorvida pela **TASK-046**: o caso de remoção é regressão da reconciliação geral de horários (inserir/remover/reordenar) e não deve ser implementado isoladamente.
 - **TASK-088** (bug, 2026-07-20) fecha o caminho **RN-059** da mesma ação: depois de `matriz_distancias` ser recomposta, filtra de `matriz_seccionamento` os pares que deixaram de existir, preservando os valores confirmados dos pares sobreviventes. Depende das **TASK-026/027/084/046**, todas entregues, e é prioridade máxima por bloquear a exportação.
 - **TASK-089** (débito de teste, 2026-07-20) conserta a asserção de contagem total de pendências do E2E `etapa-itinerarios.spec.ts:71`, quebrada desde a **TASK-081** pelo alerta legítimo de grade de feriados vazia (RN-071/RN-078). Não toca `src/`; pode rodar a qualquer momento e mantém a suíte de itinerários verde para as tasks do mapa (067 em diante).
+- **TASK-090** (infraestrutura de testes, 2026-07-21) cria o executor canônico
+  com servidor Next controlado, log/fingerprint e cleanup por PID; deve rodar
+  **antes da próxima implementação ou revisão pesada**, para que
+  `implementar-task` produza uma única evidência final e `revisar-aderencia` a
+  reutilize quando válida.
 
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.
