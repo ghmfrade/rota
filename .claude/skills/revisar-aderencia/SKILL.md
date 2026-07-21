@@ -33,6 +33,13 @@ revise e oriente o usuário a iniciar outra conversa com `/revisar-aderencia TAS
 - Lacunas: regra da task sem teste; critério de aceite não verificado (matriz `docs-dev/03-TRACEABILITY_MATRIX.md`);
 - **Consequências sobre outras tasks:** a revisão foca na task atual, mas é obrigatório apontar o que a task atual afeta ou depende em outras (o contrato JSON e as fronteiras entre módulos ligam tasks). Falar de outras tasks é esperado — o que muda é o rigor da afirmação (regra abaixo).
 
+## Evidência canônica da suíte
+
+1. Antes de executar a suíte pesada, rode `npm run test:all:verificar`.
+2. Se `ultimo-test-all.log` estiver aprovado e o fingerprint coincidir, **não repita** a suíte: registre no parecer o executor e o fingerprint informados pelo verificador.
+3. Se o log estiver ausente, truncado, vermelho ou desatualizado, rode **uma única vez** `npm run test:all:log -- --executor=Codex-revisao`, sequencialmente e sem outro build/E2E em paralelo; depois exija que `npm run test:all:verificar` fique verde.
+4. Falha real é reportada como falha. Não reutilize log inválido, não converta vermelho em ressalva e não versione `ultimo-test-all.log`.
+
 ## Regra de afirmação sobre outras tasks (anti-alucinação)
 
 Toda afirmação sobre o que **outra** task faz ou não faz — que arquivo emite tal alerta, que função já cobre tal caso, que a etapa X já exibe tal mensagem — só entra no parecer como fato se o arquivo real dessa task foi **aberto e lido nesta revisão** e citado com `caminho/arquivo.ts:linha`.

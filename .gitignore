@@ -5,6 +5,7 @@
 # Dependencias e build do Next.js (criados na TASK-001)
 node_modules/
 .next/
+.next-e2e-controlado/
 out/
 dist/
 coverage/

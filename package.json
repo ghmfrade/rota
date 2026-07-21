@@ -11,6 +11,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:controlado": "node scripts/executar-e2e-controlado.mjs",
+    "test:all": "npm run test:all:log",
+    "test:all:log": "node scripts/executar-test-all-log.mjs",
+    "test:all:verificar": "node scripts/verificar-log-test-all.mjs",
     "check:rastreabilidade": "node scripts/verificar-rastreabilidade.mjs"
   },
   "dependencies": {

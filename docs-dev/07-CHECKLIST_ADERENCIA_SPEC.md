@@ -71,4 +71,7 @@ Use em **toda** entrega (IA ou humana), antes do merge. Itens não aplicáveis �
 - [ ] Há teste de regressão para UUID quando a task toca import/export/cópia? (RN-004, RN-007)
 - [ ] Testes de roteamento usam mock do OSRM (nenhum teste depende do serviço público)?
 - [ ] Fixtures canônicas reutilizadas (não inventar JSON ad hoc divergente do schema)?
-- [ ] Verificações (typecheck/lint/testes) executadas e com resultado reportado honestamente?
+- [ ] Verificações direcionadas, typecheck/lint e build aplicável foram executados e reportados honestamente?
+- [ ] A evidência final veio de uma única execução `npm run test:all:log -- --executor=<quem>` e `npm run test:all:verificar` confirmou marcador final, códigos 0 e fingerprint atual?
+- [ ] Na revisão, um log válido foi reutilizado sem repetir a suíte; ou, se ausente/inválido/desatualizado, a revisão executou o comando canônico uma única vez?
+- [ ] A porta dedicada ficou livre, os PIDs próprios foram encerrados e nenhum processo/servidor alheio foi reutilizado ou finalizado?

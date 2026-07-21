@@ -74,6 +74,7 @@ const eslintConfig = defineConfig([
     ".codex/**",
     "node_modules/**",
     ".next/**",
+    ".next-e2e-controlado/**",
     "out/**",
     "coverage/**",
     "test-results/**",

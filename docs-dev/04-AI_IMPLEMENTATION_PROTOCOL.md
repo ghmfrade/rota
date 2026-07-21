@@ -34,7 +34,7 @@ Este documento instrui **qualquer IA** (Claude, Codex ou outra) que for implemen
 9. Aguardar aprovação humana, se estiver em modo supervisionado.
 10. Implementar apenas o escopo da task.
 11. Criar ou ajustar testes (casos válidos E inválidos).
-12. Rodar verificações disponíveis (typecheck, lint, testes).
+12. Rodar testes direcionados durante a edição; depois typecheck/lint, build quando aplicável e uma única suíte completa canônica (`npm run test:all:log -- --executor=<quem executa>`).
 13. Entregar resumo final (formato abaixo).
 14. Commit da implementação: `Implementa TASK-XXX: <título>` — só código e testes da task.
 15. Encerrar a conversa de implementação.
@@ -46,6 +46,14 @@ A separação de conversas é obrigatória inclusive em modo autônomo: a autori
 prosseguir sem a parada de aprovação do plano não autoriza emendar a revisão formal à
 implementação. A nova conversa deve revisar os artefatos persistidos, sem depender da
 memória ou das justificativas do implementador.
+
+## Evidência canônica de testes
+
+- `npm run test:all:log -- --executor=Codex` (ou `--executor=humano`) é o único caminho canônico da suíte completa: Vitest e Playwright sequenciais, servidor Next próprio em porta dedicada, timeout e cleanup somente da árvore do PID criado.
+- O comando escreve `ultimo-test-all.log` primeiro como temporário e só publica o marcador final depois de ambas as etapas fecharem. O log registra executor, ambiente, Git, comandos, porta/PIDs, códigos/sinais, tempos, limpeza e fingerprint SHA-256 do conteúdo testado.
+- Implementação: testes direcionados durante a edição; lint/typecheck; build quando aplicável; **uma única** execução final de `test:all:log`. Se falhar, corrigir e repetir o mesmo comando. Processos pesados nunca rodam em paralelo.
+- Revisão: rodar primeiro `npm run test:all:verificar`. Log aprovado com fingerprint coincidente é reutilizado, registrando executor/fingerprint no parecer e sem repetir a suíte. Log ausente, truncado, vermelho ou desatualizado exige uma execução de `test:all:log` pela revisão.
+- `ultimo-test-all.log` é artefato efêmero ignorado pelo Git, não fonte de verdade de negócio. `npm test` continua disponível para testes direcionados; `npm run test:e2e` continua disponível para diagnóstico isolado, mas não substitui a evidência canônica.
 
 ## Convenção de commits por task (obrigatória)
 

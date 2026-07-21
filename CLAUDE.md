@@ -70,7 +70,11 @@ Português em código, comentários, docs e mensagens. Nomenclatura oficial das 
 - Typecheck: `npm run typecheck`
 - Lint: `npm run lint`
 - Testes unitários (Vitest): `npm test` (watch: `npm run test:watch`)
-- E2E (Playwright): `npm run test:e2e` — sobe `next dev` sozinho; requer navegador instalado (`npx playwright install chromium`)
+- E2E isolado (Playwright): `npm run test:e2e` — sobe `next dev` sozinho; requer navegador instalado (`npx playwright install chromium`)
+- Suíte completa canônica: `npm run test:all:log -- --executor=Codex` (ou `--executor=humano`) — Vitest + Playwright sequenciais, servidor Next próprio na porta dedicada 3100, timeout e cleanup por PID; nunca executar em paralelo com build/E2E.
+- Verificar/reutilizar a evidência: `npm run test:all:verificar` — aceita `ultimo-test-all.log` somente com marcador final aprovado, os dois códigos 0 e fingerprint do conteúdo atual.
+
+Na implementação, use testes direcionados durante a edição, depois lint/typecheck e build quando aplicável, e produza **uma única** evidência final com `test:all:log`. A revisão executa primeiro `test:all:verificar`: se o log for válido, registra executor/fingerprint e não repete a suíte; se for ausente, truncado, vermelho ou desatualizado, roda `test:all:log` uma vez. O log é efêmero (`*.log`), nunca versionado nem fonte de verdade de negócio.
 
 ## Limites do enforcement automático
 
