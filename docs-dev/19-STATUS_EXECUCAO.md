@@ -166,7 +166,7 @@ Fecha a UX de mapa e interações. Depende só do que já está entregue (060, 0
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 1 | **068** — Vocabulário visual dos marcadores (vértice ciano, Seção quadrada, Local −30%) + degradação do clique posicional | **2** | Precede a 069 (que reusa o token). Ampliada em 2026-07-21: absorve a **condição de merge da TASK-067** (item D) e a mudança de forma/tamanho de Seção e Local. **Nasce bloqueada** até a decisão de 2026-07-21 virar **DEC-069** — a DEC-054 vigente ainda diz "marcadores circulares para ambos". |
+| 1 | **068** — Vocabulário visual dos marcadores (Seção quadrada 16 px, Local 12 px, vértice ciano 9 px) + degradação do clique posicional | **2** | Precede a 069 (que reusa o token). Ampliada em 2026-07-21: absorve a **condição de merge da TASK-067** (item D) e a mudança de forma/tamanho de Seção e Local. Desbloqueada pela **DEC-069** (registrada em 2026-07-21), que supera em parte a DEC-054 (marcadores circulares para ambos) e a DEC-057 (vértice maior que 9 px). |
 | 2 | **069** — Affordance de hover sobre a linha | **2** | Precisa da 068. |
 | 3 | **070** — Clique sobre o vértice remove o ponto de rota | **2** | Independente de 067 (✅). |
 | 4 | **079** — Pontos de rota na lista lateral intercalados | **4** | Desbloqueada por 066 + 071. |
