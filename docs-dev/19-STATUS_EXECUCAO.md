@@ -4,7 +4,7 @@
 
 **O que este documento NÃO é:** não é fonte de verdade sobre o conteúdo, escopo ou regras de nenhuma task — isso continua sendo o `06-BACKLOG_INICIAL.md` (e, acima dele, as specs e o `01-RULE_INDEX.md`, conforme a hierarquia do `00-README-SPEC-DRIVEN.md`). Aqui só se registra **status e sequenciamento**. Em caso de divergência sobre escopo, o backlog vence.
 
-**Última atualização:** 2026-07-21 (branch `redesign`) — TASK-068 corrigida e aprovada na reavaliação; ciclo concluído. Q-049 decidida pela DEC-070; TASK-079/064/076 alinhadas ao estado contextual de Local em extremo.
+**Última atualização:** 2026-07-21 (branch `redesign`) — TASK-068 corrigida e aprovada na reavaliação; Q-049 decidida pela DEC-070 e TASK-079/064/076 alinhadas ao estado contextual de Local em extremo. TASK-089 reconhecida como absorvida pela TASK-068 e aprovada com ressalva de rastreabilidade; não deve ser reimplementada.
 
 ---
 
@@ -39,7 +39,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 
 ## 3. Tasks executadas
 
-70 tasks concluídas. Agrupadas pela fase do backlog.
+71 tasks concluídas. Agrupadas pela fase do backlog.
 
 ### Fases 1–3 — Fundação, contrato JSON e validações de domínio
 
@@ -145,6 +145,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 065 | Inverter os gestos do mapa único: esquerdo = ponto de rota, direito = menu Seção/Local |
 | 067 | Inserção posicional: clique direito sobre a linha insere a parada entre as paradas do trecho |
 | 068 | Vocabulário visual + degradação do clique + erro contextual de Local em extremo |
+| 089 | E2E de recálculo afere ausência de bloqueante — absorvida pela TASK-068 |
 | 090 | Executor canônico e controlado da suíte completa |
 
 ---
@@ -160,7 +161,7 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 ## 5. Tasks a executar — ordem recomendada
 
-18 tasks pendentes (17 do backlog original + a TASK-089). A **TASK-068** saiu da lista: a entrega inicial `37502b4` foi reprovada em `14-REVISOES/TASK-068-20260721.md`, corrigida em `861b5a4` e **aprovada** em `14-REVISOES/TASK-068-20260721-reavaliacao.md`; a correção completou a cobertura de RN-035/fallback, impediu a promoção do Serviço com Local extremo e a suíte canônica terminou verde. A **TASK-090** também saiu da lista: a entrega inicial `735c992` foi reprovada em `14-REVISOES/TASK-090-20260721.md`, corrigida em `aa79302` e **aprovada** em `14-REVISOES/TASK-090-20260721-reavaliacao.md`; o executor canônico agora rejeita log de outro working tree e cobre os caminhos negativos reais. A ordem abaixo respeita as dependências declaradas nas próprias tasks; onde há folga, ela é indicada. A antiga prioridade máxima (TASK-082) foi concluída; a visibilidade dos motivos usa a infraestrutura entregue pelas TASK-085/086. O Grupo A (bug vivo de integridade das matrizes) foi fechado pela **TASK-088**, implementada em `2b27c9a` e aprovada em `docs-dev/14-REVISOES/TASK-088-20260720.md` — não há mais bug bloqueando a exportação após remover uma Seção. A **TASK-065** saiu da lista de pendentes: reprovada em 2026-07-20 por E2E vermelho, foi corrigida em `6469a04` e **aprovada com ressalvas** na reavaliação `docs-dev/14-REVISOES/TASK-065-20260720-reavaliacao.md`. A **TASK-067** também saiu: implementada em `b2b3ab7` e **aprovada com ressalvas** em `docs-dev/14-REVISOES/TASK-067-20260720.md` — a condição de entrada herdada da 065 (teste do hit-test de `contextmenu`) foi cumprida por `testes/unitarios/mapa/mapa.test.tsx`, e sua condição de merge foi absorvida e concluída pela TASK-068.
+17 tasks pendentes. A **TASK-089** saiu da lista: a correção foi absorvida pelo commit `37502b4` da TASK-068 e **aprovada com ressalva de rastreabilidade** em `docs-dev/14-REVISOES/TASK-089-20260721.md`; o cenário afere ausência de bloqueante, passa 3/3 e a suíte canônica está verde. A **TASK-068** saiu da lista: a entrega inicial `37502b4` foi reprovada em `14-REVISOES/TASK-068-20260721.md`, corrigida em `861b5a4` e **aprovada** em `14-REVISOES/TASK-068-20260721-reavaliacao.md`; a correção completou a cobertura de RN-035/fallback, impediu a promoção do Serviço com Local extremo e a suíte canônica terminou verde. A **TASK-090** também saiu da lista: a entrega inicial `735c992` foi reprovada em `14-REVISOES/TASK-090-20260721.md`, corrigida em `aa79302` e **aprovada** em `14-REVISOES/TASK-090-20260721-reavaliacao.md`; o executor canônico agora rejeita log de outro working tree e cobre os caminhos negativos reais. A ordem abaixo respeita as dependências declaradas nas próprias tasks; onde há folga, ela é indicada. A antiga prioridade máxima (TASK-082) foi concluída; a visibilidade dos motivos usa a infraestrutura entregue pelas TASK-085/086. O Grupo A (bug vivo de integridade das matrizes) foi fechado pela **TASK-088**, implementada em `2b27c9a` e aprovada em `docs-dev/14-REVISOES/TASK-088-20260720.md` — não há mais bug bloqueando a exportação após remover uma Seção. A **TASK-065** saiu da lista de pendentes: reprovada em 2026-07-20 por E2E vermelho, foi corrigida em `6469a04` e **aprovada com ressalvas** na reavaliação `docs-dev/14-REVISOES/TASK-065-20260720-reavaliacao.md`. A **TASK-067** também saiu: implementada em `b2b3ab7` e **aprovada com ressalvas** em `docs-dev/14-REVISOES/TASK-067-20260720.md` — a condição de entrada herdada da 065 (teste do hit-test de `contextmenu`) foi cumprida por `testes/unitarios/mapa/mapa.test.tsx`, e sua condição de merge foi absorvida e concluída pela TASK-068.
 
 ### Grupo B — Ramo do mapa e pontos de rota
 
@@ -205,8 +206,6 @@ As próprias tasks pedem rodar **depois** do Grupo B, para não retrabalhar a su
 |:---:|---|:---:|---|
 | 8 | **075** — Identificação: pré-visualização + confirmação explícita | **2** | Encaixe livre — independente de tudo acima. |
 | 9 | **062** — E2E do fluxo "criar do zero" ponta a ponta | **3** | Depois do mapa estabilizado, senão os seletores mudam de novo. |
-| — | **089** — E2E `etapa-itinerarios.spec.ts:71` afere ausência de bloqueante, não painel vazio | **1** | Débito de teste da TASK-081 (ver §6.4). **Encaixe livre, sem dependências** — só `testes/e2e/`, nenhum arquivo de `src/`. A 067 rodou antes dela e a revisão confirmou o estado documentado (**8 passed / 1 failed**, a falha sendo exatamente esta); executar agora, para a suíte de itinerários voltar a ser sinal confiável nas tasks do mapa restantes. |
-
 ### Grupo E — Fases originais restantes (MVP 3 em diante)
 
 Independentes do ramo do mapa: nada aqui bloqueia ou é bloqueado por ele.
@@ -258,10 +257,10 @@ O write-back atual verificado na revisão é `servicosComItinerarioAtualizado`.
 
 Ver §4. Código entregue, ciclo formal não encerrado.
 
-### 6.4 `etapa-itinerarios.spec.ts:71` ficou desatualizado desde a TASK-081 — aberto em 2026-07-20
+### 6.4 `etapa-itinerarios.spec.ts:71` ficou desatualizado desde a TASK-081 — resolvido em 2026-07-21
 
-Achado na reavaliação da TASK-065 (`14-REVISOES/TASK-065-20260720-reavaliacao.md`, problema 4). O E2E `mover parada recalcula com sucesso …` exige `painel-pendencias → pendencia-item` com contagem **0**, mas o fixture `carregar-multi-servico.json` passou a produzir o alerta *"Serviços 0001-1SU, 0001-2SU sem grade de feriados"*, emitido por `src/formulario/pendencias/pendencias.ts:184` — introduzido pela **TASK-081** (`06a7ed4`). Falha determinística (3/3 em `--repeat-each=3`), e **não** é a flakiness intermitente descrita no parecer anterior da 065.
+Achado na reavaliação da TASK-065 (`14-REVISOES/TASK-065-20260720-reavaliacao.md`, problema 4). O E2E `mover parada recalcula com sucesso …` exige `painel-pendencias → pendencia-item` com contagem **0**, mas o fixture `carregar-multi-servico.json` passou a produzir o alerta *"Serviços 0001-1SU, 0001-2SU sem grade de feriados"*, emitido atualmente por `src/formulario/pendencias/pendencias.ts:200` — introduzido pela **TASK-081** (`06a7ed4`). Falha determinística (3/3 em `--repeat-each=3`), e **não** é a flakiness intermitente descrita no parecer anterior da 065.
 
 **Atribuição:** não é da TASK-065 — nenhum dos seus commits toca `src/formulario/pendencias/`. É débito de teste da TASK-081, que acrescentou o alerta sem atualizar o E2E que assume zero pendências nesse fixture.
 
-**Resolução encaminhada:** virou a **TASK-089** (`06-BACKLOG_INICIAL.md`), que realinha a asserção com a RN-078 (aferir ausência de **bloqueante**, não painel vazio) e proíbe expressamente consertar pelo fixture canônico. Enquanto não for executada, a suíte `etapa-itinerarios.spec.ts` fica em **8 passed / 1 failed**, e esse vermelho não deve ser confundido com regressão de tasks novas do mapa.
+**Resolução:** a correção foi absorvida pelo commit `37502b4` da TASK-068: a asserção agora filtra `pendencia-item` por `data-severidade="bloqueante"`, preservando a prova de recálculo e o caso inválido `NoRoute`. A revisão `docs-dev/14-REVISOES/TASK-089-20260721.md` aprovou a entrega com ressalva pela ausência de commit próprio; o cenário passou 3/3, a suíte canônica ficou verde e a TASK-089 não deve ser reimplementada.
