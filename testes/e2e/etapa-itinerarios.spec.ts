@@ -705,6 +705,24 @@ test.describe("Etapa Seções, Locais e Itinerários — sincronização de sele
     expect(chamadasOsrm).toBe(0);
   });
 
+  test("linha par selecionada pinta de azul (zebra não mascara o fundo de seleção)", async ({
+    page,
+  }) => {
+    // Bugfix TASK-064: o zebra (`nth-child(even)`) da `<Tabela>` tinha
+    // especificidade maior que a classe simples `bg-azul-100` da seleção, e
+    // vencia a cascata nas linhas pares — a seleção ficava correta no estado
+    // (`aria-current`) mas visualmente invisível. Corrigido excluindo a linha
+    // com `aria-current="true"` do zebra/hover em `tabela.tsx`.
+    await page.route("https://router.project-osrm.org/**", (rota) => rota.abort());
+    await abrirEtapaVolta(page);
+
+    const linhas = page.getByTestId("tabela-paradas").getByTestId("parada-item");
+    // nth(1) é a 2ª linha da tabela — `:nth-child(2)`, portanto par.
+    await linhas.nth(1).click();
+    await expect(linhas.nth(1)).toHaveAttribute("aria-current", "true");
+    await expect(linhas.nth(1)).toHaveCSS("background-color", "rgb(219, 234, 254)");
+  });
+
   test("clicar num marcador no mapa realça a linha correspondente na tabela e rola até ela", async ({
     page,
   }) => {

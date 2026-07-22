@@ -14,8 +14,11 @@ const CLASSES_TABELA =
   "w-full border-collapse text-sm " +
   "[&_thead]:sticky [&_thead]:top-0 [&_thead]:bg-cinza-100 " +
   "[&_tbody_tr]:[transition:background-color_var(--transicao-rapida)] " +
-  "[&_tbody_tr:nth-child(even)]:bg-cinza-50 " +
-  "[&_tbody_tr:hover]:bg-azul-50 " +
+  // Zebra e hover não se aplicam à linha selecionada (`aria-current="true"`):
+  // os seletores arbitrários têm especificidade maior que a classe simples
+  // `bg-azul-100` usada na seleção (TASK-064) e a mascarariam nas linhas pares.
+  '[&_tbody_tr:nth-child(even):not([aria-current="true"])]:bg-cinza-50 ' +
+  '[&_tbody_tr:hover:not([aria-current="true"])]:bg-azul-50 ' +
   "[&_th]:px-3 [&_th]:py-2 [&_td]:px-3 [&_td]:py-2 " +
   "[&_th]:text-left [&_th]:text-sm [&_td]:text-sm";
 

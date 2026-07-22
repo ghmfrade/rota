@@ -67,8 +67,12 @@ describe("Tabela", () => {
     );
     const tabela = container.querySelector("table")!;
     expect(tabela.className).toContain("[&_thead]:bg-cinza-100");
-    expect(tabela.className).toContain("[&_tbody_tr:nth-child(even)]:bg-cinza-50");
-    expect(tabela.className).toContain("[&_tbody_tr:hover]:bg-azul-50");
+    expect(tabela.className).toContain(
+      '[&_tbody_tr:nth-child(even):not([aria-current="true"])]:bg-cinza-50',
+    );
+    expect(tabela.className).toContain(
+      '[&_tbody_tr:hover:not([aria-current="true"])]:bg-azul-50',
+    );
     desmontar();
   });
 });
