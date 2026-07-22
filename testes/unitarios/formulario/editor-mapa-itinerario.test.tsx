@@ -425,33 +425,13 @@ describe("EditorMapaItinerario — gesto de ponto de rota (TASK-063; Spec 04 §7
     desmontar();
   });
 
-  it("a sub-lista de pontos de rota exibe os pontos e NÃO entram na tabela de paradas (Spec 04 §7.3)", () => {
+  it("TASK-079 remove a sub-lista própria sem remover os vértices do mapa", () => {
     const { container, desmontar } = montar({ pontosDeRota: PONTOS_DE_ROTA });
-    const subLista = container.querySelector('[data-testid="sub-lista-pontos-de-rota"]');
-    const itens = subLista?.querySelectorAll('[data-testid="ponto-rota-item"]');
 
-    expect(itens).toHaveLength(2);
-    // Não há tabela de paradas neste componente (é responsabilidade da etapa,
-    // `tabela-paradas`); confirmamos apenas que a sub-lista é uma superfície
-    // própria, sem nome nem município (só a coordenada).
+    expect(container.querySelector('[data-testid="sub-lista-pontos-de-rota"]')).toBeNull();
+    expect(container.querySelector('[data-testid="ponto-rota-item"]')).toBeNull();
     expect(container.querySelector('[data-testid="tabela-paradas"]')).toBeNull();
-    desmontar();
-  });
-
-  it("remover um ponto de rota pela sub-lista chama aoRemoverPontoDeRota com o índice", () => {
-    const { container, aoRemoverPontoDeRota, desmontar } = montar({ pontosDeRota: PONTOS_DE_ROTA });
-    const botoesRemover = container.querySelectorAll('[data-testid="remover-ponto-rota"]');
-
-    clicar(botoesRemover[1]);
-
-    expect(aoRemoverPontoDeRota).toHaveBeenCalledWith(1);
-    desmontar();
-  });
-
-  it("[inválido] sem pontosDeRota, a sub-lista fica vazia", () => {
-    const { container, desmontar } = montar();
-    const itens = container.querySelectorAll('[data-testid="ponto-rota-item"]');
-    expect(itens).toHaveLength(0);
+    expect((capturado.props?.marcadores ?? []).filter((m) => m.id.startsWith("ponto-rota-"))).toHaveLength(2);
     desmontar();
   });
 });

@@ -93,8 +93,8 @@ export interface PropsEditorMapaItinerario {
    * 04 §7.3, RN-046/052), desenhada sobre o mapa; ausente quando `sem-rota`. */
   linhaRota?: LinhaMapa;
   /** Pontos de rota persistidos do itinerário corrente (Spec 02 §10.4) —
-   * exibidos como vértices arrastáveis sobre a linha e na sub-lista própria
-   * (Spec 04 §7.3: "não entra na tabela de paradas"). */
+   * exibidos como vértices arrastáveis sobre a linha. A representação na
+   * lista lateral unificada pertence ao host (TASK-079/DEC-060). */
   pontosDeRota?: readonly PontoDeRota[];
   /** Clique esquerdo SOBRE a linha da rota (TASK-063; Spec 04 §7.3 item 6;
    * DEC-055): o host ancora a coordenada ao trecho correto e insere o novo
@@ -126,7 +126,6 @@ export function EditorMapaItinerario({
   pontosDeRota = [],
   aoCriarPontoDeRota,
   aoMoverPontoDeRota,
-  aoRemoverPontoDeRota,
 }: PropsEditorMapaItinerario) {
   const [mensagemSecao, definirMensagemSecao] = useState<string | null>(null);
   const [mensagemLocal, definirMensagemLocal] = useState<string | null>(null);
@@ -507,27 +506,6 @@ export function EditorMapaItinerario({
         })}
       </ul>
 
-      {/* Sub-lista PRÓPRIA dos pontos de rota (Spec 04 §7.3: "não entra na
-          tabela de paradas; aparece em sub-lista própria") — sem nome, sem
-          município, identificados só pela posição (RN-042, sem `uuid`). */}
-      <ul data-testid="sub-lista-pontos-de-rota" className="flex flex-col gap-2">
-        {pontosDeRota.map((ponto, indice) => (
-          <li
-            key={indice}
-            data-testid="ponto-rota-item"
-            className="flex items-center gap-2 text-sm text-cinza-700"
-          >
-            Ponto de rota {indice + 1} ({ponto.latitude.toFixed(5)}, {ponto.longitude.toFixed(5)})
-            <Botao
-              variante="secundario"
-              data-testid="remover-ponto-rota"
-              onClick={() => aoRemoverPontoDeRota?.(indice)}
-            >
-              Remover
-            </Botao>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }

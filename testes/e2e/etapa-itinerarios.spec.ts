@@ -496,10 +496,11 @@ test.describe("Etapa Seções, Locais e Itinerários — gesto de ponto de rota 
     // Criou ponto de rota, NÃO Seção (DEC-055: esquerdo sobre a linha é
     // ponto de rota; o formulário de Seção não aparece).
     await expect(page.getByTestId("form-criar-secao")).toHaveCount(0);
-    await expect(page.getByTestId("sub-lista-pontos-de-rota").getByTestId("ponto-rota-item")).toHaveCount(1);
+    await expect(page.getByTestId("tabela-paradas").getByTestId("ponto-rota-item")).toHaveCount(1);
+    await expect(page.getByTestId("sub-lista-pontos-de-rota")).toHaveCount(0);
 
-    // A tabela de paradas continua com as MESMAS 3 paradas (RN-042: ponto de
-    // rota não é Parada, não entra na tabela — Spec 04 §7.3).
+    // A lista lateral única continua com as MESMAS 3 Paradas: o ponto de rota
+    // aparece intercalado, mas não recebe `parada-item` (RN-042/DEC-060).
     await expect(page.getByTestId("tabela-paradas").getByTestId("parada-item")).toHaveCount(3);
 
     // O recálculo (RN-052) foi disparado com o ponto de rota intercalado: 3
@@ -510,6 +511,20 @@ test.describe("Etapa Seções, Locais e Itinerários — gesto de ponto de rota 
     expect(url).toContain("waypoints=");
     const coordenadas = url.match(/\/driving\/([^?]+)/)?.[1] ?? "";
     expect(coordenadas.split(";").length).toBe(4);
+
+    // O ancorador geométrico posiciona este clique no segundo trecho. A seta
+    // move o ponto para antes da Parada intermediária: a coordenada não muda,
+    // mas os waypoints passam de 0;1;3 para 0;2;3 e o OSRM é chamado novamente
+    // (TASK-079/DEC-060; RN-052).
+    expect(new URL(url).searchParams.get("waypoints")).toBe("0;1;3");
+    const requisicaoMovimento = page.waitForRequest("**/route/v1/driving/**");
+    await page.getByTestId("ponto-rota-mover-cima").click();
+    const urlMovimento = (await requisicaoMovimento).url();
+    expect(new URL(urlMovimento).searchParams.get("waypoints")).toBe("0;2;3");
+    await expect(page.getByTestId("tabela-paradas").locator("tbody > tr").nth(1)).toHaveAttribute(
+      "data-testid",
+      "ponto-rota-item",
+    );
   });
 
   test("TASK-071: ponto de rota sobrevive a um recálculo que falha; o recálculo seguinte bem-sucedido o reaplica", async ({
@@ -569,23 +584,23 @@ test.describe("Etapa Seções, Locais e Itinerários — gesto de ponto de rota 
 
     // Chamada 1 (Ok): cria o ponto de rota.
     await page.mouse.click(meio.x, meio.y);
-    await expect(page.getByTestId("sub-lista-pontos-de-rota").getByTestId("ponto-rota-item")).toHaveCount(1);
+    await expect(page.getByTestId("tabela-paradas").getByTestId("ponto-rota-item")).toHaveCount(1);
 
     // Chamada 2 (NoRoute): qualquer gesto que dispare recálculo (aqui, mover
     // uma parada) leva o itinerário a `sem-rota` — mas o ponto de rota, que
-    // vive agora em estado de sessão PRÓPRIO (DEC-058), não some da sub-lista
-    // nem do mapa.
+    // vive agora em estado de sessão PRÓPRIO (DEC-058), não some da lista
+    // lateral unificada nem do mapa.
     await page.getByTestId("parada-mover-baixo").first().click();
     await expect(page.getByTestId("mensagem-sem-rota")).toBeVisible();
-    await expect(page.getByTestId("sub-lista-pontos-de-rota").getByTestId("ponto-rota-item")).toHaveCount(1);
+    await expect(page.getByTestId("tabela-paradas").getByTestId("ponto-rota-item")).toHaveCount(1);
 
     // Chamada 3 (Ok): o próximo recálculo bem-sucedido REAPLICA o ponto que
     // sobreviveu à falha (Spec 03 §3.6.2) — a URL final leva `waypoints=` e a
-    // sub-lista continua com o ponto. Move a mesma parada de volta (mover-baixo
+    // lista continua com o ponto. Move a mesma parada de volta (mover-baixo
     // de novo — o índice 0 nunca fica desabilitado enquanto não for o último).
     await page.getByTestId("parada-mover-baixo").first().click();
     await expect(page.getByTestId("mensagem-sem-rota")).toHaveCount(0);
-    await expect(page.getByTestId("sub-lista-pontos-de-rota").getByTestId("ponto-rota-item")).toHaveCount(1);
+    await expect(page.getByTestId("tabela-paradas").getByTestId("ponto-rota-item")).toHaveCount(1);
 
     expect(chamada).toBe(3);
     expect(ultimaUrlOsrm).not.toBeNull();
@@ -618,7 +633,7 @@ test.describe("Etapa Seções, Locais e Itinerários — gesto de ponto de rota 
     await expect(page.getByTestId("form-criar-secao")).toHaveCount(0);
     await expect(page.getByTestId("form-criar-local")).toHaveCount(0);
     await expect(page.getByTestId("menu-criar-parada")).toHaveCount(0);
-    await expect(page.getByTestId("sub-lista-pontos-de-rota").getByTestId("ponto-rota-item")).toHaveCount(0);
+    await expect(page.getByTestId("tabela-paradas").getByTestId("ponto-rota-item")).toHaveCount(0);
     expect(chamadasOsrm).toBe(0);
   });
 });

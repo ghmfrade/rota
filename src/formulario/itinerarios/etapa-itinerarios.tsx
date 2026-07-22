@@ -55,6 +55,12 @@ import {
 import { promoverServicoNaSessao } from "./promocao-servico";
 import { reconciliarHorariosAposMudancaItinerario } from "./reconciliar-horarios-itinerario";
 import {
+  montarListaIntercaladaItinerario,
+  moverPontoDeRotaNaLista,
+  podeMoverPontoDeRotaNaLista,
+  type DirecaoMovimentoLista,
+} from "./lista-intercalada-itinerario";
+import {
   chaveParadaEmEdicao,
   conjuntoSecoesConsistente,
   inserirParada,
@@ -243,6 +249,10 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     linhaAtual && sentidoSelecionado
       ? pontosDeRotaDoItinerario(sessao, linhaAtual.servicoUuid, sentidoSelecionado)
       : [];
+  const itensListaAtual = montarListaIntercaladaItinerario(
+    paradasAtual,
+    pontosDeRotaAtual,
+  );
 
   // Rota ativa desenhada no mapa (TASK-059; Spec 04 §7.3, RN-046/052) — só a
   // LineString congelada/recalculada; em `sem-rota` (RN-048) nenhuma linha é
@@ -648,6 +658,20 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     void aplicarNovasParadas(paradasAtual, { pontosDeRota: novosPontos });
   }
 
+  function moverPontoDeRotaNaTabela(
+    indicePonto: number,
+    direcao: DirecaoMovimentoLista,
+  ) {
+    const novosPontos = moverPontoDeRotaNaLista(
+      paradasAtual,
+      pontosDeRotaAtual,
+      indicePonto,
+      direcao,
+    );
+    if (!novosPontos) return;
+    void aplicarNovasParadas(paradasAtual, { pontosDeRota: novosPontos });
+  }
+
   if (!identidade) {
     return (
       <Painel tom="informativo">
@@ -807,12 +831,79 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
                 <Tabela data-testid="tabela-paradas">
                   <thead>
                     <tr>
-                      <th scope="col">Parada</th>
+                      <th scope="col">Item do itinerário</th>
                       <th scope="col">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {paradasAtual.map((parada, indice) => {
+                    {itensListaAtual.map((item) => {
+                      if (item.tipo === "ponto-de-rota") {
+                        return (
+                          <tr
+                            key={`ponto-de-rota-${item.indicePonto}`}
+                            data-testid="ponto-rota-item"
+                            data-tipo="ponto-de-rota"
+                            className="text-ciano-500"
+                          >
+                            <td>
+                              <span className="font-semibold">
+                                Ponto de rota {item.numeroNaTravessia}
+                              </span>{" "}
+                              <span className="text-xs text-cinza-500">
+                                ({item.ponto.latitude.toFixed(5)},{" "}
+                                {item.ponto.longitude.toFixed(5)})
+                              </span>
+                            </td>
+                            <td>
+                              <div className="flex flex-wrap gap-2">
+                                <Botao
+                                  variante="secundario"
+                                  data-testid="ponto-rota-mover-cima"
+                                  disabled={
+                                    !podeMoverPontoDeRotaNaLista(
+                                      paradasAtual,
+                                      pontosDeRotaAtual,
+                                      item.indicePonto,
+                                      "cima",
+                                    )
+                                  }
+                                  onClick={() =>
+                                    moverPontoDeRotaNaTabela(item.indicePonto, "cima")
+                                  }
+                                >
+                                  ↑
+                                </Botao>
+                                <Botao
+                                  variante="secundario"
+                                  data-testid="ponto-rota-mover-baixo"
+                                  disabled={
+                                    !podeMoverPontoDeRotaNaLista(
+                                      paradasAtual,
+                                      pontosDeRotaAtual,
+                                      item.indicePonto,
+                                      "baixo",
+                                    )
+                                  }
+                                  onClick={() =>
+                                    moverPontoDeRotaNaTabela(item.indicePonto, "baixo")
+                                  }
+                                >
+                                  ↓
+                                </Botao>
+                                <Botao
+                                  variante="secundario"
+                                  data-testid="remover-ponto-rota"
+                                  onClick={() => aoRemoverPontoDeRota(item.indicePonto)}
+                                >
+                                  Remover
+                                </Botao>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      const { parada, indiceParada: indice } = item;
                       const localExtremo = localExtremoPorIndice.get(indice);
                       const mensagemErro = localExtremo
                         ? mensagemLocalExtremo(localExtremo.posicoes)

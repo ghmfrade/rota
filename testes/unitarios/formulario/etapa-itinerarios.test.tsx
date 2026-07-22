@@ -77,10 +77,35 @@ function respostaOsrmMock(): typeof fetch {
   }) as unknown as typeof fetch;
 }
 
+function respostaOsrmTresParadasMock(): typeof fetch {
+  return vi.fn().mockResolvedValue({
+    json: () =>
+      Promise.resolve({
+        code: "Ok",
+        routes: [
+          {
+            geometry: {
+              type: "LineString",
+              coordinates: [
+                [-46.3339, -23.9608],
+                [-46.38, -23.97],
+                [-46.4025, -24.0084],
+              ],
+            },
+            legs: [
+              { distance: 8000, duration: 1080, steps: [{ name: "Via 1" }] },
+              { distance: 6000, duration: 720, steps: [{ name: "Via 2" }] },
+            ],
+          },
+        ],
+      }),
+  }) as unknown as typeof fetch;
+}
+
 function sessaoComTresSecoes(
   aposParadaOrdem: number,
   latitudePontoDeRota = -23.97,
-): SessaoFormulario {
+): Extract<SessaoFormulario, { modo: "carregado" }> {
   const documento = documentoExemploMinimo();
   const servico = documento.autos.servicos[0];
   const ida = servico.itinerarios.find((itinerario) => itinerario.sentido === "ida")!;
@@ -206,6 +231,165 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+describe("EtapaItinerarios — lista lateral intercalada (TASK-079/DEC-060)", () => {
+  test("exibe ponto entre as Paradas sem duplicar a sub-lista e preserva seletores das Paradas", async () => {
+    const { resultado } = await montarEtapa(1);
+    const tabela = resultado.container.querySelector('[data-testid="tabela-paradas"]')!;
+    const linhas = tabela.querySelectorAll("tbody > tr");
+
+    expect(linhas).toHaveLength(4);
+    expect(Array.from(linhas).map((linha) => linha.getAttribute("data-testid"))).toEqual([
+      "parada-item",
+      "ponto-rota-item",
+      "parada-item",
+      "parada-item",
+    ]);
+    expect(tabela.querySelectorAll('[data-testid="parada-item"]')).toHaveLength(3);
+    expect(tabela.querySelectorAll('[data-testid="parada-mover-cima"]')).toHaveLength(3);
+    expect(tabela.querySelectorAll('[data-testid="parada-mover-baixo"]')).toHaveLength(3);
+    expect(tabela.querySelectorAll('[data-testid="parada-remover"]')).toHaveLength(3);
+    expect(resultado.container.querySelector('[data-testid="sub-lista-pontos-de-rota"]')).toBeNull();
+
+    const linhaPonto = tabela.querySelector('[data-testid="ponto-rota-item"]')!;
+    expect(linhaPonto.textContent).toContain("Ponto de rota 1");
+    expect(linhaPonto.textContent).not.toContain("Santos -");
+    expect(linhaPonto.querySelector("input, select, textarea")).toBeNull();
+    expect(linhaPonto.querySelector('[data-testid="remover-ponto-rota"]')).not.toBeNull();
+    resultado.desmontar();
+  });
+
+  test("mover ponto através de Parada re-deriva a âncora e recalcula com OSRM mockado", async () => {
+    const fetchMock = respostaOsrmTresParadasMock();
+    vi.stubGlobal("fetch", fetchMock);
+    const { obterSessao, resultado } = await montarEtapa(1);
+    const pontoAntes = sessaoComTresSecoes(1).documento.autos.servicos[0].itinerarios[0]
+      .rota.pontos_de_rota[0];
+
+    act(() => {
+      (
+        resultado.container.querySelector(
+          '[data-testid="ponto-rota-mover-baixo"]',
+        ) as HTMLButtonElement
+      ).click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const chave = chaveItinerario(SERVICO_UUID, "ida");
+    expect(obterSessao().pontosDeRotaEmEdicao?.[chave]).toEqual([
+      { ...pontoAntes, apos_parada_ordem: 2 },
+    ]);
+    const linhas = resultado.container.querySelectorAll(
+      '[data-testid="tabela-paradas"] tbody > tr',
+    );
+    expect(Array.from(linhas).map((linha) => linha.getAttribute("data-testid"))).toEqual([
+      "parada-item",
+      "parada-item",
+      "ponto-rota-item",
+      "parada-item",
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    resultado.desmontar();
+  });
+
+  test("mover pontos no mesmo trecho altera apenas a ordem do array", async () => {
+    const sessao = sessaoComTresSecoes(1);
+    const ida = sessao.documento.autos.servicos[0].itinerarios[0];
+    ida.rota.pontos_de_rota.push({
+      apos_parada_ordem: 1,
+      latitude: -23.975,
+      longitude: -46.385,
+    });
+    const coordenadasAntes = ida.rota.pontos_de_rota.map((ponto) => ponto.latitude);
+    const fetchMock = respostaOsrmTresParadasMock();
+    vi.stubGlobal("fetch", fetchMock);
+    const { obterSessao, resultado } = await montarSessaoNaEtapa(
+      sessao,
+      SERVICO_UUID,
+      "ida",
+    );
+
+    act(() => {
+      (
+        resultado.container.querySelector(
+          '[data-testid="ponto-rota-mover-baixo"]',
+        ) as HTMLButtonElement
+      ).click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const chave = chaveItinerario(SERVICO_UUID, "ida");
+    const pontosDepois = obterSessao().pontosDeRotaEmEdicao?.[chave] ?? [];
+    expect(pontosDepois.map((ponto) => ponto.latitude)).toEqual(coordenadasAntes.reverse());
+    expect(pontosDepois.map((ponto) => ponto.apos_parada_ordem)).toEqual([1, 1]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    resultado.desmontar();
+  });
+
+  test("remover ponto pela lista atualiza a sessão e recalcula", async () => {
+    const fetchMock = respostaOsrmTresParadasMock();
+    vi.stubGlobal("fetch", fetchMock);
+    const { obterSessao, resultado } = await montarEtapa(1);
+
+    act(() => {
+      (
+        resultado.container.querySelector(
+          '[data-testid="remover-ponto-rota"]',
+        ) as HTMLButtonElement
+      ).click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const chave = chaveItinerario(SERVICO_UUID, "ida");
+    expect(obterSessao().pontosDeRotaEmEdicao?.[chave]).toEqual([]);
+    expect(resultado.container.querySelector('[data-testid="ponto-rota-item"]')).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    resultado.desmontar();
+  });
+
+  test("[inválido][RN-042] desabilita setas que deixariam ponto fora dos trechos", async () => {
+    const { resultado } = await montarEtapa(1);
+    const linhaPonto = resultado.container.querySelector('[data-testid="ponto-rota-item"]')!;
+
+    expect(
+      (linhaPonto.querySelector('[data-testid="ponto-rota-mover-cima"]') as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      (linhaPonto.querySelector('[data-testid="ponto-rota-mover-baixo"]') as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
+    resultado.desmontar();
+  });
+
+  test("[inválido][RN-048] continua exibindo pontos preservados em sessão no estado sem-rota", async () => {
+    const sessao = sessaoComTresSecoes(1);
+    const chave = chaveItinerario(SERVICO_UUID, "ida");
+    const ponto = sessao.documento.autos.servicos[0].itinerarios[0].rota.pontos_de_rota[0];
+    sessao.pontosDeRotaEmEdicao = { [chave]: [ponto] };
+    sessao.estadosRotaViva = {
+      [chave]: { situacao: "sem-rota", falha: { tipo: "indisponivel" } },
+    };
+
+    const { resultado } = await montarSessaoNaEtapa(sessao, SERVICO_UUID, "ida");
+
+    expect(resultado.container.querySelector('[data-testid="ponto-rota-item"]')).not.toBeNull();
+    expect(resultado.container.querySelector('[data-testid="mensagem-sem-rota"]')).not.toBeNull();
+    resultado.desmontar();
+  });
 });
 
 describe("EtapaItinerarios — descarte de ponto de rota órfão (TASK-083/DEC-068)", () => {
@@ -477,6 +661,11 @@ describe("EtapaItinerarios — Local extremo contextual (TASK-068/DEC-070)", () 
           paradaDeSecao(secaoA.uuid),
         ],
       },
+      pontosDeRotaEmEdicao: {
+        [chaveIda]: [
+          { apos_parada_ordem: 1, latitude: -23.97, longitude: -46.38 },
+        ],
+      },
     };
     const { resultado } = await montarSessaoNaEtapa(sessao, servico.uuid, "ida");
 
@@ -489,6 +678,9 @@ describe("EtapaItinerarios — Local extremo contextual (TASK-068/DEC-070)", () 
     expect(alvoErro?.getAttribute("aria-describedby")).toBeTruthy();
     expect(linhaInvalida?.textContent).toContain("a primeira Parada deve ser uma Seção");
     expect(editorCapturado.props?.locaisInvalidos).toEqual([local.uuid]);
+    const linhaPonto = resultado.container.querySelector('[data-testid="ponto-rota-item"]');
+    expect(linhaPonto).not.toBeNull();
+    expect(linhaPonto?.getAttribute("data-estado")).toBeNull();
 
     act(() => {
       (
