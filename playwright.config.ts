@@ -7,6 +7,13 @@ const baseURL = `http://127.0.0.1:${porta}`;
 export default defineConfig({
   testDir: "testes/e2e",
   fullyParallel: true,
+  // Windows pode esgotar buffer de socket/portas efêmeras sob rajada de
+  // conexões (ERR_NO_BUFFER_SPACE). As retentativas absorvem esse soluço de
+  // rede — um flaky não pinta a suíte inteira de vermelho — sem mascarar bug
+  // real: falha reproduzível continua falhando nas duas retentativas. Com essa
+  // rede de segurança, o paralelismo fica pela velocidade (4 workers).
+  workers: 4,
+  retries: 2,
   reporter: "list",
   use: {
     baseURL,

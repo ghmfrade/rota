@@ -1075,6 +1075,7 @@ A TASK-060 unificou os mapas e pôs a tabela lateral ao lado (DEC-054 / doc 18 �
 - Qualquer regra de OSRM/350 m/montagem/descrição — comportamento preservado; a task só adiciona realce/seleção de UI.
 - Contrato JSON/schema — seleção é estado de UI efêmero, nunca persistido (RN-096).
 - Criação/edição de paradas ou pontos de rota (TASK-060/063).
+- Calcular ou redesenhar o estado inválido de Local em extremo — entregue pela TASK-068/DEC-070; esta task apenas **compõe** a seleção sem apagá-lo.
 
 ## Specs fonte
 
@@ -1102,6 +1103,7 @@ A TASK-060 unificou os mapas e pôs a tabela lateral ao lado (DEC-054 / doc 18 �
 
 - [ ] Clicar numa linha da tabela lateral destaca o marcador correspondente no mapa (cor/realce/`aria-current`).
 - [ ] Clicar num marcador no mapa destaca a linha correspondente na tabela.
+- [ ] Selecionar um Local extremo inválido **não remove nem mascara** o vermelho da linha ou a borda vermelha do marcador (DEC-070); seleção usa canal visual distinto, como contorno/fundo/`aria-current`, e os dois estados são perceptíveis simultaneamente.
 - [ ] A seleção é estado de UI efêmero — não altera o JSON nem dispara recálculo.
 - [ ] E2E existentes verdes sem alterar seletores; testids novos só para o realce/seleção, se houver.
 
@@ -1112,11 +1114,12 @@ A TASK-060 unificou os mapas e pôs a tabela lateral ao lado (DEC-054 / doc 18 �
 ## Casos inválidos
 
 - Selecionar uma parada cujo marcador não existe no sentido atual (ex.: Local unidirecional) → sem realce no mapa, sem erro.
+- Local extremo inválido selecionado → não pode parecer válido nem perder a descrição de RN-035; desselecionar preserva integralmente o estado vermelho.
 
 ## Testes esperados
 
 - Unitários: nenhum novo de regra.
-- Integração: seleção na tabela propaga ao mapa e vice-versa; nenhuma chamada de OSRM disparada pela seleção.
+- Integração: seleção na tabela propaga ao mapa e vice-versa; nenhuma chamada de OSRM disparada pela seleção; seleção + erro RN-035 coexistem sem sobrescrita.
 - E2E: selecionar na tabela e ver o marcador destacado (tiles mockados).
 - Snapshot/contrato JSON: N/A (nada persistido).
 - PDF: N/A.
@@ -1129,12 +1132,14 @@ A TASK-060 unificou os mapas e pôs a tabela lateral ao lado (DEC-054 / doc 18 �
 ## Riscos
 
 - Estado de seleção bidirecional sem loops de atualização; realce de marcador na primitiva do mapa.
+- Colisão visual seleção × erro: a borda vermelha/descrição da DEC-070 tem precedência semântica e precisa permanecer visível.
 - Não regredir os E2E da TASK-060 (seletores preservados).
 
 ## Perguntas em aberto
 
 - Nenhuma (habilitada por DEC-054).
 - **Atenção (2026-07-17):** a **Q-040 foi decidida (DEC-060)** — os pontos de rota entram na tabela lateral, intercalados (TASK-079). A sincronização desta task deve projetar sobre a **lista unificada**; se esta task rodar antes da TASK-079, a 079 herda a obrigação de não quebrar o sync.
+- **Atenção (2026-07-21):** a **Q-049 foi decidida (DEC-070)** — a TASK-068 entrega o estado contextual de Local extremo; seleção deve preservá-lo por composição, nunca reutilizar o vermelho como simples realce.
 
 ---
 
@@ -1439,7 +1444,7 @@ Hoje toda parada criada pelo mapa vai para o **fim** da lista, obrigando o usuá
 
 ---
 
-## TASK-068 — Vocabulário visual dos marcadores do mapa (Seção quadrada 16 px, Local 12 px, vértice ciano 9 px) + degradação do clique posicional sem ancoragem
+## TASK-068 — Vocabulário visual dos marcadores + degradação do clique sem ancoragem + erro contextual de Local em extremo
 
 ## Objetivo
 
@@ -1449,6 +1454,7 @@ Fechar o **vocabulário visual dos três marcadores** do mapa único de itinerá
 - **B. Marcador de Seção** — passa de **círculo azul** para **quadrado azul** de 16 px; a cor não muda.
 - **C. Marcador de Local** — continua **círculo verde**, agora de **12 px** (era 16 px).
 - **D. Clique direito sobre a linha quando não há como ancorar** — deixa de descartar o gesto em silêncio e volta a **acrescentar a parada ao fim**, como manda a DEC-055.
+- **E. Local temporariamente em extremo (DEC-070/Q-049)** — permanece na lista de edição, mas a **linha da tabela lateral correspondente ao Local** fica em estado vermelho com explicação no hover/foco e o **marcador circular verde de 12 px recebe borda vermelha** naquele itinerário/sentido. O aviso geral da TASK-047 permanece; não há OSRM, conclusão/promoção do Serviço nem exportação enquanto a RN-035 persistir.
 
 Depois desta task, forma, cor e tamanho carregam significado independente: **quadrado azul de 16 px = Seção**, **círculo verde de 12 px = Local**, **círculo ciano de 9 px = ponto de rota** — legível mesmo por quem não distingue azul de verde. A hierarquia `9 < 12 < 16` é verificável por teste.
 
@@ -1460,21 +1466,25 @@ Os itens **B** e **C** vêm da **DEC-069** (2026-07-21), que **supera em parte a
 
 O item **D** é a condição de merge registrada em [`14-REVISOES/TASK-067-20260720.md`](../14-REVISOES/TASK-067-20260720.md) (problema 1): com a montagem inválida e a última rota válida ainda desenhada, `prepararInsercaoDeParada` devolve `undefined` (`etapa-itinerarios.tsx:490,499,510`) e os chamadores só retornam — a Seção/Local que o usuário acabou de nomear some sem mensagem, justamente no estado em que criar uma Seção seria a saída. Entra aqui por decisão do responsável (2026-07-21), por ser correção pequena, no mesmo ramo do mapa, e sem task própria que a cubra. **Não é regra nova:** a DEC-055 já fixa "fora da linha → acrescenta ao FIM", e os "Casos inválidos" da TASK-067 já mandam tratar `sem-rota` assim — aqui apenas se estende a mesma degradação ao caso vizinho "há linha desenhada, mas não há como ancorar".
 
+O item **E** foi decidido pelo responsável na **Q-049/DEC-070** (2026-07-21). A montagem incremental pode conter temporariamente um Local no primeiro/último lugar, mas isso **não flexibiliza** a Spec 02 §10.1/RN-035: é estado inválido de edição, não documento válido. A ocorrência precisa ser identificada onde o usuário olha — tabela e mapa — sem depender apenas do aviso geral. O erro é por **Parada naquele itinerário e sentido**, não pela entidade Local globalmente; se o mesmo Local estiver válido no outro sentido, só a ocorrência inválida recebe os realces.
+
 ## Fora de escopo
 
 - **Affordance de hover** sobre a linha (cursor + fantasma) — é a **TASK-069**.
 - **Clique para remover** o vértice — é a **TASK-070**.
 - Qualquer mudança no **contrato JSON**, no ancorador geométrico ou no motor de roteamento.
-- **Cor** do marcador de Seção (segue azul) e **cor** do de Local (segue verde) — só forma e tamanho mudam.
+- **Cor de preenchimento** do marcador de Seção (segue azul) e do Local (segue verde) — a única cor adicional do Local é a borda vermelha quando sua ocorrência viola RN-035 (DEC-070).
 - Marcador **pendente** (âmbar, `COR_MARCADOR_PENDENTE`) e o `forma: "pino"` usado fora do mapa de itinerários — inalterados.
 - Rótulo, popup ou entrada na tabela de paradas para o ponto de rota — proibido por Spec 04 §7.3.
 - Qualquer outra mudança de comportamento do clique posicional além da degradação do item D — a lógica de cálculo do índice, a re-ancoragem e o recálculo ficam como a TASK-067 os entregou.
+- Generalizar o estado vermelho para toda `ViolacaoMontagem`: esta task marca diretamente apenas **Local no primeiro/último lugar** (RN-035); RN-034/RN-036 continuam no aviso geral da TASK-047.
 - Os follow-ups menores 2 a 4 do parecer da TASK-067 (aviso de descarte preso, cobertura E2E de RN-035, comentário de acoplamento) — **não** entram; seguem como follow-up livre.
 
 ## Specs fonte
 
 - Spec 04 §7.3 (regra "Ponto de rota não é Seção, Local nem Parada — visual distinto, vértice pequeno sobre a linha, sem rótulo, sem nome, sem município"; item 2, "insere Seções e Locais em ordem")
 - Spec 04 §7 (mapa único com os três tipos; a spec não fixa aparência nem gesto)
+- Spec 02 §10.1 e §14 (primeira e última Parada são sempre Seção; Local só pode ser intermediário)
 - Spec 03 §3.6 (ponto de rota: definição e propósito único)
 
 ## Regras envolvidas
@@ -1483,11 +1493,12 @@ O item **D** é a condição de merge registrada em [`14-REVISOES/TASK-067-20260
 - RN-076 (padrão de exibição — o vértice **não** recebe rótulo `Cidade - Nome`, ao contrário da Seção)
 - RN-025/031 (Seção e Local são entidades distintas — a distinção visual por forma reforça, não cria, essa separação)
 - RN-052 (a degradação do item D volta a disparar o recálculo que o aborto silencioso suprimia)
-- RN-035 (a parada acrescentada ao fim pode violar o extremo-Seção; o aviso de montagem existente é quem trata — não inventar bloqueio novo)
+- RN-035 (a parada acrescentada ao fim pode violar o extremo-Seção; validação, aviso e gate aplicam a regra já existente — não criar uma RN nova)
+- DEC-070/Q-049 (a ocorrência de Local em extremo permanece editável, mas é identificada na tabela e no mapa e impede conclusão/exportação)
 
 ## Entidades afetadas
 
-- Seção, Local, ponto de rota (só aparência; nem o modelo nem o contrato mudam) — e o gesto de criação pelo mapa, no item D
+- Seção, Local, Parada e ponto de rota (aparência/estado de edição; nem o modelo nem o contrato mudam) — e o gesto de criação pelo mapa, no item D
 
 ## Ferramentas afetadas
 
@@ -1506,15 +1517,22 @@ O item **D** é a condição de merge registrada em [`14-REVISOES/TASK-067-20260
 - [ ] **Hierarquia de tamanho verificada por teste**, não por inspeção visual: `ponto de rota (9) < Local (12) < Seção (16)`.
 - [ ] As três formas são distinguíveis **sem depender da cor** (quadrado × círculo grande × círculo pequeno).
 - [ ] O vértice segue **sem rótulo, sem nome, sem município e fora da tabela de paradas** (Spec 04 §7.3, RN-042) — inalterado.
-- [ ] Clique direito **sobre a linha** num itinerário cuja montagem está inválida (rota antiga ainda desenhada): a Seção/Local criada **entra ao fim da lista**, o recálculo é disparado e a violação de montagem aparece na etapa — **nunca** um descarte silencioso.
+- [ ] Clique direito **sobre a linha** num itinerário cuja montagem está inválida (rota antiga ainda desenhada): a Seção/Local criada **entra ao fim da lista**, o fluxo de recálculo/validação é disparado e a violação de montagem aparece na etapa — **nunca** um descarte silencioso. Se o resultado mantiver um Local no extremo, a validação recusa a montagem antes de chamar o OSRM.
+- [ ] Se o item acrescentado deixar um **Local como primeira ou última Parada**, a linha da tabela lateral correspondente recebe estado de erro com `--color-erro` e explicação disponível no **hover e no foco**, sem depender somente da cor. Mensagem semanticamente equivalente a: “Este Local está no fim do itinerário. Locais (pontos de parada) só podem ocupar posições intermediárias; a última Parada deve ser uma Seção.” Para o primeiro lugar, a redação identifica o início/primeira Parada.
+- [ ] O marcador dessa ocorrência mantém **círculo verde de 12 px** e recebe **borda vermelha**; Seções, pontos de rota e ocorrências válidas do mesmo Local não recebem essa borda.
+- [ ] O aviso geral `avisos-montagem-invalida` da TASK-047 permanece junto do feedback contextual.
+- [ ] Enquanto houver Local em extremo, o OSRM **não é chamado**, o Serviço não é concluído/promovido e a exportação permanece bloqueada; ao inserir/reordenar uma Seção e tornar o Local intermediário, linha e marcador voltam automaticamente ao estado normal.
+- [ ] O bloqueio chega a `coletarPendencias`/gate de exportação como **estado efêmero da sessão ou derivação equivalente**, inclusive quando a última rota/documento válido permanece congelado; não basta manter `violacoesMontagemMapa` local à etapa. Nenhuma pendência entra no JSON (NEG-004).
+- [ ] O estado inválido é isolado por itinerário/sentido; o mesmo Local válido no outro sentido não é marcado como erro.
 - [ ] Clique direito sobre a linha com montagem **válida**: continua inserindo **na posição do trecho** (TASK-067 intacta).
-- [ ] Nenhum `data-testid`/`aria-*` alterado; E2E existentes verdes (DEC-050).
+- [ ] Nenhum `data-testid`/`aria-*` **existente** é alterado; atributos acessíveis aditivos (`aria-invalid`, `aria-describedby` ou equivalente) e testids novos mínimos podem identificar o estado contextual; E2E existentes permanecem verdes (DEC-050).
 - [ ] Zero alteração no contrato JSON, no ancorador ou no motor de roteamento.
 
 ## Casos válidos
 
 - Itinerário com rota calculada, 3 Seções, 1 Local e 2 pontos de rota: quadrados azuis de 16 px nas Seções, círculo verde de 12 px no Local, vértices ciano de 9 px sobre a linha — as três famílias distinguíveis em escala de cinza.
 - Montagem válida + clique direito sobre a linha entre as paradas 2 e 3 → parada nova com `ordem` 3 (comportamento da TASK-067, preservado).
+- Seção A → Local X (inválido, linha vermelha e marcador verde com borda vermelha) → acrescentar Seção B → A/X/B válido, realces removidos e rota recalculada.
 
 ## Casos inválidos
 
@@ -1522,23 +1540,29 @@ O item **D** é a condição de merge registrada em [`14-REVISOES/TASK-067-20260
 - Vértice do tamanho do marcador de parada (ou maior): viola "vértice **pequeno**" (§7.3) e a hierarquia da DEC-057/DEC-069.
 - Local com o mesmo tamanho da Seção, ou Seção redonda: desfaz a distinção por forma/tamanho que é o objetivo da DEC-069.
 - Montagem inválida (ex.: 1 parada só, ou extremo Local) + clique direito sobre a linha ainda desenhada → **não pode** sumir com a entidade criada; acrescenta ao fim e a etapa exibe o motivo da recusa.
+- Local como primeira ou última Parada sem linha/marcador em vermelho, ou com erro indicado somente por cor/hover sem descrição acessível → viola DEC-070.
+- Marcar a entidade Local nos dois sentidos quando só uma ocorrência é extrema → inválido; o estado é por itinerário/sentido.
 - Itinerário sem rota (`sem-rota`) → não há linha, o gesto cai no caminho "fora da linha" como já cai hoje.
 
 ## Testes esperados
 
-- Unitários: `forma`/`tamanho`/`cor` dos três marcadores em `editor-mapa-itinerario.test.tsx` (que já asserta `forma` para Seção, Local e vértice — as asserções de `"circulo"` da Seção mudam para `"quadrado"`); render do `Mapa` com `forma: "quadrado"` produzindo a classe CSS correspondente; hierarquia de tamanho aferida a partir dos tokens, não de números repetidos no teste.
+- Unitários: `forma`/`tamanho`/`cor` dos três marcadores em `editor-mapa-itinerario.test.tsx` (que já asserta `forma` para Seção, Local e vértice — as asserções de `"circulo"` da Seção mudam para `"quadrado"`); render do `Mapa` com `forma: "quadrado"` produzindo a classe CSS correspondente; hierarquia de tamanho aferida a partir dos tokens, não de números repetidos no teste; estado aditivo inválido aplica borda de erro sem trocar o preenchimento verde.
 - Integração: o caso D — montar a etapa com montagem inválida e linha desenhada, disparar `aoCriarLocal`/`aoCriarSecao` **com** `posicaoNaLinha`, e afirmar que a parada foi acrescentada ao fim, que o recálculo ocorreu e que nada foi descartado em silêncio (OSRM mockado). Cobre os três `return undefined` de `prepararInsercaoDeParada`.
-- E2E: N/A para o visual (specs existentes seguem verdes sem tocar seletores). Opcional para o caso D, se couber sem alongar a suíte.
+- Integração/UI: Local no primeiro e no último lugar marca exatamente a linha e o marcador daquele sentido, mantém o aviso geral, não chama OSRM/não promove e expõe descrição acessível; corrigir para posição intermediária remove ambos os realces e permite o recálculo.
+- Pendências/exportação: com última rota válida preservada e `paradasEmEdicao` contendo Local extremo, `coletarPendencias` e `avaliarGateExportacao` retornam bloqueio de RN-035; corrigida a ordem, o bloqueio desaparece. O teste não pode passar apenas porque o documento antigo continua válido.
+- E2E: criar Local ao fim, aferir linha vermelha + explicação, marcador com borda vermelha e bloqueio; acrescentar Seção depois e aferir recuperação. OSRM/tiles sempre mockados.
 - Snapshot/contrato JSON: N/A (não toca contrato).
 - PDF: N/A.
 
 ## Arquivos prováveis
 
-- `docs-dev/18-DESIGN_SYSTEM.md` (§2 Cores — token ciano novo; especificação das três formas de marcador) — **vinculante, entra junto com o código** (DEC-050)
-- `src/app/globals.css` (`@theme` do token; `.marcador-mapa-circulo--pequeno`, tamanho do círculo de Local, classe nova do quadrado)
-- `src/shared/mapa/mapa.tsx` (`forma?: "pino" | "circulo" | "quadrado"` e o criador de elemento correspondente)
+- `docs-dev/18-DESIGN_SYSTEM.md` (§2 Cores — token ciano novo; especificação das três formas e do estado inválido de marcador/linha) — **vinculante, entra junto com o código** (DEC-050/070)
+- `src/app/globals.css` (`@theme` do token; `.marcador-mapa-circulo--pequeno`, tamanho do círculo de Local, classe nova do quadrado e estado de borda inválida)
+- `src/shared/mapa/mapa.tsx` (`forma?: "pino" | "circulo" | "quadrado"`, criador de elemento correspondente e estado visual aditivo de marcador inválido)
 - `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (`COR_MARCADOR_PONTO_DE_ROTA`, `forma`/`tamanho` de Seção e Local)
-- `src/formulario/itinerarios/etapa-itinerarios.tsx` (item D: `prepararInsercaoDeParada` degrada para `inserirParada(paradasAtual, parada)` em vez de devolver `undefined`)
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (item D: fallback para `inserirParada`; item E: detectar Local extremo por sentido e marcar a linha da tabela com `Tooltip`/descrição acessível)
+- `src/formulario/sessao.ts` e/ou `src/formulario/pendencias/pendencias.ts` (tornar a violação de montagem corrente visível ao painel/gate como estado efêmero ou derivação pura; nunca persistir no contrato)
+- `testes/unitarios/formulario/pendencias.test.ts`, `testes/unitarios/formulario/gate-exportacao.test.ts` e `testes/e2e/revisao-exportacao.spec.ts` (bloqueio real apesar da última rota válida e liberação após correção)
 - `testes/unitarios/formulario/editor-mapa-itinerario.test.tsx`, `testes/unitarios/mapa/mapa.test.tsx`, `testes/unitarios/formulario/etapa-itinerarios.test.tsx`
 
 ## Riscos
@@ -1547,15 +1571,19 @@ O item **D** é a condição de merge registrada em [`14-REVISOES/TASK-067-20260
 - **9 px e 12 px ficam próximos.** A diferença Local × vértice é de 3 px; garantir que borda e sombra reforcem a distinção (o vértice já usa borda mais fina e `sombra-1`), sob pena de a hierarquia existir só no CSS e não aos olhos.
 - Quadrado e círculo de mesmo lado/diâmetro parecem tamanhos diferentes ao olho (o quadrado "pesa" mais); ajustar por área percebida, não por número igual.
 - O item D é a única parte com risco de comportamento: cuidado para **não** reintroduzir o append ao fim no caminho em que a ancoragem **funciona** — a TASK-067 tem testes que pegam isso, mantê-los verdes.
+- O vermelho de RN-035 não pode substituir o verde do Local nem depender só de cor/hover; borda, estado da linha e descrição acessível precisam apontar a mesma ocorrência.
+- **Rota válida antiga pode mascarar o rascunho inválido no gate.** O estado/derivação da violação corrente precisa ser consumido por pendências/exportação; testar só o aviso local não atende a DEC-070.
+- A seleção da TASK-064 e o segundo plano por sentido da TASK-076 devem compor com o erro, não sobrescrevê-lo; os critérios dessas tasks foram atualizados pela DEC-070.
 
 ## Dependências
 
 - **DEC-069** (2026-07-21) — ✅ **registrada**; era o que bloqueava os itens B e C (a DEC-054 vigente dizia "marcadores circulares para ambos"). A task está **desbloqueada**.
+- **DEC-070/Q-049** (2026-07-21) — ✅ **registrada**; fixa o tratamento contextual do Local em extremo e as obrigações de preservação nas TASK-079/064/076.
 - TASK-067 (✅ implementada em `b2b3ab7`, aprovada com ressalvas) — o item D é a condição de merge dela.
 
 ## Perguntas em aberto
 
-- Nenhuma. Formas e tamanhos estão fixados pela DEC-069; a cor ciano, pela DEC-057. O **tom exato** do ciano e o **raio de canto** do quadrado são escolha de design sob DEC-050/doc 18, a resolver na implementação sem consulta.
+- Nenhuma. Formas e tamanhos estão fixados pela DEC-069; a cor ciano, pela DEC-057; o tratamento do Local extremo, pela DEC-070/Q-049. O **tom exato** do ciano e o **raio de canto** do quadrado são escolha de design sob DEC-050/doc 18, a resolver na implementação sem consulta.
 
 ---
 
@@ -1567,15 +1595,15 @@ Passar o mouse sobre a linha da rota passa a **mudar o cursor** (deixando de ind
 
 ## Contexto
 
-A Spec 04 §7.3 item 6 manda que clicar sobre a linha crie um vértice, e a TASK-063 entregou o gesto — mas **nada na tela diz que a linha é clicável**: o cursor continua o de pan, e o usuário só descobre o recurso pela frase de ajuda em `dica-gestos-mapa`. O responsável decidiu a affordance na conversa da `/revisar-aderencia` da TASK-063 (**DEC-057**). O caro já está pronto: `projetarNaLinha` ([`src/shared/mapa/ancoragem.ts`](../../src/shared/mapa/ancoragem.ts), TASK-063) devolve a projeção de um ponto qualquer sobre o traçado, e o `Mapa` já faz hit-test na camada `ID_CAMADA_LINHAS` com tolerância de 6 px ([`mapa.tsx`](../../src/shared/mapa/mapa.tsx)). Falta o `mousemove`, o cursor e o marcador de pré-visualização.
+A Spec 04 §7.3 item 6 manda que clicar sobre a linha crie um vértice, e a TASK-063 entregou o gesto — mas **nada na tela diz que a linha é clicável**: o cursor continua o de pan, e o usuário só descobre o recurso pela frase de ajuda em `dica-gestos-mapa`. O responsável decidiu a affordance na conversa da `/revisar-aderencia` da TASK-063 (**DEC-057**). O caro já está pronto: `projetarNaLinha` ([`src/shared/mapa/ancoragem.ts`](../../src/shared/mapa/ancoragem.ts), TASK-063) calcula a projeção de um ponto qualquer sobre o traçado, e o `Mapa` já faz hit-test na camada `ID_CAMADA_LINHAS` com tolerância de 6 px ([`mapa.tsx`](../../src/shared/mapa/mapa.tsx)). Falta expor a coordenada projetada, o `mousemove`, o cursor e o marcador de pré-visualização. A **DEC-072/Q-051** decidiu que fantasma e clique usam essa mesma projeção: o ponto de rota é criado exatamente sobre a linha, no ponto dela mais próximo do clique bruto.
 
 ## Fora de escopo
 
 - **Cor/tamanho** do vértice real — é a **TASK-068** (o fantasma reusa o token de lá; por isso 068 vem antes).
 - **Clique para remover** o vértice — é a **TASK-070**.
-- Criar/mover/remover ponto de rota — comportamento da TASK-063, **inalterado**: esta task só antecipa visualmente onde o clique cairia.
+- Mover/remover ponto de rota — comportamento da TASK-063, **inalterado**. A criação recebe apenas o ajuste estreito da DEC-072: usa a mesma coordenada projetada antecipada pelo fantasma.
 - Affordance do **clique direito** (menu Seção/Local) — é a TASK-065.
-- Qualquer mudança no contrato JSON, no ancorador (`projetarNaLinha` é reusado como está) ou no motor de roteamento.
+- Qualquer mudança no contrato JSON, no ancorador **lógico** (`apos_parada_ordem`) ou no motor de roteamento. Exceção estreita da DEC-072: `projetarNaLinha` ganha, de forma aditiva, a coordenada projetada que hover e clique compartilham.
 - Chamar OSRM no hover — **proibido**: passar o mouse não é editar (RN-052); nenhuma requisição sai de um `mousemove`.
 
 ## Specs fonte
@@ -1589,6 +1617,7 @@ A Spec 04 §7.3 item 6 manda que clicar sobre a linha crie um vértice, e a TASK
 - RN-052 (rota recalculada **ao editar** — hover **não** é edição: zero chamada ao OSRM)
 - RN-042 (o fantasma não é ponto de rota: não existe no modelo, não é persistido, não tem `apos_parada_ordem` gravado)
 - RN-096 / NEG-004 (pré-visualização é estado de UI efêmero, nunca gravado)
+- DEC-072/Q-051 (fantasma e criação usam a mesma coordenada projetada sobre a linha)
 
 ## Entidades afetadas
 
@@ -1605,6 +1634,7 @@ A Spec 04 §7.3 item 6 manda que clicar sobre a linha crie um vértice, e a TASK
 ## Critérios de aceite
 
 - [ ] Com o mouse **sobre a linha** da rota, o cursor muda (deixa de ser o de pan) e um **vértice fantasma** aparece sobre o traçado, na projeção do cursor.
+- [ ] Ao clicar dentro da tolerância da linha, o ponto de rota é criado na **mesma coordenada projetada** mostrada pelo fantasma, não na coordenada bruta do cursor (DEC-072).
 - [ ] Com o mouse **fora da linha**, o cursor volta ao normal e o fantasma **some** — sem resíduo ao sair do mapa (`mouseleave`).
 - [ ] O fantasma é **visualmente distinto** do vértice real (ex.: translucidez) — não confunde "vai criar" com "já existe".
 - [ ] **Nenhuma chamada ao OSRM** é disparada por hover (RN-052) — assert explícito no teste com OSRM mockado.
@@ -1625,7 +1655,7 @@ A Spec 04 §7.3 item 6 manda que clicar sobre a linha crie um vértice, e a TASK
 
 ## Testes esperados
 
-- Unitários: a projeção do cursor sobre o traçado reusa `projetarNaLinha` (já testado na TASK-063 — não reimplementar nem reduplicar); o editor rende o marcador fantasma na posição projetada e o remove ao sair.
+- Unitários: `projetarNaLinha` devolve a coordenada pertencente ao traçado mais próxima do cursor; hover e clique entregam a mesma projeção; o editor rende o marcador fantasma nessa posição e o remove ao sair.
 - Integração: hover não dispara recálculo (contador de chamadas do OSRM mockado permanece em zero).
 - E2E: mover o mouse sobre a linha mostra o fantasma; afastar some (OSRM/tiles mockados).
 - Snapshot/contrato JSON: N/A.
@@ -1634,6 +1664,7 @@ A Spec 04 §7.3 item 6 manda que clicar sobre a linha crie um vértice, e a TASK
 ## Arquivos prováveis
 
 - `src/shared/mapa/mapa.tsx` (`mousemove`/`mouseleave` na camada de linhas, cursor via `getCanvas().style.cursor`, callback aditivo)
+- `src/shared/mapa/ancoragem.ts` (extensão aditiva do retorno com a coordenada projetada — DEC-072)
 - `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (marcador fantasma)
 - `src/app/globals.css` (classe do fantasma) + `docs-dev/18-DESIGN_SYSTEM.md` (especificação do estado de pré-visualização)
 - `src/shared/mapa/ancoragem.ts` — **reusado sem alteração**
@@ -2087,6 +2118,7 @@ Pedido do responsável (2026-07-17), **decidido pela DEC-062**. Hoje `etapa-itin
 - Gestos de criação/menu (DEC-055/TASK-065) e inserção posicional (TASK-067) — inalterados; apenas ganham o alvo de sentido definido pela Q-042.
 - Sincronização seleção tabela↔mapa (TASK-064).
 - Qualquer regra de OSRM/350 m/montagem/descrição; qualquer mudança de contrato.
+- Recalcular a regra de Local extremo — pertence à TASK-068/DEC-070; esta task apenas preserva e separa corretamente o estado já derivado por sentido.
 
 ## Specs fonte
 
@@ -2118,6 +2150,8 @@ Pedido do responsável (2026-07-17), **decidido pela DEC-062**. Hoje `etapa-itin
 - [ ] Gestos sem alvo natural (criar por clique direito, clique na linha) vão para o **sentido ativo** (a aba — DEC-062).
 - [ ] Os dois painéis de descrição (Ida e Volta) aparecem embaixo, cada um com copiar/recalcular/ver estruturado; recalcular um sentido não toca o outro.
 - [ ] Estados `sem-rota`/violações de montagem exibidos por sentido, sem ambiguidade.
+- [ ] Um Local extremo inválido em apenas um sentido mantém a linha vermelha na tabela desse sentido e a borda vermelha somente no marcador correspondente; o marcador do mesmo Local no outro sentido permanece normal quando sua ocorrência for intermediária (DEC-070).
+- [ ] O tratamento de segundo plano/acinzentado do sentido inativo não apaga nem transfere a borda de erro; ao trocar o sentido ativo, a tabela mostra o estado da lista daquele sentido.
 - [ ] Abrir JSON desenha as duas rotas congeladas **sem** chamar OSRM (RN-052/RN-015).
 - [ ] Serviço unidirecional: comportamento equivalente ao atual (um sentido só).
 - [ ] `data-testid`/`aria-*` existentes preservados onde a estrutura sobreviver; mudanças de seletor só as inevitáveis pela remoção das abas, registradas e com E2E atualizados na mesma task.
@@ -2130,11 +2164,12 @@ Pedido do responsável (2026-07-17), **decidido pela DEC-062**. Hoje `etapa-itin
 
 - Ida `recalculada` e Volta `sem-rota` (OSRM mockado): a linha da Ida permanece; a mensagem de falha aparece atribuída à Volta.
 - Ocultar um sentido não dispara recálculo nem altera a sessão.
+- Local intermediário na Ida e extremo na Volta → somente a ocorrência/marcador da Volta fica em erro; ocultar/mostrar sentidos não contamina a Ida.
 
 ## Testes esperados
 
-- Integração: duas linhas passadas ao `<Mapa>` (cheia/tracejada); visibilidade filtra; alvo de gesto por marcador; zero chamada OSRM na abertura (espião ativo, DEC-042).
-- E2E: fluxo bidirecional com os dois sentidos visíveis (OSRM/tiles mockados).
+- Integração: duas linhas passadas ao `<Mapa>` (cheia/tracejada); visibilidade filtra; alvo de gesto por marcador; zero chamada OSRM na abertura (espião ativo, DEC-042); estado inválido de Local isolado por sentido.
+- E2E: fluxo bidirecional com os dois sentidos visíveis e Local inválido em apenas um deles (OSRM/tiles mockados).
 
 ## Arquivos prováveis
 
@@ -2148,10 +2183,11 @@ Pedido do responsável (2026-07-17), **decidido pela DEC-062**. Hoje `etapa-itin
 - **Refator grande** sobre a superfície mais ativa do app; rodar **depois** do ramo pendente do mapa (TASK-064..071) para não retrabalhar.
 - O modelo atual de estado é fortemente indexado por `(servicoUuid, sentido)` — favorece a mudança, mas os handlers assumem "sentido selecionado" único em vários pontos.
 - Tabela lateral: definir na análise se mostra o sentido ativo (recomendado, com a Q-043 tornando a Volta derivada) ou as duas listas.
+- Composição visual por sentido: numeração, segundo plano e erro RN-035 precisam coexistir sem fazer um Local válido parecer inválido.
 
 ## Dependências
 
-- **DEC-062** (decidida — task liberada). Recomendado: após TASK-064..071 e a TASK-079 (lista unificada que a aba rege).
+- **DEC-062** (decidida — task liberada). Recomendado: após TASK-064..071 e a TASK-079 (lista unificada que a aba rege); depende também da TASK-068/DEC-070 para preservar o estado contextual por sentido.
 
 ## Perguntas em aberto
 
@@ -2355,6 +2391,7 @@ A TASK-063 implementou o literal da Spec 04 §7.3 ("sub-lista própria"), mas §
 - O motor de re-ancoragem por mudança de conjunto (inserir/remover parada) — TASK-066 (esta task consome; a 066 já implementa o caso da reordenação conforme a DEC-060).
 - Sobrevivência dos pontos à falha de recálculo (TASK-071) — fonte de dados reusada.
 - Qualquer mudança de contrato.
+- Calcular ou alterar a regra visual de Local em extremo — pertence à TASK-068/DEC-070; esta task deve somente preservar o estado ao reconstruir/intercalar a lista.
 
 ## Specs fonte
 
@@ -2383,6 +2420,7 @@ A TASK-063 implementou o literal da Spec 04 §7.3 ("sub-lista própria"), mas §
 - [ ] Mover uma **parada** pela setinha re-ancora os pontos ultrapassados pela posição na lista (DEC-060 — sem descarte; supera o caso de reordenação da DEC-056), com recálculo.
 - [ ] A `sub-lista-pontos-de-rota` abaixo do mapa deixa de existir **ou** é substituída pela representação nova — sem duplicação.
 - [ ] As paradas mantêm exatamente as ações e `data-testid` atuais (`parada-item`, `parada-mover-cima/baixo`, `parada-remover`).
+- [ ] A linha de um Local extremo mantém o estado vermelho, a explicação no hover/foco e a descrição acessível entregues pela TASK-068/DEC-070 depois que a tabela vira lista unificada; intercalar pontos de rota não desloca o erro para outro item.
 - [ ] Remover uma parada re-intercala os pontos conforme a re-ancoragem vigente (TASK-066) — a lista nunca mostra ponto órfão.
 - [ ] `apos_parada_ordem ∈ [1, paradas−1]` e `trechos == paradas − 1` em todos os caminhos (RN-041/042).
 - [ ] E2E existentes verdes; seletores da sub-lista antiga atualizados de forma deliberada e registrada (`ponto-rota-item`/`remover-ponto-rota` preservados se possível).
@@ -2398,11 +2436,12 @@ A TASK-063 implementou o literal da Spec 04 §7.3 ("sub-lista própria"), mas §
 - Ponto de rota não expõe edição de campos nem rótulo `Cidade - Nome` (asserção negativa — RN-042/076).
 - Itinerário `sem-rota` com pontos preservados na sessão (TASK-071): a lista continua exibindo os pontos (não órfãos do estado).
 - Nenhum movimento pela lista produz `apos_parada_ordem` fora do intervalo (RN-042) — teste de borda nos extremos da lista.
+- Reordenar a lista e deixar um Local no primeiro/último lugar → exatamente a ocorrência extrema fica vermelha; movê-la para posição intermediária remove o estado, sem afetar pontos de rota vizinhos.
 
 ## Testes esperados
 
 - Unitários: função pura de intercalação (paradas + pontos → lista de exibição) e a inversa (posição na lista → `apos_parada_ordem`/índice), casos do §3.6.1 (vários pontos no mesmo trecho), extremos da lista.
-- Integração: renderização intercalada; setinhas e "Remover" da lista disparam recálculo com a lista re-ancorada (OSRM mockado).
+- Integração: renderização intercalada; setinhas e "Remover" da lista disparam recálculo com a lista re-ancorada (OSRM mockado); o estado de Local extremo acompanha a ocorrência correta antes/depois da reordenação.
 - E2E: criar ponto pelo mapa e vê-lo aparecer intercalado na lista; movê-lo pela setinha (OSRM/tiles mockados).
 
 ## Arquivos prováveis
@@ -2415,10 +2454,11 @@ A TASK-063 implementou o literal da Spec 04 §7.3 ("sub-lista própria"), mas §
 
 - Interação com a TASK-064 (sync tabela↔mapa): se a 064 rodar antes, esta task não pode quebrar o sync; se rodar depois, a 064 já projeta sobre a lista unificada (ver nota na TASK-064).
 - Interação com a TASK-071: a fonte dos pontos exibidos passa a ser o estado de sessão (DEC-058) — exibir da fonte certa.
+- Interação com a TASK-068/DEC-070: a lista unificada não pode perder tooltip/descrição nem aplicar o vermelho a um ponto de rota intercalado.
 
 ## Dependências
 
-- **DEC-060** (decidida — task liberada). TASK-063 (entregue). **TASK-066** (a re-ancoragem por posição que as setinhas consomem) e **TASK-071** (fonte de dados) antes; coordenada com a TASK-064.
+- **DEC-060** (decidida — task liberada). TASK-063 (entregue). **TASK-066** (a re-ancoragem por posição que as setinhas consomem), **TASK-071** (fonte de dados) e **TASK-068/DEC-070** (estado contextual de Local extremo) antes; coordenada com a TASK-064.
 
 ## Perguntas em aberto
 
@@ -3695,13 +3735,13 @@ ownership do servidor, timeout, cleanup, log canônico e uso tanto por
 **Correções da etapa de itinerários (mapa/rota — Spec 04 §7; descobertas na revisão da TASK-055):**
 
 ```text
-059 → 060 → 063 → 065 → 071 → 066 → 067
-                  ├→ 064
-                  └→ 068 → 069 → 070
+059 → 060 → 063 → 065 → 071 → 066 → 067 → 068 → 069
+063 → 070
+068 → 079 → 064
 ```
 
-- TASK-063 (gesto de ponto de rota) e TASK-064 (sync tabela↔mapa) foram deferidas da TASK-060 por DEC-054 — dependem da TASK-060 (mapa único) e podem seguir em qualquer ordem entre si.
-- TASK-068/069/070 vêm da **DEC-057** (decisão do responsável na revisão da TASK-063): identidade visual ciano do vértice, affordance de hover sobre a linha e clique-para-remover **exclusivo do ponto de rota** (Seção/Local só saem pela tabela lateral). Dependem só da TASK-063 (entregue) e não bloqueiam nem são bloqueadas pela TASK-065; a ordem 068 → 069 existe porque o vértice fantasma da 069 reusa o token de cor que a 068 cria.
+- TASK-063 (gesto de ponto de rota) e TASK-064 (sync tabela↔mapa) foram deferidas da TASK-060 por DEC-054. A TASK-064 agora roda **depois da TASK-079**, para projetar sobre a lista unificada e preservar o estado de erro da DEC-070.
+- TASK-068/069/070 nasceram da **DEC-057** (identidade visual ciano do vértice, hover e clique-para-remover). A **TASK-068 foi ampliada**: depende também da TASK-067 e das DEC-069/070; implementa o fallback sem ancoragem e o erro contextual de Local em extremo. A ordem `068 → 069` permanece porque o fantasma da 069 reusa seu token; a TASK-070 continua independente da 068. A DEC-070 acrescenta a trava `068 → 079 → 064` e obriga a TASK-076 a preservar o erro por sentido.
 - TASK-071 vem da **DEC-058** (Q-038 decidida): os pontos de rota da sessão sobrevivem a um recálculo que falha. **Precede a TASK-066** — as duas tocam a reaplicação dos pontos, e re-ancorar (066) uma lista que evapora numa falha seria construir sobre areia.
 - TASK-065/066/067 vêm da **DEC-055** (Q-036), que superou em parte a DEC-054 invertendo os botões do mouse: esquerdo sobre a linha cria ponto de rota, direito abre menu Seção/Local. Todas dependem do **ancorador geométrico** entregue pela TASK-063. A **DEC-056** (Q-037) fixou a re-ancoragem dos pontos de rota e liberou TASK-066/067 — nenhuma task deste ramo está bloqueada.
 
