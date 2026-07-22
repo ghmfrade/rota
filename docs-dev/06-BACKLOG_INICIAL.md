@@ -3803,6 +3803,97 @@ Reportado pelo responsável (2026-07-22): a tabela atual (`src/formulario/itiner
 
 ---
 
+## TASK-092 — Setas de mover lado a lado na tabela lateral + testes-guarda pendentes da revisão da TASK-091
+
+## Objetivo
+
+As setas ↑/↓ da coluna "Mover" da tabela lateral de itinerários passam a ficar **lado a lado, sem quebrar para baixo**, devolvendo à linha a altura de um único botão compacto. No mesmo ciclo, entram os dois testes-guarda deixados como follow-up pelo parecer da TASK-091: (a) asserção de integração das quatro colunas/vocabulário de "Tipo"/`aria-label` do "X"; (b) desseleção sobre linha de Local extremo preserva o estado vermelho.
+
+## Contexto
+
+Reportado pelo responsável (2026-07-22), após o fechamento do ciclo da TASK-091: os contêineres das setas usam `flex flex-wrap gap-1` (`src/formulario/itinerarios/etapa-itinerarios.tsx:913` e `:1026`) — o `flex-wrap` era útil quando a célula "Ações" reunia três botões (layout anterior à 091), mas na coluna estreita "Mover" faz a segunda seta quebrar para baixo, dobrando a altura da linha e contrariando o objetivo de linhas compactas da DEC-073. Os testes-guarda vêm dos problemas 1 e 2 de `docs-dev/14-REVISOES/TASK-091-20260722.md` (o segundo herdado da ressalva 2 de `14-REVISOES/TASK-064-20260722.md`).
+
+## Fora de escopo
+
+- Qualquer mudança nas decisões da DEC-073 já implementadas: colunas, vocabulário de "Tipo", densidade/zebra (`densidade="compacta"`), tamanho dos botões, precedência de canais — nada disso é rediscutido.
+- Tokens globais, outras tabelas do app, `docs-dev/18-DESIGN_SYSTEM.md` (a entrada da tabela lateral já está registrada; um ajuste de `wrap` não altera contrato visual).
+- Handlers, `data-testid`, `aria-*`, regras de desabilitar, motores de montagem/rota/OSRM — intocáveis.
+- Sincronização tabela↔mapa (TASK-064) — apenas testada, não alterada.
+- Contrato JSON/schema (RN-096; nada persistido).
+
+## Specs fonte
+
+- Spec 04 §7/§7.3 (tabela lateral de paradas na etapa de itinerários)
+- doc 18 §3/§5 (componentes `Botao`/`Tabela` e entrada da tabela lateral — vinculante, DEC-050/073)
+
+## Regras envolvidas
+
+- RN-025 / RN-031 (vocabulário da coluna "Tipo": `Seção` / `Local de parada` — alvo do teste-guarda)
+- RN-042 (ponto de rota: célula Tipo vazia, "Ponto de Rota N (lat, long)", nunca `parada-item` — alvo do teste-guarda)
+- RN-035 + DEC-070 (estado vermelho de Local extremo que a desseleção deve preservar)
+- RN-096 (seleção/desseleção é estado de UI efêmero; nada persistido, zero OSRM)
+
+## Entidades afetadas
+
+- Seção, Local, ponto de rota (só apresentação/testes; sem mudança de modelo)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] As setas ↑/↓ ficam na mesma linha horizontal dentro da célula "Mover" (sem wrap), tanto em linha de Parada quanto de ponto de rota, e a linha volta à altura de um único botão compacto.
+- [ ] Teste de integração afere os quatro cabeçalhos (`Cidade - Nome` · Tipo · Mover · Remover), o vocabulário da coluna Tipo (`Seção`, `Local de parada`, célula vazia para ponto de rota) e o `aria-label="Remover …"` do "X".
+- [ ] Teste de integração prova que desselecionar a linha de Local extremo (segundo clique) remove `aria-current`/`bg-azul-100` e **preserva** `data-estado="local-extremo"`, `text-erro` e `aria-invalid` — sem chamada OSRM.
+- [ ] Nenhum `data-testid`/`aria-*`/handler alterado; E2E existentes verdes sem alterar seletores.
+- [ ] Nenhuma chamada OSRM disparada pelos ajustes (fetch mockado com contagem).
+
+## Casos válidos
+
+- Lista com 3 paradas + 1 ponto de rota → cada célula "Mover" exibe ↑ e ↓ lado a lado; a altura da linha é a de um botão `compacto` único.
+- Linha de Local extremo selecionada e depois desselecionada → vermelho (texto/borda/`aria-invalid`) intacto nos dois estados.
+
+## Casos inválidos
+
+- Wrap reintroduzido (setas empilhadas) → recusado pelo critério 1.
+- Desseleção que apague `data-estado`/`aria-invalid` da linha inválida → recusado (teste do critério 3).
+- Regressão de coluna/vocabulário/`aria-label` → recusado (teste-guarda do critério 2).
+
+## Testes esperados
+
+- Unitários: nenhum novo de regra (ajuste de apresentação).
+- Integração (jsdom, padrão de `etapa-itinerarios.test.tsx`, OSRM mockado): os dois testes-guarda dos critérios 2 e 3; asserção de ausência de `flex-wrap` (ou presença de `flex-nowrap`) nos contêineres das setas.
+- E2E: existentes verdes sem alterar seletores (nenhum cenário novo).
+- Snapshot/contrato JSON: N/A (nada persistido).
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (dois contêineres `flex flex-wrap gap-1` → sem wrap)
+- `testes/unitarios/formulario/etapa-itinerarios.test.tsx` (testes-guarda novos)
+
+## Dependências
+
+- **TASK-091** (entregue — `f1eca46`, parecer aprovado com ressalvas) — é o layout que esta task ajusta e cujos follow-ups absorve.
+- **TASK-064** (entregue) — o gesto de seleção/desseleção que o teste do critério 3 exercita.
+- Nenhuma Q-xxx pendente.
+
+## Riscos
+
+- Baixo. O `flex-wrap` atual também protege contra overflow em célula muito estreita: com `nowrap`, conferir que o wrapper `overflow-x-auto` da `Tabela` absorve o excesso em viewport estreita, sem estourar o layout da coluna lateral.
+- Teste de desseleção depende da ordem de eventos do jsdom (dois cliques na mesma linha) — seguir o padrão do teste de toggle já existente (`etapa-itinerarios.test.tsx:757`).
+
+## Perguntas em aberto
+
+- Nenhuma.
+
+---
+
 ## Ordem recomendada de execução
 
 ```text
