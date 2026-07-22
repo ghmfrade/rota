@@ -75,4 +75,49 @@ describe("Tabela", () => {
     );
     desmontar();
   });
+
+  it("densidade padrão (default) não emite as classes da variante compacta (DEC-073/TASK-091)", () => {
+    const { container, desmontar } = renderizar(
+      <Tabela>
+        <thead>
+          <tr>
+            <th>Seção</th>
+          </tr>
+        </thead>
+        <tbody />
+      </Tabela>,
+    );
+    const tabela = container.querySelector("table")!;
+    expect(tabela.className).toContain(
+      '[&_tbody_tr:nth-child(even):not([aria-current="true"])]:bg-cinza-50',
+    );
+    expect(tabela.className).not.toContain(
+      '[&_tbody_tr:nth-child(even):not([aria-current="true"])]:bg-cinza-100',
+    );
+    expect(tabela.className).not.toContain("[&_td]:py-1.5");
+    desmontar();
+  });
+
+  it('densidade="compacta" aplica zebra de maior contraste e células mais baixas, preservando a exclusão da linha selecionada', () => {
+    const { container, desmontar } = renderizar(
+      <Tabela densidade="compacta" data-testid="tabela-compacta">
+        <thead>
+          <tr>
+            <th>Cidade - Nome</th>
+          </tr>
+        </thead>
+        <tbody />
+      </Tabela>,
+    );
+    const tabela = container.querySelector("table")!;
+    expect(tabela.className).toContain(
+      '[&_tbody_tr:nth-child(even):not([aria-current="true"])]:bg-cinza-100',
+    );
+    expect(tabela.className).toContain(
+      '[&_tbody_tr:hover:not([aria-current="true"])]:bg-azul-50',
+    );
+    expect(tabela.className).toContain("[&_td]:py-1.5");
+    expect(tabela.className).not.toContain("bg-cinza-50 ");
+    desmontar();
+  });
 });

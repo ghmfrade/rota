@@ -11,16 +11,19 @@
 import type { ButtonHTMLAttributes, ComponentProps } from "react";
 
 export type VarianteBotao = "primario" | "secundario" | "perigo" | "fantasma";
+export type TamanhoBotao = "padrao" | "compacto";
 
 export interface BotaoProps extends ComponentProps<"button"> {
   variante?: VarianteBotao;
+  /** Tamanho visual (DEC-073/TASK-091) — variante por prop, nunca por `className` (doc 18 §4). */
+  tamanho?: TamanhoBotao;
 }
 
 const CLASSES_BASE =
   "inline-flex items-center justify-center gap-2 rounded-controle text-sm font-medium " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-azul-300 " +
   "disabled:opacity-50 disabled:cursor-not-allowed " +
-  "px-4 py-2 [transition:all_var(--transicao-rapida)]";
+  "[transition:all_var(--transicao-rapida)]";
 
 const CLASSES_POR_VARIANTE: Record<VarianteBotao, string> = {
   primario:
@@ -33,14 +36,25 @@ const CLASSES_POR_VARIANTE: Record<VarianteBotao, string> = {
   fantasma: "border-0 bg-transparent text-cinza-700 hover:bg-cinza-100",
 };
 
+const CLASSES_POR_TAMANHO: Record<TamanhoBotao, string> = {
+  padrao: "px-4 py-2",
+  compacto: "px-2 py-1",
+};
+
 /** Botão de ação do formulário/comparador, nas 4 variantes do doc 18 §3. */
 export function Botao({
   variante = "secundario",
+  tamanho = "padrao",
   type = "button" as ButtonHTMLAttributes<HTMLButtonElement>["type"],
   className,
   ...props
 }: BotaoProps) {
-  const classes = [CLASSES_BASE, CLASSES_POR_VARIANTE[variante], className]
+  const classes = [
+    CLASSES_BASE,
+    CLASSES_POR_VARIANTE[variante],
+    CLASSES_POR_TAMANHO[tamanho],
+    className,
+  ]
     .filter(Boolean)
     .join(" ");
 

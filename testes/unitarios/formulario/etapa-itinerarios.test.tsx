@@ -255,7 +255,7 @@ describe("EtapaItinerarios — lista lateral intercalada (TASK-079/DEC-060)", ()
     expect(resultado.container.querySelector('[data-testid="sub-lista-pontos-de-rota"]')).toBeNull();
 
     const linhaPonto = tabela.querySelector('[data-testid="ponto-rota-item"]')!;
-    expect(linhaPonto.textContent).toContain("Ponto de rota 1");
+    expect(linhaPonto.textContent).toContain("Ponto de Rota 1");
     expect(linhaPonto.textContent).not.toContain("Santos -");
     expect(linhaPonto.querySelector("input, select, textarea")).toBeNull();
     expect(linhaPonto.querySelector('[data-testid="remover-ponto-rota"]')).not.toBeNull();

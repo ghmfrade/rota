@@ -868,11 +868,13 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
                   estreita), o teto próprio `max-h-[60vh]` mantém a rolagem
                   funcional mesmo sem a coluna ter altura fixa. */}
               <div className="min-h-0 flex-1 overflow-y-auto max-h-[60vh] lg:max-h-none">
-                <Tabela data-testid="tabela-paradas">
+                <Tabela data-testid="tabela-paradas" densidade="compacta">
                   <thead>
                     <tr>
-                      <th scope="col">Item do itinerário</th>
-                      <th scope="col">Ações</th>
+                      <th scope="col">Cidade - Nome</th>
+                      <th scope="col">Tipo</th>
+                      <th scope="col">Mover</th>
+                      <th scope="col">Remover</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -880,6 +882,7 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
                       if (item.tipo === "ponto-de-rota") {
                         const chaveSelecaoPonto = chaveSelecaoDoPontoDeRota(item.indicePonto);
                         const pontoSelecionado = selecao?.chave === chaveSelecaoPonto;
+                        const rotuloPonto = `Ponto de Rota ${item.numeroNaTravessia}`;
                         return (
                           <tr
                             key={`ponto-de-rota-${item.indicePonto}`}
@@ -899,18 +902,18 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
                             }`}
                           >
                             <td>
-                              <span className="font-semibold">
-                                Ponto de rota {item.numeroNaTravessia}
-                              </span>{" "}
+                              <span className="font-semibold">{rotuloPonto}</span>{" "}
                               <span className="text-xs text-cinza-500">
                                 ({item.ponto.latitude.toFixed(5)},{" "}
                                 {item.ponto.longitude.toFixed(5)})
                               </span>
                             </td>
+                            <td />
                             <td>
-                              <div className="flex flex-wrap gap-2">
+                              <div className="flex flex-wrap gap-1">
                                 <Botao
                                   variante="secundario"
+                                  tamanho="compacto"
                                   data-testid="ponto-rota-mover-cima"
                                   disabled={
                                     !podeMoverPontoDeRotaNaLista(
@@ -928,6 +931,7 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
                                 </Botao>
                                 <Botao
                                   variante="secundario"
+                                  tamanho="compacto"
                                   data-testid="ponto-rota-mover-baixo"
                                   disabled={
                                     !podeMoverPontoDeRotaNaLista(
@@ -943,14 +947,18 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
                                 >
                                   ↓
                                 </Botao>
-                                <Botao
-                                  variante="secundario"
-                                  data-testid="remover-ponto-rota"
-                                  onClick={() => aoRemoverPontoDeRota(item.indicePonto)}
-                                >
-                                  Remover
-                                </Botao>
                               </div>
+                            </td>
+                            <td>
+                              <Botao
+                                variante="fantasma"
+                                tamanho="compacto"
+                                data-testid="remover-ponto-rota"
+                                aria-label={`Remover ${rotuloPonto}`}
+                                onClick={() => aoRemoverPontoDeRota(item.indicePonto)}
+                              >
+                                ✕
+                              </Botao>
                             </td>
                           </tr>
                         );
@@ -971,6 +979,7 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
                               const local = linhaAtual.locais.find((l) => l.uuid === parada.localUuid);
                               return local ? nomeExibicaoLocal(local) : parada.localUuid;
                             })();
+                      const tipoParada = parada.tipo === "secao" ? "Seção" : "Local de parada";
                       const chaveSelecaoParada = chaveSelecaoDaParada(parada);
                       const paradaSelecionada = selecao?.chave === chaveSelecaoParada;
                       return (
@@ -1012,10 +1021,12 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
                               <span data-testid="parada-rotulo">{rotulo}</span>
                             )}
                           </td>
+                          <td>{tipoParada}</td>
                           <td>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-1">
                               <Botao
                                 variante="secundario"
+                                tamanho="compacto"
                                 data-testid="parada-mover-cima"
                                 disabled={indice === 0}
                                 onClick={() => moverParada(indice, indice - 1)}
@@ -1024,20 +1035,25 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
                               </Botao>
                               <Botao
                                 variante="secundario"
+                                tamanho="compacto"
                                 data-testid="parada-mover-baixo"
                                 disabled={indice === paradasAtual.length - 1}
                                 onClick={() => moverParada(indice, indice + 1)}
                               >
                                 ↓
                               </Botao>
-                              <Botao
-                                variante="secundario"
-                                data-testid="parada-remover"
-                                onClick={() => removerParadaNaTabela(indice)}
-                              >
-                                Remover
-                              </Botao>
                             </div>
+                          </td>
+                          <td>
+                            <Botao
+                              variante="fantasma"
+                              tamanho="compacto"
+                              data-testid="parada-remover"
+                              aria-label={`Remover ${rotulo}`}
+                              onClick={() => removerParadaNaTabela(indice)}
+                            >
+                              ✕
+                            </Botao>
                           </td>
                         </tr>
                       );

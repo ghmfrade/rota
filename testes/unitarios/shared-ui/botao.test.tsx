@@ -102,4 +102,31 @@ describe("Botao", () => {
     expect(aoClicar).toHaveBeenCalledTimes(1);
     desmontar();
   });
+
+  it("usa o tamanho padrão (px-4 py-2) quando a prop não é informada", () => {
+    const { container, desmontar } = renderizar(<Botao>Salvar</Botao>);
+    const botao = container.querySelector("button")!;
+    expect(botao.className).toContain("px-4");
+    expect(botao.className).toContain("py-2");
+    desmontar();
+  });
+
+  it("aplica o tamanho compacto (DEC-073/TASK-091) sem alterar variante/handlers", () => {
+    const aoClicar = vi.fn();
+    const { container, desmontar } = renderizar(
+      <Botao tamanho="compacto" variante="fantasma" onClick={aoClicar} data-testid="botao-x">
+        ✕
+      </Botao>,
+    );
+    const botao = container.querySelector(
+      '[data-testid="botao-x"]',
+    ) as HTMLButtonElement;
+    expect(botao.className).toContain("px-2");
+    expect(botao.className).toContain("py-1");
+    expect(botao.className).not.toContain("px-4");
+    expect(botao.className).toContain("hover:bg-cinza-100");
+    botao.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(aoClicar).toHaveBeenCalledTimes(1);
+    desmontar();
+  });
 });
