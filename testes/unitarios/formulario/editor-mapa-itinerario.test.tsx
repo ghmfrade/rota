@@ -20,6 +20,7 @@ interface PropsMapaCapturadas {
   linhas?: readonly LinhaMapa[];
   aoClicar?: (p: Coordenada) => void;
   aoClicarNaLinha?: (p: Coordenada) => void;
+  aoMoverSobreLinha?: (p: Coordenada | null) => void;
   aoClicarDireito?: (p: Coordenada, ancora: AncoraTelaMapa) => void;
   aoClicarDireitoNaLinha?: (p: Coordenada, ancora: AncoraTelaMapa) => void;
 }
@@ -353,6 +354,47 @@ describe("EditorMapaItinerario — gesto de ponto de rota (TASK-063; Spec 04 §7
     expect(aoCriarPontoDeRota).not.toHaveBeenCalled();
     expect(container.querySelector('[data-testid="form-criar-secao"]')).toBeNull();
     expect(container.querySelector('[data-testid="form-criar-local"]')).toBeNull();
+    desmontar();
+  });
+
+  it("TASK-069: hover compõe o fantasma na projeção sem criar ponto de rota", () => {
+    const linha: LinhaMapa = { id: "rota-ativa", pontos: [P0_COORD, P_LONGE] };
+    const { aoCriarPontoDeRota, desmontar } = montar({ linhaRota: linha });
+    const projetada: Coordenada = { lng: -50, lat: -22.55 };
+
+    act(() => capturado.props?.aoMoverSobreLinha?.(projetada));
+
+    const fantasma = (capturado.props?.marcadores ?? []).find(
+      (marcador) => marcador.id === "ponto-rota-fantasma",
+    );
+    expect(fantasma).toMatchObject({
+      posicao: projetada,
+      forma: "circulo",
+      tamanho: "pequeno",
+      cor: COR_PONTO_DE_ROTA,
+      fantasma: true,
+    });
+    expect(fantasma?.arrastavel).not.toBe(true);
+    expect(aoCriarPontoDeRota).not.toHaveBeenCalled();
+
+    act(() => capturado.props?.aoMoverSobreLinha?.(null));
+    expect(
+      (capturado.props?.marcadores ?? []).find(
+        (marcador) => marcador.id === "ponto-rota-fantasma",
+      ),
+    ).toBeUndefined();
+    desmontar();
+  });
+
+  it("[inválido] sem linhaRota não habilita hover nem mostra fantasma", () => {
+    const { desmontar } = montar();
+
+    expect(capturado.props?.aoMoverSobreLinha).toBeUndefined();
+    expect(
+      (capturado.props?.marcadores ?? []).some(
+        (marcador) => marcador.id === "ponto-rota-fantasma",
+      ),
+    ).toBe(false);
     desmontar();
   });
 

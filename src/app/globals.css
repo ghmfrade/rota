@@ -35,6 +35,7 @@
   --spacing-marcador-secao: 16px;
   --spacing-marcador-local: 12px;
   --spacing-marcador-ponto-rota: 9px;
+  --opacity-marcador-fantasma: 0.55;
 
   /* Sombras */
   --shadow-sombra-1: 0 1px 2px rgb(15 23 42 / 0.06);
@@ -99,6 +100,12 @@
 /* Erro contextual aditivo: preserva forma e preenchimento do Local. */
 .marcador-mapa--invalido {
   border-color: var(--color-erro);
+}
+
+/* Pré-visualização efêmera do ponto de rota (TASK-069/DEC-072). */
+.marcador-mapa--fantasma {
+  opacity: var(--opacity-marcador-fantasma);
+  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

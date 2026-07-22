@@ -16,6 +16,8 @@ const paraPonto = (c: Coordenada): Ponto => ({ latitude: c.lat, longitude: c.lng
  * do traçado até o ponto mais próximo da polilinha, e a distância
  * perpendicular (afastamento) até esse ponto. */
 export interface ProjecaoNaLinha {
+  /** Coordenada pertencente ao traçado mais próxima do ponto informado. */
+  posicao: Coordenada;
   distanciaAoLongoM: number;
   distanciaPerpendicularM: number;
 }
@@ -55,7 +57,11 @@ export function projetarNaLinha(
     const distanciaAoLongo = distanciaAcumulada + t * comprimentoSegmento;
 
     if (!melhor || distanciaPerpendicular < melhor.distanciaPerpendicularM) {
-      melhor = { distanciaAoLongoM: distanciaAoLongo, distanciaPerpendicularM: distanciaPerpendicular };
+      melhor = {
+        posicao: projetado,
+        distanciaAoLongoM: distanciaAoLongo,
+        distanciaPerpendicularM: distanciaPerpendicular,
+      };
     }
 
     distanciaAcumulada += comprimentoSegmento;

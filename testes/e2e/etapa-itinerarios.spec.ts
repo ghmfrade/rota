@@ -384,7 +384,60 @@ test.describe("TASK-068 — vocabulário visual e Local extremo contextual", () 
   });
 });
 
-test.describe("Etapa Seções, Locais e Itinerários — gesto de ponto de rota (TASK-063)", () => {
+test.describe("Etapa Seções, Locais e Itinerários — hover da linha (TASK-069)", () => {
+  test("mostra o fantasma projetado, limpa fora/ao sair e não chama OSRM", async ({
+    page,
+  }) => {
+    let chamadasOsrm = 0;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamadasOsrm += 1;
+      return rota.abort();
+    });
+    await abrirEtapaVolta(page);
+
+    const mapa = page.getByTestId("mapa-base");
+    await mapa.scrollIntoViewIfNeeded();
+    const marcadores = mapa.locator(
+      ".maplibregl-marker:not(.marcador-mapa--fantasma)",
+    );
+    await expect(marcadores).toHaveCount(3);
+
+    const caixaA = await marcadores.nth(0).boundingBox();
+    const caixaB = await marcadores.nth(1).boundingBox();
+    const caixaMapa = await mapa.boundingBox();
+    if (!caixaA || !caixaB || !caixaMapa) throw new Error("mapa/marcador sem bounding box");
+    const meio = {
+      x: (caixaA.x + caixaA.width / 2 + caixaB.x + caixaB.width / 2) / 2,
+      y: (caixaA.y + caixaA.height / 2 + caixaB.y + caixaB.height / 2) / 2,
+    };
+
+    await page.mouse.move(meio.x, meio.y);
+    const fantasma = mapa.locator(".marcador-mapa--fantasma");
+    await expect(fantasma).toHaveCount(1);
+    await expect(fantasma).toHaveClass(/marcador-mapa--pequeno/);
+    await expect
+      .poll(() => mapa.locator("canvas").evaluate((canvas) => canvas.style.cursor))
+      .toBe("pointer");
+    expect(chamadasOsrm).toBe(0);
+
+    const foraY =
+      meio.y + 50 < caixaMapa.y + caixaMapa.height ? meio.y + 50 : meio.y - 50;
+    await page.mouse.move(meio.x, foraY);
+    await expect(fantasma).toHaveCount(0);
+    await expect
+      .poll(() => mapa.locator("canvas").evaluate((canvas) => canvas.style.cursor))
+      .toBe("");
+    expect(chamadasOsrm).toBe(0);
+
+    await page.mouse.move(meio.x, meio.y);
+    await expect(fantasma).toHaveCount(1);
+    await mapa.dispatchEvent("mouseleave");
+    await expect(fantasma).toHaveCount(0);
+    expect(chamadasOsrm).toBe(0);
+  });
+});
+
+test.describe("Etapa Seções, Locais e Itinerários — gesto de ponto de rota (TASK-063/069)", () => {
   test("clicar SOBRE a linha da rota cria um ponto de rota (não uma Seção) e recalcula", async ({
     page,
   }) => {
@@ -651,7 +704,9 @@ test.describe("Etapa Seções, Locais e Itinerários — feedback de montagem in
     // O clique direito é feito SOBRE a linha: o hit-test da TASK-065 agora
     // escolhe o caminho posicional da TASK-067.
     const mapa = page.getByTestId("mapa-base");
-    const marcadores = mapa.locator(".maplibregl-marker");
+    const marcadores = mapa.locator(
+      ".maplibregl-marker:not(.marcador-mapa--fantasma)",
+    );
     await marcadores.first().waitFor();
     await expect(mapa).toBeVisible();
     await mapa.scrollIntoViewIfNeeded();

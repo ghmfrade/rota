@@ -33,6 +33,15 @@ describe("projetarNaLinha", () => {
     expect(projecaoFim?.distanciaAoLongoM).toBeGreaterThan(projecaoMeio!.distanciaAoLongoM);
   });
 
+  it("DEC-072: devolve o ponto pertencente à linha mais próximo do cursor", () => {
+    const cursorForaDaLinha: Coordenada = { lng: -45.99, lat: -23.25 };
+    const projecao = projetarNaLinha(cursorForaDaLinha, LINHA);
+
+    expect(projecao?.posicao.lng).toBeCloseTo(-46, 8);
+    expect(projecao?.posicao.lat).toBeCloseTo(-23.25, 8);
+    expect(projecao?.distanciaPerpendicularM).toBeGreaterThan(0);
+  });
+
   it("[inválido] linha degenerada (< 2 pontos) devolve undefined", () => {
     expect(projetarNaLinha(A, [])).toBeUndefined();
     expect(projetarNaLinha(A, [A])).toBeUndefined();

@@ -133,6 +133,10 @@ export function EditorMapaItinerario({
   const [criacaoPendente, definirCriacaoPendente] = useState<CriacaoPendente | null>(null);
   const [menuCriacao, definirMenuCriacao] = useState<MenuCriacaoPendente | null>(null);
   const [nomeNovo, definirNomeNovo] = useState("");
+  const [preVisualizacao, definirPreVisualizacao] = useState<{
+    linha: LinhaMapa;
+    posicao: Coordenada;
+  } | null>(null);
 
   const marcadoresSecoes: MarcadorMapa[] = secoes.flatMap((secao) => {
     const entrada = secao.servicos.find((s) => s.servico_uuid === servicoUuid);
@@ -190,6 +194,22 @@ export function EditorMapaItinerario({
     arrastavel: true,
     aoArrastar: (posicao: Coordenada) => aoMoverPontoDeRota?.(indice, posicao),
   }));
+
+  const marcadorFantasma: MarcadorMapa[] =
+    linhaRota &&
+    aoCriarPontoDeRota &&
+    preVisualizacao?.linha === linhaRota
+      ? [
+          {
+            id: "ponto-rota-fantasma",
+            posicao: preVisualizacao.posicao,
+            forma: "circulo",
+            tamanho: "pequeno",
+            cor: COR_MARCADOR_PONTO_DE_ROTA,
+            fantasma: true,
+          },
+        ]
+      : [];
 
   function iniciarCriacao(
     tipo: "secao" | "local",
@@ -353,9 +373,18 @@ export function EditorMapaItinerario({
             ...marcadoresLocais,
             ...marcadorPendente,
             ...marcadoresPontosDeRota,
+            ...marcadorFantasma,
           ]}
           linhas={linhaRota ? [linhaRota] : []}
           aoClicarNaLinha={aoCriarPontoDeRota}
+          aoMoverSobreLinha={
+            linhaRota && aoCriarPontoDeRota
+              ? (posicao) =>
+                  definirPreVisualizacao(
+                    posicao ? { linha: linhaRota, posicao } : null,
+                  )
+              : undefined
+          }
           aoClicarDireito={(posicao, ancoraTela) =>
             abrirMenuCriacao(posicao, ancoraTela, false)
           }

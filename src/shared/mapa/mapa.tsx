@@ -27,6 +27,7 @@ import {
   type Coordenada,
   type LinhaMapa,
 } from "./geometria";
+import { projetarNaLinha } from "./ancoragem";
 
 export type { Coordenada, LinhaMapa } from "./geometria";
 
@@ -57,6 +58,8 @@ export interface MarcadorMapa {
   tamanho?: "normal" | "medio" | "pequeno";
   /** Estado visual aditivo de erro da ocorrência, sem trocar forma/preenchimento. */
   invalido?: boolean;
+  /** Pré-visualização efêmera, decorativa e sem interação (TASK-069/DEC-072). */
+  fantasma?: boolean;
   aoArrastar?: (posicao: Coordenada) => void;
 }
 
@@ -76,12 +79,18 @@ export interface MapaProps {
   aoClicar?: (posicao: Coordenada) => void;
   /**
    * Chamado ao clicar com o botão ESQUERDO SOBRE a linha da rota desenhada
-   * (`linhas`), com a coordenada clicada (não a coordenada da linha — a do
-   * cursor). No mapa único de itinerários cria um ponto de rota (TASK-063;
-   * Spec 04 §7.3 item 6; DEC-055). Sem esta prop, todo clique esquerdo cai em
+   * (`linhas`), com o ponto do traçado mais próximo do cursor (DEC-072). No
+   * mapa único de itinerários cria um ponto de rota (TASK-063/069; Spec 04
+   * §7.3 item 6; DEC-055). Sem esta prop, todo clique esquerdo cai em
    * `aoClicar`, como antes da TASK-063.
    */
   aoClicarNaLinha?: (posicao: Coordenada) => void;
+  /**
+   * Informa a projeção do cursor sobre a linha enquanto ela estiver sob
+   * hover. `null` limpa a pré-visualização ao afastar/sair do mapa. Opt-in:
+   * consumidores sem esta prop preservam cursor e comportamento anteriores.
+   */
+  aoMoverSobreLinha?: (posicao: Coordenada | null) => void;
   /**
    * Chamado ao clicar com o botão DIREITO (`contextmenu`), com a coordenada.
    * No mapa único de itinerários o clique direito fora da linha abre o menu
@@ -113,12 +122,14 @@ function classesMarcadorCustomizado(
   forma: FormaCustomizada,
   tamanho: MarcadorMapa["tamanho"],
   invalido: boolean,
+  fantasma: boolean,
 ): string {
   return [
     `marcador-mapa-${forma}`,
     tamanho === "medio" ? "marcador-mapa--medio" : "",
     tamanho === "pequeno" ? "marcador-mapa--pequeno" : "",
     invalido ? "marcador-mapa--invalido" : "",
+    fantasma ? "marcador-mapa--fantasma" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -133,8 +144,22 @@ function atualizarElementoCustomizado(
   cor: string | undefined,
   tamanho: MarcadorMapa["tamanho"],
   invalido: boolean,
+  fantasma: boolean,
 ) {
-  elemento.className = classesMarcadorCustomizado(forma, tamanho, invalido);
+  // O MapLibre acrescenta classes estruturais (`maplibregl-marker`, âncoras
+  // e estado de arrasto) ao mesmo elemento. Remover somente as classes que o
+  // ROTA governa evita apagar essas classes em cada atualização de hover.
+  elemento.classList.remove(
+    "marcador-mapa-circulo",
+    "marcador-mapa-quadrado",
+    "marcador-mapa--medio",
+    "marcador-mapa--pequeno",
+    "marcador-mapa--invalido",
+    "marcador-mapa--fantasma",
+  );
+  elemento.classList.add(
+    ...classesMarcadorCustomizado(forma, tamanho, invalido, fantasma).split(" "),
+  );
   elemento.style.backgroundColor = cor ?? "";
 }
 
@@ -143,9 +168,17 @@ function criarElementoCustomizado(
   cor?: string,
   tamanho?: MarcadorMapa["tamanho"],
   invalido = false,
+  fantasma = false,
 ): HTMLElement {
   const elemento = document.createElement("div");
-  atualizarElementoCustomizado(elemento, forma, cor, tamanho, invalido);
+  atualizarElementoCustomizado(
+    elemento,
+    forma,
+    cor,
+    tamanho,
+    invalido,
+    fantasma,
+  );
   return elemento;
 }
 
@@ -158,6 +191,7 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
     linhas = [],
     aoClicar,
     aoClicarNaLinha,
+    aoMoverSobreLinha,
     aoClicarDireito,
     aoClicarDireitoNaLinha,
     className,
@@ -176,6 +210,8 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
   aoClicarRef.current = aoClicar;
   const aoClicarNaLinhaRef = useRef(aoClicarNaLinha);
   aoClicarNaLinhaRef.current = aoClicarNaLinha;
+  const aoMoverSobreLinhaRef = useRef(aoMoverSobreLinha);
+  aoMoverSobreLinhaRef.current = aoMoverSobreLinha;
   const aoClicarDireitoRef = useRef(aoClicarDireito);
   aoClicarDireitoRef.current = aoClicarDireito;
   const aoClicarDireitoNaLinhaRef = useRef(aoClicarDireitoNaLinha);
@@ -203,15 +239,15 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
   // Inicialização única do mapa. maplibre-gl é carregado dinamicamente para não
   // ser avaliado no SSR/prerender (só existe no navegador, usa WebGL).
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
     let cancelado = false;
+    let limparHoverLinha: (() => void) | undefined;
 
     // Cópia estável do Map de marcadores vivos, para uso seguro na limpeza.
     const marcadoresVivos = marcadoresRef.current;
 
     void (async () => {
-      const container = containerRef.current;
-      if (!container) return;
-
       const maplibregl = await import("maplibre-gl");
       if (cancelado) return;
 
@@ -225,30 +261,72 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
       });
       mapaRef.current = mapa;
 
-      // Clique esquerdo: se acertar a camada de linhas (rota desenhada) e o
-      // consumidor tiver `aoClicarNaLinha`, o gesto é ponto de rota (TASK-063;
-      // DEC-055); senão, o clique cai em `aoClicar` como antes. A tolerância
-      // de alguns pixels ao redor do ponto compensa a linha fina (largura em
-      // `LARGURA_LINHA_PADRAO`) sem exigir precisão de 1 pixel do usuário.
       const TOLERANCIA_PX = 6;
-      mapa.on("click", (evento) => {
-        const posicao = { lng: evento.lngLat.lng, lat: evento.lngLat.lat };
-        if (aoClicarNaLinhaRef.current && mapa.getLayer(ID_CAMADA_LINHAS)) {
-          const { x, y } = evento.point;
-          const acertos = mapa.queryRenderedFeatures(
+      const consultarLinha = (evento: { point: { x: number; y: number } }) => {
+        if (!mapa.getLayer(ID_CAMADA_LINHAS)) return false;
+        const { x, y } = evento.point;
+        return (
+          mapa.queryRenderedFeatures(
             [
               [x - TOLERANCIA_PX, y - TOLERANCIA_PX],
               [x + TOLERANCIA_PX, y + TOLERANCIA_PX],
             ],
             { layers: [ID_CAMADA_LINHAS] },
-          );
-          if (acertos.length > 0) {
-            aoClicarNaLinhaRef.current(posicao);
+          ).length > 0
+        );
+      };
+      const projetarSobreLinhas = (posicao: Coordenada) => {
+        let melhor: ReturnType<typeof projetarNaLinha>;
+        for (const linha of linhasRefProp.current) {
+          const projecao = projetarNaLinha(posicao, linha.pontos);
+          if (
+            projecao &&
+            (!melhor ||
+              projecao.distanciaPerpendicularM <
+                melhor.distanciaPerpendicularM)
+          ) {
+            melhor = projecao;
+          }
+        }
+        return melhor?.posicao;
+      };
+
+      // Clique esquerdo: se acertar a camada de linhas (rota desenhada) e o
+      // consumidor tiver `aoClicarNaLinha`, o gesto é ponto de rota (TASK-063;
+      // DEC-055); senão, o clique cai em `aoClicar` como antes. A tolerância
+      // de alguns pixels ao redor do ponto compensa a linha fina (largura em
+      // `LARGURA_LINHA_PADRAO`) sem exigir precisão de 1 pixel do usuário.
+      mapa.on("click", (evento) => {
+        const posicao = { lng: evento.lngLat.lng, lat: evento.lngLat.lat };
+        if (aoClicarNaLinhaRef.current && consultarLinha(evento)) {
+          const posicaoProjetada = projetarSobreLinhas(posicao);
+          if (posicaoProjetada) {
+            aoClicarNaLinhaRef.current(posicaoProjetada);
             return;
           }
         }
         aoClicarRef.current?.(posicao);
       });
+
+      // Hover é somente affordance de UI: usa o mesmo hit-test e a mesma
+      // projeção do clique, sem editar estado de domínio nem chamar OSRM
+      // (TASK-069, RN-052, DEC-072).
+      mapa.on("mousemove", (evento) => {
+        if (!aoMoverSobreLinhaRef.current) return;
+        const posicao = { lng: evento.lngLat.lng, lat: evento.lngLat.lat };
+        const posicaoProjetada = consultarLinha(evento)
+          ? projetarSobreLinhas(posicao)
+          : undefined;
+        mapa.getCanvas().style.cursor = posicaoProjetada ? "pointer" : "";
+        aoMoverSobreLinhaRef.current(posicaoProjetada ?? null);
+      });
+
+      limparHoverLinha = () => {
+        if (!aoMoverSobreLinhaRef.current) return;
+        mapa.getCanvas().style.cursor = "";
+        aoMoverSobreLinhaRef.current(null);
+      };
+      container.addEventListener("mouseleave", limparHoverLinha);
 
       // Clique direito (contextmenu): sobre e fora da linha são callbacks
       // mutuamente exclusivos (TASK-065/DEC-055). A âncora de viewport é
@@ -262,19 +340,9 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
           x: evento.originalEvent.clientX,
           y: evento.originalEvent.clientY,
         };
-        if (aoClicarDireitoNaLinhaRef.current && mapa.getLayer(ID_CAMADA_LINHAS)) {
-          const { x, y } = evento.point;
-          const acertos = mapa.queryRenderedFeatures(
-            [
-              [x - TOLERANCIA_PX, y - TOLERANCIA_PX],
-              [x + TOLERANCIA_PX, y + TOLERANCIA_PX],
-            ],
-            { layers: [ID_CAMADA_LINHAS] },
-          );
-          if (acertos.length > 0) {
-            aoClicarDireitoNaLinhaRef.current(posicao, ancoraTela);
-            return;
-          }
+        if (aoClicarDireitoNaLinhaRef.current && consultarLinha(evento)) {
+          aoClicarDireitoNaLinhaRef.current(posicao, ancoraTela);
+          return;
         }
         aoClicarDireitoRef.current?.(posicao, ancoraTela);
       });
@@ -285,11 +353,15 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
         sincronizarLinhas(mapa, linhasRefProp.current);
         sincronizarMarcadores(mapa, maplibregl, marcadoresRefProp.current);
       });
+
     })();
 
     return () => {
       cancelado = true;
       prontoRef.current = false;
+      if (limparHoverLinha) {
+        container.removeEventListener("mouseleave", limparHoverLinha);
+      }
       marcadoresVivos.forEach((marcador) => marcador.remove());
       marcadoresVivos.clear();
       mapaRef.current?.remove();
@@ -299,6 +371,13 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
     // consumidores via os arrays de marcadores/linhas.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!aoMoverSobreLinha) {
+      const mapa = mapaRef.current;
+      if (mapa) mapa.getCanvas().style.cursor = "";
+    }
+  }, [aoMoverSobreLinha]);
 
   // Reconcilia linhas (LineString) quando a prop muda.
   useEffect(() => {
@@ -350,6 +429,7 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
             spec.cor,
             spec.tamanho,
             spec.invalido ?? false,
+            spec.fantasma ?? false,
           );
         }
         continue;
@@ -362,6 +442,7 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
                 spec.cor,
                 spec.tamanho,
                 spec.invalido,
+                spec.fantasma,
               ),
               draggable: spec.arrastavel ?? false,
             })
