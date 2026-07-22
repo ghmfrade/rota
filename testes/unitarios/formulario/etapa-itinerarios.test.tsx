@@ -35,6 +35,8 @@ interface PropsEditorCapturadas {
   aoCriarSecao: (secao: Secao, posicaoNaLinha?: Coordenada) => void;
   aoCriarLocal: (local: Local, posicaoNaLinha?: Coordenada) => void;
   locaisInvalidos?: readonly string[];
+  selecaoAtual?: string | null;
+  aoSelecionarMarcador?: (chave: string) => void;
 }
 
 const editorCapturado = vi.hoisted<{ props: PropsEditorCapturadas | null }>(() => ({
@@ -746,6 +748,146 @@ describe("EtapaItinerarios — Local extremo contextual (TASK-068/DEC-070)", () 
       ),
     ).toBeNull();
     expect(editorCapturado.props?.locaisInvalidos).toEqual([]);
+
+    resultado.desmontar();
+  });
+});
+
+describe("EtapaItinerarios — sincronização de seleção tabela↔mapa (TASK-064; Spec 04 §7)", () => {
+  test("clicar numa linha da tabela propaga a chave ao mapa e marca aria-current; clicar de novo desseleciona", async () => {
+    const secaoUuidPrimeira = sessaoComTresSecoes(1).documento.autos.secoes[0].uuid;
+    const { resultado } = await montarEtapa(1);
+    const chamadasAntes = vi.mocked(fetch).mock.calls.length;
+
+    const linhaSecao = resultado.container.querySelector(
+      '[data-testid="parada-item"]',
+    ) as HTMLTableRowElement;
+    act(() => linhaSecao.click());
+
+    expect(editorCapturado.props?.selecaoAtual).toBe(`secao-${secaoUuidPrimeira}`);
+    expect(linhaSecao.getAttribute("aria-current")).toBe("true");
+    // Seleção é estado de UI efêmero (RN-096) — nenhum recálculo/OSRM disparado.
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(chamadasAntes);
+
+    act(() => linhaSecao.click());
+    expect(editorCapturado.props?.selecaoAtual).toBeNull();
+    expect(linhaSecao.getAttribute("aria-current")).toBeNull();
+
+    resultado.desmontar();
+  });
+
+  test("clicar num marcador (mapa→tabela) realça a linha correspondente sem chamar OSRM", async () => {
+    const { resultado } = await montarEtapa(1);
+    const chamadasAntes = vi.mocked(fetch).mock.calls.length;
+
+    act(() => editorCapturado.props?.aoSelecionarMarcador?.("ponto-rota-0"));
+
+    const linhaPonto = resultado.container.querySelector('[data-testid="ponto-rota-item"]');
+    expect(linhaPonto?.getAttribute("aria-current")).toBe("true");
+    expect(editorCapturado.props?.selecaoAtual).toBe("ponto-rota-0");
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(chamadasAntes);
+
+    resultado.desmontar();
+  });
+
+  test("[inválido] selecionar uma parada cujo marcador não existe no sentido atual não gera erro nem realce no mapa", async () => {
+    const { resultado } = await montarEtapa(1);
+
+    // Chave sem marcador correspondente no sentido atual (ex.: Local unidirecional
+    // ausente deste sentido) — o host apenas registra a chave, sem lançar erro; o
+    // mapa real (não o dublê) é quem decide se algum marcador combina com ela.
+    expect(() =>
+      act(() => editorCapturado.props?.aoSelecionarMarcador?.("local-inexistente")),
+    ).not.toThrow();
+    expect(editorCapturado.props?.selecaoAtual).toBe("local-inexistente");
+
+    resultado.desmontar();
+  });
+
+  test("trocar de sentido descarta a seleção (não sobrevive à troca de itinerário)", async () => {
+    const documento = documentoExemploMinimo();
+    const servico = documento.autos.servicos[0];
+    const [secaoA] = documento.autos.secoes;
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+    const { resultado } = await montarSessaoNaEtapa(sessao, servico.uuid, "ida");
+
+    act(() =>
+      editorCapturado.props?.aoSelecionarMarcador?.(`secao-${secaoA.uuid}`),
+    );
+    expect(editorCapturado.props?.selecaoAtual).toBe(`secao-${secaoA.uuid}`);
+
+    act(() => {
+      (
+        resultado.container.querySelector(
+          '[data-testid="botao-sentido"][data-sentido="volta"]',
+        ) as HTMLButtonElement
+      ).click();
+    });
+
+    expect(editorCapturado.props?.selecaoAtual).toBeNull();
+    expect(
+      resultado.container.querySelector('[data-testid="parada-item"][aria-current="true"]'),
+    ).toBeNull();
+
+    resultado.desmontar();
+  });
+
+  test("seleção compõe com o Local extremo (DEC-070): os dois estados coexistem, nenhum mascara o outro", async () => {
+    const documento = documentoExemploMinimo();
+    const servico = documento.autos.servicos[0];
+    const local = servico.locais[0];
+    const [secaoA, secaoB] = documento.autos.secoes;
+    local.geolocalizacao_volta = { latitude: -24.005, longitude: -46.398 };
+
+    const chaveIda = chaveItinerario(servico.uuid, "ida");
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+      paradasEmEdicao: {
+        [chaveIda]: [
+          paradaDeLocal(local.uuid),
+          paradaDeSecao(secaoA.uuid),
+          paradaDeSecao(secaoB.uuid),
+        ],
+      },
+    };
+    const { resultado } = await montarSessaoNaEtapa(sessao, servico.uuid, "ida");
+
+    const linhaInvalida = resultado.container.querySelector(
+      '[data-testid="parada-item"][data-estado="local-extremo"]',
+    ) as HTMLTableRowElement;
+    expect(linhaInvalida).not.toBeNull();
+
+    act(() => linhaInvalida.click());
+
+    // O vermelho de RN-035/DEC-070 e o realce de seleção (RN-096) coexistem
+    // na MESMA linha — nem `data-estado` nem a descrição de erro somem.
+    expect(linhaInvalida.getAttribute("aria-current")).toBe("true");
+    expect(linhaInvalida.getAttribute("data-estado")).toBe("local-extremo");
+    const alvoErro = linhaInvalida.querySelector('[data-testid="parada-local-extremo"]');
+    expect(alvoErro?.getAttribute("aria-invalid")).toBe("true");
+    expect(linhaInvalida.className).toContain("text-erro");
+    expect(linhaInvalida.className).toContain("bg-azul-100");
+
+    resultado.desmontar();
+  });
+
+  test("clicar num botão de ação da linha (mover/remover) não altera a seleção", async () => {
+    const { resultado } = await montarEtapa(1);
+    vi.stubGlobal("fetch", respostaOsrmTresParadasMock());
+
+    const botaoMoverBaixo = resultado.container.querySelector(
+      '[data-testid="parada-item"] [data-testid="parada-mover-baixo"]',
+    ) as HTMLButtonElement;
+    act(() => botaoMoverBaixo.click());
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(editorCapturado.props?.selecaoAtual).toBeNull();
 
     resultado.desmontar();
   });

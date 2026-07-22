@@ -76,6 +76,7 @@ import {
   type ParadaEmEdicao,
   type ViolacaoMontagem,
 } from "./motor-montagem";
+import { chaveSelecaoDaParada, chaveSelecaoDoPontoDeRota } from "./selecao-itinerario";
 
 // Etapa real "Seções, Locais e Itinerários" (TASK-019; Spec 04 §7.1–§7.4). É a
 // etapa que MONTA o mapa único de itinerários (`EditorMapaItinerario`, TASK-060)
@@ -148,6 +149,43 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
   const [descartePontoDeRotaMapa, definirDescartePontoDeRotaMapa] = useState<
     Record<string, boolean>
   >({});
+  // Seleção efêmera de sincronização tabela↔mapa (TASK-064; Spec 04 §7) — a
+  // MESMA chave que os marcadores do `EditorMapaItinerario` usam (`secao-*`/
+  // `local-*`/`ponto-rota-*`). `origem` distingue o gesto que criou a seleção:
+  // só a origem "mapa" dispara o scroll-into-view da linha (evita a tabela
+  // "pular" sob o cursor quando o próprio clique já foi na linha). Nunca
+  // integra a sessão/documento (RN-096).
+  const [selecao, definirSelecao] = useState<{ chave: string; origem: "tabela" | "mapa" } | null>(
+    null,
+  );
+  const refsLinhasTabela = useRef<Map<string, HTMLTableRowElement>>(new Map());
+
+  function alternarSelecao(chave: string, origem: "tabela" | "mapa") {
+    definirSelecao((atual) => (atual?.chave === chave ? null : { chave, origem }));
+  }
+
+  // Troca de Serviço/sentido descarta a seleção — o marcador/linha realçados
+  // pertencem ao itinerário anterior (RN-096: efêmero, sem persistir estado
+  // obsoleto entre itinerários). Ajuste feito DURANTE o render (não em
+  // `useEffect`, que cascataria um render extra) — o padrão recomendado do
+  // React para "resetar estado quando uma prop/derivada muda".
+  const chaveItinerarioAtual = `${servicoSelecionado ?? ""}-${sentidoSelecionado ?? ""}`;
+  const [chaveItinerarioDaSelecao, definirChaveItinerarioDaSelecao] =
+    useState(chaveItinerarioAtual);
+  if (chaveItinerarioDaSelecao !== chaveItinerarioAtual) {
+    definirChaveItinerarioDaSelecao(chaveItinerarioAtual);
+    definirSelecao(null);
+  }
+
+  // Rola a linha selecionada para dentro da viewport própria da tabela
+  // (`overflow-y-auto`, TASK-074) somente quando a seleção nasceu no MAPA —
+  // selecionar pela própria linha não deve deslocar a rolagem sob o cursor.
+  useEffect(() => {
+    if (!selecao || selecao.origem !== "mapa") return;
+    // `scrollIntoView` é ausente no jsdom (testes de componente) — presente em
+    // todo navegador real; chamada opcional para não acoplar o teste ao DOM.
+    refsLinhasTabela.current.get(selecao.chave)?.scrollIntoView?.({ block: "nearest" });
+  }, [selecao]);
 
   // "Latest ref" da sessão (padrão para ler o estado mais recente de dentro de
   // uma continuação assíncrona — o `await dispararRecalculo` abaixo atravessa
@@ -767,6 +805,8 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
               aoCriarPontoDeRota={aoCriarPontoDeRota}
               aoMoverPontoDeRota={aoMoverPontoDeRota}
               aoRemoverPontoDeRota={aoRemoverPontoDeRota}
+              selecaoAtual={selecao?.chave ?? null}
+              aoSelecionarMarcador={(chave) => alternarSelecao(chave, "mapa")}
             />
 
             <div
@@ -838,12 +878,25 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
                   <tbody>
                     {itensListaAtual.map((item) => {
                       if (item.tipo === "ponto-de-rota") {
+                        const chaveSelecaoPonto = chaveSelecaoDoPontoDeRota(item.indicePonto);
+                        const pontoSelecionado = selecao?.chave === chaveSelecaoPonto;
                         return (
                           <tr
                             key={`ponto-de-rota-${item.indicePonto}`}
+                            ref={(elemento) => {
+                              if (elemento) refsLinhasTabela.current.set(chaveSelecaoPonto, elemento);
+                              else refsLinhasTabela.current.delete(chaveSelecaoPonto);
+                            }}
                             data-testid="ponto-rota-item"
                             data-tipo="ponto-de-rota"
-                            className="text-ciano-500"
+                            aria-current={pontoSelecionado ? "true" : undefined}
+                            onClick={(evento) => {
+                              if ((evento.target as HTMLElement).closest("button")) return;
+                              alternarSelecao(chaveSelecaoPonto, "tabela");
+                            }}
+                            className={`cursor-pointer text-ciano-500 ${
+                              pontoSelecionado ? "bg-azul-100" : ""
+                            }`}
                           >
                             <td>
                               <span className="font-semibold">
@@ -918,16 +971,31 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
                               const local = linhaAtual.locais.find((l) => l.uuid === parada.localUuid);
                               return local ? nomeExibicaoLocal(local) : parada.localUuid;
                             })();
+                      const chaveSelecaoParada = chaveSelecaoDaParada(parada);
+                      const paradaSelecionada = selecao?.chave === chaveSelecaoParada;
                       return (
                         <tr
                           key={`${parada.tipo}-${indice}`}
+                          ref={(elemento) => {
+                            if (elemento) refsLinhasTabela.current.set(chaveSelecaoParada, elemento);
+                            else refsLinhasTabela.current.delete(chaveSelecaoParada);
+                          }}
                           data-testid="parada-item"
                           data-estado={localExtremo ? "local-extremo" : undefined}
-                          className={
+                          aria-current={paradaSelecionada ? "true" : undefined}
+                          onClick={(evento) => {
+                            if ((evento.target as HTMLElement).closest("button")) return;
+                            alternarSelecao(chaveSelecaoParada, "tabela");
+                          }}
+                          // Seleção usa `bg-azul-100` (fundo) — canal distinto do
+                          // `border-erro`/`text-erro` do Local extremo (DEC-070):
+                          // os dois se compõem na mesma linha sem que um mascare
+                          // o outro.
+                          className={`cursor-pointer ${
                             localExtremo
                               ? "text-erro [&>td]:border-y [&>td]:border-erro [&>td:first-child]:border-l [&>td:last-child]:border-r"
-                              : undefined
-                          }
+                              : ""
+                          } ${paradaSelecionada ? "bg-azul-100" : ""}`}
                         >
                           <td>
                             {mensagemErro ? (

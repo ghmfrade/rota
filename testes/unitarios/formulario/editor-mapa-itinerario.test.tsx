@@ -435,3 +435,68 @@ describe("EditorMapaItinerario — gesto de ponto de rota (TASK-063; Spec 04 §7
     desmontar();
   });
 });
+
+// TASK-064 (Spec 04 §7) — sincronização de seleção tabela↔mapa. Aqui só o
+// lado do MAPA: `selecaoAtual` marca o marcador certo, e clicar num marcador
+// (via `aoSelecionar` capturado do dublê de `<Mapa>`) propaga a chave ao host
+// por `aoSelecionarMarcador`. O outro lado (tabela→mapa, scroll-into-view) é
+// coberto em `etapa-itinerarios.test.tsx`, que monta o host real.
+describe("EditorMapaItinerario — sincronização de seleção com o mapa (TASK-064)", () => {
+  it("projeta `selecionado: true` apenas no marcador cuja chave é `selecaoAtual`", () => {
+    const { desmontar } = montar({
+      pontosDeRota: PONTOS_DE_ROTA,
+      selecaoAtual: `local-${LOCAL_BI.uuid}`,
+    });
+    const marcadores = capturado.props?.marcadores ?? [];
+    const local = marcadores.find((m) => m.id === `local-${LOCAL_BI.uuid}`);
+    const secao = marcadores.find((m) => m.id === `secao-${SECAO_DUPLA.uuid}`);
+    const ponto0 = marcadores.find((m) => m.id === "ponto-rota-0");
+
+    expect(local?.selecionado).toBe(true);
+    expect(secao?.selecionado).toBe(false);
+    expect(ponto0?.selecionado).toBe(false);
+    desmontar();
+  });
+
+  it("[inválido] sem `selecaoAtual` nenhum marcador fica selecionado", () => {
+    const { desmontar } = montar();
+    const marcadores = capturado.props?.marcadores ?? [];
+
+    expect(marcadores.every((m) => m.selecionado !== true)).toBe(true);
+    desmontar();
+  });
+
+  it("clicar num marcador (Seção) chama aoSelecionarMarcador com o id do marcador", () => {
+    const aoSelecionarMarcador = vi.fn();
+    const { desmontar } = montar({ aoSelecionarMarcador });
+    const secao = (capturado.props?.marcadores ?? []).find(
+      (m) => m.id === `secao-${SECAO_DUPLA.uuid}`,
+    );
+
+    act(() => secao?.aoSelecionar?.());
+
+    expect(aoSelecionarMarcador).toHaveBeenCalledWith(`secao-${SECAO_DUPLA.uuid}`);
+    desmontar();
+  });
+
+  it("clicar num vértice de ponto de rota propaga a chave posicional (RN-042)", () => {
+    const aoSelecionarMarcador = vi.fn();
+    const { desmontar } = montar({ pontosDeRota: PONTOS_DE_ROTA, aoSelecionarMarcador });
+    const vertice1 = (capturado.props?.marcadores ?? []).find((m) => m.id === "ponto-rota-1");
+
+    act(() => vertice1?.aoSelecionar?.());
+
+    expect(aoSelecionarMarcador).toHaveBeenCalledWith("ponto-rota-1");
+    desmontar();
+  });
+
+  it("[inválido] sem aoSelecionarMarcador, clicar no marcador não lança erro", () => {
+    const { desmontar } = montar();
+    const secao = (capturado.props?.marcadores ?? []).find(
+      (m) => m.id === `secao-${SECAO_DUPLA.uuid}`,
+    );
+
+    expect(() => act(() => secao?.aoSelecionar?.())).not.toThrow();
+    desmontar();
+  });
+});

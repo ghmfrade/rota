@@ -108,6 +108,15 @@
   pointer-events: none;
 }
 
+/* Realce de seleção (TASK-064; Spec 04 §7): canal `outline`, deliberadamente
+   distinto do `border-color` que `--invalido` ocupa (DEC-070) — os dois
+   estados coexistem sem que um mascare o outro. Estado de UI efêmero, nunca
+   persistido (RN-096). */
+.marcador-mapa--selecionado {
+  outline: 3px solid var(--color-azul-700);
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

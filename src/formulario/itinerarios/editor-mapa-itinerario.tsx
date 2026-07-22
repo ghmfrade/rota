@@ -107,6 +107,12 @@ export interface PropsEditorMapaItinerario {
   /** Remover o ponto de rota do índice, disparando o recálculo (Spec 04
    * §7.3 item 5). */
   aoRemoverPontoDeRota?: (indice: number) => void;
+  /** Chave de seleção corrente (TASK-064; `selecao-itinerario.ts`) — mesmo
+   * `id` do marcador selecionado. `null`/ausente: nenhum marcador realçado. */
+  selecaoAtual?: string | null;
+  /** Clicar num marcador (Seção, Local ou ponto de rota) propaga a seleção
+   * ao host, que projeta o realce na linha correspondente da tabela. */
+  aoSelecionarMarcador?: (chave: string) => void;
 }
 
 export function EditorMapaItinerario({
@@ -126,6 +132,8 @@ export function EditorMapaItinerario({
   pontosDeRota = [],
   aoCriarPontoDeRota,
   aoMoverPontoDeRota,
+  selecaoAtual = null,
+  aoSelecionarMarcador,
 }: PropsEditorMapaItinerario) {
   const [mensagemSecao, definirMensagemSecao] = useState<string | null>(null);
   const [mensagemLocal, definirMensagemLocal] = useState<string | null>(null);
@@ -142,14 +150,17 @@ export function EditorMapaItinerario({
     const ponto =
       sentido === "ida" ? entrada?.geolocalizacao_ida : entrada?.geolocalizacao_volta;
     if (!ponto) return [];
+    const id = `secao-${secao.uuid}`;
     return [
       {
-        id: `secao-${secao.uuid}`,
+        id,
         posicao: paraCoordenada(ponto),
         forma: "quadrado",
         cor: COR_MARCADOR_SECAO,
         arrastavel: true,
+        selecionado: selecaoAtual === id,
         aoArrastar: (posicao: Coordenada) => lidarArrastoSecao(secao, posicao),
+        aoSelecionar: () => aoSelecionarMarcador?.(id),
       },
     ];
   });
@@ -157,17 +168,22 @@ export function EditorMapaItinerario({
   const locaisDoSentido = locais.filter((local) => geolocDoSentido(local, sentido));
 
   const uuidsLocaisInvalidos = new Set(locaisInvalidos);
-  const marcadoresLocais: MarcadorMapa[] = locaisDoSentido.map((local) => ({
-    id: `local-${local.uuid}`,
-    // filtrado acima: geoloc do sentido existe.
-    posicao: paraCoordenada(geolocDoSentido(local, sentido)!),
-    forma: "circulo",
-    tamanho: "medio",
-    cor: COR_MARCADOR_LOCAL,
-    invalido: uuidsLocaisInvalidos.has(local.uuid),
-    arrastavel: true,
-    aoArrastar: (posicao: Coordenada) => lidarArrastoLocal(local, posicao),
-  }));
+  const marcadoresLocais: MarcadorMapa[] = locaisDoSentido.map((local) => {
+    const id = `local-${local.uuid}`;
+    return {
+      id,
+      // filtrado acima: geoloc do sentido existe.
+      posicao: paraCoordenada(geolocDoSentido(local, sentido)!),
+      forma: "circulo",
+      tamanho: "medio",
+      cor: COR_MARCADOR_LOCAL,
+      invalido: uuidsLocaisInvalidos.has(local.uuid),
+      arrastavel: true,
+      selecionado: selecaoAtual === id,
+      aoArrastar: (posicao: Coordenada) => lidarArrastoLocal(local, posicao),
+      aoSelecionar: () => aoSelecionarMarcador?.(id),
+    };
+  });
 
   const marcadorPendente: MarcadorMapa[] = criacaoPendente
     ? [
@@ -184,15 +200,20 @@ export function EditorMapaItinerario({
   // sobre a linha, sem rótulo"): identificados pelo índice no array
   // `pontosDeRota` (RN-042 — ponto de rota não tem `uuid`, não é entidade
   // comparável; a posição no array É a identidade dentro do gesto).
-  const marcadoresPontosDeRota: MarcadorMapa[] = pontosDeRota.map((ponto, indice) => ({
-    id: `ponto-rota-${indice}`,
-    posicao: { lng: ponto.longitude, lat: ponto.latitude },
-    forma: "circulo",
-    tamanho: "pequeno",
-    cor: COR_MARCADOR_PONTO_DE_ROTA,
-    arrastavel: true,
-    aoArrastar: (posicao: Coordenada) => aoMoverPontoDeRota?.(indice, posicao),
-  }));
+  const marcadoresPontosDeRota: MarcadorMapa[] = pontosDeRota.map((ponto, indice) => {
+    const id = `ponto-rota-${indice}`;
+    return {
+      id,
+      posicao: { lng: ponto.longitude, lat: ponto.latitude },
+      forma: "circulo",
+      tamanho: "pequeno",
+      cor: COR_MARCADOR_PONTO_DE_ROTA,
+      arrastavel: true,
+      selecionado: selecaoAtual === id,
+      aoArrastar: (posicao: Coordenada) => aoMoverPontoDeRota?.(indice, posicao),
+      aoSelecionar: () => aoSelecionarMarcador?.(id),
+    };
+  });
 
   const marcadorFantasma: MarcadorMapa[] =
     linhaRota &&

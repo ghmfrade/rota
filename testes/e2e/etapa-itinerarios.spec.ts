@@ -484,6 +484,27 @@ test.describe("Etapa Seções, Locais e Itinerários — gesto de ponto de rota 
     // EXATAMENTE as coordenadas dos dois marcadores (fixture sem vias
     // intermediárias) — o ponto médio entre os dois cai sobre a linha
     // desenhada, em pixels de tela, qualquer que seja a projeção do mapa.
+    const caixaInicialA = await marcadores.nth(0).boundingBox();
+    const caixaInicialB = await marcadores.nth(1).boundingBox();
+    if (!caixaInicialA || !caixaInicialB) throw new Error("marcador sem bounding box");
+    const meioInicial = {
+      x: (caixaInicialA.x + caixaInicialA.width / 2 + caixaInicialB.x + caixaInicialB.width / 2) / 2,
+      y: (caixaInicialA.y + caixaInicialA.height / 2 + caixaInicialB.y + caixaInicialB.height / 2) / 2,
+    };
+    // No zoom inicial do Estado inteiro, os 3 marcadores ficam sobrepostos e
+    // cobrem todos os pixels do primeiro segmento (mesma ambiguidade do
+    // clique direito, TASK-067) — desde a TASK-064 o marcador tem clique
+    // PRÓPRIO (seleção), então um clique nessa faixa acerta o marcador, não a
+    // linha. Amplia em torno do próprio segmento para expor a linha sem mudar
+    // o alvo geográfico do cenário (o meio do segmento continua o mesmo
+    // ponto do mundo real, só renderizado longe da área de qualquer marcador).
+    await page.mouse.move(meioInicial.x, meioInicial.y);
+    for (let passo = 0; passo < 6; passo += 1) {
+      await page.mouse.wheel(0, -500);
+      await page.waitForTimeout(250);
+    }
+    await page.waitForTimeout(500);
+
     const caixaA = await marcadores.nth(0).boundingBox();
     const caixaB = await marcadores.nth(1).boundingBox();
     if (!caixaA || !caixaB) throw new Error("marcador sem bounding box");
@@ -575,6 +596,23 @@ test.describe("Etapa Seções, Locais e Itinerários — gesto de ponto de rota 
     await expect(marcadores).toHaveCount(3);
     await mapa.scrollIntoViewIfNeeded();
 
+    const caixaInicialA = await marcadores.nth(0).boundingBox();
+    const caixaInicialB = await marcadores.nth(1).boundingBox();
+    if (!caixaInicialA || !caixaInicialB) throw new Error("marcador sem bounding box");
+    const meioInicial = {
+      x: (caixaInicialA.x + caixaInicialA.width / 2 + caixaInicialB.x + caixaInicialB.width / 2) / 2,
+      y: (caixaInicialA.y + caixaInicialA.height / 2 + caixaInicialB.y + caixaInicialB.height / 2) / 2,
+    };
+    // Mesma ambiguidade de sobreposição de marcadores da TASK-067/TASK-064 —
+    // amplia antes de clicar para acertar a linha, não o marcador (que agora
+    // tem clique próprio de seleção).
+    await page.mouse.move(meioInicial.x, meioInicial.y);
+    for (let passo = 0; passo < 6; passo += 1) {
+      await page.mouse.wheel(0, -500);
+      await page.waitForTimeout(250);
+    }
+    await page.waitForTimeout(500);
+
     const caixaA = await marcadores.nth(0).boundingBox();
     const caixaB = await marcadores.nth(1).boundingBox();
     if (!caixaA || !caixaB) throw new Error("marcador sem bounding box");
@@ -634,6 +672,68 @@ test.describe("Etapa Seções, Locais e Itinerários — gesto de ponto de rota 
     await expect(page.getByTestId("form-criar-local")).toHaveCount(0);
     await expect(page.getByTestId("menu-criar-parada")).toHaveCount(0);
     await expect(page.getByTestId("tabela-paradas").getByTestId("ponto-rota-item")).toHaveCount(0);
+    expect(chamadasOsrm).toBe(0);
+  });
+});
+
+test.describe("Etapa Seções, Locais e Itinerários — sincronização de seleção tabela↔mapa (TASK-064; Spec 04 §7)", () => {
+  test("clicar numa linha da tabela realça o marcador correspondente no mapa", async ({ page }) => {
+    let chamadasOsrm = 0;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamadasOsrm += 1;
+      return rota.abort();
+    });
+    await abrirEtapaVolta(page);
+
+    const mapa = page.getByTestId("mapa-base");
+    const marcadores = mapa.locator(".maplibregl-marker");
+    await expect(marcadores).toHaveCount(3);
+
+    const linhas = page.getByTestId("tabela-paradas").getByTestId("parada-item");
+    await linhas.nth(1).click();
+
+    await expect(linhas.nth(1)).toHaveAttribute("aria-current", "true");
+    await expect(marcadores.nth(1)).toHaveClass(/marcador-mapa--selecionado/);
+    await expect(marcadores.nth(0)).not.toHaveClass(/marcador-mapa--selecionado/);
+    await expect(marcadores.nth(2)).not.toHaveClass(/marcador-mapa--selecionado/);
+    expect(chamadasOsrm).toBe(0);
+
+    // Clicar de novo desseleciona (toggle) — o realce some dos dois lados.
+    await linhas.nth(1).click();
+    await expect(linhas.nth(1)).not.toHaveAttribute("aria-current", "true");
+    await expect(marcadores.nth(1)).not.toHaveClass(/marcador-mapa--selecionado/);
+    expect(chamadasOsrm).toBe(0);
+  });
+
+  test("clicar num marcador no mapa realça a linha correspondente na tabela e rola até ela", async ({
+    page,
+  }) => {
+    let chamadasOsrm = 0;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamadasOsrm += 1;
+      return rota.abort();
+    });
+    await abrirEtapaVolta(page);
+
+    const mapa = page.getByTestId("mapa-base");
+    const marcadores = mapa.locator(".maplibregl-marker");
+    await expect(marcadores).toHaveCount(3);
+
+    // Praia Grande/São Vicente/Santos são cidades vizinhas na Baixada
+    // Santista — no zoom inicial do Estado inteiro os 3 marcadores ficam tão
+    // próximos que um cobre o outro, e um clique por coordenada de tela
+    // (mesmo com `force`) acerta o marcador que estiver por cima, não
+    // necessariamente o do índice esperado. O teste alvo é a identidade do
+    // marcador (seu elemento DOM), não a geometria de tela — como o
+    // clique-na-linha da TASK-067 — então despacha o evento diretamente no
+    // elemento do marcador do meio (São Vicente), sem depender de qual
+    // marcador está visualmente por cima naquele pixel.
+    await marcadores.nth(1).dispatchEvent("click");
+
+    const linhas = page.getByTestId("tabela-paradas").getByTestId("parada-item");
+    await expect(linhas.nth(1)).toHaveAttribute("aria-current", "true");
+    await expect(linhas.nth(1)).toContainText("São Vicente");
+    await expect(linhas.nth(1)).toBeInViewport();
     expect(chamadasOsrm).toBe(0);
   });
 });

@@ -322,3 +322,111 @@ describe("Mapa — vocabulário visual dos marcadores (TASK-068/DEC-069/070)", (
     resultado.desmontar();
   });
 });
+
+describe("Mapa — realce de seleção (TASK-064; Spec 04 §7)", () => {
+  test("`selecionado: true` acrescenta a classe na criação e coexiste com `invalido`", async () => {
+    dublê.marcadores.length = 0;
+    const resultado = renderizar(
+      <Mapa
+        marcadores={[
+          {
+            id: "local",
+            posicao: { lng: 2, lat: 2 },
+            forma: "circulo",
+            tamanho: "medio",
+            invalido: true,
+            selecionado: true,
+          },
+        ]}
+      />,
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    act(() => dublê.instancia?.handlers.get("load")?.(EVENTO));
+
+    const elemento = dublê.marcadores[0].elemento;
+    // Seleção (outline) e erro contextual (border, DEC-070) são classes
+    // distintas na MESMA classList — nenhuma remove a outra.
+    expect(elemento.className).toContain("marcador-mapa--selecionado");
+    expect(elemento.className).toContain("marcador-mapa--invalido");
+    resultado.desmontar();
+  });
+
+  test("atualiza `selecionado` num marcador já existente (reconciliação)", async () => {
+    dublê.marcadores.length = 0;
+    const base: MarcadorMapa = {
+      id: "secao",
+      posicao: { lng: 1, lat: 1 },
+      forma: "quadrado",
+    };
+    const resultado = renderizar(<Mapa marcadores={[base]} />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    act(() => dublê.instancia?.handlers.get("load")?.(EVENTO));
+    const elemento = dublê.marcadores[0].elemento;
+    expect(elemento.className).not.toContain("marcador-mapa--selecionado");
+
+    resultado.rerenderizar(<Mapa marcadores={[{ ...base, selecionado: true }]} />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(dublê.marcadores).toHaveLength(1);
+    expect(elemento.className).toContain("marcador-mapa--selecionado");
+
+    resultado.rerenderizar(<Mapa marcadores={[{ ...base, selecionado: false }]} />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(elemento.className).not.toContain("marcador-mapa--selecionado");
+    resultado.desmontar();
+  });
+
+  test("clicar no elemento DOM do marcador chama `aoSelecionar` (sincronização mapa→tabela)", async () => {
+    dublê.marcadores.length = 0;
+    const aoSelecionar = vi.fn();
+    const resultado = renderizar(
+      <Mapa
+        marcadores={[
+          { id: "local", posicao: { lng: 2, lat: 2 }, forma: "circulo", aoSelecionar },
+        ]}
+      />,
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    act(() => dublê.instancia?.handlers.get("load")?.(EVENTO));
+
+    act(() => {
+      dublê.marcadores[0].elemento.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(aoSelecionar).toHaveBeenCalledTimes(1);
+    resultado.desmontar();
+  });
+
+  test("[inválido] marcador sem `aoSelecionar` não lança erro ao ser clicado", async () => {
+    dublê.marcadores.length = 0;
+    const resultado = renderizar(
+      <Mapa marcadores={[{ id: "local", posicao: { lng: 2, lat: 2 }, forma: "circulo" }]} />,
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    act(() => dublê.instancia?.handlers.get("load")?.(EVENTO));
+
+    expect(() =>
+      act(() => {
+        dublê.marcadores[0].elemento.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      }),
+    ).not.toThrow();
+    resultado.desmontar();
+  });
+});

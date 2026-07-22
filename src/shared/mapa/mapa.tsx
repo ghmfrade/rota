@@ -60,7 +60,14 @@ export interface MarcadorMapa {
   invalido?: boolean;
   /** Pré-visualização efêmera, decorativa e sem interação (TASK-069/DEC-072). */
   fantasma?: boolean;
+  /** Estado visual aditivo de seleção (TASK-064; Spec 04 §7) — canal distinto
+   * de `invalido` (outline em vez de borda), para que os dois coexistam sem
+   * que um mascare o outro (DEC-070). Nunca persistido (RN-096). */
+  selecionado?: boolean;
   aoArrastar?: (posicao: Coordenada) => void;
+  /** Clicar no marcador (não arrastar) — sincronização de seleção mapa→tabela
+   * (TASK-064). Opt-in: sem esta prop, o marcador não reage a clique. */
+  aoSelecionar?: () => void;
 }
 
 export interface MapaProps {
@@ -123,6 +130,7 @@ function classesMarcadorCustomizado(
   tamanho: MarcadorMapa["tamanho"],
   invalido: boolean,
   fantasma: boolean,
+  selecionado: boolean,
 ): string {
   return [
     `marcador-mapa-${forma}`,
@@ -130,6 +138,7 @@ function classesMarcadorCustomizado(
     tamanho === "pequeno" ? "marcador-mapa--pequeno" : "",
     invalido ? "marcador-mapa--invalido" : "",
     fantasma ? "marcador-mapa--fantasma" : "",
+    selecionado ? "marcador-mapa--selecionado" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -145,6 +154,7 @@ function atualizarElementoCustomizado(
   tamanho: MarcadorMapa["tamanho"],
   invalido: boolean,
   fantasma: boolean,
+  selecionado: boolean,
 ) {
   // O MapLibre acrescenta classes estruturais (`maplibregl-marker`, âncoras
   // e estado de arrasto) ao mesmo elemento. Remover somente as classes que o
@@ -156,9 +166,10 @@ function atualizarElementoCustomizado(
     "marcador-mapa--pequeno",
     "marcador-mapa--invalido",
     "marcador-mapa--fantasma",
+    "marcador-mapa--selecionado",
   );
   elemento.classList.add(
-    ...classesMarcadorCustomizado(forma, tamanho, invalido, fantasma).split(" "),
+    ...classesMarcadorCustomizado(forma, tamanho, invalido, fantasma, selecionado).split(" "),
   );
   elemento.style.backgroundColor = cor ?? "";
 }
@@ -169,6 +180,7 @@ function criarElementoCustomizado(
   tamanho?: MarcadorMapa["tamanho"],
   invalido = false,
   fantasma = false,
+  selecionado = false,
 ): HTMLElement {
   const elemento = document.createElement("div");
   atualizarElementoCustomizado(
@@ -178,6 +190,7 @@ function criarElementoCustomizado(
     tamanho,
     invalido,
     fantasma,
+    selecionado,
   );
   return elemento;
 }
@@ -430,6 +443,7 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
             spec.tamanho,
             spec.invalido ?? false,
             spec.fantasma ?? false,
+            spec.selecionado ?? false,
           );
         }
         continue;
@@ -443,6 +457,7 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
                 spec.tamanho,
                 spec.invalido,
                 spec.fantasma,
+                spec.selecionado,
               ),
               draggable: spec.arrastavel ?? false,
             })
@@ -455,6 +470,19 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
         const { lng, lat } = marcador.getLngLat();
         const atual = marcadoresRefProp.current.find((m) => m.id === spec.id);
         atual?.aoArrastar?.({ lng, lat });
+      });
+      // Clique no marcador (sem arrastar) — sincronização mapa→tabela
+      // (TASK-064). Lê o callback mais recente do spec vivo, como o
+      // `dragend` acima, para nunca chamar uma versão obsoleta do handler.
+      // `stopPropagation` só roda quando ESTE marcador tem `aoSelecionar`
+      // (opt-in, RN-097): sem isso, o clique segue seu caminho normal e
+      // continua alcançando `aoClicar`/`aoClicarNaLinha` do mapa, como antes
+      // da TASK-064 — nenhum consumidor sem seleção nota diferença.
+      marcador.getElement().addEventListener("click", (evento) => {
+        const atual = marcadoresRefProp.current.find((m) => m.id === spec.id);
+        if (!atual?.aoSelecionar) return;
+        evento.stopPropagation();
+        atual.aoSelecionar();
       });
       vivos.set(spec.id, marcador);
     }
