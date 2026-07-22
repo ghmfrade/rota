@@ -910,7 +910,10 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
                             </td>
                             <td />
                             <td>
-                              <div className="flex flex-wrap gap-1">
+                              {/* Setas lado a lado, sem quebrar (TASK-092): o wrap
+                                  dobrava a altura da linha na coluna estreita
+                                  "Mover", contra as linhas compactas da DEC-073. */}
+                              <div className="flex flex-nowrap gap-1">
                                 <Botao
                                   variante="secundario"
                                   tamanho="compacto"
@@ -1023,7 +1026,10 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
                           </td>
                           <td>{tipoParada}</td>
                           <td>
-                            <div className="flex flex-wrap gap-1">
+                            {/* Setas lado a lado, sem quebrar (TASK-092): o wrap
+                                dobrava a altura da linha na coluna estreita
+                                "Mover", contra as linhas compactas da DEC-073. */}
+                            <div className="flex flex-nowrap gap-1">
                               <Botao
                                 variante="secundario"
                                 tamanho="compacto"

@@ -262,6 +262,23 @@ describe("EtapaItinerarios — lista lateral intercalada (TASK-079/DEC-060)", ()
     resultado.desmontar();
   });
 
+  test("[TASK-092] os contêineres da coluna Mover usam flex-nowrap, sem quebrar as setas para baixo", async () => {
+    const { resultado } = await montarEtapa(1);
+
+    const containerParada = resultado.container
+      .querySelector('[data-testid="parada-item"] [data-testid="parada-mover-cima"]')!
+      .closest("div")!;
+    const containerPonto = resultado.container
+      .querySelector('[data-testid="ponto-rota-item"] [data-testid="ponto-rota-mover-cima"]')!
+      .closest("div")!;
+
+    for (const container of [containerParada, containerPonto]) {
+      expect(container.className).toContain("flex-nowrap");
+      expect(container.className).not.toContain("flex-wrap");
+    }
+    resultado.desmontar();
+  });
+
   test("mover ponto através de Parada re-deriva a âncora e recalcula com OSRM mockado", async () => {
     const fetchMock = respostaOsrmTresParadasMock();
     vi.stubGlobal("fetch", fetchMock);
@@ -869,6 +886,109 @@ describe("EtapaItinerarios — sincronização de seleção tabela↔mapa (TASK-
     expect(alvoErro?.getAttribute("aria-invalid")).toBe("true");
     expect(linhaInvalida.className).toContain("text-erro");
     expect(linhaInvalida.className).toContain("bg-azul-100");
+
+    resultado.desmontar();
+  });
+
+  test("[follow-up TASK-064/091] desselecionar a linha de Local extremo preserva data-estado, text-erro e aria-invalid", async () => {
+    const documento = documentoExemploMinimo();
+    const servico = documento.autos.servicos[0];
+    const local = servico.locais[0];
+    const [secaoA, secaoB] = documento.autos.secoes;
+    local.geolocalizacao_volta = { latitude: -24.005, longitude: -46.398 };
+
+    const chaveIda = chaveItinerario(servico.uuid, "ida");
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+      paradasEmEdicao: {
+        [chaveIda]: [
+          paradaDeLocal(local.uuid),
+          paradaDeSecao(secaoA.uuid),
+          paradaDeSecao(secaoB.uuid),
+        ],
+      },
+    };
+    const { resultado } = await montarSessaoNaEtapa(sessao, servico.uuid, "ida");
+    const chamadasAntes = vi.mocked(fetch).mock.calls.length;
+
+    const linhaInvalida = resultado.container.querySelector(
+      '[data-testid="parada-item"][data-estado="local-extremo"]',
+    ) as HTMLTableRowElement;
+    expect(linhaInvalida).not.toBeNull();
+
+    act(() => linhaInvalida.click());
+    expect(linhaInvalida.getAttribute("aria-current")).toBe("true");
+
+    act(() => linhaInvalida.click());
+
+    // O segundo clique (desseleção) remove só o canal de seleção — o erro
+    // estrutural de RN-035/DEC-070 continua pertencendo à ocorrência da
+    // Parada, independente do estado de UI efêmero da seleção (RN-096).
+    expect(linhaInvalida.getAttribute("aria-current")).toBeNull();
+    expect(linhaInvalida.className).not.toContain("bg-azul-100");
+    expect(linhaInvalida.getAttribute("data-estado")).toBe("local-extremo");
+    expect(linhaInvalida.className).toContain("text-erro");
+    const alvoErro = linhaInvalida.querySelector('[data-testid="parada-local-extremo"]');
+    expect(alvoErro?.getAttribute("aria-invalid")).toBe("true");
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(chamadasAntes);
+
+    resultado.desmontar();
+  });
+
+  test("[follow-up TASK-091] quatro cabeçalhos, vocabulário de Tipo e aria-label do X coexistem para Seção, Local e ponto de rota", async () => {
+    const documento = documentoExemploMinimo();
+    const servico = documento.autos.servicos[0];
+    const local = servico.locais[0];
+    const [secaoA, secaoB] = documento.autos.secoes;
+    const ida = servico.itinerarios.find((itinerario) => itinerario.sentido === "ida")!;
+    ida.paradas = [
+      { ordem: 1, secao_uuid: secaoA.uuid },
+      { ordem: 2, local_uuid: local.uuid },
+      { ordem: 3, secao_uuid: secaoB.uuid },
+    ];
+    ida.rota = {
+      ...ida.rota,
+      pontos_de_rota: [{ apos_parada_ordem: 1, latitude: -23.97, longitude: -46.38 }],
+    };
+
+    const sessao: SessaoFormulario = { modo: "carregado", documento, alertasImportacao: [] };
+    const { resultado } = await montarSessaoNaEtapa(sessao, servico.uuid, "ida");
+
+    const tabela = resultado.container.querySelector('[data-testid="tabela-paradas"]')!;
+    const cabecalhos = Array.from(tabela.querySelectorAll("thead th")).map(
+      (th) => th.textContent,
+    );
+    expect(cabecalhos).toEqual(["Cidade - Nome", "Tipo", "Mover", "Remover"]);
+
+    const linhas = tabela.querySelectorAll("tbody > tr");
+    expect(Array.from(linhas).map((linha) => linha.getAttribute("data-testid"))).toEqual([
+      "parada-item",
+      "ponto-rota-item",
+      "parada-item",
+      "parada-item",
+    ]);
+    const [linhaSecaoA, linhaPonto, linhaLocal, linhaSecaoB] = Array.from(
+      linhas,
+    ) as HTMLTableRowElement[];
+
+    expect(linhaSecaoA.querySelectorAll("td")[1].textContent).toBe("Seção");
+    expect(linhaLocal.querySelectorAll("td")[1].textContent).toBe("Local de parada");
+    expect(linhaSecaoB.querySelectorAll("td")[1].textContent).toBe("Seção");
+    // Ponto de rota: célula Tipo vazia — a natureza já é evidente pelo nome
+    // "Ponto de Rota N (lat, long)" (RN-042, DEC-073 item 1).
+    expect(linhaPonto.querySelectorAll("td")[1].textContent).toBe("");
+
+    expect(
+      linhaSecaoA.querySelector('[data-testid="parada-remover"]')?.getAttribute("aria-label"),
+    ).toMatch(/^Remover /);
+    expect(
+      linhaLocal.querySelector('[data-testid="parada-remover"]')?.getAttribute("aria-label"),
+    ).toMatch(/^Remover /);
+    expect(
+      linhaPonto.querySelector('[data-testid="remover-ponto-rota"]')?.getAttribute("aria-label"),
+    ).toBe("Remover Ponto de Rota 1");
 
     resultado.desmontar();
   });
