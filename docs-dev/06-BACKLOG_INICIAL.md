@@ -1140,6 +1140,7 @@ A TASK-060 unificou os mapas e pôs a tabela lateral ao lado (DEC-054 / doc 18 �
 - Nenhuma (habilitada por DEC-054).
 - **Atenção (2026-07-17):** a **Q-040 foi decidida (DEC-060)** — os pontos de rota entram na tabela lateral, intercalados (TASK-079). A sincronização desta task deve projetar sobre a **lista unificada**; se esta task rodar antes da TASK-079, a 079 herda a obrigação de não quebrar o sync.
 - **Atenção (2026-07-21):** a **Q-049 foi decidida (DEC-070)** — a TASK-068 entrega o estado contextual de Local extremo; seleção deve preservá-lo por composição, nunca reutilizar o vermelho como simples realce.
+- **Atenção (2026-07-22):** a tabela roda dentro de um contêiner com rolagem própria (`overflow-y-auto`, TASK-074); a sincronização **mapa→tabela** desta task inclui **rolar a linha selecionada para dentro da viewport** (`scrollIntoView`), só quando a seleção tem origem no mapa (nunca no próprio clique da linha, para não "pular" sob o cursor). O **redesenho estrutural** da tabela (colunas, zebra, densidade, "X") é a **TASK-091** (bloqueada pela **Q-052**) e roda **depois** desta; se a 091 vier antes, herda a obrigação de não quebrar este sync.
 
 ---
 
@@ -3699,6 +3700,106 @@ executor.
 Nenhuma. O responsável aprovou explicitamente as propostas de porta dedicada,
 ownership do servidor, timeout, cleanup, log canônico e uso tanto por
 `implementar-task` quanto por `revisar-aderencia`.
+
+---
+
+## TASK-091 — Redesenho da tabela lateral unificada da etapa de itinerários (colunas explícitas, densidade e "X" de remover)
+
+## Objetivo
+
+A lista lateral da etapa de itinerários (paradas + pontos de rota intercalados, DEC-060/TASK-079) passa a ter **colunas explícitas** — `Cidade - Nome` · Tipo · mover (↑/↓) · remover ("X") —, todas na **mesma linha** por item, com **linhas mais compactas** e **zebrado de maior contraste**. É uma redecoração de apresentação: nenhum dado, nenhuma regra de montagem/rota e nenhum comportamento de edição mudam.
+
+## Contexto
+
+Reportado pelo responsável (2026-07-22): a tabela atual (`src/formulario/itinerarios/etapa-itinerarios.tsx`) tem só duas colunas ("Item do itinerário" / "Ações"), com rótulo e coordenadas amontoados na primeira e todos os botões ("↑", "↓", "Remover") na segunda; o zebrado herdado do componente `Tabela` (doc 18 §3 — `nth-child(even):bg-cinza-50`, hover `azul-50`) tem contraste baixo e as linhas são altas, dificultando a leitura. A lista unificada (TASK-079), o gesto de sync (TASK-064) e os motores de Seção/Local/ponto de rota já existem e permanecem intactos — esta task só reorganiza a superfície da tabela.
+
+## Fora de escopo
+
+- Sincronização de seleção tabela↔mapa e o scroll-into-view da linha selecionada — é a **TASK-064**. Esta task apenas **compõe** com o realce de seleção; não o reimplementa.
+- Qualquer regra de OSRM / 350 m / montagem / ancoragem / reordenação — preservada: as setas continuam chamando `moverParada`/`moverPontoDeRotaNaTabela` e o "X" continua chamando `removerParadaNaTabela`/`aoRemoverPontoDeRota`.
+- Vocabulário visual dos marcadores do mapa (TASK-068/DEC-069) — inalterado.
+- Contrato JSON/schema — seleção e decoração são estado de UI efêmero (RN-096); nada é persistido.
+- Alterar o token **global** de zebra de forma que afete outras tabelas do app sem a decisão da **Q-052**.
+
+## Specs fonte
+
+- Spec 04 §7/§7.3 (tabela lateral de paradas na etapa de itinerários)
+- Spec 02 §5 (Seção = município + nome; convenção de exibição `Cidade - Nome da Seção`)
+- Spec 02 §10.1/§10.4 (ordem de travessia; ponto de rota ancorado, sem identidade)
+- doc 18 §2/§3/§4 (tokens; componente `Tabela` com zebra/hover; **variação por prop, nunca por `className`**) — vinculante (DEC-050)
+
+## Regras envolvidas
+
+- RN-025 (Seção tem município + nome — base do rótulo `Cidade - Nome`)
+- RN-031 (Local pertence ao Serviço — a coluna "Tipo" o distingue como "Local de parada")
+- RN-042 (ponto de rota sem identidade; é item discriminado, **não** Parada — a coluna "Tipo" e a ausência de `Cidade - Nome` refletem isso)
+- RN-096 (redecoração não persiste nada; exportar JSON é o salvar)
+
+## Entidades afetadas
+
+- Seção, Local, ponto de rota (só apresentação na tabela; sem mudança de modelo)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] A tabela lateral tem colunas explícitas — `Cidade - Nome` · Tipo · Mover · Remover — todas na mesma linha por item.
+- [ ] A coluna "Tipo" usa o vocabulário definido na **Q-052** para os três casos (Seção / Local de parada / ponto de rota).
+- [ ] O ponto de rota, que não tem `Cidade - Nome`, exibe na coluna de nome o que a Q-052 definir (ex.: "Ponto de rota N" + coordenadas) e **continua** item discriminado, sem receber `parada-item` (RN-042).
+- [ ] O botão de remover é um "X" compacto, com `aria-label` acessível, **preservando** os `data-testid` existentes (`parada-remover`, `remover-ponto-rota`).
+- [ ] As setas ↑/↓ preservam `data-testid` e handlers atuais (`parada-mover-cima`/`-baixo`, `ponto-rota-mover-cima`/`-baixo`) e as regras de desabilitar (extremos / `podeMoverPontoDeRotaNaLista`).
+- [ ] Linhas mais compactas e zebrado de maior contraste conforme a Q-052, **sem** alterar o token global de outras tabelas se a Q-052 optar por variante local.
+- [ ] O zebrado **compõe com, sem mascarar**: o vermelho de Local extremo (DEC-070), o ciano do ponto de rota (DEC-069) e o realce de seleção da TASK-064 — os quatro estados perceptíveis simultaneamente, conforme a Q-052.
+- [ ] Nenhuma mudança de dado/JSON e nenhum recálculo/OSRM disparado pela redecoração.
+- [ ] E2E existentes verdes sem alterar seletores.
+
+## Casos válidos
+
+- Lista com 3 paradas + 1 ponto de rota intercalado → 4 linhas, cada uma com nome, tipo, setas e "X"; zebra alternada perceptível; a linha de ponto de rota mostra "Ponto de rota 1" na coluna de nome e "ponto de rota" na coluna Tipo.
+- Linha de Local extremo inválido → mantém `data-estado="local-extremo"`, com texto/borda vermelhos legíveis **tanto** sobre a faixa clara **quanto** sobre a faixa escura do zebrado.
+
+## Casos inválidos
+
+- "X" que perca o `data-testid`/handler de remover → recusado (teste-guarda de seletor + E2E).
+- Zebra/seleção que torne o vermelho de Local extremo imperceptível → recusado (teste de composição conforme Q-052).
+- Ponto de rota recebendo `parada-item` ou a coluna `Cidade - Nome` preenchida como se fosse Parada → recusado (RN-042).
+
+## Testes esperados
+
+- Unitários: nenhum novo de regra (redecoração); eventual helper puro do rótulo de "Tipo" por item da lista unificada, se criado.
+- Integração (jsdom, dublê de `@/shared/mapa`, padrão de `etapa-itinerarios.test.tsx`): `EtapaItinerarios` renderiza as quatro colunas por item; ponto de rota não recebe `parada-item`; "X" e setas preservam testids/handlers; **nenhuma** chamada de `dispararRecalculo` disparada só por renderizar/redecorar.
+- E2E (`etapa-itinerarios.spec.ts`, tiles/OSRM mockados): seletores existentes continuam verdes; remover via "X" funciona; Local extremo mantém `data-estado`/`aria-invalid`.
+- Snapshot/contrato JSON: N/A (nada persistido).
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (estrutura da `<Tabela>`: colunas, células, "X")
+- `src/shared/ui/tabela.tsx` + `src/app/globals.css` (variante/prop de densidade e zebra de maior contraste, **se** a Q-052 optar por variante em vez de mudar o token global)
+- `src/app/globals.css` (classe do "X" e composição do estado de seleção com o zebrado), conforme Q-052
+- Testes em `testes/unitarios/formulario/etapa-itinerarios.test.tsx` e `testes/e2e/etapa-itinerarios.spec.ts`
+
+## Dependências
+
+- **Q-052** (sem decisão registrada) → **a task nasce bloqueada**.
+- **TASK-079** (entregue) — lista lateral unificada que esta task redecora.
+- **TASK-064** (recomendada **antes**) — para o realce de seleção existir e o zebrado compor sobre ele em vez de brigar. Se a 091 rodar antes, **herda a obrigação** de não quebrar o sync que a 064 adicionará.
+
+## Riscos
+
+- **Colisão de quatro canais** na mesma linha — zebra (fundo), seleção da 064 (fundo/contorno), erro de Local extremo (vermelho) e ponto de rota (ciano): a Q-052 tem de fixar a precedência antes de implementar, senão o resultado fica à mercê da ordem de emissão do CSS (o "perde em silêncio" de doc 18 §4).
+- Regressão de seletores E2E (doc 18 §6 — testids/aria intocáveis): o "X" e as setas devem manter os `data-testid`.
+- Elevar o contraste do zebrado **alterando o token global** afetaria todas as tabelas do app — a Q-052 decide global × variante.
+
+## Perguntas em aberto
+
+- **Q-052** (bloqueante) — composição visual da lista unificada: colunas, zebra de maior contraste, densidade, vocabulário de "Tipo" e "X" de remover; token de zebra global × variante local.
 
 ---
 
