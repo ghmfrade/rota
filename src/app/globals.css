@@ -72,6 +72,15 @@
   border: 2px solid #fff;
   box-shadow: var(--shadow-sombra-2);
   cursor: pointer;
+  /* Prioridade de clique quando marcadores se sobrepõem no mapa (TASK-064):
+     Seção (maior) fica por cima de Local, que fica por cima do ponto de rota
+     — a mesma hierarquia de tamanho/importância da DEC-069, agora também em
+     `z-index` explícito. `.maplibregl-marker` já é `position: absolute`
+     (maplibre-gl.css), então `z-index` funciona independente da ordem de
+     criação — cobre tanto os marcadores existentes na carga inicial quanto
+     um ponto de rota criado depois, ao vivo, sobre uma Seção/Local já
+     desenhado (RN-042: o ponto não tem identidade própria, cede prioridade). */
+  z-index: 3;
 }
 
 .marcador-mapa-circulo {
@@ -87,6 +96,7 @@
   height: var(--spacing-marcador-local);
   border-width: 1.5px;
   box-shadow: var(--shadow-sombra-1);
+  z-index: 2;
 }
 
 /* Vértice pequeno, sem rótulo (Spec 04 §7.3). */
@@ -95,6 +105,7 @@
   height: var(--spacing-marcador-ponto-rota);
   border-width: 1.5px;
   box-shadow: var(--shadow-sombra-1);
+  z-index: 1;
 }
 
 /* Erro contextual aditivo: preserva forma e preenchimento do Local. */

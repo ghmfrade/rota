@@ -738,6 +738,97 @@ test.describe("Etapa Seções, Locais e Itinerários — sincronização de sele
   });
 });
 
+test.describe("Etapa Seções, Locais e Itinerários — prioridade de clique entre marcadores sobrepostos (bugfix TASK-064)", () => {
+  test("Seção mantém z-index maior que um ponto de rota criado depois, mesmo sobrepostos no mapa", async ({
+    page,
+  }) => {
+    // Reportado após a entrega da TASK-064: com Seção + Local + ponto de rota
+    // + Seção no mesmo itinerário, clicar no marcador de alguns deles não
+    // realçava a linha da tabela. Causa: `<Mapa>` cria os marcadores na ordem
+    // em que aparecem no array de `marcadores`; um marcador criado DEPOIS
+    // (ex.: um ponto de rota adicionado ao vivo, já com o mapa montado) entra
+    // por último no DOM e, sem `z-index` explícito, passa a cobrir cliques de
+    // marcadores mais antigos (Seção/Local) sempre que ficam próximos na
+    // tela — mesmo a Seção sendo maior/visualmente por cima. Corrigido com
+    // `z-index` fixo por classe em `globals.css` (Seção > Local > ponto de
+    // rota, a mesma hierarquia de tamanho da DEC-069), que funciona
+    // independente da ordem/momento de criação, já que os marcadores do
+    // MapLibre são `position: absolute`.
+    await page.route("https://router.project-osrm.org/**", (rota) =>
+      rota.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          code: "Ok",
+          routes: [
+            {
+              geometry: {
+                type: "LineString",
+                coordinates: [
+                  [-46.402, -24.0081],
+                  [-46.396, -23.98],
+                  [-46.3915, -23.9629],
+                  [-46.3342, -23.9611],
+                ],
+              },
+              legs: [
+                { distance: 3000, duration: 400, steps: [{ name: "Via forçada" }] },
+                { distance: 3500, duration: 460, steps: [{ name: "Via forçada" }] },
+                { distance: 8000, duration: 1080, steps: [{ name: "Via 2" }] },
+              ],
+            },
+          ],
+        }),
+      }),
+    );
+    await abrirEtapaVolta(page);
+
+    const mapa = page.getByTestId("mapa-base");
+    const marcadores = mapa.locator(".maplibregl-marker");
+    await expect(marcadores).toHaveCount(3);
+    await mapa.scrollIntoViewIfNeeded();
+
+    // Cria um ponto de rota ao vivo — o mapa (e os marcadores de Seção) já
+    // estava montado ANTES deste marcador existir, o cenário exato do relato.
+    // Amplia primeiro (mesma técnica da TASK-067/069) para acertar a LINHA,
+    // não um marcador — cidades vizinhas se sobrepõem no zoom do Estado.
+    const caixaInicialA = await marcadores.nth(0).boundingBox();
+    const caixaInicialB = await marcadores.nth(1).boundingBox();
+    if (!caixaInicialA || !caixaInicialB) throw new Error("marcador sem bounding box");
+    const meioInicial = {
+      x: (caixaInicialA.x + caixaInicialA.width / 2 + caixaInicialB.x + caixaInicialB.width / 2) / 2,
+      y: (caixaInicialA.y + caixaInicialA.height / 2 + caixaInicialB.y + caixaInicialB.height / 2) / 2,
+    };
+    await page.mouse.move(meioInicial.x, meioInicial.y);
+    for (let passo = 0; passo < 6; passo += 1) {
+      await page.mouse.wheel(0, -500);
+      await page.waitForTimeout(250);
+    }
+    await page.waitForTimeout(500);
+
+    const caixaA = await marcadores.nth(0).boundingBox();
+    const caixaB = await marcadores.nth(1).boundingBox();
+    if (!caixaA || !caixaB) throw new Error("marcador sem bounding box");
+    const meio = {
+      x: (caixaA.x + caixaA.width / 2 + caixaB.x + caixaB.width / 2) / 2,
+      y: (caixaA.y + caixaA.height / 2 + caixaB.y + caixaB.height / 2) / 2,
+    };
+    await page.mouse.click(meio.x, meio.y);
+    await expect(page.getByTestId("tabela-paradas").getByTestId("ponto-rota-item")).toHaveCount(1);
+
+    const zIndices = await page.evaluate(() => {
+      const secao = document.querySelector(".marcador-mapa-quadrado");
+      const ponto = document.querySelector(".marcador-mapa--pequeno");
+      return {
+        secao: secao ? Number(getComputedStyle(secao).zIndex) : null,
+        ponto: ponto ? Number(getComputedStyle(ponto).zIndex) : null,
+      };
+    });
+    expect(zIndices.secao).not.toBeNull();
+    expect(zIndices.ponto).not.toBeNull();
+    expect(zIndices.secao as number).toBeGreaterThan(zIndices.ponto as number);
+  });
+});
+
 test.describe("Etapa Seções, Locais e Itinerários — feedback de montagem inválida (TASK-047)", () => {
   test("remover paradas até restar 1 acende o aviso de RN-034, sem chamar o OSRM de novo nem apagar a última rota válida", async ({
     page,
