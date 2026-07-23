@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 import {
   conjuntoSecoesConsistente,
+  espelharGestoDeSecao,
+  espelharInsercaoDeSecao,
+  espelharMovimentoDeSecao,
+  espelharRemocaoDeSecao,
   inserirParada,
   ocorrenciasLocaisEmExtremo,
   paradaDeLocal,
@@ -11,6 +15,7 @@ import {
   removerParadasDeLocal,
   reordenarParada,
   resolverParadasRota,
+  subsequenciaSecoes,
   validarMontagem,
   type ParadaEmEdicao,
   type ViolacaoMontagem,
@@ -297,5 +302,217 @@ describe("resolverParadasRota — resolve para ParadaRota[] (insumo de recalcula
     expect(resultado.ok).toBe(false);
     if (resultado.ok) throw new Error("esperava violação");
     expect(resultado.violacoes.some((v) => v.codigo === "RN-034")).toBe(true);
+  });
+});
+
+// Espelhamento Ida↔Volta por gesto atômico de Seção (TASK-077; DEC-063/071).
+// Letras (A-E) = Seções; números (1-4) = Locais — mesma notação da DEC-071.
+const S_A = "a0000000-0000-4000-8000-000000000001";
+const S_B = "a0000000-0000-4000-8000-000000000002";
+const S_C = "a0000000-0000-4000-8000-000000000003";
+const S_D = "a0000000-0000-4000-8000-000000000004";
+const S_E = "a0000000-0000-4000-8000-000000000005";
+const S_X = "a0000000-0000-4000-8000-000000000009";
+const L_1 = "b0000000-0000-4000-8000-000000000001";
+const L_2 = "b0000000-0000-4000-8000-000000000002";
+const L_3 = "b0000000-0000-4000-8000-000000000003";
+const L_4 = "b0000000-0000-4000-8000-000000000004";
+
+describe("subsequenciaSecoes — insumo do espelho e da RN-030 (ordem inversa)", () => {
+  test("extrai só as Seções, na ordem em que aparecem, ignorando Locais", () => {
+    const paradas = [
+      paradaDeSecao(S_A),
+      paradaDeLocal(L_1),
+      paradaDeSecao(S_B),
+      paradaDeSecao(S_C),
+    ];
+    expect(subsequenciaSecoes(paradas)).toEqual([S_A, S_B, S_C]);
+  });
+});
+
+describe("espelharInsercaoDeSecao — DEC-071 (Q-050, opção A)", () => {
+  test("exemplo da DEC-071: Ida A-B → A-X-B; Volta B-1-2-A → B-X-1-2-A", () => {
+    const idaDepois = [paradaDeSecao(S_A), paradaDeSecao(S_X), paradaDeSecao(S_B)];
+    const volta = [paradaDeSecao(S_B), paradaDeLocal(L_1), paradaDeLocal(L_2), paradaDeSecao(S_A)];
+    const resultado = espelharInsercaoDeSecao(volta, S_X, idaDepois);
+    expect(resultado).toEqual([
+      paradaDeSecao(S_B),
+      paradaDeSecao(S_X),
+      paradaDeLocal(L_1),
+      paradaDeLocal(L_2),
+      paradaDeSecao(S_A),
+    ]);
+  });
+
+  test("inserção no NOVO ÚLTIMO extremo do sentido editado vira o novo PRIMEIRO extremo do alvo", () => {
+    // Ida A-B passa a A-B-X (X é o novo último extremo da Ida); X não tem
+    // sucessora na Ida ⇒ na Volta (inverso), X é o novo PRIMEIRO extremo.
+    const idaDepois = [paradaDeSecao(S_A), paradaDeSecao(S_B), paradaDeSecao(S_X)];
+    const volta = [paradaDeSecao(S_B), paradaDeSecao(S_A)];
+    const resultado = espelharInsercaoDeSecao(volta, S_X, idaDepois);
+    expect(resultado).toEqual([paradaDeSecao(S_X), paradaDeSecao(S_B), paradaDeSecao(S_A)]);
+  });
+
+  test("não muta a lista alvo original", () => {
+    const idaDepois = [paradaDeSecao(S_A), paradaDeSecao(S_X), paradaDeSecao(S_B)];
+    const volta = [paradaDeSecao(S_B), paradaDeSecao(S_A)];
+    espelharInsercaoDeSecao(volta, S_X, idaDepois);
+    expect(volta).toEqual([paradaDeSecao(S_B), paradaDeSecao(S_A)]);
+  });
+});
+
+describe("espelharRemocaoDeSecao — DEC-071", () => {
+  test("elimina somente a ocorrência correspondente, sem reposicionar mais nada", () => {
+    const volta = [
+      paradaDeSecao(S_C),
+      paradaDeLocal(L_1),
+      paradaDeSecao(S_B),
+      paradaDeLocal(L_2),
+      paradaDeSecao(S_A),
+    ];
+    const resultado = espelharRemocaoDeSecao(volta, S_B);
+    expect(resultado).toEqual([
+      paradaDeSecao(S_C),
+      paradaDeLocal(L_1),
+      paradaDeLocal(L_2),
+      paradaDeSecao(S_A),
+    ]);
+  });
+
+  test("[inválido] remoção pode deixar um Local no extremo do alvo — a função não corrige, só remove (DEC-070 cuida do estado)", () => {
+    const volta = [paradaDeLocal(L_1), paradaDeSecao(S_B), paradaDeSecao(S_A)];
+    const resultado = espelharRemocaoDeSecao(volta, S_B);
+    expect(resultado).toEqual([paradaDeLocal(L_1), paradaDeSecao(S_A)]);
+    expect(ocorrenciasLocaisEmExtremo(resultado)).toEqual([
+      { indice: 0, localUuid: L_1, posicoes: ["inicio"] },
+    ]);
+  });
+});
+
+describe("espelharMovimentoDeSecao — DEC-071 (replay do gesto, nunca diff da sequência final)", () => {
+  test("exemplo da DEC-071: mover D antes de C (Ida A-B-C-D-E → A-B-D-C-E) produz Volta E-1-2-C-D-3-B-4-A", () => {
+    const idaDepois = [
+      paradaDeSecao(S_A),
+      paradaDeSecao(S_B),
+      paradaDeSecao(S_D),
+      paradaDeSecao(S_C),
+      paradaDeSecao(S_E),
+    ];
+    const voltaAntes = [
+      paradaDeSecao(S_E),
+      paradaDeSecao(S_D),
+      paradaDeLocal(L_1),
+      paradaDeLocal(L_2),
+      paradaDeSecao(S_C),
+      paradaDeLocal(L_3),
+      paradaDeSecao(S_B),
+      paradaDeLocal(L_4),
+      paradaDeSecao(S_A),
+    ];
+    const resultado = espelharMovimentoDeSecao(voltaAntes, S_D, idaDepois);
+    expect(resultado).toEqual([
+      paradaDeSecao(S_E),
+      paradaDeLocal(L_1),
+      paradaDeLocal(L_2),
+      paradaDeSecao(S_C),
+      paradaDeSecao(S_D),
+      paradaDeLocal(L_3),
+      paradaDeSecao(S_B),
+      paradaDeLocal(L_4),
+      paradaDeSecao(S_A),
+    ]);
+  });
+
+  test("exemplo da DEC-071 (movimentos atômicos sucessivos até A-D-C-B-E) produz Volta E-1-2-3-B-C-D-4-A", () => {
+    // O gesto da UI só move UMA Seção por vez (troca adjacente — `moverParada`
+    // na etapa). "Movimentos sucessivos" da DEC-071 é uma SEQUÊNCIA de gestos
+    // atômicos, nunca um "salto" — replay de cada um, em ordem:
+    //   1) D antes de C: A-B-C-D-E → A-B-D-C-E (já coberto no teste acima)
+    //   2) D antes de B: A-B-D-C-E → A-D-B-C-E
+    //   3) C antes de B: A-D-B-C-E → A-D-C-B-E
+    const voltaAposPasso1 = [
+      paradaDeSecao(S_E),
+      paradaDeLocal(L_1),
+      paradaDeLocal(L_2),
+      paradaDeSecao(S_C),
+      paradaDeSecao(S_D),
+      paradaDeLocal(L_3),
+      paradaDeSecao(S_B),
+      paradaDeLocal(L_4),
+      paradaDeSecao(S_A),
+    ];
+
+    const idaAposPasso2 = [
+      paradaDeSecao(S_A),
+      paradaDeSecao(S_D),
+      paradaDeSecao(S_B),
+      paradaDeSecao(S_C),
+      paradaDeSecao(S_E),
+    ];
+    const voltaAposPasso2 = espelharMovimentoDeSecao(voltaAposPasso1, S_D, idaAposPasso2);
+    expect(voltaAposPasso2).toEqual([
+      paradaDeSecao(S_E),
+      paradaDeLocal(L_1),
+      paradaDeLocal(L_2),
+      paradaDeSecao(S_C),
+      paradaDeLocal(L_3),
+      paradaDeSecao(S_B),
+      paradaDeSecao(S_D),
+      paradaDeLocal(L_4),
+      paradaDeSecao(S_A),
+    ]);
+
+    const idaAposPasso3 = [
+      paradaDeSecao(S_A),
+      paradaDeSecao(S_D),
+      paradaDeSecao(S_C),
+      paradaDeSecao(S_B),
+      paradaDeSecao(S_E),
+    ];
+    const voltaAposPasso3 = espelharMovimentoDeSecao(voltaAposPasso2, S_C, idaAposPasso3);
+    expect(voltaAposPasso3).toEqual([
+      paradaDeSecao(S_E),
+      paradaDeLocal(L_1),
+      paradaDeLocal(L_2),
+      paradaDeLocal(L_3),
+      paradaDeSecao(S_B),
+      paradaDeSecao(S_C),
+      paradaDeSecao(S_D),
+      paradaDeLocal(L_4),
+      paradaDeSecao(S_A),
+    ]);
+  });
+
+  test("não muta a lista alvo original", () => {
+    const idaDepois = [paradaDeSecao(S_A), paradaDeSecao(S_C), paradaDeSecao(S_B)];
+    const voltaAntes = [paradaDeSecao(S_B), paradaDeSecao(S_C), paradaDeSecao(S_A)];
+    const copia = [...voltaAntes];
+    espelharMovimentoDeSecao(voltaAntes, S_C, idaDepois);
+    expect(voltaAntes).toEqual(copia);
+  });
+});
+
+describe("espelharGestoDeSecao — despacho único usado pela etapa", () => {
+  test("gesto de inserção delega para espelharInsercaoDeSecao", () => {
+    const idaDepois = [paradaDeSecao(S_A), paradaDeSecao(S_X), paradaDeSecao(S_B)];
+    const volta = [paradaDeSecao(S_B), paradaDeSecao(S_A)];
+    expect(espelharGestoDeSecao(volta, { tipo: "insercao", secaoUuid: S_X }, idaDepois)).toEqual(
+      espelharInsercaoDeSecao(volta, S_X, idaDepois),
+    );
+  });
+
+  test("gesto de remoção delega para espelharRemocaoDeSecao", () => {
+    const volta = [paradaDeSecao(S_B), paradaDeSecao(S_A)];
+    expect(espelharGestoDeSecao(volta, { tipo: "remocao", secaoUuid: S_B }, volta)).toEqual(
+      espelharRemocaoDeSecao(volta, S_B),
+    );
+  });
+
+  test("gesto de movimento delega para espelharMovimentoDeSecao", () => {
+    const idaDepois = [paradaDeSecao(S_A), paradaDeSecao(S_C), paradaDeSecao(S_B)];
+    const volta = [paradaDeSecao(S_B), paradaDeSecao(S_C), paradaDeSecao(S_A)];
+    expect(espelharGestoDeSecao(volta, { tipo: "movimento", secaoUuid: S_C }, idaDepois)).toEqual(
+      espelharMovimentoDeSecao(volta, S_C, idaDepois),
+    );
   });
 });

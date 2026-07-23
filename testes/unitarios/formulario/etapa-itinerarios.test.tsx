@@ -9,7 +9,7 @@ import {
   paradaDeSecao,
 } from "@/formulario/itinerarios";
 import { coletarPendencias } from "@/formulario/pendencias";
-import type { SessaoFormulario } from "@/formulario/sessao";
+import type { ServicoEmConstrucao, SessaoFormulario } from "@/formulario/sessao";
 import * as mapa from "@/shared/mapa";
 import type { Coordenada } from "@/shared/mapa";
 import {
@@ -102,6 +102,59 @@ function respostaOsrmTresParadasMock(): typeof fetch {
         ],
       }),
   }) as unknown as typeof fetch;
+}
+
+// Mock de OSRM GENÉRICO (TASK-077): lê o número de coordenadas da própria URL
+// (`/driving/lon,lat;lon,lat;...`) e devolve exatamente `coordenadas - 1` legs
+// — sempre consistente com `extrairRota` (RN-041), qualquer que seja o número
+// de paradas/pontos de rota da requisição. Necessário porque o espelho
+// Ida↔Volta dispara DUAS chamadas OSRM por gesto, cada uma com uma contagem de
+// paradas possivelmente diferente (`respostaOsrmMock`/`respostaOsrmTresParadasMock`
+// fixam uma única contagem, insuficiente aqui).
+function respostaOsrmGenericaMock(): typeof fetch {
+  return vi.fn().mockImplementation((url: string) => {
+    const casado = /\/driving\/([^?]+)/.exec(url);
+    const coordenadas = casado ? casado[1].split(";") : [];
+    const totalLegs = Math.max(coordenadas.length - 1, 0);
+    return Promise.resolve({
+      json: () =>
+        Promise.resolve({
+          code: "Ok",
+          routes: [
+            {
+              geometry: {
+                type: "LineString",
+                coordinates: coordenadas.map((par) => par.split(",").map(Number)),
+              },
+              legs: Array.from({ length: totalLegs }, () => ({
+                distance: 1000,
+                duration: 100,
+                steps: [{ name: "Via Teste" }],
+              })),
+            },
+          ],
+        }),
+    });
+  }) as unknown as typeof fetch;
+}
+
+/** Sessão bidirecional mínima (Spec 02 §15) para os testes de espelhamento
+ * (TASK-077; DEC-063/071) — Ida A-B-Local-C, Volta C-B-A, sem pontos de rota
+ * (fora de escopo do espelho, mantidos noutra suíte). */
+function sessaoBidirecionalParaEspelho(): Extract<SessaoFormulario, { modo: "carregado" }> {
+  const documento = documentoExemploMinimo();
+  const servico = documento.autos.servicos[0];
+  const ida = servico.itinerarios.find((i) => i.sentido === "ida")!;
+  const volta = servico.itinerarios.find((i) => i.sentido === "volta")!;
+  ida.rota = { ...ida.rota, pontos_de_rota: [] };
+  volta.rota = { ...volta.rota, pontos_de_rota: [] };
+  return { modo: "carregado", documento, alertasImportacao: [] };
+}
+
+async function flush(voltas = 10) {
+  for (let i = 0; i < voltas; i++) {
+    await Promise.resolve();
+  }
 }
 
 function sessaoComTresSecoes(
@@ -1008,6 +1061,275 @@ describe("EtapaItinerarios — sincronização de seleção tabela↔mapa (TASK-
     });
 
     expect(editorCapturado.props?.selecaoAtual).toBeNull();
+
+    resultado.desmontar();
+  });
+});
+
+describe("EtapaItinerarios — espelhamento Ida↔Volta (TASK-077; DEC-063/071)", () => {
+  const SECAO_A_UUID = "4da15f36-5bbe-4f4e-90e3-68029097c1b9";
+  const SECAO_B_UUID = "6f51076b-aaf8-4546-8530-4da1e489c880";
+  const SECAO_C_UUID = "63344e28-4722-4a8b-ae9d-1862e8daded4";
+
+  function secaoUuidsDeChave(
+    sessao: SessaoFormulario,
+    chave: string,
+  ): (string | undefined)[] {
+    return (sessao.paradasEmEdicao?.[chave] ?? []).map((p) =>
+      p.tipo === "secao" ? p.secaoUuid : undefined,
+    );
+  }
+
+  test("remover uma Seção na Ida remove a mesma Seção na Volta, no MESMO commit síncrono", async () => {
+    vi.stubGlobal("fetch", respostaOsrmGenericaMock());
+    const { obterSessao, resultado } = await montarSessaoNaEtapa(
+      sessaoBidirecionalParaEspelho(),
+      SERVICO_UUID,
+      "ida",
+    );
+
+    // Ida = A, B, Local, C (ver spec02-15-exemplo-minimo.json) — remover a
+    // Seção de índice 1 (B) entre as linhas parada-item.
+    const botoesRemover = resultado.container.querySelectorAll<HTMLButtonElement>(
+      '[data-testid="parada-remover"]',
+    );
+    act(() => {
+      botoesRemover[1].click();
+    });
+
+    // Commit síncrono (DEC-063: "no mesmo commit de sessão") — os DOIS
+    // sentidos já refletem o gesto ANTES do recálculo OSRM resolver.
+    const chaveIda = chaveItinerario(SERVICO_UUID, "ida");
+    const chaveVolta = chaveItinerario(SERVICO_UUID, "volta");
+    expect(secaoUuidsDeChave(obterSessao(), chaveIda)).not.toContain(SECAO_B_UUID);
+    expect(secaoUuidsDeChave(obterSessao(), chaveVolta)).not.toContain(SECAO_B_UUID);
+    expect(secaoUuidsDeChave(obterSessao(), chaveVolta)).toEqual([SECAO_C_UUID, SECAO_A_UUID]);
+
+    await act(async () => {
+      await flush();
+    });
+
+    // Dois recálculos sequenciais (editado → espelhado — RN-052).
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const sessaoFinal = obterSessao();
+    if (sessaoFinal.modo !== "carregado") throw new Error("esperava modo carregado");
+    const servico = sessaoFinal.documento.autos.servicos[0];
+    const idaFinal = servico.itinerarios.find((i) => i.sentido === "ida")!;
+    const voltaFinal = servico.itinerarios.find((i) => i.sentido === "volta")!;
+    expect(idaFinal.paradas.some((p) => p.secao_uuid === SECAO_B_UUID)).toBe(false);
+    expect(voltaFinal.paradas.some((p) => p.secao_uuid === SECAO_B_UUID)).toBe(false);
+    // RN-030 (DEC-063): conjunto e ordem inversa mantidos por construção.
+    expect(
+      coletarViolacoesEstruturais(sessaoFinal.documento).some((v) => v.mensagem.includes("[RN-030]")),
+    ).toBe(false);
+
+    resultado.desmontar();
+  });
+
+  test("mover uma Seção na Ida (troca adjacente) reflete na Volta pelo replay do gesto (DEC-071)", async () => {
+    vi.stubGlobal("fetch", respostaOsrmGenericaMock());
+    const { obterSessao, resultado } = await montarSessaoNaEtapa(
+      sessaoBidirecionalParaEspelho(),
+      SERVICO_UUID,
+      "ida",
+    );
+
+    // Ida = A, B, Local, C — mover B (índice 1) para cima troca com A: B, A, Local, C.
+    act(() => {
+      (
+        resultado.container.querySelectorAll<HTMLButtonElement>(
+          '[data-testid="parada-mover-cima"]',
+        )[1]
+      ).click();
+    });
+    await act(async () => {
+      await flush();
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const chaveIda = chaveItinerario(SERVICO_UUID, "ida");
+    const chaveVolta = chaveItinerario(SERVICO_UUID, "volta");
+    const sessaoFinal = obterSessao();
+    expect(secaoUuidsDeChave(sessaoFinal, chaveIda)).toEqual([
+      SECAO_B_UUID,
+      SECAO_A_UUID,
+      undefined,
+      SECAO_C_UUID,
+    ]);
+    // Ida secoes-only vira B,A,C ⇒ inverso exato = C,A,B (DEC-071: replay do
+    // gesto — nunca diff da sequência final).
+    expect(secaoUuidsDeChave(sessaoFinal, chaveVolta)).toEqual([SECAO_C_UUID, SECAO_A_UUID, SECAO_B_UUID]);
+
+    resultado.desmontar();
+  });
+
+  test("o reuso não oferta Seções já usadas por QUALQUER sentido do Serviço corrente (DEC-063; RN-025)", async () => {
+    const sessao = sessaoBidirecionalParaEspelho();
+    const secaoDeOutroServico: Secao = {
+      uuid: "dddddddd-4444-4444-8444-dddddddddddd",
+      municipio: "Outro Município",
+      nome: "Outro Terminal",
+      servicos: [
+        {
+          servico_uuid: "eeeeeeee-5555-4555-8555-eeeeeeeeeeee",
+          geolocalizacao_ida: { latitude: -23.5, longitude: -46.5 },
+        },
+      ],
+    };
+    sessao.documento.autos.secoes.push(secaoDeOutroServico);
+    const { resultado } = await montarSessaoNaEtapa(sessao, SERVICO_UUID, "ida");
+
+    const opcoes = Array.from(
+      resultado.container.querySelectorAll<HTMLOptionElement>(
+        '[data-testid="select-secao-reuso"] option',
+      ),
+    ).map((o) => o.value);
+
+    expect(opcoes).not.toContain(SECAO_A_UUID);
+    expect(opcoes).not.toContain(SECAO_B_UUID);
+    expect(opcoes).not.toContain(SECAO_C_UUID);
+    expect(opcoes).toContain(secaoDeOutroServico.uuid);
+
+    resultado.desmontar();
+  });
+
+  test("[inválido][RN-048] falha de OSRM no sentido ESPELHADO não apaga a rota válida anterior daquele sentido, com o sentido editado gravado normalmente", async () => {
+    const fetchMock = vi.fn();
+    // 1ª chamada (sentido editado — Ida): sucesso. 2ª (espelhado — Volta): NoRoute.
+    fetchMock.mockImplementationOnce((url: string) => {
+      const casado = /\/driving\/([^?]+)/.exec(url);
+      const total = (casado ? casado[1].split(";") : []).length;
+      return Promise.resolve({
+        json: () =>
+          Promise.resolve({
+            code: "Ok",
+            routes: [
+              {
+                geometry: { type: "LineString", coordinates: [[-46.33, -23.96], [-46.4, -24.0]] },
+                legs: Array.from({ length: Math.max(total - 1, 0) }, () => ({
+                  distance: 1000,
+                  duration: 100,
+                  steps: [{ name: "Via Teste" }],
+                })),
+              },
+            ],
+          }),
+      });
+    });
+    fetchMock.mockImplementationOnce(() =>
+      Promise.resolve({ json: () => Promise.resolve({ code: "NoRoute" }) }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { obterSessao, resultado } = await montarSessaoNaEtapa(
+      sessaoBidirecionalParaEspelho(),
+      SERVICO_UUID,
+      "ida",
+    );
+
+    const botoesRemover = resultado.container.querySelectorAll<HTMLButtonElement>(
+      '[data-testid="parada-remover"]',
+    );
+    act(() => {
+      botoesRemover[1].click(); // remove Seção B da Ida (espelha remoção na Volta)
+    });
+    await act(async () => {
+      await flush();
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const chaveIda = chaveItinerario(SERVICO_UUID, "ida");
+    const chaveVolta = chaveItinerario(SERVICO_UUID, "volta");
+    const sessaoFinal = obterSessao();
+    expect(sessaoFinal.estadosRotaViva?.[chaveIda]?.situacao).toBe("recalculada");
+    expect(sessaoFinal.estadosRotaViva?.[chaveVolta]?.situacao).toBe("sem-rota");
+
+    if (sessaoFinal.modo !== "carregado") throw new Error("esperava modo carregado");
+    const servico = sessaoFinal.documento.autos.servicos[0];
+    const idaFinal = servico.itinerarios.find((i) => i.sentido === "ida")!;
+    const voltaFinal = servico.itinerarios.find((i) => i.sentido === "volta")!;
+    // Sentido editado (Ida): write-back aplicado — Seção B removida do documento.
+    expect(idaFinal.paradas.some((p) => p.secao_uuid === SECAO_B_UUID)).toBe(false);
+    // Sentido espelhado (Volta): falha do OSRM não apaga a última rota válida
+    // do DOCUMENTO — a Seção B continua lá (RN-048), mesmo com o rascunho de
+    // edição já sem ela.
+    expect(voltaFinal.paradas.some((p) => p.secao_uuid === SECAO_B_UUID)).toBe(true);
+
+    resultado.desmontar();
+  });
+
+  test("promoção de Serviço 'ambos' num gesto só quando o espelho completa os dois sentidos (DEC-053/DEC-063)", async () => {
+    vi.stubGlobal("fetch", respostaOsrmGenericaMock());
+    const SERVICO_NOVO_UUID = "ffffffff-6666-4666-8666-ffffffffffff";
+
+    const documento = documentoExemploMinimo();
+    // Seção A ganha uma contribuição do Serviço novo, nos dois sentidos
+    // (bidirecional — Spec 04 §7.1, "cria Ida e Volta no mesmo ponto"), para
+    // que a resolução (RN-036) encontre geolocalização ao roteirizar.
+    documento.autos.secoes[0].servicos.push({
+      servico_uuid: SERVICO_NOVO_UUID,
+      geolocalizacao_ida: { latitude: -23.9608, longitude: -46.3339 },
+      geolocalizacao_volta: { latitude: -23.9611, longitude: -46.3342 },
+    });
+    documento.autos.secoes[1].servicos.push({
+      servico_uuid: SERVICO_NOVO_UUID,
+      geolocalizacao_ida: { latitude: -23.9631, longitude: -46.3919 },
+      geolocalizacao_volta: { latitude: -23.9629, longitude: -46.3915 },
+    });
+
+    const servicoEmConstrucao: ServicoEmConstrucao = {
+      uuid: SERVICO_NOVO_UUID,
+      numero_n: "0000-2CR",
+      caracteristica_veiculo: "CR",
+      carater: "principal",
+      direcionalidade: "ambos",
+    };
+    const chaveIda = chaveItinerario(SERVICO_NOVO_UUID, "ida");
+    const chaveVolta = chaveItinerario(SERVICO_NOVO_UUID, "volta");
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+      servicosEmConstrucao: [servicoEmConstrucao],
+      // Só a Seção A em cada sentido — ainda incompleto (RN-034, < 2 paradas);
+      // já simétrico porque toda inserção anterior também teria espelhado.
+      paradasEmEdicao: {
+        [chaveIda]: [paradaDeSecao(SECAO_A_UUID)],
+        [chaveVolta]: [paradaDeSecao(SECAO_A_UUID)],
+      },
+    };
+
+    const { obterSessao, resultado } = await montarSessaoNaEtapa(
+      sessao,
+      SERVICO_NOVO_UUID,
+      "ida",
+    );
+
+    // Insere a Seção B (já existente no documento) na Ida — completa a Ida
+    // (2 paradas) e dispara o espelho, que também completa a Volta.
+    const secaoB = documento.autos.secoes[1];
+    act(() => {
+      editorCapturado.props?.aoCriarSecao(secaoB);
+    });
+    await act(async () => {
+      await flush();
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const sessaoFinal = obterSessao();
+    if (sessaoFinal.modo !== "carregado") throw new Error("esperava modo carregado");
+    expect(
+      (sessaoFinal.servicosEmConstrucao ?? []).some((s) => s.uuid === SERVICO_NOVO_UUID),
+    ).toBe(false);
+    const servicoPromovido = sessaoFinal.documento.autos.servicos.find(
+      (s) => s.uuid === SERVICO_NOVO_UUID,
+    );
+    expect(servicoPromovido).toBeDefined();
+    expect(servicoPromovido?.itinerarios).toHaveLength(2);
+    const idaPromovida = servicoPromovido?.itinerarios.find((i) => i.sentido === "ida");
+    const voltaPromovida = servicoPromovido?.itinerarios.find((i) => i.sentido === "volta");
+    expect(idaPromovida?.paradas.map((p) => p.secao_uuid)).toEqual([SECAO_A_UUID, SECAO_B_UUID]);
+    expect(voltaPromovida?.paradas.map((p) => p.secao_uuid)).toEqual([SECAO_B_UUID, SECAO_A_UUID]);
 
     resultado.desmontar();
   });

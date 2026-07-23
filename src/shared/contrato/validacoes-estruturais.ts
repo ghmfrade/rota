@@ -464,10 +464,16 @@ function validarServico(
     (i) => i.sentido === "volta",
   );
 
-  // RN-030 — Ida e Volta referenciam o mesmo conjunto de Seções
+  // RN-030 — Ida e Volta referenciam o mesmo conjunto de Seções, na ORDEM
+  // INVERSA exata (DEC-063: Spec 02 §14 editada pelo dono — "se na ida as
+  // seções são ABCD, na volta necessariamente são DCBA"). A checagem de
+  // ordem só faz sentido quando o conjunto já é igual — divergência de
+  // conjunto já é reportada isoladamente, sem duplicar violação.
   if (itinerarioIda && itinerarioVolta) {
-    const secoesIda = new Set(secoesReferenciadas(itinerarioIda));
-    const secoesVolta = new Set(secoesReferenciadas(itinerarioVolta));
+    const sequenciaIda = secoesReferenciadas(itinerarioIda);
+    const sequenciaVolta = secoesReferenciadas(itinerarioVolta);
+    const secoesIda = new Set(sequenciaIda);
+    const secoesVolta = new Set(sequenciaVolta);
     const iguais =
       secoesIda.size === secoesVolta.size &&
       [...secoesIda].every((uuid) => secoesVolta.has(uuid));
@@ -477,6 +483,18 @@ function validarServico(
         mensagem:
           "[RN-030] quando Ida e Volta existem, referenciam o mesmo conjunto de Seções — só os Locais podem divergir (Spec 02 §2, §14)",
       });
+    } else {
+      const sequenciaVoltaInvertida = [...sequenciaVolta].reverse();
+      const ordemInversa =
+        sequenciaIda.length === sequenciaVoltaInvertida.length &&
+        sequenciaIda.every((uuid, indice) => uuid === sequenciaVoltaInvertida[indice]);
+      if (!ordemInversa) {
+        violacoes.push({
+          caminho: [...caminhoServico, "itinerarios"],
+          mensagem:
+            "[RN-030] a sequência de Seções da Volta deve ser o inverso exato da Ida — se a Ida é ABCD, a Volta deve ser DCBA (Spec 02 §14, DEC-063)",
+        });
+      }
     }
   }
 

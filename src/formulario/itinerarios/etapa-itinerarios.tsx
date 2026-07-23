@@ -63,6 +63,7 @@ import {
 import {
   chaveParadaEmEdicao,
   conjuntoSecoesConsistente,
+  espelharGestoDeSecao,
   inserirParada,
   ocorrenciasLocaisEmExtremo,
   paradaDeLocal,
@@ -73,6 +74,8 @@ import {
   removerParadasDeLocal,
   reordenarParada,
   resolverParadasRota,
+  subsequenciaSecoes,
+  type GestoSecao,
   type ParadaEmEdicao,
   type ViolacaoMontagem,
 } from "./motor-montagem";
@@ -300,9 +303,16 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
       ? linhaDaGeometria("rota-ativa", estadoAtual.rota.geometria)
       : undefined;
 
+  const sentidoOutro: Sentido | undefined =
+    sentidoSelecionado && bidirecional ? (sentidoSelecionado === "ida" ? "volta" : "ida") : undefined;
   const paradasOutroSentido =
-    linhaAtual && sentidoSelecionado && bidirecional
-      ? paradasDe(linhaAtual.servicoUuid, sentidoSelecionado === "ida" ? "volta" : "ida")
+    linhaAtual && sentidoOutro ? paradasDe(linhaAtual.servicoUuid, sentidoOutro) : undefined;
+  // Pontos de rota do OUTRO sentido (TASK-077; DEC-060/071): insumo da
+  // reancoragem do espelho — o mesmo `reancorarPontosDeRota` já usado para o
+  // sentido editado, agora aplicado ao antes/depois do sentido espelhado.
+  const pontosDeRotaOutroSentido: readonly PontoDeRota[] | undefined =
+    linhaAtual && sentidoOutro
+      ? pontosDeRotaDoItinerario(sessao, linhaAtual.servicoUuid, sentidoOutro)
       : undefined;
   const conjuntoConsistente = bidirecional
     ? conjuntoSecoesConsistente(
@@ -310,6 +320,15 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
         sentidoSelecionado === "volta" ? paradasAtual : paradasOutroSentido,
       )
     : true;
+  // Seções já usadas por QUALQUER sentido do Serviço corrente (RN-030: o
+  // conjunto é idêntico entre Ida/Volta) — o reuso (DEC-063) deixa de ofertar
+  // Seções já presentes no itinerário do Serviço, servindo só para trazer
+  // Seções de OUTROS Serviços (RN-025).
+  const secoesUsadasNoServico = new Set<string>([
+    ...subsequenciaSecoes(paradasAtual),
+    ...(paradasOutroSentido ? subsequenciaSecoes(paradasOutroSentido) : []),
+  ]);
+  const secoesParaReuso = secoes.filter((s) => !secoesUsadasNoServico.has(s.uuid));
 
   // Funções PURAS de composição de sessão (base → próxima base), usadas para
   // dobrar várias mudanças (Seção/Local + paradas) num ÚNICO `aoAtualizarSessao`
@@ -390,15 +409,136 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
   }
 
   /**
-   * Comita a nova sequência de paradas imediatamente (RN-052: reordenar/
-   * inserir/remover é aplicado na tabela na hora) e dispara o recálculo ao
-   * vivo (assíncrono) — sucesso grava a rota nova; falha só acende a
-   * pendência ao vivo, sem apagar a última rota válida do documento (RN-048).
-   * `opcoes.aoComitarBase` dobra uma mudança de Seção/Local NO MESMO commit
-   * síncrono (ver nota acima); `secoesParaResolver`/`locaisParaResolver`
-   * (default: os arrays já renderizados) são os que `dispararRecalculo`
-   * efetivamente resolve — precisam incluir a entidade recém-criada/atualizada
-   * quando `aoComitarBase` a introduz, senão a resolução (RN-036) não a encontra.
+   * Dispara o recálculo ao vivo de UM sentido e grava o resultado (TASK-019;
+   * generalizada pela TASK-077 para aceitar qualquer sentido, não só
+   * `sentidoSelecionado` — o espelho Ida↔Volta recalcula os DOIS sentidos no
+   * mesmo gesto). Sucesso grava a rota nova e reconcilia matrizes/horários
+   * (Serviço completo) ou tenta promover (Serviço em construção); falha só
+   * acende a pendência ao vivo, sem apagar a última rota válida (RN-048).
+   * Mescla sobre a sessão MAIS RECENTE (`sessaoRef`), atualizado
+   * SINCRONAMENTE ao final — não pela espera do próximo render — para que a
+   * chamada seguinte (o recálculo do sentido ESPELHADO, sequencial a este)
+   * enxergue este write-back mesmo que o `await` do OSRM resolva antes do
+   * ciclo de render do React.
+   */
+  async function recalcularERegistrar(
+    servicoUuid: string,
+    sentido: Sentido,
+    completo: boolean,
+    chave: string,
+    paradasDoSentido: readonly ParadaEmEdicao[],
+    pontosDoSentido: readonly PontoDeRota[],
+    secoesParaResolver: Secao[],
+    locaisParaResolver: Local[],
+  ) {
+    const resultado = await dispararRecalculo(
+      paradasDoSentido,
+      secoesParaResolver,
+      locaisParaResolver,
+      servicoUuid,
+      sentido,
+      pontosDoSentido,
+    );
+
+    if (!resultado.ok) {
+      // Itinerário ainda em montagem (RN-034/035/036) — sem pendência
+      // prematura (§11), mas o motivo da recusa é exibido (TASK-047) em vez de
+      // descartado silenciosamente.
+      definirViolacoesMontagemMapa((mapa) => ({ ...mapa, [chave]: resultado.violacoes }));
+      return;
+    }
+    definirViolacoesMontagemMapa((mapa) => {
+      if (!(chave in mapa)) return mapa;
+      const resto = { ...mapa };
+      delete resto[chave];
+      return resto;
+    });
+
+    // Mescla sobre a sessão MAIS RECENTE (`sessaoRef`), não a fechada por este
+    // closure — o `await` acima atravessa um ciclo de render; entre o disparo
+    // e a resposta do OSRM outro gesto pode ter comitado (ex.: o usuário
+    // continuou editando enquanto a rota calculava).
+    const atual = sessaoRef.current;
+    const estadosMapa = { ...(atual.estadosRotaViva ?? {}), [chave]: resultado.estado };
+    let proxima: SessaoFormulario = { ...atual, estadosRotaViva: estadosMapa };
+
+    if (completo && resultado.estado.situacao === "recalculada") {
+      // Serviço já completo (documento carregado, ou já promovido — DEC-053):
+      // grava a rota+paradas novas e reconcilia a matriz no mesmo commit
+      // (RN-054..057).
+      const atualizacaoServico = servicosComItinerarioAtualizado(
+        servicosDaSessao(atual),
+        servicoUuid,
+        sentido,
+        [...paradasDoSentido],
+        resultado.estado.rota,
+      );
+      const servicosAtualizados = atualizacaoServico.servicos;
+      proxima = comServicosDaSessao(proxima, servicosAtualizados);
+
+      // DEC-048/049: mudar ordem/conjunto reseta os horários e descarta, no
+      // MESMO update, somente as âncoras efêmeras das Viagens reconciliadas.
+      // Mudança apenas de rota devolve a lista vazia e preserva âncoras/offsets.
+      if (atualizacaoServico.uuidsViagensComAncorasDescartadas.length > 0) {
+        proxima = {
+          ...proxima,
+          ancorasHorario: removerAncorasHorarioDeViagens(
+            proxima.ancorasHorario ?? {},
+            atualizacaoServico.uuidsViagensComAncorasDescartadas,
+          ),
+        };
+      }
+
+      // TASK-084 (RN-018): a remoção de parada pode ter deixado de referenciar
+      // uma Seção em TODOS os itinerários do Serviço — limpa a contribuição
+      // dele e descarta a Seção que ficar órfã, no MESMO commit (senão o
+      // documento fica com a violação estrutural RN-018 até o próximo gesto).
+      // Ao espelhar remoção nos dois sentidos (TASK-077), a Seção só fica
+      // realmente órfã depois que o SEGUNDO write-back (o do sentido
+      // espelhado) fechar — comportamento correto por construção, pois este
+      // write-back lê `secoesDaSessao(atual)` no momento em que roda.
+      const servicoAtualizado = servicosAtualizados.find((s) => s.uuid === servicoUuid);
+      if (servicoAtualizado) {
+        const secoesLimpas = limparSecoesAposEdicaoDeParadas(
+          secoesDaSessao(atual),
+          servicoAtualizado,
+        );
+        proxima = comSecoesAtualizadas(proxima, secoesLimpas);
+      }
+    } else if (!completo && resultado.estado.situacao === "recalculada") {
+      // Ainda em construção, em QUALQUER modo (DEC-053/TASK-061; gate de modo
+      // removido pela TASK-080): tenta promover. "Ambos" só promove quando os
+      // dois sentidos têm rota válida — o sentido que falta permanece em
+      // `servicosEmConstrucao`. `proxima` já carrega `estadosRotaViva`
+      // atualizado com o resultado deste recálculo.
+      proxima = promoverServicoNaSessao(proxima, servicoUuid);
+    }
+
+    // Atualiza a ref IMEDIATAMENTE (não espera o próximo render) — essencial
+    // quando esta chamada é a PRIMEIRA de duas sequenciais no mesmo gesto
+    // (TASK-077): a segunda (sentido espelhado) precisa enxergar este
+    // write-back ao ler `sessaoRef.current`, mesmo que o React ainda não
+    // tenha re-renderizado com a nova `sessao`.
+    sessaoRef.current = proxima;
+    aoAtualizarSessao(proxima);
+  }
+
+  /**
+   * Comita a nova sequência de paradas do sentido SELECIONADO imediatamente
+   * (RN-052: reordenar/inserir/remover é aplicado na tabela na hora) e
+   * dispara o recálculo ao vivo (assíncrono). `opcoes.aoComitarBase` dobra
+   * uma mudança de Seção/Local NO MESMO commit síncrono (ver nota acima);
+   * `secoesParaResolver`/`locaisParaResolver` (default: os arrays já
+   * renderizados) são os que `dispararRecalculo` efetivamente resolve —
+   * precisam incluir a entidade recém-criada/atualizada quando
+   * `aoComitarBase` a introduz, senão a resolução (RN-036) não a encontra.
+   *
+   * `opcoes.gestoSecao` (TASK-077; DEC-063/071) dispara o espelhamento
+   * Ida↔Volta num Serviço bidirecional: a lista espelhada do sentido OUTRO é
+   * computada a partir do gesto atômico (nunca por diff da sequência final —
+   * DEC-071) e comitada no MESMO commit síncrono das paradas do sentido
+   * editado; os dois recálculos disparam em SEQUÊNCIA (editado → espelhado),
+   * nunca em paralelo, para não correr sobre `sessaoRef`.
    */
   async function aplicarNovasParadas(
     novasParadas: ParadaEmEdicao[],
@@ -413,6 +553,11 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
        * rota diretamente; só os handlers de ponto de rota (TASK-063) passam a
        * lista já atualizada (paradas inalteradas — a re-ancoragem vira no-op). */
       pontosDeRota?: readonly PontoDeRota[];
+      /** Gesto atômico de Seção do sentido EDITADO — `undefined` para gestos
+       * que não tocam a subsequência de Seções (Local, ponto de rota, arrasto
+       * de coordenada): esses nunca espelham (Locais/pontos de rota são
+       * livres por sentido, Spec 02 §14, Spec 04 §7.2). */
+      gestoSecao?: GestoSecao;
     } = {},
   ) {
     if (!linhaAtual || !sentidoSelecionado || !recursosMunicipio) return;
@@ -437,104 +582,83 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
       definirDescartePontoDeRotaMapa((mapa) => ({ ...mapa, [chave]: houveDescarte }));
     }
 
+    // Espelho Ida↔Volta (TASK-077; DEC-063/071) — computado a partir do
+    // estado do sentido OUTRO lido neste render (`paradasOutroSentido`), o
+    // mesmo padrão que `paradasAtual` já usa para o sentido corrente. Sem
+    // `gestoSecao` (gesto que não toca Seção) ou sem o outro sentido existir
+    // (RN-038, Serviço unidirecional) não há o que espelhar.
+    const chaveOutro =
+      sentidoOutro && linhaAtual ? chaveItinerario(linhaAtual.servicoUuid, sentidoOutro) : undefined;
+    const paradasEspelhadas =
+      sentidoOutro && chaveOutro && opcoes.gestoSecao && paradasOutroSentido
+        ? espelharGestoDeSecao(paradasOutroSentido, opcoes.gestoSecao, novasParadas)
+        : undefined;
+    const pontosEspelhados =
+      paradasEspelhadas && paradasOutroSentido
+        ? reancorarPontosDeRota(
+            paradasOutroSentido.map(chaveParadaEmEdicao),
+            paradasEspelhadas.map(chaveParadaEmEdicao),
+            pontosDeRotaOutroSentido ?? [],
+          )
+        : undefined;
+
     const base = opcoes.aoComitarBase ? opcoes.aoComitarBase(sessao) : sessao;
     const paradasMapa = { ...(base.paradasEmEdicao ?? {}), [chave]: novasParadas };
     const pontosDeRotaMapa = { ...(base.pontosDeRotaEmEdicao ?? {}), [chave]: [...pontosParaReaplicar] };
-    aoAtualizarSessao({ ...base, paradasEmEdicao: paradasMapa, pontosDeRotaEmEdicao: pontosDeRotaMapa });
+    if (chaveOutro && paradasEspelhadas) {
+      paradasMapa[chaveOutro] = paradasEspelhadas;
+      pontosDeRotaMapa[chaveOutro] = [...(pontosEspelhados ?? [])];
+    }
+    const proximaBase: SessaoFormulario = {
+      ...base,
+      paradasEmEdicao: paradasMapa,
+      pontosDeRotaEmEdicao: pontosDeRotaMapa,
+    };
+    sessaoRef.current = proximaBase;
+    aoAtualizarSessao(proximaBase);
 
     definirRecalculando(true);
-    const resultado = await dispararRecalculo(
-      novasParadas,
-      opcoes.secoesParaResolver ?? secoes,
-      opcoes.locaisParaResolver ?? linhaAtual.locais,
+    await recalcularERegistrar(
       linhaAtual.servicoUuid,
       sentidoSelecionado,
+      linhaAtual.completo,
+      chave,
+      novasParadas,
       pontosParaReaplicar,
+      opcoes.secoesParaResolver ?? secoes,
+      opcoes.locaisParaResolver ?? linhaAtual.locais,
     );
-    definirRecalculando(false);
-
-    if (!resultado.ok) {
-      // Itinerário ainda em montagem (RN-034/035/036) — sem pendência
-      // prematura (§11), mas o motivo da recusa é exibido (TASK-047) em vez de
-      // descartado silenciosamente.
-      definirViolacoesMontagemMapa((mapa) => ({ ...mapa, [chave]: resultado.violacoes }));
-      return;
-    }
-    definirViolacoesMontagemMapa((mapa) => {
-      if (!(chave in mapa)) return mapa;
-      const resto = { ...mapa };
-      delete resto[chave];
-      return resto;
-    });
-
-    // Mescla sobre a sessão MAIS RECENTE (`sessaoRef`), não a fechada por este
-    // closure — o `await` acima atravessa um ciclo de render; entre o disparo
-    // e a resposta do OSRM outro gesto pode ter comitado (ex.: o usuário
-    // continuou editando enquanto a rota calculava).
-    const atual = sessaoRef.current;
-    const estadosMapa = { ...(atual.estadosRotaViva ?? {}), [chave]: resultado.estado };
-    let proxima: SessaoFormulario = { ...atual, estadosRotaViva: estadosMapa };
-
-    if (linhaAtual.completo && resultado.estado.situacao === "recalculada") {
-      // Serviço já completo (documento carregado, ou já promovido — DEC-053):
-      // grava a rota+paradas novas e reconcilia a matriz no mesmo commit
-      // (RN-054..057).
-      const atualizacaoServico = servicosComItinerarioAtualizado(
-        servicosDaSessao(atual),
+    if (sentidoOutro && chaveOutro && paradasEspelhadas) {
+      await recalcularERegistrar(
         linhaAtual.servicoUuid,
-        sentidoSelecionado,
-        novasParadas,
-        resultado.estado.rota,
+        sentidoOutro,
+        linhaAtual.completo,
+        chaveOutro,
+        paradasEspelhadas,
+        pontosEspelhados ?? [],
+        opcoes.secoesParaResolver ?? secoes,
+        opcoes.locaisParaResolver ?? linhaAtual.locais,
       );
-      const servicosAtualizados = atualizacaoServico.servicos;
-      proxima = comServicosDaSessao(proxima, servicosAtualizados);
-
-      // DEC-048/049: mudar ordem/conjunto reseta os horários e descarta, no
-      // MESMO update, somente as âncoras efêmeras das Viagens reconciliadas.
-      // Mudança apenas de rota devolve a lista vazia e preserva âncoras/offsets.
-      if (atualizacaoServico.uuidsViagensComAncorasDescartadas.length > 0) {
-        proxima = {
-          ...proxima,
-          ancorasHorario: removerAncorasHorarioDeViagens(
-            proxima.ancorasHorario ?? {},
-            atualizacaoServico.uuidsViagensComAncorasDescartadas,
-          ),
-        };
-      }
-
-      // TASK-084 (RN-018): a remoção de parada pode ter deixado de referenciar
-      // uma Seção em TODOS os itinerários do Serviço — limpa a contribuição
-      // dele e descarta a Seção que ficar órfã, no MESMO commit (senão o
-      // documento fica com a violação estrutural RN-018 até o próximo gesto).
-      const servicoAtualizado = servicosAtualizados.find(
-        (s) => s.uuid === linhaAtual.servicoUuid,
-      );
-      if (servicoAtualizado) {
-        const secoesLimpas = limparSecoesAposEdicaoDeParadas(
-          secoesDaSessao(atual),
-          servicoAtualizado,
-        );
-        proxima = comSecoesAtualizadas(proxima, secoesLimpas);
-      }
-    } else if (!linhaAtual.completo && resultado.estado.situacao === "recalculada") {
-      // Ainda em construção, em QUALQUER modo (DEC-053/TASK-061; gate de modo
-      // removido pela TASK-080): tenta promover. "Ambos" só promove quando os
-      // dois sentidos têm rota válida — o sentido que falta permanece em
-      // `servicosEmConstrucao`. `proxima` já carrega `estadosRotaViva`
-      // atualizado com o resultado deste recálculo.
-      proxima = promoverServicoNaSessao(proxima, linhaAtual.servicoUuid);
     }
-
-    aoAtualizarSessao(proxima);
+    definirRecalculando(false);
   }
 
   function moverParada(deIndice: number, paraIndice: number) {
     if (paraIndice < 0 || paraIndice >= paradasAtual.length) return;
-    void aplicarNovasParadas(reordenarParada(paradasAtual, deIndice, paraIndice));
+    // Mover é gesto de SEÇÃO só quando o item movido é Seção (TASK-077;
+    // DEC-071) — mover um Local por cima/baixo de uma Seção não altera a
+    // subsequência de Seções e não espelha (Locais são livres por sentido).
+    const paradaMovida = paradasAtual[deIndice];
+    const gestoSecao: GestoSecao | undefined =
+      paradaMovida.tipo === "secao" ? { tipo: "movimento", secaoUuid: paradaMovida.secaoUuid } : undefined;
+    void aplicarNovasParadas(reordenarParada(paradasAtual, deIndice, paraIndice), { gestoSecao });
   }
 
   function removerParadaNaTabela(indice: number) {
-    void aplicarNovasParadas(removerParada(paradasAtual, indice));
+    const paradaRemovida = paradasAtual[indice];
+    const gestoSecao: GestoSecao | undefined =
+      paradaRemovida.tipo === "secao" ? { tipo: "remocao", secaoUuid: paradaRemovida.secaoUuid } : undefined;
+    void aplicarNovasParadas(removerParada(paradasAtual, indice), { gestoSecao });
   }
 
   function aoRecalcularManualmente() {
@@ -606,12 +730,19 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
       ? { paradas: paradasAtual }
       : prepararInsercaoDeParada(paradaDeSecao(secao.uuid), posicaoNaLinha);
     if (!insercao) return;
+    // Insere/reutiliza é gesto de SEÇÃO (TASK-077; DEC-063/071) só quando
+    // realmente introduz uma parada nova — arrastar um ponto já inserido
+    // (`jaEhParada`) é mudança de coordenada, não de conjunto, e não espelha.
+    const gestoSecao: GestoSecao | undefined = jaEhParada
+      ? undefined
+      : { tipo: "insercao", secaoUuid: secao.uuid };
     void aplicarNovasParadas(
       insercao.paradas,
       {
         secoesParaResolver: secoesAtualizadas,
         aoComitarBase: (base) => comSecoesAtualizadas(base, secoesAtualizadas),
         pontosDeRota: insercao.pontosDeRota,
+        gestoSecao,
       },
     );
   }
@@ -814,7 +945,7 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
               className={`flex min-h-0 flex-col gap-4 ${ALTURA_MAPA_CLASSE_LG}`}
             >
               <PainelReusoSecao
-                secoes={secoes}
+                secoes={secoesParaReuso}
                 servicoUuid={linhaAtual.servicoUuid}
                 sentido={sentidoSelecionado}
                 bidirecional={bidirecional}

@@ -41,6 +41,52 @@ async function abrirEtapaVolta(page: import("@playwright/test").Page) {
   await expect(page.getByTestId("tabela-paradas").getByTestId("parada-item")).toHaveCount(3);
 }
 
+// TASK-077 (DEC-063/071): gestos de Seção nesta etapa espelham no OUTRO
+// sentido do Serviço bidirecional 0001-1SU — cada gesto de Seção dispara DOIS
+// recálculos OSRM (Volta editada, depois Ida espelhada), não mais um só.
+// `ehCoordenadaDaVolta` identifica, pela URL da requisição, qual chamada
+// pertence à Volta (usa as geolocalizações `geolocalizacao_volta`, distintas
+// das de Ida no fixture) — permite manter, sem ambiguidade, a lógica de
+// mock/contagem específica de cada teste apontada exclusivamente ao sentido
+// que o teste exercita, enquanto a chamada espelhada da Ida recebe uma
+// resposta OK genérica (legs coerentes com o nº de coordenadas da própria
+// requisição — nunca fixas), sem afetar as asserções do sentido testado.
+function ehCoordenadaDaVolta(url: string): boolean {
+  // Pares completos "lon,lat" (não só um fragmento): `-46.402` isoladamente é
+  // PREFIXO de `-46.4025` (a variante Ida de Praia Grande) — um match parcial
+  // classificaria errado a chamada espelhada da Ida como se fosse da Volta.
+  return (
+    url.includes("-46.402,-24.0081") ||
+    url.includes("-46.3915,-23.9629") ||
+    url.includes("-46.3342,-23.9611")
+  );
+}
+
+function respostaOsrmGenericaOk(url: string) {
+  const casado = /\/driving\/([^?]+)/.exec(url);
+  const coordenadas = casado ? casado[1].split(";") : [];
+  const totalLegs = Math.max(coordenadas.length - 1, 0);
+  return {
+    contentType: "application/json",
+    body: JSON.stringify({
+      code: "Ok",
+      routes: [
+        {
+          geometry: {
+            type: "LineString",
+            coordinates: coordenadas.map((par) => par.split(",").map(Number)),
+          },
+          legs: Array.from({ length: totalLegs }, () => ({
+            distance: 1000,
+            duration: 100,
+            steps: [{ name: "Via Espelho E2E" }],
+          })),
+        },
+      ],
+    }),
+  };
+}
+
 test.describe("Etapa Seções, Locais e Itinerários — abertura (RN-015)", () => {
   test("abrir JSON existente exibe a rota/descrição CONGELADAS, sem chamar o OSRM", async ({
     page,
@@ -126,6 +172,10 @@ test.describe("Etapa Seções, Locais e Itinerários — reordenar dispara recá
   test("falha do OSRM (NoRoute, mockado) acende a pendência bloqueante no painel (TASK-044)", async ({
     page,
   }) => {
+    // TASK-077: mover uma Seção na Volta espelha o mesmo movimento na Ida
+    // (0001-1SU é bidirecional, sem Locais) — as DUAS recalculam e as DUAS
+    // falham com o mesmo mock (NoRoute uniforme), gerando duas pendências
+    // bloqueantes. A asserção mira exclusivamente a da Volta.
     await page.route("https://router.project-osrm.org/**", (rota) =>
       rota.fulfill({
         contentType: "application/json",
@@ -144,10 +194,10 @@ test.describe("Etapa Seções, Locais e Itinerários — reordenar dispara recá
     const pendencia = page
       .getByTestId("painel-pendencias")
       .getByTestId("pendencia-item")
-      .filter({ hasText: "está sem rota calculada" });
+      .filter({ hasText: "está sem rota calculada" })
+      .filter({ hasText: "O itinerário de Volta do Serviço 0001-1SU" });
     await expect(pendencia).toBeVisible();
     await expect(pendencia).toHaveAttribute("data-severidade", "bloqueante");
-    await expect(pendencia).toContainText("O itinerário de Volta do Serviço 0001-1SU");
   });
 });
 
@@ -159,9 +209,14 @@ test.describe("Etapa Seções, Locais e Itinerários — criar Seção via mapa 
     // (não a lista `secoes` obsoleta de antes do gesto) — sem o array fresco
     // passado por `secoesParaResolver`, o recálculo falharia por RN-036 (Seção
     // sem geolocalização do sentido "encontrada") e o OSRM nunca seria chamado.
+    // TASK-077: a criação espelha na Ida (bidirecional) — `ultimaUrlOsrm`
+    // captura só a chamada da VOLTA (o sentido exercitado pelo teste); a
+    // chamada espelhada da Ida usa a MESMA resposta fixa (mesmo nº de legs,
+    // coincidência segura aqui — Ida também vai de 3 para 4 paradas).
     let ultimaUrlOsrm: string | null = null;
     await page.route("https://router.project-osrm.org/**", (rota) => {
-      ultimaUrlOsrm = rota.request().url();
+      const url = rota.request().url();
+      if (ehCoordenadaDaVolta(url)) ultimaUrlOsrm = url;
       return rota.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
@@ -340,21 +395,25 @@ test.describe("TASK-068 — vocabulário visual e Local extremo contextual", () 
     await page.getByTestId("confirmar-criar-secao").click();
 
     await expect(page.getByTestId("recalculando-rota")).toHaveCount(0);
-    expect(chamadasOsrm).toBe(1);
+    // TASK-077: criar a Seção na Volta espelha a inserção na Ida (bidirecional,
+    // sem Locais) — 2 chamadas (Volta + Ida), não mais 1.
+    expect(chamadasOsrm).toBe(2);
     await expect(page.locator('[data-testid="parada-item"][data-estado="local-extremo"]')).toHaveCount(0);
     await expect(mapaRetorno.locator(".marcador-mapa--invalido")).toHaveCount(0);
     await expect(page.getByTestId("avisos-montagem-invalida")).toHaveCount(0);
 
     // Move o mesmo Local válido até a primeira posição. Os dois primeiros
     // movimentos ainda o deixam intermediário e recalculam; o terceiro viola
-    // RN-035 e é recusado antes do OSRM.
+    // RN-035 e é recusado antes do OSRM. Mover um LOCAL nunca espelha
+    // (TASK-077: só gesto de Seção dispara o espelho) — cada movimento válido
+    // soma exatamente 1 chamada, a partir da base de 2 acima.
     const linhaLocal = page
       .locator('[data-testid="parada-item"]')
       .filter({ hasText: "Jaú - Local extremo E2E" });
     await linhaLocal.getByTestId("parada-mover-cima").click();
-    await expect.poll(() => chamadasOsrm).toBe(2);
-    await linhaLocal.getByTestId("parada-mover-cima").click();
     await expect.poll(() => chamadasOsrm).toBe(3);
+    await linhaLocal.getByTestId("parada-mover-cima").click();
+    await expect.poll(() => chamadasOsrm).toBe(4);
     await linhaLocal.getByTestId("parada-mover-cima").click();
 
     await expect(linhaLocal).toHaveAttribute("data-estado", "local-extremo");
@@ -365,7 +424,7 @@ test.describe("TASK-068 — vocabulário visual e Local extremo contextual", () 
       "a primeira Parada deve ser uma Seção",
     );
     await expect(mapaRetorno.locator(".marcador-mapa--invalido")).toHaveCount(1);
-    expect(chamadasOsrm).toBe(3);
+    expect(chamadasOsrm).toBe(4);
 
     // O erro pertence à ocorrência da Volta: a Ida do mesmo Serviço não
     // herda a borda nem a linha inválida.
@@ -378,7 +437,7 @@ test.describe("TASK-068 — vocabulário visual e Local extremo contextual", () 
     await page.locator('[data-testid="botao-sentido"][data-sentido="volta"]').click();
     await expect(linhaLocal).toHaveAttribute("data-estado", "local-extremo");
     await linhaLocal.getByTestId("parada-mover-baixo").click();
-    await expect.poll(() => chamadasOsrm).toBe(4);
+    await expect.poll(() => chamadasOsrm).toBe(5);
     await expect(linhaLocal).not.toHaveAttribute("data-estado", "local-extremo");
     await expect(mapaRetorno.locator(".marcador-mapa--invalido")).toHaveCount(0);
   });
@@ -551,7 +610,15 @@ test.describe("Etapa Seções, Locais e Itinerários — gesto de ponto de rota 
   test("TASK-071: ponto de rota sobrevive a um recálculo que falha; o recálculo seguinte bem-sucedido o reaplica", async ({
     page,
   }) => {
+    // TASK-077: "mover uma parada" abaixo é sempre gesto de SEÇÃO (as 3
+    // paradas de 0001-1SU são Seções, sem Locais) — espelha na Ida a cada
+    // vez. `chamada` conta TODAS as requisições (Volta + Ida espelhada);
+    // `chamadaVolta` conta só as da Volta, preservando a numeração original
+    // do cenário ("a 2ª tentativa falha") sem ambiguidade. A chamada
+    // espelhada da Ida sempre responde OK genérico — não faz parte do
+    // cenário de falha/reaplicação de ponto de rota, que é Volta-only.
     let chamada = 0;
+    let chamadaVolta = 0;
     let ultimaUrlOsrm: string | null = null;
     const respostaOk = {
       code: "Ok",
@@ -576,15 +643,20 @@ test.describe("Etapa Seções, Locais e Itinerários — gesto de ponto de rota 
     };
     await page.route("https://router.project-osrm.org/**", (rota) => {
       chamada += 1;
-      // A 2ª tentativa (após criar o ponto) falha — simula o soluço
-      // transitório do OSRM demo (Spec 04 §7.3) que a DEC-058 endereça.
-      if (chamada === 2) {
+      const url = rota.request().url();
+      if (!ehCoordenadaDaVolta(url)) {
+        return rota.fulfill(respostaOsrmGenericaOk(url));
+      }
+      chamadaVolta += 1;
+      // A 2ª tentativa DA VOLTA (após criar o ponto) falha — simula o
+      // soluço transitório do OSRM demo (Spec 04 §7.3) que a DEC-058 endereça.
+      if (chamadaVolta === 2) {
         return rota.fulfill({
           contentType: "application/json",
           body: JSON.stringify({ code: "NoRoute", routes: [] }),
         });
       }
-      ultimaUrlOsrm = rota.request().url();
+      ultimaUrlOsrm = url;
       return rota.fulfill({ contentType: "application/json", body: JSON.stringify(respostaOk) });
     });
 
@@ -640,7 +712,8 @@ test.describe("Etapa Seções, Locais e Itinerários — gesto de ponto de rota 
     await expect(page.getByTestId("mensagem-sem-rota")).toHaveCount(0);
     await expect(page.getByTestId("tabela-paradas").getByTestId("ponto-rota-item")).toHaveCount(1);
 
-    expect(chamada).toBe(3);
+    // 1 (ponto de rota, Volta-only) + 2×2 (mover-baixo espelha Volta+Ida) = 5.
+    expect(chamada).toBe(5);
     expect(ultimaUrlOsrm).not.toBeNull();
     const url = ultimaUrlOsrm as unknown as string;
     expect(url).toContain("waypoints=");
@@ -872,15 +945,20 @@ test.describe("Etapa Seções, Locais e Itinerários — feedback de montagem in
 
     // Volta tem 3 paradas, todas Seções (Praia Grande, São Vicente, Santos).
     // Remover a primeira deixa 2 paradas — montagem ainda válida, recalcula
-    // com sucesso (fixa a última rota válida do documento).
+    // com sucesso (fixa a última rota válida do documento). TASK-077: a
+    // remoção espelha na Ida (também some com 3→2 paradas, válida) — 2
+    // chamadas, não mais 1 (mesma resposta serve às duas, coincidência
+    // segura: as duas terminam com 2 paradas, mesmo nº de legs).
     await page.getByTestId("parada-remover").first().click();
     await expect(page.getByTestId("tabela-paradas").getByTestId("parada-item")).toHaveCount(2);
     await expect(page.getByTestId("descricao-texto")).toContainText("Via Remanescente");
-    expect(chamadasOsrm).toBe(1);
+    expect(chamadasOsrm).toBe(2);
 
     // Remover a última parada restante deixa só 1 — RN-034 (mínimo 2). O
     // motor recusa ANTES de chamar o OSRM (não é falha de rota, é montagem em
-    // andamento — resolverParadasRota nunca chega a resolver as paradas).
+    // andamento — resolverParadasRota nunca chega a resolver as paradas). O
+    // espelho na Ida também fica com 1 parada só (mesma Seção removida) —
+    // igualmente recusado antes do OSRM, sem nenhuma chamada nova.
     await page.getByTestId("parada-remover").first().click();
 
     await expect(page.getByTestId("tabela-paradas").getByTestId("parada-item")).toHaveCount(1);
@@ -890,7 +968,7 @@ test.describe("Etapa Seções, Locais e Itinerários — feedback de montagem in
     );
     // Nenhuma menção a tarifa/R$ na mensagem exibida (RN-049).
     await expect(page.getByTestId("aviso-montagem-invalida")).not.toContainText(/tarifa|R\$/i);
-    expect(chamadasOsrm).toBe(1); // nenhuma chamada nova para a tentativa inválida
+    expect(chamadasOsrm).toBe(2); // nenhuma chamada nova para a tentativa inválida
 
     // Sem pendência de "sem rota" — a última rota VÁLIDA (com 2 paradas)
     // continua sendo a exibida; a tentativa inválida não a apaga (RN-048).
@@ -988,6 +1066,8 @@ test.describe("Etapa Seções, Locais e Itinerários — feedback de montagem in
     const rotulos = page.getByTestId("tabela-paradas").getByTestId("parada-rotulo");
     await expect(rotulos.nth(2)).toContainText("Nova Seção Posicional E2E");
     await expect(rotulos.last()).toHaveText("Santos - Terminal Santos");
-    expect(chamadasOsrm).toBe(1);
+    // TASK-077: a inserção espelha na Ida (3→4 paradas também lá) — 2
+    // chamadas, não mais 1.
+    expect(chamadasOsrm).toBe(2);
   });
 });

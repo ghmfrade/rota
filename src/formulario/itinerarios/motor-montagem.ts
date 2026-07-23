@@ -261,6 +261,123 @@ export function conjuntoSecoesConsistente(
   return true;
 }
 
+/** Subsequência de `secaoUuid`, na ordem em que aparecem — insumo do espelho
+ * Ida↔Volta (DEC-063/DEC-071) e da validação estrutural da ordem inversa
+ * (RN-030, `shared/contrato/validacoes-estruturais.ts`). */
+export function subsequenciaSecoes(paradas: readonly ParadaEmEdicao[]): string[] {
+  return paradas
+    .filter((p): p is Extract<ParadaEmEdicao, { tipo: "secao" }> => p.tipo === "secao")
+    .map((p) => p.secaoUuid);
+}
+
+/** Gesto atômico de Seção que dispara o espelhamento Ida↔Volta (DEC-071:
+ * "o motor deve receber a identidade da Seção movida e sua posição de
+ * destino, em vez de tentar deduzir o gesto apenas comparando a sequência
+ * final"). Só gestos que tocam a SUBSEQUÊNCIA DE SEÇÕES do sentido editado
+ * disparam o espelho — Local e ponto de rota são livres por sentido (Spec 02
+ * §14; Spec 04 §7.2) e nunca produzem `GestoSecao`. */
+export type GestoSecao =
+  | { tipo: "insercao"; secaoUuid: string }
+  | { tipo: "remocao"; secaoUuid: string }
+  | { tipo: "movimento"; secaoUuid: string };
+
+/** Secao que sucede `secaoUuid` na subsequência de Seções de `paradas` (o
+ * estado do sentido EDITADO, já após o gesto). `undefined` quando `secaoUuid`
+ * é a última Seção da subsequência (o gesto a tornou o novo último extremo
+ * do sentido editado). */
+function secaoSeguinte(
+  paradas: readonly ParadaEmEdicao[],
+  secaoUuid: string,
+): string | undefined {
+  const sequencia = subsequenciaSecoes(paradas);
+  const indice = sequencia.indexOf(secaoUuid);
+  return indice === -1 ? undefined : sequencia[indice + 1];
+}
+
+/**
+ * Espelha a INSERÇÃO de `secaoUuid` (já presente em `paradasEditadasDepois`,
+ * o sentido editado após o gesto) no sentido alvo (DEC-071, opção A da
+ * Q-050): a nova Parada entra imediatamente depois da Seção que, no sentido
+ * editado, a sucede — porque a ordem do alvo é o INVERSO da editada, a
+ * sucessora na editada é a antecessora no alvo. Sem sucessora (a Seção virou
+ * o novo último extremo do sentido editado): a nova Parada é o novo PRIMEIRO
+ * extremo do alvo (Spec 02 §14 — inversão simétrica dos extremos).
+ *
+ * Exemplo da DEC-071: Ida `A-B` → `A-X-B`; Volta era `B-1-2-A` → resultado
+ * `B-X-1-2-A` (a sucessora de X na Ida é B; X entra logo depois de B na
+ * Volta).
+ */
+export function espelharInsercaoDeSecao(
+  paradasAlvo: readonly ParadaEmEdicao[],
+  secaoUuid: string,
+  paradasEditadasDepois: readonly ParadaEmEdicao[],
+): ParadaEmEdicao[] {
+  const novaParada = paradaDeSecao(secaoUuid);
+  const antecessoraNoAlvo = secaoSeguinte(paradasEditadasDepois, secaoUuid);
+  if (antecessoraNoAlvo === undefined) {
+    return [novaParada, ...paradasAlvo];
+  }
+  const indiceAntecessora = paradasAlvo.findIndex(
+    (p) => p.tipo === "secao" && p.secaoUuid === antecessoraNoAlvo,
+  );
+  if (indiceAntecessora === -1) {
+    // Defensivo: a antecessora deveria sempre existir no alvo, dado o
+    // invariante RN-030 mantido antes deste gesto. Sem ela para ancorar,
+    // insere no início em vez de descartar o gesto.
+    return [novaParada, ...paradasAlvo];
+  }
+  return inserirParada(paradasAlvo, novaParada, indiceAntecessora + 1);
+}
+
+/** Espelha a REMOÇÃO de `secaoUuid` no sentido alvo (DEC-071): elimina
+ * somente a ocorrência correspondente — sem reposicionar mais nada. Se um
+ * Local ficar no extremo do alvo por consequência, o estado é sinalizado
+ * pela DEC-070 (`ocorrenciasLocaisEmExtremo`), sem correção silenciosa aqui. */
+export function espelharRemocaoDeSecao(
+  paradasAlvo: readonly ParadaEmEdicao[],
+  secaoUuid: string,
+): ParadaEmEdicao[] {
+  return paradasAlvo.filter((p) => !(p.tipo === "secao" && p.secaoUuid === secaoUuid));
+}
+
+/**
+ * Espelha o MOVIMENTO de `secaoUuid` no sentido alvo (DEC-071): replay do
+ * gesto atômico como remoção seguida de reinserção pela mesma regra da
+ * inserção — nunca por diff da sequência final (o diff é ambíguo quando duas
+ * Seções adjacentes trocam de posição). `paradasEditadasDepois` é o sentido
+ * editado já após o movimento.
+ *
+ * Exemplo da DEC-071: Ida `A-B-C-D-E` → `A-B-D-C-E` (D antes de C); Volta era
+ * `E-D-1-2-C-3-B-4-A` → resultado `E-1-2-C-D-3-B-4-A`.
+ */
+export function espelharMovimentoDeSecao(
+  paradasAlvo: readonly ParadaEmEdicao[],
+  secaoUuid: string,
+  paradasEditadasDepois: readonly ParadaEmEdicao[],
+): ParadaEmEdicao[] {
+  const semSecao = espelharRemocaoDeSecao(paradasAlvo, secaoUuid);
+  return espelharInsercaoDeSecao(semSecao, secaoUuid, paradasEditadasDepois);
+}
+
+/** Aplica o `GestoSecao` ao sentido alvo (DEC-071) — despacho único usado
+ * pela etapa para computar a lista espelhada do outro sentido no mesmo
+ * commit. `undefined` quando `paradasAlvo` é `undefined` (Serviço ainda
+ * unidirecional, RN-038 — nada para espelhar). */
+export function espelharGestoDeSecao(
+  paradasAlvo: readonly ParadaEmEdicao[],
+  gesto: GestoSecao,
+  paradasEditadasDepois: readonly ParadaEmEdicao[],
+): ParadaEmEdicao[] {
+  switch (gesto.tipo) {
+    case "insercao":
+      return espelharInsercaoDeSecao(paradasAlvo, gesto.secaoUuid, paradasEditadasDepois);
+    case "remocao":
+      return espelharRemocaoDeSecao(paradasAlvo, gesto.secaoUuid);
+    case "movimento":
+      return espelharMovimentoDeSecao(paradasAlvo, gesto.secaoUuid, paradasEditadasDepois);
+  }
+}
+
 export type ResultadoParadasRota =
   | { ok: true; paradas: ParadaRota[] }
   | { ok: false; violacoes: ViolacaoMontagem[] };

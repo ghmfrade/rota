@@ -149,6 +149,24 @@ describe("itinerários", () => {
     esperarInvalido(doc, "[RN-030]");
   });
 
+  it("rn030 (DEC-063): aceita Volta cuja sequência de Seções é o inverso exato da Ida (fixture intacta — Ida ABC, Volta CBA)", () => {
+    esperarValido(documentoDaFixture());
+  });
+
+  it("rn030 (DEC-063): recusa Volta com o MESMO CONJUNTO de Seções da Ida, mas fora da ordem inversa", () => {
+    const doc = documentoDaFixture();
+    // Ida (Terminal Central=4da15f36 → Terminal Norte=6f51076b → Local →
+    // Rodoviária Praia Grande=63344e28): sequência de Seções A-B-C. A Volta
+    // válida seria C-B-A; aqui as paradas 1 e 2 (Terminal Norte/Terminal
+    // Central) são trocadas de posição → C-A-B, mesmo conjunto, ordem errada.
+    const paradasVolta = doc.autos.servicos[0].itinerarios[1].paradas;
+    const secaoB = paradasVolta[1].secao_uuid;
+    const secaoA = paradasVolta[2].secao_uuid;
+    paradasVolta[1].secao_uuid = secaoA;
+    paradasVolta[2].secao_uuid = secaoB;
+    esperarInvalido(doc, "[RN-030]");
+  });
+
   it("rn039: recusa itinerário sem viagens", () => {
     const doc = documentoDaFixture();
     doc.autos.servicos[0].itinerarios[0].viagens = [];

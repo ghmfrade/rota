@@ -116,6 +116,20 @@ export const VARIANTES_INVALIDAS: VarianteInvalida[] = [
     }),
   },
   {
+    rn: "RN-030-ordem",
+    descricao: "Volta com o mesmo conjunto de Seções da Ida, mas fora da ordem inversa (DEC-063)",
+    fragmentoEsperado: "[RN-030]",
+    construir: base((doc) => {
+      // Ida é A-B-C (Santos, São Vicente, Praia Grande); a Volta VÁLIDA seria
+      // C-B-A. Aqui a Volta vira C-A-B: mesmo conjunto, ordem não-inversa.
+      const paradasVolta = doc.autos.servicos[0].itinerarios[1].paradas;
+      const secaoB = paradasVolta[1].secao_uuid;
+      const secaoA = paradasVolta[2].secao_uuid;
+      paradasVolta[1].secao_uuid = secaoA;
+      paradasVolta[2].secao_uuid = secaoB;
+    }),
+  },
+  {
     rn: "RN-032",
     descricao: "Local sem nenhuma geolocalizacao (ida nem volta)",
     fragmentoEsperado: "[RN-032]",

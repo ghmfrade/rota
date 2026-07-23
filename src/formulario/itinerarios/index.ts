@@ -16,12 +16,18 @@ export {
   validarMontagem,
   conjuntoSecoesConsistente,
   resolverParadasRota,
+  subsequenciaSecoes,
+  espelharInsercaoDeSecao,
+  espelharRemocaoDeSecao,
+  espelharMovimentoDeSecao,
+  espelharGestoDeSecao,
   type ParadaEmEdicao,
   type PosicaoExtrema,
   type OcorrenciaLocalExtremo,
   type CodigoViolacaoMontagem,
   type ViolacaoMontagem,
   type ResultadoParadasRota,
+  type GestoSecao,
 } from "./motor-montagem";
 export {
   chaveItinerario,
