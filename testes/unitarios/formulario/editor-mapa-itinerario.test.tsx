@@ -98,7 +98,6 @@ function montar(props?: Partial<Parameters<typeof EditorMapaItinerario>[0]>) {
   const aoAtualizarSecao = vi.fn();
   const aoCriarLocal = vi.fn();
   const aoAtualizarLocal = vi.fn();
-  const aoExcluirSentido = vi.fn();
   const aoCriarPontoDeRota = vi.fn();
   const aoMoverPontoDeRota = vi.fn();
   const aoRemoverPontoDeRota = vi.fn();
@@ -114,7 +113,6 @@ function montar(props?: Partial<Parameters<typeof EditorMapaItinerario>[0]>) {
       aoAtualizarSecao={aoAtualizarSecao}
       aoCriarLocal={aoCriarLocal}
       aoAtualizarLocal={aoAtualizarLocal}
-      aoExcluirSentido={aoExcluirSentido}
       aoCriarPontoDeRota={aoCriarPontoDeRota}
       aoMoverPontoDeRota={aoMoverPontoDeRota}
       aoRemoverPontoDeRota={aoRemoverPontoDeRota}
@@ -127,7 +125,6 @@ function montar(props?: Partial<Parameters<typeof EditorMapaItinerario>[0]>) {
     aoAtualizarSecao,
     aoCriarLocal,
     aoAtualizarLocal,
-    aoExcluirSentido,
     aoCriarPontoDeRota,
     aoMoverPontoDeRota,
     aoRemoverPontoDeRota,

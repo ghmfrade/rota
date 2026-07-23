@@ -1071,3 +1071,52 @@ test.describe("Etapa Seções, Locais e Itinerários — feedback de montagem in
     expect(chamadasOsrm).toBe(2);
   });
 });
+
+test.describe('TASK-094 — Local nasce unidirecional; o "X" remove a entidade (DEC-075/DEC-076)', () => {
+  test('criar Local e remover pelo "X": entidade some da tabela e da lista; gesto "Excluir ponto deste sentido" não existe mais', async ({
+    page,
+  }) => {
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      const url = rota.request().url();
+      return rota.fulfill(respostaOsrmGenericaOk(url));
+    });
+
+    await abrirEtapaVolta(page);
+    const mapa = page.getByTestId("mapa-base");
+    await mapa.locator(".maplibregl-marker").first().waitFor();
+    const caixa = await mapa.boundingBox();
+    if (!caixa) throw new Error("mapa sem bounding box");
+
+    // Centro do mapa (fora da rota congelada, Jaú — mesmo ponto do TASK-068):
+    // clique direito acrescenta o Local ao FIM (sem `posicaoNaLinha`).
+    await mapa.click({
+      button: "right",
+      position: { x: caixa.width / 2, y: caixa.height / 2 },
+    });
+    await page.getByRole("menuitem", { name: "Local" }).click();
+    await page.getByTestId("nome-local-input").fill("Local TASK-094 E2E");
+    await page.getByTestId("confirmar-criar-local").click();
+
+    const linhaLocal = page
+      .locator('[data-testid="parada-item"]')
+      .filter({ hasText: "Local TASK-094 E2E" });
+    await expect(linhaLocal).toHaveCount(1);
+
+    // DEC-076: o gesto antigo (excluir só o ponto de um sentido) não existe
+    // mais em lugar nenhum da tela — nem o rótulo, nem os testids
+    // `excluir-sentido-*`.
+    await expect(page.getByText("Excluir ponto deste sentido")).toHaveCount(0);
+    await expect(page.locator('[data-testid^="excluir-sentido-"]')).toHaveCount(0);
+
+    // O "X" da linha do Local remove a ENTIDADE (não só a Parada): some da
+    // tabela e da lista lateral de Locais do mapa.
+    await linhaLocal.getByTestId("parada-remover").click();
+    await expect(linhaLocal).toHaveCount(0);
+    await expect(page.getByText("Local TASK-094 E2E")).toHaveCount(0);
+
+    // Locais são livres por sentido (Spec 02 §14; Spec 04 §7.2) — o Local
+    // criado só na Volta nunca apareceu na Ida.
+    await page.locator('[data-testid="botao-sentido"][data-sentido="ida"]').click();
+    await expect(page.getByText("Local TASK-094 E2E")).toHaveCount(0);
+  });
+});

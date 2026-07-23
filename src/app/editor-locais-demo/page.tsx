@@ -47,9 +47,10 @@ const RECURSOS: RecursosMunicipio = {
   nomes: indiceDeNomes([{ codigo_ibge: "3500000", nome: "Cidade Demo" }]),
 };
 
-// Local inicial bidirecional com Ida e Volta no MESMO ponto (centro default do
-// mapa). Sem o par, arrastar o único ponto não teria contrapartida para medir os
-// 350 m pareados (RN-032) e nunca seria recusado. Montado como literal (não via
+// Local inicial com Ida e Volta no MESMO ponto (centro default do mapa) — caso
+// de Local LEGADO com dois pontos (a criação normal, DEC-075, só gera um).
+// Sem o par, arrastar o único ponto não teria contrapartida para medir os 350 m
+// pareados (RN-032) e nunca seria recusado. Montado como literal (não via
 // `criarLocalNoPonto`/fábrica) para ter uuid estável entre servidor e cliente —
 // ver `UUID_LOCAL_DEMO`.
 function localInicial(): Local {
@@ -75,13 +76,9 @@ export default function PaginaEditorLocaisDemo() {
       <EditorLocais
         locais={locais}
         sentido="ida"
-        bidirecional
         recursosMunicipio={RECURSOS}
         aoCriarLocal={(local) => setLocais((atual) => [...atual, local])}
         aoAtualizarLocal={(local) =>
-          setLocais((atual) => atual.map((l) => (l.uuid === local.uuid ? local : l)))
-        }
-        aoExcluirSentido={(local) =>
           setLocais((atual) => atual.map((l) => (l.uuid === local.uuid ? local : l)))
         }
       />

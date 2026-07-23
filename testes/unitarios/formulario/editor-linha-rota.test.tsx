@@ -79,11 +79,9 @@ describe("EditorLocais — repasse da rota ativa ao <Mapa> (TASK-059)", () => {
       <EditorLocais
         locais={[]}
         sentido="ida"
-        bidirecional={false}
         recursosMunicipio={RECURSOS}
         aoCriarLocal={() => {}}
         aoAtualizarLocal={() => {}}
-        aoExcluirSentido={() => {}}
         linhaRota={LINHA_ROTA}
       />,
     );
@@ -96,11 +94,9 @@ describe("EditorLocais — repasse da rota ativa ao <Mapa> (TASK-059)", () => {
       <EditorLocais
         locais={[]}
         sentido="ida"
-        bidirecional={false}
         recursosMunicipio={RECURSOS}
         aoCriarLocal={() => {}}
         aoAtualizarLocal={() => {}}
-        aoExcluirSentido={() => {}}
       />,
     );
     expect(capturado.props?.linhas).toEqual([]);

@@ -5,21 +5,21 @@ import type { Local } from "@/shared/contrato";
 import { esquemaLocal } from "@/shared/contrato";
 import {
   criarLocalNoPonto,
-  excluirSentidoDoLocal,
   MENSAGEM_FORA_DE_SP,
   MENSAGEM_RECUSA_350M_LOCAL,
   nomeExibicaoLocal,
+  removerEntidadeLocal,
   revalidarArrastoLocal,
   type RecursosMunicipio,
 } from "@/formulario/locais";
 
 // Unitários (categorias 2/3, docs-dev/08) do motor do editor de Locais (TASK-018;
-// Spec 04 §7.2): criar (espelhado quando bidirecional), arrastar (350 m pareada
-// Ida×Volta) e excluir por sentido, com RN-031/032/029 e DEC-045. A matemática
-// dos 350 m pareados e da derivação de município já é coberta em
-// testes/unitarios/geo/ (TASK-010/011) — aqui o foco é a composição do Local por
-// sentido/bidirecionalidade, a identidade (UUID), a validação pareada aplicada
-// aos gestos e a fronteira da exclusão por sentido (DEC-045).
+// TASK-094): criar (SEMPRE unidirecional — DEC-075), arrastar (350 m pareada
+// Ida×Volta, só para Local legado com os dois pontos) e remover a entidade
+// (DEC-076), com RN-031/032/029. A matemática dos 350 m pareados e da
+// derivação de município já é coberta em testes/unitarios/geo/ (TASK-010/011)
+// — aqui o foco é a composição do Local por sentido, a identidade (UUID), a
+// validação pareada aplicada aos gestos e a remoção de entidade.
 
 // Mesma técnica de testes/unitarios/geo/regra-350m.test.ts: pontos no equador,
 // longitude escalada para que a distância Haversine entre dois pontos seja
@@ -51,16 +51,26 @@ const RECURSOS: RecursosMunicipio = { features: [MUNICIPIO_TESTE], nomes: NOMES 
 // Bem longe do polígono de teste e do fallback de 2 km (Spec 03 §2.3).
 const PONTO_FORA_DE_SP: Ponto = { latitude: 80, longitude: 80 };
 
+// Local LEGADO com dois pontos (documento importado) — a criação normal
+// (DEC-075) nunca produz isto; construído aqui via criação (Ida) + arrasto
+// pareado (Volta no mesmo ponto), o único caminho que o motor ainda permite
+// chegar a um Local bidirecional.
 function localBidirecionalBase(): Local {
-  const resultado = criarLocalNoPonto({
+  const criado = criarLocalNoPonto({
     nome: "Ponto Base",
     ponto: ponto(0),
     sentido: "ida",
-    bidirecional: true,
     ...RECURSOS,
   });
-  if (!resultado.ok) throw new Error("setup inválido");
-  return resultado.local;
+  if (!criado.ok) throw new Error("setup inválido");
+  const comVolta = revalidarArrastoLocal({
+    local: criado.local,
+    sentido: "volta",
+    pontoNovo: ponto(0),
+    ...RECURSOS,
+  });
+  if (!comVolta.ok) throw new Error("setup inválido");
+  return comVolta.local;
 }
 
 describe("nomeExibicaoLocal (Spec 04 §7.1/§13.1)", () => {
@@ -71,13 +81,12 @@ describe("nomeExibicaoLocal (Spec 04 §7.1/§13.1)", () => {
   });
 });
 
-describe("criarLocalNoPonto (RN-031, RN-032, RN-029)", () => {
+describe("criarLocalNoPonto (RN-031, RN-032, RN-029; DEC-075)", () => {
   it("Serviço unidirecional (ida): só geolocalizacao_ida é preenchida", () => {
     const resultado = criarLocalNoPonto({
       nome: "Ponto Novo",
       ponto: ponto(0),
       sentido: "ida",
-      bidirecional: false,
       ...RECURSOS,
     });
     expect(resultado.ok).toBe(true);
@@ -91,7 +100,6 @@ describe("criarLocalNoPonto (RN-031, RN-032, RN-029)", () => {
       nome: "Ponto Novo",
       ponto: ponto(0),
       sentido: "volta",
-      bidirecional: false,
       ...RECURSOS,
     });
     expect(resultado.ok).toBe(true);
@@ -100,22 +108,30 @@ describe("criarLocalNoPonto (RN-031, RN-032, RN-029)", () => {
     expect(resultado.local.geolocalizacao_ida).toBeUndefined();
   });
 
-  it("Serviço bidirecional: cria Ida e Volta no mesmo ponto (espelhado — Spec 04 §7.2)", () => {
+  it("Serviço BIDIRECIONAL: criar na Ida NÃO espelha para a Volta (DEC-075 — supera a antiga criação espelhada)", () => {
     const resultado = criarLocalNoPonto({
       nome: "Ponto Novo",
       ponto: ponto(10),
       sentido: "ida",
-      bidirecional: true,
       ...RECURSOS,
     });
     expect(resultado.ok).toBe(true);
     if (!resultado.ok) return;
     expect(resultado.local.geolocalizacao_ida).toEqual(ponto(10));
+    expect(resultado.local.geolocalizacao_volta).toBeUndefined();
+  });
+
+  it("Serviço BIDIRECIONAL: criar na Volta NÃO espelha para a Ida (DEC-075)", () => {
+    const resultado = criarLocalNoPonto({
+      nome: "Ponto Novo",
+      ponto: ponto(10),
+      sentido: "volta",
+      ...RECURSOS,
+    });
+    expect(resultado.ok).toBe(true);
+    if (!resultado.ok) return;
     expect(resultado.local.geolocalizacao_volta).toEqual(ponto(10));
-    // Cópias independentes (não a mesma referência) — evita aliasing no arrasto.
-    expect(resultado.local.geolocalizacao_ida).not.toBe(
-      resultado.local.geolocalizacao_volta,
-    );
+    expect(resultado.local.geolocalizacao_ida).toBeUndefined();
   });
 
   it("deriva o município do ponto (nunca digitado — RN-029)", () => {
@@ -123,7 +139,6 @@ describe("criarLocalNoPonto (RN-031, RN-032, RN-029)", () => {
       nome: "Ponto Novo",
       ponto: ponto(0),
       sentido: "ida",
-      bidirecional: false,
       ...RECURSOS,
     });
     expect(resultado.ok && resultado.local.municipio).toBe("Cidade Teste");
@@ -134,7 +149,6 @@ describe("criarLocalNoPonto (RN-031, RN-032, RN-029)", () => {
       nome: "Ponto Novo",
       ponto: ponto(0),
       sentido: "ida",
-      bidirecional: true,
       ...RECURSOS,
     });
     expect(resultado.ok).toBe(true);
@@ -151,7 +165,6 @@ describe("criarLocalNoPonto (RN-031, RN-032, RN-029)", () => {
         nome: "   ",
         ponto: ponto(0),
         sentido: "ida",
-        bidirecional: false,
         ...RECURSOS,
       }),
     ).toThrow(/RN-031/);
@@ -162,7 +175,6 @@ describe("criarLocalNoPonto (RN-031, RN-032, RN-029)", () => {
       nome: "Ponto Novo",
       ponto: PONTO_FORA_DE_SP,
       sentido: "ida",
-      bidirecional: false,
       ...RECURSOS,
     });
     expect(resultado.ok).toBe(false);
@@ -210,7 +222,6 @@ describe("revalidarArrastoLocal (RN-032 pareada, RN-029)", () => {
       nome: "Só Ida",
       ponto: ponto(0),
       sentido: "ida",
-      bidirecional: false,
       ...RECURSOS,
     });
     if (!criacao.ok) throw new Error("setup inválido");
@@ -231,7 +242,6 @@ describe("revalidarArrastoLocal (RN-032 pareada, RN-029)", () => {
       nome: "Só Ida",
       ponto: ponto(0),
       sentido: "ida",
-      bidirecional: false,
       ...RECURSOS,
     });
     if (!criacao.ok) throw new Error("setup inválido");
@@ -247,64 +257,37 @@ describe("revalidarArrastoLocal (RN-032 pareada, RN-029)", () => {
   });
 });
 
-describe("excluirSentidoDoLocal (Spec 04 §7.2; RN-032; DEC-045)", () => {
-  it("exclui um sentido de Local bidirecional → unidirecional, município recomputado", () => {
-    // Ida em ponto(0), Volta arrastada para ponto(300) — municípios idênticos
-    // aqui, mas o ponto decisor muda (deixa de ser ponto médio).
-    const base = localBidirecionalBase();
-    const comVolta = revalidarArrastoLocal({
-      local: base,
-      sentido: "volta",
-      pontoNovo: ponto(300),
+describe("removerEntidadeLocal (Spec 04 §7.2; RN-031; DEC-076)", () => {
+  it("remove a entidade-alvo e preserva as demais (com suas UUIDs)", () => {
+    const alvo = localBidirecionalBase();
+    const outro = criarLocalNoPonto({
+      nome: "Outro Local",
+      ponto: ponto(1000),
+      sentido: "ida",
       ...RECURSOS,
     });
-    if (!comVolta.ok) throw new Error("setup inválido");
+    if (!outro.ok) throw new Error("setup inválido");
 
-    const resultado = excluirSentidoDoLocal({
-      local: comVolta.local,
-      sentido: "volta",
-      ...RECURSOS,
-    });
-    expect(resultado.ok).toBe(true);
-    if (!resultado.ok) return;
-    expect(resultado.local.geolocalizacao_volta).toBeUndefined();
-    expect(resultado.local.geolocalizacao_ida).toEqual(ponto(0));
-    expect(resultado.local.uuid).toBe(base.uuid);
-    expect(resultado.local.municipio).toBe("Cidade Teste");
-    // Continua um Local válido (ao menos uma geoloc — Spec 02 §7.1).
-    expect(() => esquemaLocal.parse(resultado.local)).not.toThrow();
+    const resultado = removerEntidadeLocal([alvo, outro.local], alvo.uuid);
+
+    expect(resultado).toHaveLength(1);
+    expect(resultado[0].uuid).toBe(outro.local.uuid);
   });
 
-  it("exclui a Ida, mantém só a Volta", () => {
-    const base = localBidirecionalBase();
-    const resultado = excluirSentidoDoLocal({
-      local: base,
-      sentido: "ida",
-      ...RECURSOS,
-    });
-    expect(resultado.ok).toBe(true);
-    if (!resultado.ok) return;
-    expect(resultado.local.geolocalizacao_ida).toBeUndefined();
-    expect(resultado.local.geolocalizacao_volta).toEqual(ponto(0));
+  it("remove Local legado com dois pontos por inteiro (não deixa resquício de nenhum sentido)", () => {
+    const legado = localBidirecionalBase();
+    const resultado = removerEntidadeLocal([legado], legado.uuid);
+    expect(resultado).toEqual([]);
   });
 
-  it("caso inválido: excluir o único ponto de um Local unidirecional é barrado (RN-032; DEC-045)", () => {
-    const criacao = criarLocalNoPonto({
-      nome: "Só Ida",
-      ponto: ponto(0),
-      sentido: "ida",
-      bidirecional: false,
-      ...RECURSOS,
-    });
-    if (!criacao.ok) throw new Error("setup inválido");
-    const resultado = excluirSentidoDoLocal({
-      local: criacao.local,
-      sentido: "ida",
-      ...RECURSOS,
-    });
-    expect(resultado.ok).toBe(false);
-    if (resultado.ok) return;
-    expect(resultado.motivo).toBe("ponto_unico");
+  it("caso inválido: UUID inexistente não altera a lista", () => {
+    const local = localBidirecionalBase();
+    const resultado = removerEntidadeLocal([local], "00000000-0000-4000-8000-000000000001");
+    expect(resultado).toEqual([local]);
+  });
+
+  it("caso inválido: lista vazia devolve lista vazia", () => {
+    expect(removerEntidadeLocal([], "00000000-0000-4000-8000-000000000001")).toEqual([]);
   });
 });
 

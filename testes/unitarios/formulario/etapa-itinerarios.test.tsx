@@ -1438,3 +1438,169 @@ describe("EtapaItinerarios — espelhamento Ida↔Volta (TASK-077; DEC-063/071)"
     resultado.desmontar();
   });
 });
+
+// TASK-094 (DEC-075/DEC-076): Local nasce unidirecional (sem espelho na
+// criação) e o "X" da tabela remove a ENTIDADE (não só a Parada do sentido
+// corrente). Fixture (Spec 02 §15): Ida = SecaoA, SecaoB, Local, SecaoC;
+// Volta = SecaoC, SecaoB, SecaoA (o Local só existe na Ida, caso comum de
+// DEC-075). Os UUIDs abaixo vêm literalmente do fixture.
+describe("EtapaItinerarios — remoção da entidade Local pelo \"X\" (TASK-094; DEC-076)", () => {
+  const SECAO_A_UUID = "4da15f36-5bbe-4f4e-90e3-68029097c1b9";
+  const SECAO_B_UUID = "6f51076b-aaf8-4546-8530-4da1e489c880";
+  const SECAO_C_UUID = "63344e28-4722-4a8b-ae9d-1862e8daded4";
+  const LOCAL_UUID = "c2afe932-bf0f-4338-8ff4-63cd908b9033";
+
+  test('Local unidirecional comum: "X" remove a entidade e a Parada só do sentido corrente, sem tocar a Volta (Locais são livres por sentido)', async () => {
+    vi.stubGlobal("fetch", respostaOsrmGenericaMock());
+    const { obterSessao, resultado } = await montarSessaoNaEtapa(
+      sessaoBidirecionalParaEspelho(),
+      SERVICO_UUID,
+      "ida",
+    );
+
+    // Ida = SecaoA, SecaoB, Local, SecaoC — remove a linha do Local (índice 2).
+    const botoesRemover = resultado.container.querySelectorAll<HTMLButtonElement>(
+      '[data-testid="parada-remover"]',
+    );
+    act(() => {
+      botoesRemover[2].click();
+    });
+    await act(async () => {
+      await flush();
+    });
+
+    // UM só recálculo OSRM — gesto de Local nunca espelha (Spec 02 §14; Spec
+    // 04 §7.2), diferente de um gesto de Seção (TASK-077).
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    const sessaoFinal = obterSessao();
+    if (sessaoFinal.modo !== "carregado") throw new Error("esperava modo carregado");
+    const servico = sessaoFinal.documento.autos.servicos[0];
+    const idaFinal = servico.itinerarios.find((i) => i.sentido === "ida")!;
+    const voltaFinal = servico.itinerarios.find((i) => i.sentido === "volta")!;
+
+    // A entidade some de `servico.locais[]` — não fica órfã, "apagada" só do
+    // itinerário (a lacuna que a DEC-045 deixava, fechada pela DEC-076).
+    expect(servico.locais.some((l) => l.uuid === LOCAL_UUID)).toBe(false);
+    expect(idaFinal.paradas.some((p) => p.local_uuid === LOCAL_UUID)).toBe(false);
+    expect(idaFinal.paradas.map((p) => p.secao_uuid ?? p.local_uuid)).toEqual([
+      SECAO_A_UUID,
+      SECAO_B_UUID,
+      SECAO_C_UUID,
+    ]);
+    // A Volta (sem Parada deste Local) permanece EXATAMENTE como estava.
+    expect(voltaFinal.paradas.map((p) => p.secao_uuid)).toEqual([
+      SECAO_C_UUID,
+      SECAO_B_UUID,
+      SECAO_A_UUID,
+    ]);
+
+    resultado.desmontar();
+  });
+
+  test('Local LEGADO com dois pontos, referenciado nos DOIS sentidos: "X" remove a entidade e as Paradas de ambos, recalculando o sentido OUTRO no mesmo commit', async () => {
+    vi.stubGlobal("fetch", respostaOsrmGenericaMock());
+    const sessaoInicial = sessaoBidirecionalParaEspelho();
+    const servico = sessaoInicial.documento.autos.servicos[0];
+    const volta = servico.itinerarios.find((i) => i.sentido === "volta")!;
+    // Torna o Local (só Ida no fixture) LEGADO com os dois pontos, e insere a
+    // Parada correspondente também na Volta — documento importado de versão
+    // anterior (Spec 04 §7.2, caso legado da DEC-075/076).
+    const local = servico.locais.find((l) => l.uuid === LOCAL_UUID)!;
+    local.geolocalizacao_volta = { latitude: -24.0049, longitude: -46.3979 };
+    volta.paradas = [
+      { ordem: 1, secao_uuid: SECAO_C_UUID },
+      { ordem: 2, local_uuid: LOCAL_UUID },
+      { ordem: 3, secao_uuid: SECAO_B_UUID },
+      { ordem: 4, secao_uuid: SECAO_A_UUID },
+    ];
+    volta.rota = {
+      ...volta.rota,
+      trechos: [
+        { parada_origem_ordem: 1, parada_destino_ordem: 2, distancia_km: 3, duracao_s: 350 },
+        { parada_origem_ordem: 2, parada_destino_ordem: 3, distancia_km: 3.1, duracao_s: 400 },
+        { parada_origem_ordem: 3, parada_destino_ordem: 4, distancia_km: 8, duracao_s: 1080 },
+      ],
+    };
+    for (const viagem of volta.viagens) {
+      viagem.horarios_paradas = [
+        { parada_ordem: 1, offset_horario: "00:00:00" },
+        { parada_ordem: 2, offset_horario: "00:08:00" },
+        { parada_ordem: 3, offset_horario: "00:15:00" },
+        { parada_ordem: 4, offset_horario: "00:35:00" },
+      ];
+    }
+
+    const { obterSessao, resultado } = await montarSessaoNaEtapa(
+      sessaoInicial,
+      SERVICO_UUID,
+      "ida",
+    );
+
+    const botoesRemover = resultado.container.querySelectorAll<HTMLButtonElement>(
+      '[data-testid="parada-remover"]',
+    );
+    act(() => {
+      botoesRemover[2].click(); // Ida = SecaoA, SecaoB, Local, SecaoC
+    });
+    await act(async () => {
+      await flush();
+    });
+
+    // DOIS recálculos sequenciais (editado → outro sentido — mesma disciplina
+    // do espelho de Seção, RN-052), mesmo sem ser um `gestoSecao`.
+    expect(fetch).toHaveBeenCalledTimes(2);
+
+    const sessaoFinal = obterSessao();
+    if (sessaoFinal.modo !== "carregado") throw new Error("esperava modo carregado");
+    const servicoFinal = sessaoFinal.documento.autos.servicos[0];
+    const idaFinal = servicoFinal.itinerarios.find((i) => i.sentido === "ida")!;
+    const voltaFinal = servicoFinal.itinerarios.find((i) => i.sentido === "volta")!;
+
+    expect(servicoFinal.locais.some((l) => l.uuid === LOCAL_UUID)).toBe(false);
+    expect(idaFinal.paradas.some((p) => p.local_uuid === LOCAL_UUID)).toBe(false);
+    expect(voltaFinal.paradas.some((p) => p.local_uuid === LOCAL_UUID)).toBe(false);
+    expect(idaFinal.paradas.map((p) => p.secao_uuid)).toEqual([
+      SECAO_A_UUID,
+      SECAO_B_UUID,
+      SECAO_C_UUID,
+    ]);
+    expect(voltaFinal.paradas.map((p) => p.secao_uuid)).toEqual([
+      SECAO_C_UUID,
+      SECAO_B_UUID,
+      SECAO_A_UUID,
+    ]);
+
+    resultado.desmontar();
+  });
+
+  test("[inválido] remover uma Seção não remove nenhum Local nem deixa entidade órfã", async () => {
+    vi.stubGlobal("fetch", respostaOsrmGenericaMock());
+    const { obterSessao, resultado } = await montarSessaoNaEtapa(
+      sessaoBidirecionalParaEspelho(),
+      SERVICO_UUID,
+      "ida",
+    );
+
+    // Remove a Seção B (índice 1) — o Local (índice 2 original) deve
+    // permanecer intacto em `servico.locais[]` e no itinerário.
+    const botoesRemover = resultado.container.querySelectorAll<HTMLButtonElement>(
+      '[data-testid="parada-remover"]',
+    );
+    act(() => {
+      botoesRemover[1].click();
+    });
+    await act(async () => {
+      await flush();
+    });
+
+    const sessaoFinal = obterSessao();
+    if (sessaoFinal.modo !== "carregado") throw new Error("esperava modo carregado");
+    const servico = sessaoFinal.documento.autos.servicos[0];
+    const idaFinal = servico.itinerarios.find((i) => i.sentido === "ida")!;
+    expect(servico.locais.some((l) => l.uuid === LOCAL_UUID)).toBe(true);
+    expect(idaFinal.paradas.some((p) => p.local_uuid === LOCAL_UUID)).toBe(true);
+
+    resultado.desmontar();
+  });
+});

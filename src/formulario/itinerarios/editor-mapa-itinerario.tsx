@@ -21,7 +21,6 @@ import {
 } from "@/formulario/secoes";
 import {
   criarLocalNoPonto,
-  excluirSentidoDoLocal,
   MENSAGEM_RECUSA_350M_LOCAL,
   nomeExibicaoLocal,
   revalidarArrastoLocal,
@@ -86,9 +85,6 @@ export interface PropsEditorMapaItinerario {
   aoAtualizarSecao: (secao: Secao) => void;
   aoCriarLocal: (local: Local, posicaoNaLinha?: Coordenada) => void;
   aoAtualizarLocal: (local: Local) => void;
-  /** Exclusão do ponto de um sentido: o Local (já unidirecional) é devolvido e
-   * o host remove a Parada daquele sentido (DEC-045). */
-  aoExcluirSentido: (local: Local, sentido: Sentido) => void;
   /** Rota ativa do itinerário (`estadoAtual.rota.geometria` convertida — Spec
    * 04 §7.3, RN-046/052), desenhada sobre o mapa; ausente quando `sem-rota`. */
   linhaRota?: LinhaMapa;
@@ -127,7 +123,6 @@ export function EditorMapaItinerario({
   aoAtualizarSecao,
   aoCriarLocal,
   aoAtualizarLocal,
-  aoExcluirSentido,
   linhaRota,
   pontosDeRota = [],
   aoCriarPontoDeRota,
@@ -285,7 +280,6 @@ export function EditorMapaItinerario({
         nome: nomeNovo,
         ponto: paraPonto(criacaoPendente.posicao),
         sentido,
-        bidirecional,
         features: recursosMunicipio.features,
         nomes: recursosMunicipio.nomes,
       });
@@ -348,23 +342,6 @@ export function EditorMapaItinerario({
     }
     definirMensagemLocal(null);
     aoAtualizarLocal(resultado.local);
-  }
-
-  function lidarExcluirSentido(local: Local) {
-    const resultado = excluirSentidoDoLocal({
-      local,
-      sentido,
-      features: recursosMunicipio.features,
-      nomes: recursosMunicipio.nomes,
-    });
-    if (!resultado.ok) {
-      // `ponto_unico`: o Local ficaria sem geolocalização (RN-032). O botão só
-      // é oferecido quando ambos existem, mas o motor blinda o caso.
-      definirMensagemLocal(resultado.motivo === "fora_de_sp" ? MENSAGEM_FORA_DE_SP : null);
-      return;
-    }
-    definirMensagemLocal(null);
-    aoExcluirSentido(resultado.local, sentido);
   }
 
   return (
@@ -502,31 +479,16 @@ export function EditorMapaItinerario({
       ) : null}
 
       <ul data-testid="lista-locais" className="flex flex-col gap-2">
-        {locaisDoSentido.map((local) => {
-          const bidirecionalAtual = Boolean(
-            local.geolocalizacao_ida && local.geolocalizacao_volta,
-          );
-          return (
-            <li
-              key={local.uuid}
-              data-testid={`local-${local.uuid}`}
-              className="flex items-center gap-2 text-sm text-cinza-700"
-            >
-              {nomeExibicaoLocal(local)}
-              {bidirecionalAtual ? (
-                <Botao
-                  variante="secundario"
-                  data-testid={`excluir-sentido-${local.uuid}`}
-                  onClick={() => lidarExcluirSentido(local)}
-                >
-                  Excluir ponto deste sentido
-                </Botao>
-              ) : null}
-            </li>
-          );
-        })}
+        {locaisDoSentido.map((local) => (
+          <li
+            key={local.uuid}
+            data-testid={`local-${local.uuid}`}
+            className="flex items-center gap-2 text-sm text-cinza-700"
+          >
+            {nomeExibicaoLocal(local)}
+          </li>
+        ))}
       </ul>
-
     </div>
   );
 }

@@ -7,12 +7,13 @@ import {
 } from "@/shared/geo";
 import type { FeatureMunicipio } from "@/shared/dados-estaticos";
 
-// Motor puro do editor de Locais no mapa (TASK-018; Spec 04 §7.2). Cobre os três
-// gestos da spec — criar (espelhado quando bidirecional), arrastar (350 m
-// pareada Ida×Volta) e excluir por sentido — aplicando RN-031/032/029 sem
-// depender de React nem do mapa. A montagem da etapa real (seleção de
-// Serviço/sentido, tabela lateral, remoção da Parada do sentido excluído,
-// persistência em sessão) é da TASK-019 (DEC-045); este módulo só entrega o
+// Motor puro do editor de Locais no mapa (TASK-018; Spec 04 §7.2). Cobre os
+// gestos da spec — criar (unidirecional, sem espelho — DEC-075), arrastar
+// (350 m pareada Ida×Volta, só para Local legado com os dois pontos) e
+// remover a entidade (DEC-076) — aplicando RN-031/032/029 sem depender de
+// React nem do mapa. A montagem da etapa real (seleção de Serviço/sentido,
+// tabela lateral, remoção das Paradas que referenciam a entidade removida,
+// persistência em sessão) é da TASK-019/TASK-094; este módulo só entrega o
 // motor que ela consumirá, mais o componente controlado `EditorLocais` para o
 // harness de teste. Ao contrário da Seção (TASK-017), o Local NÃO é compartilhado
 // (RN-031) — não há fluxo de "reutilizar Local existente".
@@ -35,18 +36,14 @@ export interface RecursosMunicipio {
   nomes: ReadonlyMap<string, string>;
 }
 
-// RN-032/Spec 04 §7.2: a criação de um Local por um Serviço bidirecional gera os
-// DOIS pontos no mesmo lugar (Ida e Volta espelhados); um unidirecional só o
-// ponto do seu único sentido.
+// DEC-075/Spec 04 §7.2: a criação de um Local gera SEMPRE apenas a
+// geolocalização do sentido em edição, mesmo em Serviço bidirecional — sem
+// espelhamento nem vínculo entre um Local da Ida e um Local da Volta.
 function camposDeCriacao(
   ponto: Ponto,
-  bidirecional: boolean,
   sentido: Sentido,
 ): Pick<Local, "geolocalizacao_ida" | "geolocalizacao_volta"> {
   const geoloc: Ponto = { latitude: ponto.latitude, longitude: ponto.longitude };
-  if (bidirecional) {
-    return { geolocalizacao_ida: geoloc, geolocalizacao_volta: { ...geoloc } };
-  }
   return sentido === "ida"
     ? { geolocalizacao_ida: geoloc }
     : { geolocalizacao_volta: geoloc };
@@ -60,7 +57,6 @@ export interface EntradaCriarLocal extends RecursosMunicipio {
   nome: string;
   ponto: Ponto;
   sentido: Sentido;
-  bidirecional: boolean;
 }
 
 export type ResultadoCriarLocal =
@@ -68,10 +64,11 @@ export type ResultadoCriarLocal =
   | { ok: false; motivo: "fora_de_sp" };
 
 /**
- * Clique no mapa cria Local novo (Spec 04 §7.2). Não há checagem dos 350 m na
- * criação: o Local nasce com um único ponto ou com Ida/Volta espelhados no
- * MESMO lugar (distância zero, trivialmente ≤ 350 m — RN-032). `municipio` é
- * derivado do ponto decisor (RN-029), nunca digitado.
+ * Clique no mapa cria Local novo (Spec 04 §7.2; DEC-075). Não há checagem dos
+ * 350 m na criação: o Local nasce sempre com um único ponto, o do sentido em
+ * edição (trivialmente ≤ 350 m — RN-032, caso ele venha a ganhar um par depois
+ * via legado). `municipio` é derivado do ponto decisor (RN-029), nunca
+ * digitado.
  */
 export function criarLocalNoPonto(entrada: EntradaCriarLocal): ResultadoCriarLocal {
   const nome = entrada.nome.trim();
@@ -79,7 +76,7 @@ export function criarLocalNoPonto(entrada: EntradaCriarLocal): ResultadoCriarLoc
     throw new Error("[RN-031] nome do Local é obrigatório (Spec 02 §7)");
   }
 
-  const campos = camposDeCriacao(entrada.ponto, entrada.bidirecional, entrada.sentido);
+  const campos = camposDeCriacao(entrada.ponto, entrada.sentido);
   const municipio = derivarMunicipio(
     pontoDecisorLocal(campos.geolocalizacao_ida, campos.geolocalizacao_volta),
     entrada.features,
@@ -156,55 +153,20 @@ export function revalidarArrastoLocal(
 }
 
 // ---------------------------------------------------------------------------
-// 3) Excluir o ponto de um sentido (Spec 04 §7.2; RN-032, RN-029; DEC-045)
+// 3) Remover a entidade Local (Spec 04 §7.2; RN-031; DEC-076)
 // ---------------------------------------------------------------------------
 
-export interface EntradaExcluirSentido extends RecursosMunicipio {
-  local: Local;
-  sentido: Sentido;
-}
-
-export type ResultadoExcluirSentido =
-  | { ok: true; local: Local }
-  | { ok: false; motivo: "ponto_unico" }
-  | { ok: false; motivo: "fora_de_sp" };
-
 /**
- * Excluir o ponto de um sentido (Spec 04 §7.2): o Local passa a unidirecional e
- * o `municipio` é recomputado pelo ponto remanescente (RN-029). Só é permitido
- * quando AMBOS os pontos existem — esvaziar o último ponto violaria a exigência
- * de ao menos uma geolocalização (RN-032; Spec 02 §7.1); esse caso retorna
- * `ponto_unico` e a remoção da entidade Local inteira fica fora desta task
- * (DEC-045). A remoção da Parada daquele sentido no itinerário NÃO é feita aqui:
- * este motor apenas devolve o Local unidirecional; a TASK-019, dona das paradas,
- * remove a Parada correspondente (DEC-045) — o componente sinaliza o gesto.
+ * Remove a entidade `localUuid` de `locais` (DEC-076: o "X" da linha do Local
+ * na tabela lateral remove a entidade inteira, não só um sentido). Função
+ * pura — preserva as demais entidades e suas UUIDs; a remoção das Paradas que
+ * referenciam este Local (nos dois sentidos, para Local legado com dois
+ * pontos) é responsabilidade do host (`removerParadasDeLocal`,
+ * `formulario/itinerarios/motor-montagem.ts`).
  */
-export function excluirSentidoDoLocal(
-  entrada: EntradaExcluirSentido,
-): ResultadoExcluirSentido {
-  const { local, sentido } = entrada;
-  if (!local.geolocalizacao_ida || !local.geolocalizacao_volta) {
-    return { ok: false, motivo: "ponto_unico" };
-  }
-
-  const geolocIda = sentido === "ida" ? undefined : local.geolocalizacao_ida;
-  const geolocVolta = sentido === "volta" ? undefined : local.geolocalizacao_volta;
-
-  const municipio = derivarMunicipio(
-    pontoDecisorLocal(geolocIda, geolocVolta),
-    entrada.features,
-    entrada.nomes,
-  );
-  if (!municipio.encontrado) {
-    return { ok: false, motivo: "fora_de_sp" };
-  }
-
-  const localAtualizado: Local = {
-    uuid: local.uuid,
-    nome: local.nome,
-    municipio: municipio.nome,
-    ...(geolocIda ? { geolocalizacao_ida: geolocIda } : {}),
-    ...(geolocVolta ? { geolocalizacao_volta: geolocVolta } : {}),
-  };
-  return { ok: true, local: localAtualizado };
+export function removerEntidadeLocal(
+  locais: readonly Local[],
+  localUuid: string,
+): Local[] {
+  return locais.filter((local) => local.uuid !== localUuid);
 }

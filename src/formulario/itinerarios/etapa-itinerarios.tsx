@@ -16,7 +16,7 @@ import {
   type RecursosMunicipio,
   type Sentido,
 } from "@/formulario/secoes";
-import { nomeExibicaoLocal } from "@/formulario/locais";
+import { nomeExibicaoLocal, removerEntidadeLocal } from "@/formulario/locais";
 import { EditorMapaItinerario } from "./editor-mapa-itinerario";
 import { PainelReusoSecao } from "./painel-reuso-secao";
 import { ALTURA_MAPA_CLASSE_LG } from "./altura-mapa";
@@ -558,6 +558,12 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
        * de coordenada): esses nunca espelham (Locais/pontos de rota são
        * livres por sentido, Spec 02 §14, Spec 04 §7.2). */
       gestoSecao?: GestoSecao;
+      /** Paradas do sentido OUTRO já prontas (TASK-094; DEC-076) — usado pela
+       * remoção de entidade Local legada com dois pontos, cujas Paradas nos
+       * DOIS sentidos saem no mesmo commit, sem ser um espelho de Seção
+       * (`gestoSecao`). Tem prioridade sobre `espelharGestoDeSecao` quando
+       * presente. */
+      paradasOutroSentidoForcadas?: ParadaEmEdicao[];
     } = {},
   ) {
     if (!linhaAtual || !sentidoSelecionado || !recursosMunicipio) return;
@@ -590,9 +596,10 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     const chaveOutro =
       sentidoOutro && linhaAtual ? chaveItinerario(linhaAtual.servicoUuid, sentidoOutro) : undefined;
     const paradasEspelhadas =
-      sentidoOutro && chaveOutro && opcoes.gestoSecao && paradasOutroSentido
+      opcoes.paradasOutroSentidoForcadas ??
+      (sentidoOutro && chaveOutro && opcoes.gestoSecao && paradasOutroSentido
         ? espelharGestoDeSecao(paradasOutroSentido, opcoes.gestoSecao, novasParadas)
-        : undefined;
+        : undefined);
     const pontosEspelhados =
       paradasEspelhadas && paradasOutroSentido
         ? reancorarPontosDeRota(
@@ -666,8 +673,11 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
 
   function removerParadaNaTabela(indice: number) {
     const paradaRemovida = paradasAtual[indice];
-    const gestoSecao: GestoSecao | undefined =
-      paradaRemovida.tipo === "secao" ? { tipo: "remocao", secaoUuid: paradaRemovida.secaoUuid } : undefined;
+    if (paradaRemovida.tipo === "local") {
+      removerEntidadeLocalNaTabela(paradaRemovida.localUuid);
+      return;
+    }
+    const gestoSecao: GestoSecao = { tipo: "remocao", secaoUuid: paradaRemovida.secaoUuid };
     void aplicarNovasParadas(removerParada(paradasAtual, indice), { gestoSecao });
   }
 
@@ -778,16 +788,26 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     });
   }
 
-  // DEC-045: exclusão do ponto de um sentido torna o Local unidirecional e a
-  // Parada correspondente sai do itinerário DESTE sentido. `EditorLocais` está
-  // fixo em `sentidoSelecionado` (prop controlada), então o sentido excluído é
-  // sempre o corrente — a Parada removida é a de `paradasAtual`.
-  function aoExcluirSentidoDeLocal(local: Local) {
+  // DEC-076: o "X" da linha de um Local na tabela lateral remove a ENTIDADE
+  // de `servico.locais[]` e toda Parada que a referencie. Para Local legado
+  // com dois pontos (documento importado), a Parada do sentido OUTRO também
+  // sai — no mesmo commit síncrono, via `paradasOutroSentidoForcadas` — e
+  // aquele sentido é recalculado; para o Local unidirecional comum (DEC-075),
+  // só o sentido corrente tem Parada a remover.
+  function removerEntidadeLocalNaTabela(localUuid: string) {
     if (!linhaAtual) return;
-    const locaisAtualizados = linhaAtual.locais.map((l) => (l.uuid === local.uuid ? local : l));
-    void aplicarNovasParadas(removerParadasDeLocal(paradasAtual, local.uuid), {
+    const locaisAtualizados = removerEntidadeLocal(linhaAtual.locais, localUuid);
+    const paradasSemLocal = removerParadasDeLocal(paradasAtual, localUuid);
+    const referenciadoNoOutroSentido = paradasOutroSentido?.some(
+      (p) => p.tipo === "local" && p.localUuid === localUuid,
+    );
+    const paradasOutroSentidoForcadas = referenciadoNoOutroSentido
+      ? removerParadasDeLocal(paradasOutroSentido!, localUuid)
+      : undefined;
+    void aplicarNovasParadas(paradasSemLocal, {
       locaisParaResolver: locaisAtualizados,
       aoComitarBase: (base) => comLocaisAtualizados(base, locaisAtualizados),
+      paradasOutroSentidoForcadas,
     });
   }
 
@@ -940,7 +960,6 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
               aoAtualizarSecao={aoCriarOuAtualizarSecao}
               aoCriarLocal={aoCriarLocal}
               aoAtualizarLocal={aoAtualizarLocal}
-              aoExcluirSentido={aoExcluirSentidoDeLocal}
               linhaRota={linhaRotaAtual}
               pontosDeRota={pontosDeRotaAtual}
               aoCriarPontoDeRota={aoCriarPontoDeRota}

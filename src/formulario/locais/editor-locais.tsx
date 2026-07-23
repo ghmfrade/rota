@@ -7,7 +7,6 @@ import { Mapa, type Coordenada, type LinhaMapa, type MarcadorMapa } from "@/shar
 import { Botao, Campo, Painel } from "@/shared/ui";
 import {
   criarLocalNoPonto,
-  excluirSentidoDoLocal,
   MENSAGEM_FORA_DE_SP,
   MENSAGEM_RECUSA_350M_LOCAL,
   nomeExibicaoLocal,
@@ -16,14 +15,14 @@ import {
   type Sentido,
 } from "./fluxos-local";
 
-// Componente controlado do editor de Locais (TASK-018; Spec 04 §7.2) — os três
-// gestos da spec sobre o mapa: clicar cria Local novo (espelhado quando o
-// Serviço é bidirecional), arrastar revalida os 350 m pareada, excluir o ponto
-// de um sentido torna o Local unidirecional. Só entrega o motor + esta peça de
-// UI; a etapa real "Seções, Locais e Itinerários" (seleção de Serviço/sentido,
-// tabela lateral, remoção da Parada do sentido excluído, persistência em sessão)
-// é montada pela TASK-019 (DEC-045) — este componente é controlado (recebe
-// `locais` e emite os callbacks) para não antecipar aquele modelo de estado.
+// Componente controlado do editor de Locais (TASK-018; Spec 04 §7.2) — os
+// gestos da spec sobre o mapa: clicar cria Local novo (unidirecional, sem
+// espelho — DEC-075), arrastar revalida os 350 m pareada. Só entrega o motor +
+// esta peça de UI; a etapa real "Seções, Locais e Itinerários" (seleção de
+// Serviço/sentido, tabela lateral, remoção da entidade Local e suas Paradas —
+// DEC-076) é montada pela TASK-019/TASK-094 — este componente é controlado
+// (recebe `locais` e emite os callbacks) para não antecipar aquele modelo de
+// estado.
 
 const paraCoordenada = (p: Ponto): Coordenada => ({ lng: p.longitude, lat: p.latitude });
 const paraPonto = (c: Coordenada): Ponto => ({ latitude: c.lat, longitude: c.lng });
@@ -35,14 +34,9 @@ export interface PropsEditorLocais {
   /** Locais do Serviço corrente (Spec 02 §7) — não compartilhados (RN-031). */
   locais: readonly Local[];
   sentido: Sentido;
-  /** Serviço tem os dois itinerários (Ida e Volta) — a criação nasce espelhada. */
-  bidirecional: boolean;
   recursosMunicipio: RecursosMunicipio;
   aoCriarLocal: (local: Local) => void;
   aoAtualizarLocal: (local: Local) => void;
-  /** Exclusão do ponto de um sentido: o Local (já unidirecional) é devolvido e a
-   * TASK-019, dona das paradas, remove a Parada daquele sentido (DEC-045). */
-  aoExcluirSentido: (local: Local, sentido: Sentido) => void;
   /** Gesto aceito que alterou uma geolocalização — o recálculo real do estado de
    * rota ao vivo é do host (TASK-024/019); este editor só avisa. */
   aoSolicitarRecalculo?: () => void;
@@ -55,11 +49,9 @@ export interface PropsEditorLocais {
 export function EditorLocais({
   locais,
   sentido,
-  bidirecional,
   recursosMunicipio,
   aoCriarLocal,
   aoAtualizarLocal,
-  aoExcluirSentido,
   aoSolicitarRecalculo,
   linhaRota,
 }: PropsEditorLocais) {
@@ -93,7 +85,6 @@ export function EditorLocais({
       nome: nomeNovoLocal,
       ponto: paraPonto(pontoPendente),
       sentido,
-      bidirecional,
       features: recursosMunicipio.features,
       nomes: recursosMunicipio.nomes,
     });
@@ -135,26 +126,6 @@ export function EditorLocais({
     }
     definirMensagem(null);
     aoAtualizarLocal(resultado.local);
-    aoSolicitarRecalculo?.();
-  }
-
-  function lidarExcluirSentido(local: Local) {
-    const resultado = excluirSentidoDoLocal({
-      local,
-      sentido,
-      features: recursosMunicipio.features,
-      nomes: recursosMunicipio.nomes,
-    });
-    if (!resultado.ok) {
-      // `ponto_unico`: o Local ficaria sem nenhuma geolocalização (RN-032). O
-      // botão só é oferecido quando ambos existem, mas o motor blinda o caso.
-      definirMensagem(
-        resultado.motivo === "fora_de_sp" ? MENSAGEM_FORA_DE_SP : null,
-      );
-      return;
-    }
-    definirMensagem(null);
-    aoExcluirSentido(resultado.local, sentido);
     aoSolicitarRecalculo?.();
   }
 
@@ -204,29 +175,15 @@ export function EditorLocais({
       ) : null}
 
       <ul data-testid="lista-locais" className="flex flex-col gap-2">
-        {locaisDoSentido.map((local) => {
-          const bidirecionalAtual = Boolean(
-            local.geolocalizacao_ida && local.geolocalizacao_volta,
-          );
-          return (
-            <li
-              key={local.uuid}
-              data-testid={`local-${local.uuid}`}
-              className="flex items-center gap-2 text-sm text-cinza-700"
-            >
-              {nomeExibicaoLocal(local)}
-              {bidirecionalAtual ? (
-                <Botao
-                  variante="secundario"
-                  data-testid={`excluir-sentido-${local.uuid}`}
-                  onClick={() => lidarExcluirSentido(local)}
-                >
-                  Excluir ponto deste sentido
-                </Botao>
-              ) : null}
-            </li>
-          );
-        })}
+        {locaisDoSentido.map((local) => (
+          <li
+            key={local.uuid}
+            data-testid={`local-${local.uuid}`}
+            className="flex items-center gap-2 text-sm text-cinza-700"
+          >
+            {nomeExibicaoLocal(local)}
+          </li>
+        ))}
       </ul>
     </div>
   );
