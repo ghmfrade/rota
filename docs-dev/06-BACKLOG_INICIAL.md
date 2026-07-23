@@ -516,17 +516,18 @@
 
 **Prioridade:** Média · **Fase:** Cleanup pós-redesign (fecha as ressalvas ainda abertas dos pareceres)
 **Resumo:** Recolhe as ressalvas que ficaram abertas nas revisões da TASK-053 e da TASK-057 e não coube a nenhuma outra task fechar (as ressalvas de aparência de TASK-053/054 já estão na varredura da TASK-056; as condições de merge da TASK-057 vieram no parecer **após** o commit e nunca foram atendidas). Itens, todos pontuais e enumerados:
-1. **[TASK-057 P1 — condição de merge] Fixture com UUID fora do schema** (`testes/unitarios/formulario/servicos-contadores.test.tsx:19`): `viagemFeriado()` gera `uuid: \`${base.uuid}-feriado\``, que não passa no `uuidV4` do contrato (RN-001/RN-010) — o documento montado não sobreviveria a `esquemaDocumentoOperacao`. Trocar por um UUIDv4 literal válido.
+
+1. **[TASK-057 P1 — condição de merge] Fixture com UUID fora do schema** (`testes/unitarios/formulario/servicos-contadores.test.tsx:19`): `viagemFeriado()` gera `uuid: \`${base.uuid}-feriado\``, que não passa no `uuidV4`do contrato (RN-001/RN-010) — o documento montado não sobreviveria a`esquemaDocumentoOperacao`. Trocar por um UUIDv4 literal válido.
 2. **[TASK-057 P2 — condição de merge] `data-testid="rotulo-semana-padrao"` duplicado** (`src/formulario/servicos/servicos.tsx:355` e `src/formulario/resumo/resumo-operacional.tsx:34`): `testes/e2e/resumo-operacional.spec.ts:22` usa o testid **sem `.first()`**, então o dia em que as duas telas co-renderizarem esse E2E quebra por strict-mode. Renomear **só o novo** (o de `servicos.tsx`, ex.: `servicos-rotulo-semana-padrao`) e atualizar `testes/e2e/servicos.spec.ts:142`; o testid do resumo é preexistente e **intocável**.
 3. **[TASK-057 P3 — follow-up] Literal `ROTULO_SEMANA_PADRAO` duplicado** (`servicos.tsx:76` e `resumo-operacional.tsx:21`): o texto exigido literalmente pela RN-069/NEG-018 vive em dois lugares — uma edição futura diverge em silêncio. Fonte única em `shared/` (ex.: `shared/contagens` ou `shared/ui`), consumida por servicos e resumo. Toca o resumo, que é arquivo da TASK-056 — daí a dependência abaixo.
 4. **[TASK-057 P4 — estilo] `viagensSemana(undefined) + viagensSemana(undefined)`** (`servicos.tsx:155-159`) soma duas chamadas constantes para dizer `0` — ofuscação. Simplificar para a constante `0` (a semântica "Serviço em construção → 0", DEC-035, permanece; nenhuma regra muda). Opcional.
 5. **[TASK-053 P3 — consistência] Estados de erro/carregamento da Identificação sem superfície** (`identificacao.tsx:156,164`): `erroListas` e `!listas` renderizam `<p>` solto enquanto o estado carregado é `Painel` — a etapa "muda de moldura". Envolver em `Painel` (escolha de aparência, DEC-050). O `data-testid="erro-listas-identificacao"` é intocável.
-6. **[Derivado — DEC-051/DEC-052] Atualizar `docs-dev/01-RULE_INDEX.md`:** na Origem da RN-069 (`:510`), acrescentar **Spec 04 §6** (a DEC-051 antecipou este ajuste de derivado). *(A Spec 04 §5 → "Tipo do Autos" da DEC-052 é edição de `docs/specs/**`, read-only — **não** entra aqui; é ação do dono da spec.)*
-**Specs fonte / decisões:** revisões `docs-dev/14-REVISOES/TASK-053-20260715.md` e `TASK-057-20260715.md`; DEC-050 (aparência), DEC-051 (Origem da RN-069), DEC-052 (rótulo "Tipo do Autos" **permanece** — item 6 do "Fora de escopo"); doc 18 §6. **Regras RN:** RN-069/NEG-018 (literal exato preservado), RN-001/RN-010 (UUIDv4 válido), RN-072/RN-006 (contagem intacta — nada de lógica muda). **Depende de:** TASK-056 (o item 3 unifica o literal tocando `resumo-operacional.tsx`, arquivo da TASK-056 — rodar depois evita conflito) e TASK-057 (fecha o parecer dela).
-**Fora de escopo:** **reverter o rótulo "Tipo do Autos" da Identificação** (DEC-052 — permanece; não tocar); alterar `src/shared/contagens/` ou qualquer lógica/regra de contagem, viagem ou feriado; editar `docs/specs/**` (o alinhamento da Spec 04 §5 e o restante são ações do dono da spec); as ressalvas de aparência já roteadas para a varredura da TASK-056 (marca "(sem itinerário ainda)", superfície da `Tabela`, aviso aninhado); a ressalva de layout da TASK-055 (tabela lateral / mapa único — tem task própria); qualquer mudança de comportamento, mensagem ou contrato JSON.
-**Critérios de aceite resumidos:** (1) fixture usa UUIDv4 válido e o documento montado passaria em `esquemaDocumentoOperacao`; (2) `grep` do testid do rótulo no lado servicos retorna nome único, distinto do resumo, e `resumo-operacional.spec.ts` volta a ser seguro sem `.first()`; (3) o literal "semana padrão (sem feriados)" tem **uma** declaração em `shared/`, consumida por servicos e resumo (`grep` acha uma só); (4) estados de erro/carregamento da Identificação em `Painel`, consistentes com o carregado, `data-testid` intocado; (5) Origem da RN-069 no RULE_INDEX cita Spec 04 §6; (6) rótulo "Tipo do Autos" **inalterado**; `data-testid`/`aria-*` existentes preservados exceto a renomeação deliberada do item 2; suíte completa (unit + E2E + build) verde, nenhum outro seletor alterado.
-**Testes esperados:** unitários e E2E existentes verdes; ajuste do único E2E que referencia o testid renomeado (item 2); nenhum teste de `shared/contagens` alterado; nenhum teste novo de regra (não há regra nova).
-**Riscos:** (a) renomear testid e esquecer um consumidor — `grep` do nome antigo antes/depois; (b) o item 3 toca `resumo-operacional.tsx` (TASK-056) — respeitar a dependência para não conflitar com a restilização; (c) mover os estados de erro para `Painel` sem alterar `data-testid="erro-listas-identificacao"`.
+6. **[Derivado — DEC-051/DEC-052] Atualizar `docs-dev/01-RULE_INDEX.md`:** na Origem da RN-069 (`:510`), acrescentar **Spec 04 §6** (a DEC-051 antecipou este ajuste de derivado). _(A Spec 04 §5 → "Tipo do Autos" da DEC-052 é edição de `docs/specs/**`, read-only — **não** entra aqui; é ação do dono da spec.)_
+   **Specs fonte / decisões:** revisões `docs-dev/14-REVISOES/TASK-053-20260715.md` e `TASK-057-20260715.md`; DEC-050 (aparência), DEC-051 (Origem da RN-069), DEC-052 (rótulo "Tipo do Autos" **permanece** — item 6 do "Fora de escopo"); doc 18 §6. **Regras RN:** RN-069/NEG-018 (literal exato preservado), RN-001/RN-010 (UUIDv4 válido), RN-072/RN-006 (contagem intacta — nada de lógica muda). **Depende de:** TASK-056 (o item 3 unifica o literal tocando `resumo-operacional.tsx`, arquivo da TASK-056 — rodar depois evita conflito) e TASK-057 (fecha o parecer dela).
+   **Fora de escopo:** **reverter o rótulo "Tipo do Autos" da Identificação** (DEC-052 — permanece; não tocar); alterar `src/shared/contagens/` ou qualquer lógica/regra de contagem, viagem ou feriado; editar `docs/specs/**` (o alinhamento da Spec 04 §5 e o restante são ações do dono da spec); as ressalvas de aparência já roteadas para a varredura da TASK-056 (marca "(sem itinerário ainda)", superfície da `Tabela`, aviso aninhado); a ressalva de layout da TASK-055 (tabela lateral / mapa único — tem task própria); qualquer mudança de comportamento, mensagem ou contrato JSON.
+   **Critérios de aceite resumidos:** (1) fixture usa UUIDv4 válido e o documento montado passaria em `esquemaDocumentoOperacao`; (2) `grep` do testid do rótulo no lado servicos retorna nome único, distinto do resumo, e `resumo-operacional.spec.ts` volta a ser seguro sem `.first()`; (3) o literal "semana padrão (sem feriados)" tem **uma** declaração em `shared/`, consumida por servicos e resumo (`grep` acha uma só); (4) estados de erro/carregamento da Identificação em `Painel`, consistentes com o carregado, `data-testid` intocado; (5) Origem da RN-069 no RULE_INDEX cita Spec 04 §6; (6) rótulo "Tipo do Autos" **inalterado**; `data-testid`/`aria-*` existentes preservados exceto a renomeação deliberada do item 2; suíte completa (unit + E2E + build) verde, nenhum outro seletor alterado.
+   **Testes esperados:** unitários e E2E existentes verdes; ajuste do único E2E que referencia o testid renomeado (item 2); nenhum teste de `shared/contagens` alterado; nenhum teste novo de regra (não há regra nova).
+   **Riscos:** (a) renomear testid e esquecer um consumidor — `grep` do nome antigo antes/depois; (b) o item 3 toca `resumo-operacional.tsx` (TASK-056) — respeitar a dependência para não conflitar com a restilização; (c) mover os estados de erro para `Painel` sem alterar `data-testid="erro-listas-identificacao"`.
 
 ---
 
@@ -826,7 +827,7 @@ A TASK-061 introduziu a promoção `ServicoEmConstrucao → Servico`, movendo o 
 - RN-018 (documento válido exige ≥ 1 Serviço + cascata de Seção órfã) — **gate de exportação, não de sessão**: no modo novo a remoção não trava no "último Serviço"
 - RN-096 / NEG-004 (sessão efêmera; nada gravado no JSON antes da exportação)
 - DEC-035 (`ServicoEmConstrucao`), DEC-053 (`servicosDaSessao`/promoção), DEC-037 (sufixo de `numero_n` regenerado na troca de característica)
-- DEC-050 (design system vinculante para UI — o rótulo de estado usa `Selo` do `shared/ui`, tokens do doc 18; o estado "em construção" × "completo" não é conceito de contrato, é de sessão — DEC-035/DEC-053 —, logo o rótulo é *inferência controlada* de usabilidade sob o doc 18, não regra de spec)
+- DEC-050 (design system vinculante para UI — o rótulo de estado usa `Selo` do `shared/ui`, tokens do doc 18; o estado "em construção" × "completo" não é conceito de contrato, é de sessão — DEC-035/DEC-053 —, logo o rótulo é _inferência controlada_ de usabilidade sob o doc 18, não regra de spec)
 
 ## Entidades afetadas
 
@@ -2204,7 +2205,7 @@ Num Serviço bidirecional, montar a **Ida** passa a montar a **Volta automaticam
 
 ## Contexto
 
-Pedido do responsável (2026-07-17): "ABCD sempre volta DCBA — não sendo necessário reutilizar a seção já usada na ida". **Decidido pela DEC-063 (opção A — regra dura):** o dono da spec **já editou a Spec 02 §14** ("se na ida as seções são ABCD, na volta necessariamente são DCBA") e atualizou a RN-030 no RULE_INDEX — a validação estrutural nova em `validarServico` está **no escopo desta task**, com base na spec editada; importação recusa Volta fora da ordem inversa (trava dura, tratamento estrutural existente da RN-030). Hoje a Volta nasce vazia e é montada à mão, e o reuso oferta todas as Seções do documento (inclusive as do próprio Serviço) exatamente para viabilizar essa montagem manual. A Spec 04 §7.1 já manda a criação espelhada dos **pontos**; esta task espelha o **itinerário** (lista `paradas[]`). Locais e pontos de rota permanecem livres por sentido (Spec 02 §14).
+Pedido do responsável (2026-07-17): "ABCD sempre volta DCBA — não sendo necessário reutilizar a seção já usada na ida". **Decidido pela DEC-063 (opção A — regra dura):** o dono da spec **já editou a Spec 02 §14** ("se na ida as seções são ABCD, na volta necessariamente são DCBA") e atualizou a RN-030 no RULE_INDEX — a validação estrutural nova em `validarServico` está **no escopo desta task**, com base na spec editada; importação recusa Volta fora da ordem inversa (trava dura, tratamento estrutural existente da RN-030). Hoje a Volta nasce vazia e é montada à mão, e o reuso oferta todas as Seções do documento (inclusive as do próprio Serviço) exatamente para viabilizar essa montagem manual. A Spec 04 §7.1 já manda a criação espelhada dos **pontos**; esta task espelha o **itinerário** (lista `paradas[]`). Locais e pontos de rota permanecem livres por sentido (Spec 02 §14). DEC-071 define comportamento de locais e pontos de rota da volta/ida alteradas ao montar automaticamente.
 
 ## Fora de escopo
 
@@ -3240,19 +3241,19 @@ nova `matriz_distancias` são removidos.
 ## Critérios de aceite
 
 - [ ] Depois de recompor `matriz_distancias`, `matriz_seccionamento` contém
-  somente pares cuja chave não-direcional ainda existe na nova matriz.
+      somente pares cuja chave não-direcional ainda existe na nova matriz.
 - [ ] Remover uma Seção elimina todos e somente os pares de seccionamento que a
-  referenciam; pares entre Seções sobreviventes permanecem.
+      referenciam; pares entre Seções sobreviventes permanecem.
 - [ ] `distancia_km` e a ordem de armazenamento dos pares sobreviventes são
-  preservados, sem reaplicar sugestões ou valores de `matriz_distancias`.
+      preservados, sem reaplicar sugestões ou valores de `matriz_distancias`.
 - [ ] Inserir uma Seção cria os novos pares apenas em `matriz_distancias` e não
-  os habilita automaticamente em `matriz_seccionamento`.
+      os habilita automaticamente em `matriz_seccionamento`.
 - [ ] Editar Local, reordenar as mesmas Seções ou recalcular apenas a rota
-  preserva todos os pares de seccionamento ainda válidos.
+      preserva todos os pares de seccionamento ainda válidos.
 - [ ] A reconciliação ocorre no mesmo update de sessão do write-back de
-  Paradas/rota, matriz de distâncias, horários e limpeza de Seções.
+      Paradas/rota, matriz de distâncias, horários e limpeza de Seções.
 - [ ] O documento resultante não apresenta RN-059 e passa pela validação
-  estrutural/exportação quando não houver outras violações.
+      estrutural/exportação quando não houver outras violações.
 
 ## Casos válidos
 
@@ -3891,6 +3892,91 @@ Reportado pelo responsável (2026-07-22), após o fechamento do ciclo da TASK-09
 ## Perguntas em aberto
 
 - Nenhuma.
+
+---
+
+## TASK-093 — Suprimir o espelho Ida↔Volta quando o movimento de Seção não altera a subsequência de Seções (DEC-074)
+
+## Objetivo
+
+O gesto de mover uma Seção na tabela lateral só dispara o espelhamento Ida↔Volta (TASK-077) quando altera **de fato** a subsequência de Seções do sentido editado. A troca adjacente Seção↔**Local** (que mantém a subsequência idêntica) deixa de espelhar e de recalcular o outro sentido — os Locais do sentido não editado ficam intocados.
+
+## Contexto
+
+Condição do parecer `14-REVISOES/TASK-077-20260722.md` (Problema 1), decidida pela **DEC-074** item 1: hoje `moverParada` emite `GestoSecao` de movimento sempre que o item movido é Seção, mesmo quando a troca é com um Local e a subsequência não muda; o replay (remoção+reinserção) então recompõe o outro sentido e pode reposicionar Locais dele (ex.: Ida `A-1-B-C` → `A-B-1-C` faz a Volta `C-5-B-A` virar `C-B-5-A`), além de disparar um recálculo OSRM desnecessário. Isso contraria o critério que o próprio motor declara ("só gestos que tocam a subsequência de Seções disparam o espelho", `motor-montagem.ts`) e o princípio de Locais livres por sentido (Spec 02 §14; DEC-071). A correção adotada é a sugerida no parecer: comparar `subsequenciaSecoes(antes)` com `subsequenciaSecoes(depois)` e suprimir o gesto quando iguais. Deve rodar **antes da TASK-076** (que assume a Volta derivada e multiplica gestos no mesmo mapa).
+
+## Fora de escopo
+
+- Aviso DEC-068 para descarte de ponto de rota no sentido espelhado (**encerrado sem ação** — DEC-074 item 2).
+- E2E de exportação com Volta derivada (**encerrado sem ação** — DEC-074 item 3; segue candidato natural à TASK-062/076).
+- Qualquer mudança no motor de espelho (`espelharInsercaoDeSecao`/`espelharRemocaoDeSecao`/`espelharMovimentoDeSecao`) — a correção é no **disparo** do gesto, não no replay.
+- Inserção e remoção de Seção — sempre alteram a subsequência; continuam espelhando como estão.
+- Contrato JSON, validação estrutural da RN-030, filtro do reuso — inalterados.
+
+## Specs fonte
+
+- Spec 02 §14 (Locais livres por sentido; ordem inversa das Seções)
+- Spec 04 §7.2 (Locais por sentido), §7.3 (reordenar = recalcular rota — do sentido editado)
+
+## Regras envolvidas
+
+- RN-030 (a subsequência de Seções inalterada mantém a ordem inversa por construção — nada a reespelhar)
+- RN-052 (recálculo dispara para o sentido **alterado**; o outro sentido, intocado, não recalcula)
+- RN-041..043 (pontos de rota do outro sentido intocados quando o espelho não dispara)
+
+## Entidades afetadas
+
+- Itinerário, Parada (ordem no sentido editado); o outro sentido fica intocado
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor (⚠ exige decisão humana — RN-093)
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Mover uma Seção por cima/baixo de um Local (subsequência de Seções idêntica antes/depois) não altera `paradasEmEdicao` nem `pontosDeRotaEmEdicao` do outro sentido e dispara **um** recálculo OSRM (só o sentido editado).
+- [ ] Mover uma Seção por cima/baixo de outra **Seção** (subsequência alterada) continua espelhando e disparando **dois** recálculos sequenciais, como na TASK-077.
+- [ ] Mover um **Local** continua sem espelhar (comportamento da TASK-077 preservado).
+- [ ] Nenhum `data-testid`/`aria-*` alterado; suíte canônica verde.
+
+## Casos válidos
+
+- Ida `A-1-B-C` (Seções A,B,C; Local 1), mover B para cima (troca com o Local 1) → Ida `A-B-1-C`; Volta `C-5-B-A` permanece **exatamente** `C-5-B-A`; 1 chamada OSRM.
+- Ida `A-B-C`, mover B para cima (troca com a Seção A) → Volta espelha para o inverso de `B-A-C`; 2 chamadas OSRM.
+
+## Casos inválidos
+
+- (guarda de regressão) Nenhum estado passa a ser recusado por esta task; o caso "inválido" é o comportamento antigo — Volta alterada/OSRM chamado 2× num movimento Seção↔Local — que os testes devem provar extinto.
+
+## Testes esperados
+
+- Unitários: N/A no motor (não muda); a decisão de disparo é da etapa.
+- Integração (`etapa-itinerarios.test.tsx`): os dois primeiros critérios de aceite (outro sentido intocado + 1 chamada; Seção↔Seção segue com 2).
+- E2E: ajustar contagens de chamadas OSRM **somente se** algum cenário existente mover Seção sobre Local (verificar; hoje os cenários movem Seção↔Seção ou Local).
+- Snapshot/contrato JSON: N/A.
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (`moverParada`: comparar `subsequenciaSecoes` antes/depois da reordenação e emitir `gestoSecao` só quando diferirem)
+- `testes/unitarios/formulario/etapa-itinerarios.test.tsx`
+
+## Riscos
+
+- Baixos. Ponto único de decisão (`moverParada`); atenção a não suprimir o espelho no movimento Seção↔Seção com Locais adjacentes no meio (a comparação é da subsequência, não das posições).
+- Interação com a TASK-076: ela assume a Volta derivada — esta task deve entrar **antes** para que o mapa bidirecional não herde o efeito colateral.
+
+## Dependências
+
+- TASK-077 (entregue, `553d1e6`); DEC-074 (registrada).
+
+## Perguntas em aberto
+
+- Nenhuma (DEC-074 decidida).
 
 ---
 
