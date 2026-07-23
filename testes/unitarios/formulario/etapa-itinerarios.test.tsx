@@ -1080,6 +1080,52 @@ describe("EtapaItinerarios — espelhamento Ida↔Volta (TASK-077; DEC-063/071)"
     );
   }
 
+  const LOCAL_VOLTA_UUID = "9d8c7b6a-5e4f-4a3b-8c2d-1e0f9a8b7c6d";
+
+  /** Variante da sessão bidirecional com um Local TAMBÉM na Volta
+   * (C-Local5-B-A), para o teste de supressão do espelho (TASK-093; DEC-074
+   * item 1): prova que o Local do sentido NÃO editado fica exatamente onde
+   * estava quando o gesto não altera a subsequência de Seções. Trechos e
+   * `horarios_paradas` são reescritos para manter o documento estruturalmente
+   * válido (Spec 02 §14) com a nova Parada. */
+  function sessaoBidirecionalComLocalNaVolta(): Extract<
+    SessaoFormulario,
+    { modo: "carregado" }
+  > {
+    const sessao = sessaoBidirecionalParaEspelho();
+    const servico = sessao.documento.autos.servicos[0];
+    const volta = servico.itinerarios.find((i) => i.sentido === "volta")!;
+    servico.locais.push({
+      uuid: LOCAL_VOLTA_UUID,
+      nome: "Ponto de Retorno Praia",
+      municipio: "Praia Grande",
+      geolocalizacao_volta: { latitude: -23.99, longitude: -46.398 },
+    });
+    volta.paradas = [
+      { ordem: 1, secao_uuid: SECAO_C_UUID },
+      { ordem: 2, local_uuid: LOCAL_VOLTA_UUID },
+      { ordem: 3, secao_uuid: SECAO_B_UUID },
+      { ordem: 4, secao_uuid: SECAO_A_UUID },
+    ];
+    volta.rota = {
+      ...volta.rota,
+      trechos: [
+        { parada_origem_ordem: 1, parada_destino_ordem: 2, distancia_km: 3, duracao_s: 350 },
+        { parada_origem_ordem: 2, parada_destino_ordem: 3, distancia_km: 3.1, duracao_s: 400 },
+        { parada_origem_ordem: 3, parada_destino_ordem: 4, distancia_km: 8, duracao_s: 1080 },
+      ],
+    };
+    for (const viagem of volta.viagens) {
+      viagem.horarios_paradas = [
+        { parada_ordem: 1, offset_horario: "00:00:00" },
+        { parada_ordem: 2, offset_horario: "00:08:00" },
+        { parada_ordem: 3, offset_horario: "00:15:00" },
+        { parada_ordem: 4, offset_horario: "00:35:00" },
+      ];
+    }
+    return sessao;
+  }
+
   test("remover uma Seção na Ida remove a mesma Seção na Volta, no MESMO commit síncrono", async () => {
     vi.stubGlobal("fetch", respostaOsrmGenericaMock());
     const { obterSessao, resultado } = await montarSessaoNaEtapa(
@@ -1159,6 +1205,64 @@ describe("EtapaItinerarios — espelhamento Ida↔Volta (TASK-077; DEC-063/071)"
     // Ida secoes-only vira B,A,C ⇒ inverso exato = C,A,B (DEC-071: replay do
     // gesto — nunca diff da sequência final).
     expect(secaoUuidsDeChave(sessaoFinal, chaveVolta)).toEqual([SECAO_C_UUID, SECAO_A_UUID, SECAO_B_UUID]);
+
+    resultado.desmontar();
+  });
+
+  test("[TASK-093] mover Seção sobre Local (subsequência inalterada) não espelha: Volta intocada e um só recálculo (DEC-074)", async () => {
+    vi.stubGlobal("fetch", respostaOsrmGenericaMock());
+    const sessaoInicial = sessaoBidirecionalComLocalNaVolta();
+    const voltaAntes = JSON.parse(
+      JSON.stringify(
+        sessaoInicial.documento.autos.servicos[0].itinerarios.find((i) => i.sentido === "volta"),
+      ),
+    ) as unknown;
+    const { obterSessao, resultado } = await montarSessaoNaEtapa(sessaoInicial, SERVICO_UUID, "ida");
+
+    // Ida = A, B, Local, C — mover B (índice 1) para BAIXO troca com o Local:
+    // A, Local, B, C. A subsequência de Seções (A,B,C) NÃO muda.
+    act(() => {
+      (
+        resultado.container.querySelectorAll<HTMLButtonElement>(
+          '[data-testid="parada-mover-baixo"]',
+        )[1]
+      ).click();
+    });
+    await act(async () => {
+      await flush();
+    });
+
+    // UM só recálculo OSRM (RN-052: só o sentido editado) — o caso "inválido"
+    // desta task é o comportamento antigo (2ª chamada + Volta recomposta pelo
+    // replay), que estas asserções provam extinto.
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    const chaveIda = chaveItinerario(SERVICO_UUID, "ida");
+    const chaveVolta = chaveItinerario(SERVICO_UUID, "volta");
+    const sessaoFinal = obterSessao();
+    expect(secaoUuidsDeChave(sessaoFinal, chaveIda)).toEqual([
+      SECAO_A_UUID,
+      undefined,
+      SECAO_B_UUID,
+      SECAO_C_UUID,
+    ]);
+    // O outro sentido nunca é comitado em edição: sem entrada de paradas nem
+    // de pontos de rota para a chave da Volta (RN-041..043 intocadas lá).
+    expect(sessaoFinal.paradasEmEdicao?.[chaveVolta]).toBeUndefined();
+    expect(sessaoFinal.pontosDeRotaEmEdicao?.[chaveVolta]).toBeUndefined();
+
+    // A Volta congelada do documento permanece EXATAMENTE como estava
+    // (C-Local5-B-A), Local incluído — Locais são livres por sentido
+    // (Spec 02 §14; Spec 04 §7.2).
+    if (sessaoFinal.modo !== "carregado") throw new Error("esperava modo carregado");
+    const voltaFinal = sessaoFinal.documento.autos.servicos[0].itinerarios.find(
+      (i) => i.sentido === "volta",
+    );
+    expect(voltaFinal).toEqual(voltaAntes);
+    // RN-030: subsequência inalterada ⇒ ordem inversa mantida por construção.
+    expect(
+      coletarViolacoesEstruturais(sessaoFinal.documento).some((v) => v.mensagem.includes("[RN-030]")),
+    ).toBe(false);
 
     resultado.desmontar();
   });

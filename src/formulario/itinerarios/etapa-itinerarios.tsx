@@ -645,13 +645,23 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
 
   function moverParada(deIndice: number, paraIndice: number) {
     if (paraIndice < 0 || paraIndice >= paradasAtual.length) return;
-    // Mover é gesto de SEÇÃO só quando o item movido é Seção (TASK-077;
-    // DEC-071) — mover um Local por cima/baixo de uma Seção não altera a
-    // subsequência de Seções e não espelha (Locais são livres por sentido).
+    // Mover só é gesto de SEÇÃO quando altera DE FATO a subsequência de
+    // Seções do sentido editado (TASK-093; DEC-074 item 1) — mover um Local,
+    // ou mover uma Seção por cima/baixo de um Local (troca adjacente que
+    // mantém a subsequência idêntica), não espelha nem recalcula o outro
+    // sentido (Locais são livres por sentido — Spec 02 §14; Spec 04 §7.2).
     const paradaMovida = paradasAtual[deIndice];
+    const novasParadas = reordenarParada(paradasAtual, deIndice, paraIndice);
+    const subsequenciaAntes = subsequenciaSecoes(paradasAtual);
+    const subsequenciaDepois = subsequenciaSecoes(novasParadas);
+    const subsequenciaMudou =
+      subsequenciaAntes.length !== subsequenciaDepois.length ||
+      subsequenciaAntes.some((uuid, indice) => uuid !== subsequenciaDepois[indice]);
     const gestoSecao: GestoSecao | undefined =
-      paradaMovida.tipo === "secao" ? { tipo: "movimento", secaoUuid: paradaMovida.secaoUuid } : undefined;
-    void aplicarNovasParadas(reordenarParada(paradasAtual, deIndice, paraIndice), { gestoSecao });
+      paradaMovida.tipo === "secao" && subsequenciaMudou
+        ? { tipo: "movimento", secaoUuid: paradaMovida.secaoUuid }
+        : undefined;
+    void aplicarNovasParadas(novasParadas, { gestoSecao });
   }
 
   function removerParadaNaTabela(indice: number) {
