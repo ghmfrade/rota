@@ -10,9 +10,8 @@ import {
   type LinhaMapa,
   type MarcadorMapa,
 } from "@/shared/mapa";
-import { Botao, Campo, MenuFlutuante, Painel } from "@/shared/ui";
+import { MenuFlutuante } from "@/shared/ui";
 import {
-  criarSecaoNoPonto,
   MENSAGEM_FORA_DE_SP,
   MENSAGEM_RECUSA_350M_SECAO,
   revalidarArrasto,
@@ -20,7 +19,6 @@ import {
   type Sentido,
 } from "@/formulario/secoes";
 import {
-  criarLocalNoPonto,
   MENSAGEM_RECUSA_350M_LOCAL,
   nomeExibicaoLocal,
   revalidarArrastoLocal,
@@ -55,14 +53,6 @@ const paraPonto = (c: Coordenada): Ponto => ({ latitude: c.lat, longitude: c.lng
 const geolocDoSentido = (local: Local, sentido: Sentido): Ponto | undefined =>
   sentido === "ida" ? local.geolocalizacao_ida : local.geolocalizacao_volta;
 
-interface CriacaoPendente {
-  tipo: "secao" | "local";
-  posicao: Coordenada;
-  /** Presente somente quando o `contextmenu` acertou a linha da rota
-   * (TASK-067/DEC-055). O host converte a coordenada no índice da Parada. */
-  posicaoNaLinha?: Coordenada;
-}
-
 interface MenuCriacaoPendente {
   posicao: Coordenada;
   ancoraTela: AncoraTelaMapa;
@@ -78,12 +68,19 @@ export interface PropsEditorMapaItinerario {
   locaisInvalidos?: readonly string[];
   servicoUuid: string;
   sentido: Sentido;
-  /** Serviço tem os dois itinerários (Ida e Volta) — RN-026. */
-  bidirecional: boolean;
   recursosMunicipio: RecursosMunicipio;
-  aoCriarSecao: (secao: Secao, posicaoNaLinha?: Coordenada) => void;
+  /** Usuário escolheu "Seção"/"Local" no menu de criação (TASK-095; DEC-077):
+   * o host é quem monta a linha-formulário na posição de inserção da tabela
+   * lateral e chama `criarSecaoNoPonto`/`criarLocalNoPonto` ao confirmar. */
+  aoIniciarCriacaoParada: (
+    tipo: "secao" | "local",
+    posicao: Coordenada,
+    posicaoNaLinha?: Coordenada,
+  ) => void;
+  /** Posição do clique que abriu a criação pendente no host (TASK-095) —
+   * mantém o marcador laranja provisório no mapa até confirmar/cancelar. */
+  posicaoCriacaoPendente?: Coordenada;
   aoAtualizarSecao: (secao: Secao) => void;
-  aoCriarLocal: (local: Local, posicaoNaLinha?: Coordenada) => void;
   aoAtualizarLocal: (local: Local) => void;
   /** Rota ativa do itinerário (`estadoAtual.rota.geometria` convertida — Spec
    * 04 §7.3, RN-046/052), desenhada sobre o mapa; ausente quando `sem-rota`. */
@@ -117,11 +114,10 @@ export function EditorMapaItinerario({
   locaisInvalidos = [],
   servicoUuid,
   sentido,
-  bidirecional,
   recursosMunicipio,
-  aoCriarSecao,
+  aoIniciarCriacaoParada,
+  posicaoCriacaoPendente,
   aoAtualizarSecao,
-  aoCriarLocal,
   aoAtualizarLocal,
   linhaRota,
   pontosDeRota = [],
@@ -132,9 +128,7 @@ export function EditorMapaItinerario({
 }: PropsEditorMapaItinerario) {
   const [mensagemSecao, definirMensagemSecao] = useState<string | null>(null);
   const [mensagemLocal, definirMensagemLocal] = useState<string | null>(null);
-  const [criacaoPendente, definirCriacaoPendente] = useState<CriacaoPendente | null>(null);
   const [menuCriacao, definirMenuCriacao] = useState<MenuCriacaoPendente | null>(null);
-  const [nomeNovo, definirNomeNovo] = useState("");
   const [preVisualizacao, definirPreVisualizacao] = useState<{
     linha: LinhaMapa;
     posicao: Coordenada;
@@ -180,11 +174,11 @@ export function EditorMapaItinerario({
     };
   });
 
-  const marcadorPendente: MarcadorMapa[] = criacaoPendente
+  const marcadorPendente: MarcadorMapa[] = posicaoCriacaoPendente
     ? [
         {
           id: "novo-ponto-pendente",
-          posicao: criacaoPendente.posicao,
+          posicao: posicaoCriacaoPendente,
           forma: "circulo",
           cor: COR_MARCADOR_PENDENTE,
         },
@@ -226,17 +220,6 @@ export function EditorMapaItinerario({
         ]
       : [];
 
-  function iniciarCriacao(
-    tipo: "secao" | "local",
-    posicao: Coordenada,
-    posicaoNaLinha?: Coordenada,
-  ) {
-    definirMensagemSecao(null);
-    definirMensagemLocal(null);
-    definirCriacaoPendente({ tipo, posicao, posicaoNaLinha });
-    definirNomeNovo("");
-  }
-
   function abrirMenuCriacao(
     posicao: Coordenada,
     ancoraTela: AncoraTelaMapa,
@@ -244,60 +227,17 @@ export function EditorMapaItinerario({
   ) {
     definirMensagemSecao(null);
     definirMensagemLocal(null);
-    definirCriacaoPendente(null);
-    definirNomeNovo("");
     definirMenuCriacao({ posicao, ancoraTela, sobreLinha });
   }
 
   function escolherTipoCriacao(tipo: "secao" | "local") {
     if (!menuCriacao) return;
-    iniciarCriacao(
+    aoIniciarCriacaoParada(
       tipo,
       menuCriacao.posicao,
       menuCriacao.sobreLinha ? menuCriacao.posicao : undefined,
     );
-  }
-
-  function confirmarCriacao() {
-    if (!criacaoPendente || !nomeNovo.trim()) return;
-    if (criacaoPendente.tipo === "secao") {
-      const resultado = criarSecaoNoPonto({
-        nome: nomeNovo,
-        ponto: paraPonto(criacaoPendente.posicao),
-        servicoUuid,
-        sentido,
-        bidirecional,
-        features: recursosMunicipio.features,
-        nomes: recursosMunicipio.nomes,
-      });
-      if (!resultado.ok) {
-        definirMensagemSecao(MENSAGEM_FORA_DE_SP);
-        return;
-      }
-      aoCriarSecao(resultado.secao, criacaoPendente.posicaoNaLinha);
-    } else {
-      const resultado = criarLocalNoPonto({
-        nome: nomeNovo,
-        ponto: paraPonto(criacaoPendente.posicao),
-        sentido,
-        features: recursosMunicipio.features,
-        nomes: recursosMunicipio.nomes,
-      });
-      if (!resultado.ok) {
-        definirMensagemLocal(MENSAGEM_FORA_DE_SP);
-        return;
-      }
-      aoCriarLocal(resultado.local, criacaoPendente.posicaoNaLinha);
-    }
-    definirCriacaoPendente(null);
-    definirNomeNovo("");
-    definirMensagemSecao(null);
-    definirMensagemLocal(null);
-  }
-
-  function cancelarCriacao() {
-    definirCriacaoPendente(null);
-    definirNomeNovo("");
+    definirMenuCriacao(null);
   }
 
   function lidarArrastoSecao(secao: Secao, posicao: Coordenada) {
@@ -425,58 +365,6 @@ export function EditorMapaItinerario({
           Local
         </li>
       </ul>
-
-      {criacaoPendente?.tipo === "secao" ? (
-        <Painel>
-          <div data-testid="form-criar-secao" className="flex flex-col gap-4">
-            <Campo
-              rotulo="Nome da Seção"
-              data-testid="nome-secao-input"
-              value={nomeNovo}
-              onChange={(evento) => definirNomeNovo(evento.target.value)}
-            />
-            <div className="flex gap-2">
-              <Botao
-                variante="primario"
-                data-testid="confirmar-criar-secao"
-                disabled={!nomeNovo.trim()}
-                onClick={confirmarCriacao}
-              >
-                Criar Seção
-              </Botao>
-              <Botao variante="fantasma" onClick={cancelarCriacao}>
-                Cancelar
-              </Botao>
-            </div>
-          </div>
-        </Painel>
-      ) : null}
-
-      {criacaoPendente?.tipo === "local" ? (
-        <Painel>
-          <div data-testid="form-criar-local" className="flex flex-col gap-4">
-            <Campo
-              rotulo="Nome do Local"
-              data-testid="nome-local-input"
-              value={nomeNovo}
-              onChange={(evento) => definirNomeNovo(evento.target.value)}
-            />
-            <div className="flex gap-2">
-              <Botao
-                variante="primario"
-                data-testid="confirmar-criar-local"
-                disabled={!nomeNovo.trim()}
-                onClick={confirmarCriacao}
-              >
-                Criar Local
-              </Botao>
-              <Botao variante="fantasma" onClick={cancelarCriacao}>
-                Cancelar
-              </Botao>
-            </div>
-          </div>
-        </Painel>
-      ) : null}
 
       <ul data-testid="lista-locais" className="flex flex-col gap-2">
         {locaisDoSentido.map((local) => (

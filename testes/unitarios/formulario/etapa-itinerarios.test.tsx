@@ -15,25 +15,60 @@ import type { Coordenada } from "@/shared/mapa";
 import {
   coletarViolacoesEstruturais,
   esquemaDocumentoOperacao,
-  type Local,
   type PontoDeRota,
   type Secao,
 } from "@/shared/contrato";
 import { act, renderizar, type ResultadoRenderizacao } from "../shared-ui/_ajuda-render";
 import { documentoExemploMinimo } from "../../fixtures";
 
-// A etapa carrega esses dados por efeito antes de habilitar a edição. O teste
-// não exercita geocodificação; usa fixtures locais mínimas e nunca faz rede.
+// Polígono municipal sintético cobrindo as coordenadas de teste usadas neste
+// arquivo (região ampla, não o geojson real) — a criação inline (TASK-095)
+// passa pela derivação de município de verdade (`criarLocalNoPonto`/
+// `criarSecaoNoPonto`), então os testes que simulam o gesto do usuário na
+// linha-formulário precisam de um recurso que resolva "dentro de SP".
+const RECURSOS_MUNICIPIO_TESTE = vi.hoisted(() => ({
+  features: [
+    {
+      type: "Feature",
+      properties: { codarea: "9999999" },
+      geometry: {
+        type: "Polygon",
+        coordinates: [
+          [
+            [-180, -90],
+            [180, -90],
+            [180, 90],
+            [-180, 90],
+            [-180, -90],
+          ],
+        ],
+      },
+    },
+  ],
+  municipios: [{ codigo_ibge: "9999999", nome: "Santos" }],
+}));
+
+// A etapa carrega esses dados por efeito antes de habilitar a edição.
 vi.mock("@/shared/dados-estaticos", () => ({
-  carregarGeojsonMunicipios: vi.fn().mockResolvedValue({ features: [] }),
-  carregarBaseMunicipios: vi.fn().mockResolvedValue({ municipios: [] }),
+  carregarGeojsonMunicipios: vi.fn().mockResolvedValue({
+    features: RECURSOS_MUNICIPIO_TESTE.features,
+  }),
+  carregarBaseMunicipios: vi.fn().mockResolvedValue({
+    municipios: RECURSOS_MUNICIPIO_TESTE.municipios,
+  }),
 }));
 
 // MapLibre/WebGL não existe no jsdom e não participa da regra da TASK-083.
 // Mantemos a EtapaItinerarios real e substituímos somente o filho visual.
+// TASK-095/DEC-077: a criação deixou de ser prop do filho (`aoCriarSecao`/
+// `aoCriarLocal`) — o filho só REPORTA a intenção via `aoIniciarCriacaoParada`;
+// quem cria e confirma é o host, através da linha-formulário real na tabela.
 interface PropsEditorCapturadas {
-  aoCriarSecao: (secao: Secao, posicaoNaLinha?: Coordenada) => void;
-  aoCriarLocal: (local: Local, posicaoNaLinha?: Coordenada) => void;
+  aoIniciarCriacaoParada: (
+    tipo: "secao" | "local",
+    posicao: Coordenada,
+    posicaoNaLinha?: Coordenada,
+  ) => void;
   locaisInvalidos?: readonly string[];
   selecaoAtual?: string | null;
   aoSelecionarMarcador?: (chave: string) => void;
@@ -155,6 +190,44 @@ async function flush(voltas = 10) {
   for (let i = 0; i < voltas; i++) {
     await Promise.resolve();
   }
+}
+
+function digitar(input: HTMLInputElement, valor: string) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+  act(() => {
+    setter.call(input, valor);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+function clicar(el: Element) {
+  act(() => {
+    el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+}
+
+/**
+ * Simula o gesto real do usuário na linha-formulário inline (TASK-095;
+ * DEC-077): escolher "Local" no menu do mapa abre a linha na posição de
+ * inserção; digitar o nome e confirmar chama `criarLocalNoPonto` de verdade
+ * (município resolvido por `RECURSOS_MUNICIPIO_TESTE`, "Santos"). Substitui o
+ * atalho antigo de injetar um `Local` já pronto via prop do filho — a criação
+ * deixou de ser prop do filho (TASK-095).
+ */
+function criarLocalPelaLinhaFormularioInline(
+  resultado: ResultadoRenderizacao,
+  nome: string,
+  posicao: Coordenada,
+  posicaoNaLinha?: Coordenada,
+) {
+  act(() => {
+    editorCapturado.props?.aoIniciarCriacaoParada("local", posicao, posicaoNaLinha);
+  });
+  const input = resultado.container.querySelector(
+    '[data-testid="nome-local-input"]',
+  ) as HTMLInputElement;
+  digitar(input, nome);
+  clicar(resultado.container.querySelector('[data-testid="confirmar-criar-local"]')!);
 }
 
 function sessaoComTresSecoes(
@@ -577,15 +650,14 @@ describe("EtapaItinerarios — inserção posicional pelo mapa (TASK-067/DEC-055
       });
       vi.stubGlobal("fetch", fetchMock);
 
-      const local: Local = {
-        uuid: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        nome: "Local intermediário",
-        municipio: "Santos",
-        geolocalizacao_ida: { latitude: -23.98, longitude: -46.38 },
-      };
-      act(() => {
-        editorCapturado.props?.aoCriarLocal(local, { lng: -46.38, lat: -23.98 });
-      });
+      // TASK-095/DEC-077: a criação passa pela linha-formulário inline real —
+      // já não se injeta um `Local` pronto via prop do filho.
+      criarLocalPelaLinhaFormularioInline(
+        resultado,
+        "Local intermediário",
+        { lng: -46.38, lat: -23.98 },
+        { lng: -46.38, lat: -23.98 },
+      );
       await act(async () => {
         await Promise.resolve();
         await Promise.resolve();
@@ -606,7 +678,10 @@ describe("EtapaItinerarios — inserção posicional pelo mapa (TASK-067/DEC-055
       expect(sessaoAtual.estadosRotaViva?.[chave]?.situacao).toBe("recalculada");
       if (sessaoAtual.modo !== "carregado") throw new Error("sessão deveria estar carregada");
       const itinerario = sessaoAtual.documento.autos.servicos[0].itinerarios[0];
-      expect(itinerario.paradas[2]).toEqual({ ordem: 3, local_uuid: local.uuid });
+      const localCriado = sessaoAtual.documento.autos.servicos[0].locais.find(
+        (l) => l.nome === "Local intermediário",
+      )!;
+      expect(itinerario.paradas[2]).toEqual({ ordem: 3, local_uuid: localCriado.uuid });
       expect(itinerario.rota.trechos).toHaveLength(3);
       expect(esquemaDocumentoOperacao.safeParse(sessaoAtual.documento).success).toBe(true);
       expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -624,15 +699,13 @@ describe("EtapaItinerarios — inserção posicional pelo mapa (TASK-067/DEC-055
     await removerParada(resultado, 0);
     const chamadasAntesDaInsercao = vi.mocked(fetch).mock.calls.length;
 
-    const local: Local = {
-      uuid: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      nome: "Local no fim",
-      municipio: "Santos",
-      geolocalizacao_ida: { latitude: -23.98, longitude: -46.38 },
-    };
-    act(() => {
-      editorCapturado.props?.aoCriarLocal(local, { lng: -46.38, lat: -23.98 });
-    });
+    // TASK-095/DEC-077: gesto real via linha-formulário inline.
+    criarLocalPelaLinhaFormularioInline(
+      resultado,
+      "Local no fim",
+      { lng: -46.38, lat: -23.98 },
+      { lng: -46.38, lat: -23.98 },
+    );
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -644,7 +717,11 @@ describe("EtapaItinerarios — inserção posicional pelo mapa (TASK-067/DEC-055
       "local",
     ]);
     expect(vi.mocked(fetch).mock.calls).toHaveLength(chamadasAntesDaInsercao);
-    expect(editorCapturado.props?.locaisInvalidos).toEqual([local.uuid]);
+    const paradaLocal = obterSessao().paradasEmEdicao?.[chave]?.find(
+      (p) => p.tipo === "local",
+    );
+    const localUuidCriado = paradaLocal?.tipo === "local" ? paradaLocal.localUuid : undefined;
+    expect(editorCapturado.props?.locaisInvalidos).toEqual([localUuidCriado]);
     expect(
       resultado.container.querySelector('[data-testid="avisos-montagem-invalida"]'),
     ).not.toBeNull();
@@ -670,25 +747,26 @@ describe("EtapaItinerarios — inserção posicional pelo mapa (TASK-067/DEC-055
 
   test("[inválido] falha geométrica de ancoragem acrescenta Local ao fim em vez de descartar o gesto", async () => {
     const { obterSessao, resultado } = await montarEtapa(2);
-    const ancoragem = vi.spyOn(mapa, "ancorarPontoNaRota").mockReturnValueOnce(undefined);
+    // `mockReturnValue` (não `Once`): a linha-formulário inline (TASK-095)
+    // também chama `ancorarPontoNaRota` para posicionar a PRÉVIA na tabela
+    // antes de confirmar — a falha geométrica precisa persistir em todas as
+    // chamadas para que o gesto de CRIAÇÃO em si reproduza o cenário.
+    const ancoragem = vi.spyOn(mapa, "ancorarPontoNaRota").mockReturnValue(undefined);
     const chamadasAntesDaInsercao = vi.mocked(fetch).mock.calls.length;
 
-    const local: Local = {
-      uuid: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-      nome: "Local sem ancoragem geométrica",
-      municipio: "Santos",
-      geolocalizacao_ida: { latitude: -23.98, longitude: -46.38 },
-    };
-    act(() => {
-      editorCapturado.props?.aoCriarLocal(local, { lng: -46.38, lat: -23.98 });
-    });
+    criarLocalPelaLinhaFormularioInline(
+      resultado,
+      "Local sem ancoragem geométrica",
+      { lng: -46.38, lat: -23.98 },
+      { lng: -46.38, lat: -23.98 },
+    );
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
     });
 
     const chave = chaveItinerario(SERVICO_UUID, "ida");
-    expect(ancoragem).toHaveBeenCalledOnce();
+    expect(ancoragem).toHaveBeenCalled();
     expect(obterSessao().paradasEmEdicao?.[chave]?.map((parada) => parada.tipo)).toEqual([
       "secao",
       "secao",
@@ -696,7 +774,9 @@ describe("EtapaItinerarios — inserção posicional pelo mapa (TASK-067/DEC-055
       "local",
     ]);
     expect(vi.mocked(fetch).mock.calls).toHaveLength(chamadasAntesDaInsercao);
-    expect(editorCapturado.props?.locaisInvalidos).toEqual([local.uuid]);
+    const paradaLocal = obterSessao().paradasEmEdicao?.[chave]?.find((p) => p.tipo === "local");
+    const localUuidCriado = paradaLocal?.tipo === "local" ? paradaLocal.localUuid : undefined;
+    expect(editorCapturado.props?.locaisInvalidos).toEqual([localUuidCriado]);
     expect(
       resultado.container.querySelector(
         '[data-testid="parada-item"][data-estado="local-extremo"]',
@@ -1410,11 +1490,23 @@ describe("EtapaItinerarios — espelhamento Ida↔Volta (TASK-077; DEC-063/071)"
     );
 
     // Insere a Seção B (já existente no documento) na Ida — completa a Ida
-    // (2 paradas) e dispara o espelho, que também completa a Volta.
+    // (2 paradas) e dispara o espelho, que também completa a Volta. A
+    // criação por NOME deixou de ser prop do filho (TASK-095) — o reuso de
+    // Seção já existente sempre passou pelo `PainelReusoSecao` real (TASK-074),
+    // então o gesto é simulado por ele mesmo, não mais por um atalho no filho.
     const secaoB = documento.autos.secoes[1];
+    const selectReuso = resultado.container.querySelector(
+      '[data-testid="select-secao-reuso"]',
+    ) as HTMLSelectElement;
+    const definirValorSelect = Object.getOwnPropertyDescriptor(
+      HTMLSelectElement.prototype,
+      "value",
+    )!.set!;
     act(() => {
-      editorCapturado.props?.aoCriarSecao(secaoB);
+      definirValorSelect.call(selectReuso, secaoB.uuid);
+      selectReuso.dispatchEvent(new Event("change", { bubbles: true }));
     });
+    clicar(resultado.container.querySelector('[data-testid="confirmar-reuso"]')!);
     await act(async () => {
       await flush();
     });
@@ -1600,6 +1692,160 @@ describe("EtapaItinerarios — remoção da entidade Local pelo \"X\" (TASK-094;
     const idaFinal = servico.itinerarios.find((i) => i.sentido === "ida")!;
     expect(servico.locais.some((l) => l.uuid === LOCAL_UUID)).toBe(true);
     expect(idaFinal.paradas.some((p) => p.local_uuid === LOCAL_UUID)).toBe(true);
+
+    resultado.desmontar();
+  });
+});
+
+describe("EtapaItinerarios — linha-formulário de criação inline na tabela (TASK-095; DEC-077)", () => {
+  function linhaDaTabela(resultado: ResultadoRenderizacao, indice: number): Element | undefined {
+    const linhas = [
+      ...resultado.container.querySelectorAll('[data-testid="tabela-paradas"] tbody > tr'),
+    ];
+    return linhas[indice];
+  }
+
+  test("escolher Local sem âncora de linha abre a linha-formulário no FIM da tabela", async () => {
+    const { resultado } = await montarEtapa(1);
+
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: -46.38, lat: -23.98 });
+    });
+
+    const linhas = [
+      ...resultado.container.querySelectorAll('[data-testid="tabela-paradas"] tbody > tr'),
+    ];
+    const linhaFormulario = resultado.container
+      .querySelector('[data-testid="form-criar-local"]')
+      ?.closest("tr");
+    expect(linhaFormulario).not.toBeNull();
+    // A linha-formulário é a ÚLTIMA linha da tabela (sem âncora ⇒ fim).
+    expect(linhas.at(-1)).toBe(linhaFormulario);
+
+    resultado.desmontar();
+  });
+
+  test("escolher Local COM âncora de linha abre a linha-formulário na posição de inserção", async () => {
+    // Mesma âncora do caso "antes" de TASK-067/DEC-055: insere após a 2ª Parada.
+    const { resultado } = await montarEtapa(2, -23.97);
+
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada(
+        "local",
+        { lng: -46.38, lat: -23.98 },
+        { lng: -46.38, lat: -23.98 },
+      );
+    });
+
+    const linhaFormulario = resultado.container
+      .querySelector('[data-testid="form-criar-local"]')
+      ?.closest("tr");
+    expect(linhaFormulario).not.toBeNull();
+    // Entra logo antes da 3ª Parada (índice 2 na lista de paradas — trecho
+    // 2→3 da rota) e depois do ponto de rota intercalado no meio da lista.
+    const indiceNaTabela = [
+      ...resultado.container.querySelectorAll('[data-testid="tabela-paradas"] tbody > tr'),
+    ].indexOf(linhaFormulario!);
+    const linhaAnterior = linhaDaTabela(resultado, indiceNaTabela - 1);
+    const linhaSeguinte = linhaDaTabela(resultado, indiceNaTabela + 1);
+    expect(linhaAnterior?.getAttribute("data-testid")).not.toBe("form-criar-local");
+    expect(linhaSeguinte?.querySelector('[data-testid="parada-rotulo"]')).not.toBeNull();
+
+    resultado.desmontar();
+  });
+
+  test("painel de criação abaixo do mapa não existe mais; testids de criação preservados dentro da tabela", async () => {
+    const { resultado } = await montarEtapa(1);
+
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada("secao", { lng: -46.38, lat: -23.98 });
+    });
+
+    const dentroDaTabela = resultado.container.querySelector('[data-testid="tabela-paradas"]');
+    expect(dentroDaTabela?.querySelector('[data-testid="form-criar-secao"]')).not.toBeNull();
+    expect(dentroDaTabela?.querySelector('[data-testid="nome-secao-input"]')).not.toBeNull();
+    expect(dentroDaTabela?.querySelector('[data-testid="confirmar-criar-secao"]')).not.toBeNull();
+    // Fora da tabela (o antigo painel abaixo do mapa) não existe mais.
+    const foraDaTabela = resultado.container.querySelector(
+      '[data-testid="coluna-paradas"] > [data-testid="form-criar-secao"]',
+    );
+    expect(foraDaTabela).toBeNull();
+
+    resultado.desmontar();
+  });
+
+  test("nome vazio mantém o botão de confirmar desabilitado", async () => {
+    const { resultado } = await montarEtapa(1);
+
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: -46.38, lat: -23.98 });
+    });
+
+    const botaoConfirmar = resultado.container.querySelector(
+      '[data-testid="confirmar-criar-local"]',
+    ) as HTMLButtonElement;
+    expect(botaoConfirmar.disabled).toBe(true);
+
+    const input = resultado.container.querySelector(
+      '[data-testid="nome-local-input"]',
+    ) as HTMLInputElement;
+    digitar(input, "Padaria");
+    expect(botaoConfirmar.disabled).toBe(false);
+
+    resultado.desmontar();
+  });
+
+  test("[inválido] cancelar remove a linha-formulário sem criar nada e sem disparar recálculo/OSRM", async () => {
+    const { obterSessao, resultado } = await montarEtapa(1);
+    const chamadasAntes = vi.mocked(fetch).mock.calls.length;
+    const paradasAntes = obterSessao().paradasEmEdicao;
+
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: -46.38, lat: -23.98 });
+    });
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(chamadasAntes);
+    expect(resultado.container.querySelector('[data-testid="form-criar-local"]')).not.toBeNull();
+
+    const input = resultado.container.querySelector(
+      '[data-testid="nome-local-input"]',
+    ) as HTMLInputElement;
+    digitar(input, "Padaria");
+    clicar(
+      [...resultado.container.querySelectorAll("button")].find(
+        (botao) => botao.textContent === "Cancelar",
+      )!,
+    );
+
+    expect(resultado.container.querySelector('[data-testid="form-criar-local"]')).toBeNull();
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(chamadasAntes);
+    expect(obterSessao().paradasEmEdicao).toEqual(paradasAntes);
+
+    resultado.desmontar();
+  });
+
+  test("[inválido] ponto fora de SP: mensagem de recusa inline e NENHUMA Parada criada", async () => {
+    const { obterSessao, resultado } = await montarEtapa(1);
+    const paradasAntes = obterSessao().paradasEmEdicao;
+
+    act(() => {
+      // Latitude/longitude fora do polígono sintético de qualquer município
+      // conhecido pelos recursos de teste (fora do planeta é garantidamente
+      // fora do polígono — RECURSOS_MUNICIPIO_TESTE cobre todo o globo, então
+      // usamos coordenadas inválidas para o ray-casting não achar match).
+      editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: 200, lat: 100 });
+    });
+    const input = resultado.container.querySelector(
+      '[data-testid="nome-local-input"]',
+    ) as HTMLInputElement;
+    digitar(input, "Fora de SP");
+    clicar(resultado.container.querySelector('[data-testid="confirmar-criar-local"]')!);
+
+    expect(
+      resultado.container.querySelector('[data-testid="mensagem-recusa-criacao-inline"]'),
+    ).not.toBeNull();
+    // A linha-formulário permanece aberta (recusa não fecha o gesto).
+    expect(resultado.container.querySelector('[data-testid="form-criar-local"]')).not.toBeNull();
+    expect(obterSessao().paradasEmEdicao).toEqual(paradasAntes);
 
     resultado.desmontar();
   });

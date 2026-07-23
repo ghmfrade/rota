@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { z } from "zod";
 import type { Local, PontoDeRota, Secao, Servico } from "@/shared/contrato";
 import { esquemaRota } from "@/shared/contrato";
@@ -11,12 +11,19 @@ import {
 import { indiceDeNomes } from "@/shared/geo";
 import { ancorarPontoNaRota, linhaDaGeometria, type Coordenada, type LinhaMapa } from "@/shared/mapa";
 import {
+  criarSecaoNoPonto,
   limparSecoesAposEdicaoDeParadas,
+  MENSAGEM_FORA_DE_SP as MENSAGEM_FORA_DE_SP_SECAO,
   nomeExibicaoSecao,
   type RecursosMunicipio,
   type Sentido,
 } from "@/formulario/secoes";
-import { nomeExibicaoLocal, removerEntidadeLocal } from "@/formulario/locais";
+import {
+  criarLocalNoPonto,
+  MENSAGEM_FORA_DE_SP as MENSAGEM_FORA_DE_SP_LOCAL,
+  nomeExibicaoLocal,
+  removerEntidadeLocal,
+} from "@/formulario/locais";
 import { EditorMapaItinerario } from "./editor-mapa-itinerario";
 import { PainelReusoSecao } from "./painel-reuso-secao";
 import { ALTURA_MAPA_CLASSE_LG } from "./altura-mapa";
@@ -30,7 +37,7 @@ import {
   reancorarPontosDeRotaNaInsercaoPosicional,
   removerPontoDeRota,
 } from "@/formulario/roteamento";
-import { Botao, Painel, Select, Tabela, Tooltip } from "@/shared/ui";
+import { Botao, Campo, Painel, Select, Tabela, Tooltip } from "@/shared/ui";
 import {
   matrizDistanciasDoServico,
   reconciliarMatrizSeccionamento,
@@ -59,6 +66,7 @@ import {
   moverPontoDeRotaNaLista,
   podeMoverPontoDeRotaNaLista,
   type DirecaoMovimentoLista,
+  type ItemListaIntercalada,
 } from "./lista-intercalada-itinerario";
 import {
   chaveParadaEmEdicao,
@@ -163,6 +171,20 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
   );
   const refsLinhasTabela = useRef<Map<string, HTMLTableRowElement>>(new Map());
 
+  // Criação inline de Seção/Local (TASK-095; DEC-077): a linha-formulário vive
+  // na tabela lateral, na posição de inserção — não mais num `Painel` abaixo
+  // do mapa (`EditorMapaItinerario` só reporta a intenção via
+  // `aoIniciarCriacaoParada`). Estado efêmero de UI (RN-096); nunca integra a
+  // sessão/documento.
+  const [criacaoInline, definirCriacaoInline] = useState<{
+    tipo: "secao" | "local";
+    posicao: Coordenada;
+    posicaoNaLinha?: Coordenada;
+  } | null>(null);
+  const [nomeCriacaoInline, definirNomeCriacaoInline] = useState("");
+  const [mensagemCriacaoInline, definirMensagemCriacaoInline] = useState<string | null>(null);
+  const refLinhaFormularioCriacao = useRef<HTMLTableRowElement | null>(null);
+
   function alternarSelecao(chave: string, origem: "tabela" | "mapa") {
     definirSelecao((atual) => (atual?.chave === chave ? null : { chave, origem }));
   }
@@ -178,6 +200,11 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
   if (chaveItinerarioDaSelecao !== chaveItinerarioAtual) {
     definirChaveItinerarioDaSelecao(chaveItinerarioAtual);
     definirSelecao(null);
+    if (criacaoInline) {
+      definirCriacaoInline(null);
+      definirNomeCriacaoInline("");
+      definirMensagemCriacaoInline(null);
+    }
   }
 
   // Rola a linha selecionada para dentro da viewport própria da tabela
@@ -189,6 +216,13 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     // todo navegador real; chamada opcional para não acoplar o teste ao DOM.
     refsLinhasTabela.current.get(selecao.chave)?.scrollIntoView?.({ block: "nearest" });
   }, [selecao]);
+
+  // Rola a linha-formulário para dentro da viewport da tabela ao abrir
+  // (TASK-095; DEC-077) — mesma ressalva de `scrollIntoView` ausente no jsdom.
+  useEffect(() => {
+    if (!criacaoInline) return;
+    refLinhaFormularioCriacao.current?.scrollIntoView?.({ block: "nearest" });
+  }, [criacaoInline]);
 
   // "Latest ref" da sessão (padrão para ler o estado mais recente de dentro de
   // uma continuação assíncrona — o `await dispararRecalculo` abaixo atravessa
@@ -302,6 +336,23 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     estadoAtual && (estadoAtual.situacao === "congelada" || estadoAtual.situacao === "recalculada")
       ? linhaDaGeometria("rota-ativa", estadoAtual.rota.geometria)
       : undefined;
+
+  // Posição da linha-formulário de criação inline na lista intercalada
+  // (TASK-095; DEC-077) — a MESMA âncora que `prepararInsercaoDeParada` usa
+  // para a Parada real, aplicada ANTES de qualquer entidade existir, só para
+  // desenhar a linha no lugar certo. `undefined`/além do fim ⇒ linha no fim.
+  // Memorizado por `criacaoInline` (não recalcula a cada tecla digitada no
+  // nome — só quando a criação abre/fecha ou a lista muda de verdade).
+  const indiceExibicaoCriacaoInline: number | undefined = useMemo(() => {
+    if (!criacaoInline) return undefined;
+    const indiceInsercao = indiceInsercaoParaPosicao(criacaoInline.posicaoNaLinha);
+    if (indiceInsercao === undefined) return itensListaAtual.length;
+    const posicao = itensListaAtual.findIndex(
+      (item) => item.tipo === "parada" && item.indiceParada === indiceInsercao,
+    );
+    return posicao === -1 ? itensListaAtual.length : posicao;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [criacaoInline, itensListaAtual]);
 
   const sentidoOutro: Sentido | undefined =
     sentidoSelecionado && bidirecional ? (sentidoSelecionado === "ida" ? "volta" : "ida") : undefined;
@@ -685,19 +736,17 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     void aplicarNovasParadas(paradasAtual);
   }
 
-  function prepararInsercaoDeParada(
-    parada: ParadaEmEdicao,
-    posicaoNaLinha?: Coordenada,
-  ):
-    | { paradas: ParadaEmEdicao[]; pontosDeRota?: readonly PontoDeRota[] }
-    | undefined {
-    if (!posicaoNaLinha) {
-      return { paradas: inserirParada(paradasAtual, parada) };
+  // Índice (0-based) em que uma nova Parada clicada em `posicaoNaLinha` deve
+  // entrar em `paradasAtual` — `undefined` quando não há âncora (sem posição,
+  // itinerário sem rota/paradas resolvidas, ou falha geométrica), caso em que
+  // o chamador acrescenta ao FIM (RN-034/035, comportamento preservado desde a
+  // TASK-067). Extraído de `prepararInsercaoDeParada` (TASK-095) para ser
+  // reusado pela linha-formulário inline, que precisa da MESMA âncora antes de
+  // qualquer entidade existir, só para posicionar a linha na tabela.
+  function indiceInsercaoParaPosicao(posicaoNaLinha?: Coordenada): number | undefined {
+    if (!posicaoNaLinha || !linhaAtual || !sentidoSelecionado || !linhaRotaAtual) {
+      return undefined;
     }
-    if (!linhaAtual || !sentidoSelecionado || !linhaRotaAtual) {
-      return { paradas: inserirParada(paradasAtual, parada) };
-    }
-
     const resolucao = resolverParadasRota(
       paradasAtual,
       secoes,
@@ -705,9 +754,7 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
       linhaAtual.servicoUuid,
       sentidoSelecionado,
     );
-    if (!resolucao.ok) {
-      return { paradas: inserirParada(paradasAtual, parada) };
-    }
+    if (!resolucao.ok) return undefined;
 
     const paradasCoordenadas: Coordenada[] = resolucao.paradas.map((ponto) => ({
       lng: ponto.longitude,
@@ -718,19 +765,29 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
       linhaRotaAtual.pontos,
       paradasCoordenadas,
     );
-    if (!ancoragem) {
+    // `aposParadaOrdem` é 1-based e também é exatamente o índice 0-based em
+    // que a nova Parada deve entrar: trecho 2→3 ⇒ índice 2 ⇒ nova ordem 3.
+    return ancoragem?.aposParadaOrdem;
+  }
+
+  function prepararInsercaoDeParada(
+    parada: ParadaEmEdicao,
+    posicaoNaLinha?: Coordenada,
+  ):
+    | { paradas: ParadaEmEdicao[]; pontosDeRota?: readonly PontoDeRota[] }
+    | undefined {
+    const indiceInsercao = indiceInsercaoParaPosicao(posicaoNaLinha);
+    if (indiceInsercao === undefined) {
       return { paradas: inserirParada(paradasAtual, parada) };
     }
 
-    // `aposParadaOrdem` é 1-based e também é exatamente o índice 0-based em
-    // que a nova Parada deve entrar: trecho 2→3 ⇒ índice 2 ⇒ nova ordem 3.
-    const paradas = inserirParada(paradasAtual, parada, ancoragem.aposParadaOrdem);
+    const paradas = inserirParada(paradasAtual, parada, indiceInsercao);
     const pontosDeRota = reancorarPontosDeRotaNaInsercaoPosicional(
       paradasAtual.map(chaveParadaEmEdicao),
       paradas.map(chaveParadaEmEdicao),
       pontosDeRotaAtual,
-      linhaRotaAtual.pontos,
-      posicaoNaLinha,
+      linhaRotaAtual!.pontos,
+      posicaoNaLinha!,
     );
     return { paradas, pontosDeRota };
   }
@@ -786,6 +843,65 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
       locaisParaResolver: locaisAtualizados,
       aoComitarBase: (base) => comLocaisAtualizados(base, locaisAtualizados),
     });
+  }
+
+  // Criação inline de Seção/Local (TASK-095; DEC-077): o usuário escolhe o
+  // tipo no menu do mapa (`EditorMapaItinerario.aoIniciarCriacaoParada`) e a
+  // linha-formulário abre na tabela lateral, na posição de inserção. Confirmar
+  // chama os MESMOS motores puros (`criarSecaoNoPonto`/`criarLocalNoPonto`,
+  // TASK-017/018) que o antigo painel abaixo do mapa chamava — só o container
+  // visual muda; validação/espelhamento continuam intocados (TASK-094).
+  function iniciarCriacaoParada(
+    tipo: "secao" | "local",
+    posicao: Coordenada,
+    posicaoNaLinha?: Coordenada,
+  ) {
+    definirCriacaoInline({ tipo, posicao, posicaoNaLinha });
+    definirNomeCriacaoInline("");
+    definirMensagemCriacaoInline(null);
+  }
+
+  function cancelarCriacaoInline() {
+    definirCriacaoInline(null);
+    definirNomeCriacaoInline("");
+    definirMensagemCriacaoInline(null);
+  }
+
+  function confirmarCriacaoInline() {
+    if (!criacaoInline || !nomeCriacaoInline.trim() || !recursosMunicipio) return;
+    if (!linhaAtual || !sentidoSelecionado) return;
+    const ponto = { latitude: criacaoInline.posicao.lat, longitude: criacaoInline.posicao.lng };
+
+    if (criacaoInline.tipo === "secao") {
+      const resultado = criarSecaoNoPonto({
+        nome: nomeCriacaoInline,
+        ponto,
+        servicoUuid: linhaAtual.servicoUuid,
+        sentido: sentidoSelecionado,
+        bidirecional,
+        features: recursosMunicipio.features,
+        nomes: recursosMunicipio.nomes,
+      });
+      if (!resultado.ok) {
+        definirMensagemCriacaoInline(MENSAGEM_FORA_DE_SP_SECAO);
+        return;
+      }
+      aoCriarOuAtualizarSecao(resultado.secao, criacaoInline.posicaoNaLinha);
+    } else {
+      const resultado = criarLocalNoPonto({
+        nome: nomeCriacaoInline,
+        ponto,
+        sentido: sentidoSelecionado,
+        features: recursosMunicipio.features,
+        nomes: recursosMunicipio.nomes,
+      });
+      if (!resultado.ok) {
+        definirMensagemCriacaoInline(MENSAGEM_FORA_DE_SP_LOCAL);
+        return;
+      }
+      aoCriarLocal(resultado.local, criacaoInline.posicaoNaLinha);
+    }
+    cancelarCriacaoInline();
   }
 
   // DEC-076: o "X" da linha de um Local na tabela lateral remove a ENTIDADE
@@ -954,11 +1070,10 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
               locaisInvalidos={locaisExtremosAtual.map((ocorrencia) => ocorrencia.localUuid)}
               servicoUuid={linhaAtual.servicoUuid}
               sentido={sentidoSelecionado}
-              bidirecional={bidirecional}
               recursosMunicipio={recursosMunicipio}
-              aoCriarSecao={aoCriarOuAtualizarSecao}
+              aoIniciarCriacaoParada={iniciarCriacaoParada}
+              posicaoCriacaoPendente={criacaoInline?.posicao}
               aoAtualizarSecao={aoCriarOuAtualizarSecao}
-              aoCriarLocal={aoCriarLocal}
               aoAtualizarLocal={aoAtualizarLocal}
               linhaRota={linhaRotaAtual}
               pontosDeRota={pontosDeRotaAtual}
@@ -1038,192 +1153,17 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
                     </tr>
                   </thead>
                   <tbody>
-                    {itensListaAtual.map((item) => {
-                      if (item.tipo === "ponto-de-rota") {
-                        const chaveSelecaoPonto = chaveSelecaoDoPontoDeRota(item.indicePonto);
-                        const pontoSelecionado = selecao?.chave === chaveSelecaoPonto;
-                        const rotuloPonto = `Ponto de Rota ${item.numeroNaTravessia}`;
-                        return (
-                          <tr
-                            key={`ponto-de-rota-${item.indicePonto}`}
-                            ref={(elemento) => {
-                              if (elemento) refsLinhasTabela.current.set(chaveSelecaoPonto, elemento);
-                              else refsLinhasTabela.current.delete(chaveSelecaoPonto);
-                            }}
-                            data-testid="ponto-rota-item"
-                            data-tipo="ponto-de-rota"
-                            aria-current={pontoSelecionado ? "true" : undefined}
-                            onClick={(evento) => {
-                              if ((evento.target as HTMLElement).closest("button")) return;
-                              alternarSelecao(chaveSelecaoPonto, "tabela");
-                            }}
-                            className={`cursor-pointer text-ciano-500 ${
-                              pontoSelecionado ? "bg-azul-100" : ""
-                            }`}
-                          >
-                            <td>
-                              <span className="font-semibold">{rotuloPonto}</span>{" "}
-                              <span className="text-xs text-cinza-500">
-                                ({item.ponto.latitude.toFixed(5)},{" "}
-                                {item.ponto.longitude.toFixed(5)})
-                              </span>
-                            </td>
-                            <td />
-                            <td>
-                              {/* Setas lado a lado, sem quebrar (TASK-092): o wrap
-                                  dobrava a altura da linha na coluna estreita
-                                  "Mover", contra as linhas compactas da DEC-073. */}
-                              <div className="flex flex-nowrap gap-1">
-                                <Botao
-                                  variante="secundario"
-                                  tamanho="compacto"
-                                  data-testid="ponto-rota-mover-cima"
-                                  disabled={
-                                    !podeMoverPontoDeRotaNaLista(
-                                      paradasAtual,
-                                      pontosDeRotaAtual,
-                                      item.indicePonto,
-                                      "cima",
-                                    )
-                                  }
-                                  onClick={() =>
-                                    moverPontoDeRotaNaTabela(item.indicePonto, "cima")
-                                  }
-                                >
-                                  ↑
-                                </Botao>
-                                <Botao
-                                  variante="secundario"
-                                  tamanho="compacto"
-                                  data-testid="ponto-rota-mover-baixo"
-                                  disabled={
-                                    !podeMoverPontoDeRotaNaLista(
-                                      paradasAtual,
-                                      pontosDeRotaAtual,
-                                      item.indicePonto,
-                                      "baixo",
-                                    )
-                                  }
-                                  onClick={() =>
-                                    moverPontoDeRotaNaTabela(item.indicePonto, "baixo")
-                                  }
-                                >
-                                  ↓
-                                </Botao>
-                              </div>
-                            </td>
-                            <td>
-                              <Botao
-                                variante="fantasma"
-                                tamanho="compacto"
-                                data-testid="remover-ponto-rota"
-                                aria-label={`Remover ${rotuloPonto}`}
-                                onClick={() => aoRemoverPontoDeRota(item.indicePonto)}
-                              >
-                                ✕
-                              </Botao>
-                            </td>
-                          </tr>
-                        );
+                    {itensListaAtual.flatMap((item, indice) => {
+                      const linhas: ReactNode[] = [];
+                      if (criacaoInline && indiceExibicaoCriacaoInline === indice) {
+                        linhas.push(renderizarLinhaFormularioCriacao());
                       }
-
-                      const { parada, indiceParada: indice } = item;
-                      const localExtremo = localExtremoPorIndice.get(indice);
-                      const mensagemErro = localExtremo
-                        ? mensagemLocalExtremo(localExtremo.posicoes)
-                        : undefined;
-                      const rotulo =
-                        parada.tipo === "secao"
-                          ? (() => {
-                              const secao = secoes.find((s) => s.uuid === parada.secaoUuid);
-                              return secao ? nomeExibicaoSecao(secao) : parada.secaoUuid;
-                            })()
-                          : (() => {
-                              const local = linhaAtual.locais.find((l) => l.uuid === parada.localUuid);
-                              return local ? nomeExibicaoLocal(local) : parada.localUuid;
-                            })();
-                      const tipoParada = parada.tipo === "secao" ? "Seção" : "Local de parada";
-                      const chaveSelecaoParada = chaveSelecaoDaParada(parada);
-                      const paradaSelecionada = selecao?.chave === chaveSelecaoParada;
-                      return (
-                        <tr
-                          key={`${parada.tipo}-${indice}`}
-                          ref={(elemento) => {
-                            if (elemento) refsLinhasTabela.current.set(chaveSelecaoParada, elemento);
-                            else refsLinhasTabela.current.delete(chaveSelecaoParada);
-                          }}
-                          data-testid="parada-item"
-                          data-estado={localExtremo ? "local-extremo" : undefined}
-                          aria-current={paradaSelecionada ? "true" : undefined}
-                          onClick={(evento) => {
-                            if ((evento.target as HTMLElement).closest("button")) return;
-                            alternarSelecao(chaveSelecaoParada, "tabela");
-                          }}
-                          // Seleção usa `bg-azul-100` (fundo) — canal distinto do
-                          // `border-erro`/`text-erro` do Local extremo (DEC-070):
-                          // os dois se compõem na mesma linha sem que um mascare
-                          // o outro.
-                          className={`cursor-pointer ${
-                            localExtremo
-                              ? "text-erro [&>td]:border-y [&>td]:border-erro [&>td:first-child]:border-l [&>td:last-child]:border-r"
-                              : ""
-                          } ${paradaSelecionada ? "bg-azul-100" : ""}`}
-                        >
-                          <td>
-                            {mensagemErro ? (
-                              <Tooltip
-                                rotulo={mensagemErro}
-                                descricaoAcessivel={mensagemErro}
-                                tabIndex={0}
-                                aria-invalid="true"
-                                data-testid="parada-local-extremo"
-                              >
-                                <span data-testid="parada-rotulo">{rotulo}</span>
-                              </Tooltip>
-                            ) : (
-                              <span data-testid="parada-rotulo">{rotulo}</span>
-                            )}
-                          </td>
-                          <td>{tipoParada}</td>
-                          <td>
-                            {/* Setas lado a lado, sem quebrar (TASK-092): o wrap
-                                dobrava a altura da linha na coluna estreita
-                                "Mover", contra as linhas compactas da DEC-073. */}
-                            <div className="flex flex-nowrap gap-1">
-                              <Botao
-                                variante="secundario"
-                                tamanho="compacto"
-                                data-testid="parada-mover-cima"
-                                disabled={indice === 0}
-                                onClick={() => moverParada(indice, indice - 1)}
-                              >
-                                ↑
-                              </Botao>
-                              <Botao
-                                variante="secundario"
-                                tamanho="compacto"
-                                data-testid="parada-mover-baixo"
-                                disabled={indice === paradasAtual.length - 1}
-                                onClick={() => moverParada(indice, indice + 1)}
-                              >
-                                ↓
-                              </Botao>
-                            </div>
-                          </td>
-                          <td>
-                            <Botao
-                              variante="fantasma"
-                              tamanho="compacto"
-                              data-testid="parada-remover"
-                              aria-label={`Remover ${rotulo}`}
-                              onClick={() => removerParadaNaTabela(indice)}
-                            >
-                              ✕
-                            </Botao>
-                          </td>
-                        </tr>
-                      );
+                      linhas.push(renderizarLinhaItem(item));
+                      return linhas;
                     })}
+                    {criacaoInline && indiceExibicaoCriacaoInline === itensListaAtual.length
+                      ? renderizarLinhaFormularioCriacao()
+                      : null}
                   </tbody>
                 </Tabela>
               </div>
@@ -1247,4 +1187,234 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
       )}
     </div>
   );
+
+  function renderizarLinhaFormularioCriacao(): ReactNode {
+    if (!criacaoInline) return null;
+    const ehSecao = criacaoInline.tipo === "secao";
+    const rotulo = ehSecao ? "Nome da Seção" : "Nome do Local";
+    const testIdForm = ehSecao ? "form-criar-secao" : "form-criar-local";
+    const testIdInput = ehSecao ? "nome-secao-input" : "nome-local-input";
+    const testIdConfirmar = ehSecao ? "confirmar-criar-secao" : "confirmar-criar-local";
+    const rotuloBotao = ehSecao ? "Criar Seção" : "Criar Local";
+    return (
+      <tr key="linha-formulario-criacao" ref={refLinhaFormularioCriacao}>
+        <td colSpan={4} className="p-2">
+          <Painel
+            tom="padrao"
+            elevacao="flutuante"
+            data-testid={testIdForm}
+            className="flex flex-col gap-3"
+          >
+            <Campo
+              rotulo={rotulo}
+              data-testid={testIdInput}
+              value={nomeCriacaoInline}
+              onChange={(evento) => definirNomeCriacaoInline(evento.target.value)}
+            />
+            {mensagemCriacaoInline ? (
+              <p
+                role="alert"
+                data-testid="mensagem-recusa-criacao-inline"
+                className="text-sm text-erro"
+              >
+                {mensagemCriacaoInline}
+              </p>
+            ) : null}
+            <div className="flex gap-2">
+              <Botao
+                variante="primario"
+                data-testid={testIdConfirmar}
+                disabled={!nomeCriacaoInline.trim()}
+                onClick={confirmarCriacaoInline}
+              >
+                {rotuloBotao}
+              </Botao>
+              <Botao variante="fantasma" onClick={cancelarCriacaoInline}>
+                Cancelar
+              </Botao>
+            </div>
+          </Painel>
+        </td>
+      </tr>
+    );
+  }
+
+  function renderizarLinhaItem(item: ItemListaIntercalada): ReactNode {
+    if (item.tipo === "ponto-de-rota") {
+      const chaveSelecaoPonto = chaveSelecaoDoPontoDeRota(item.indicePonto);
+      const pontoSelecionado = selecao?.chave === chaveSelecaoPonto;
+      const rotuloPonto = `Ponto de Rota ${item.numeroNaTravessia}`;
+      return (
+        <tr
+          key={`ponto-de-rota-${item.indicePonto}`}
+          ref={(elemento) => {
+            if (elemento) refsLinhasTabela.current.set(chaveSelecaoPonto, elemento);
+            else refsLinhasTabela.current.delete(chaveSelecaoPonto);
+          }}
+          data-testid="ponto-rota-item"
+          data-tipo="ponto-de-rota"
+          aria-current={pontoSelecionado ? "true" : undefined}
+          onClick={(evento) => {
+            if ((evento.target as HTMLElement).closest("button")) return;
+            alternarSelecao(chaveSelecaoPonto, "tabela");
+          }}
+          className={`cursor-pointer text-ciano-500 ${pontoSelecionado ? "bg-azul-100" : ""}`}
+        >
+          <td>
+            <span className="font-semibold">{rotuloPonto}</span>{" "}
+            <span className="text-xs text-cinza-500">
+              ({item.ponto.latitude.toFixed(5)},{" "}
+              {item.ponto.longitude.toFixed(5)})
+            </span>
+          </td>
+          <td />
+          <td>
+            {/* Setas lado a lado, sem quebrar (TASK-092): o wrap
+                dobrava a altura da linha na coluna estreita
+                "Mover", contra as linhas compactas da DEC-073. */}
+            <div className="flex flex-nowrap gap-1">
+              <Botao
+                variante="secundario"
+                tamanho="compacto"
+                data-testid="ponto-rota-mover-cima"
+                disabled={
+                  !podeMoverPontoDeRotaNaLista(
+                    paradasAtual,
+                    pontosDeRotaAtual,
+                    item.indicePonto,
+                    "cima",
+                  )
+                }
+                onClick={() => moverPontoDeRotaNaTabela(item.indicePonto, "cima")}
+              >
+                ↑
+              </Botao>
+              <Botao
+                variante="secundario"
+                tamanho="compacto"
+                data-testid="ponto-rota-mover-baixo"
+                disabled={
+                  !podeMoverPontoDeRotaNaLista(
+                    paradasAtual,
+                    pontosDeRotaAtual,
+                    item.indicePonto,
+                    "baixo",
+                  )
+                }
+                onClick={() => moverPontoDeRotaNaTabela(item.indicePonto, "baixo")}
+              >
+                ↓
+              </Botao>
+            </div>
+          </td>
+          <td>
+            <Botao
+              variante="fantasma"
+              tamanho="compacto"
+              data-testid="remover-ponto-rota"
+              aria-label={`Remover ${rotuloPonto}`}
+              onClick={() => aoRemoverPontoDeRota(item.indicePonto)}
+            >
+              ✕
+            </Botao>
+          </td>
+        </tr>
+      );
+    }
+
+    const { parada, indiceParada: indice } = item;
+    const localExtremo = localExtremoPorIndice.get(indice);
+    const mensagemErro = localExtremo ? mensagemLocalExtremo(localExtremo.posicoes) : undefined;
+    const rotulo =
+      parada.tipo === "secao"
+        ? (() => {
+            const secao = secoes.find((s) => s.uuid === parada.secaoUuid);
+            return secao ? nomeExibicaoSecao(secao) : parada.secaoUuid;
+          })()
+        : (() => {
+            const local = linhaAtual!.locais.find((l) => l.uuid === parada.localUuid);
+            return local ? nomeExibicaoLocal(local) : parada.localUuid;
+          })();
+    const tipoParada = parada.tipo === "secao" ? "Seção" : "Local de parada";
+    const chaveSelecaoParada = chaveSelecaoDaParada(parada);
+    const paradaSelecionada = selecao?.chave === chaveSelecaoParada;
+    return (
+      <tr
+        key={`${parada.tipo}-${indice}`}
+        ref={(elemento) => {
+          if (elemento) refsLinhasTabela.current.set(chaveSelecaoParada, elemento);
+          else refsLinhasTabela.current.delete(chaveSelecaoParada);
+        }}
+        data-testid="parada-item"
+        data-estado={localExtremo ? "local-extremo" : undefined}
+        aria-current={paradaSelecionada ? "true" : undefined}
+        onClick={(evento) => {
+          if ((evento.target as HTMLElement).closest("button")) return;
+          alternarSelecao(chaveSelecaoParada, "tabela");
+        }}
+        // Seleção usa `bg-azul-100` (fundo) — canal distinto do
+        // `border-erro`/`text-erro` do Local extremo (DEC-070):
+        // os dois se compõem na mesma linha sem que um mascare
+        // o outro.
+        className={`cursor-pointer ${
+          localExtremo
+            ? "text-erro [&>td]:border-y [&>td]:border-erro [&>td:first-child]:border-l [&>td:last-child]:border-r"
+            : ""
+        } ${paradaSelecionada ? "bg-azul-100" : ""}`}
+      >
+        <td>
+          {mensagemErro ? (
+            <Tooltip
+              rotulo={mensagemErro}
+              descricaoAcessivel={mensagemErro}
+              tabIndex={0}
+              aria-invalid="true"
+              data-testid="parada-local-extremo"
+            >
+              <span data-testid="parada-rotulo">{rotulo}</span>
+            </Tooltip>
+          ) : (
+            <span data-testid="parada-rotulo">{rotulo}</span>
+          )}
+        </td>
+        <td>{tipoParada}</td>
+        <td>
+          {/* Setas lado a lado, sem quebrar (TASK-092): o wrap
+              dobrava a altura da linha na coluna estreita
+              "Mover", contra as linhas compactas da DEC-073. */}
+          <div className="flex flex-nowrap gap-1">
+            <Botao
+              variante="secundario"
+              tamanho="compacto"
+              data-testid="parada-mover-cima"
+              disabled={indice === 0}
+              onClick={() => moverParada(indice, indice - 1)}
+            >
+              ↑
+            </Botao>
+            <Botao
+              variante="secundario"
+              tamanho="compacto"
+              data-testid="parada-mover-baixo"
+              disabled={indice === paradasAtual.length - 1}
+              onClick={() => moverParada(indice, indice + 1)}
+            >
+              ↓
+            </Botao>
+          </div>
+        </td>
+        <td>
+          <Botao
+            variante="fantasma"
+            tamanho="compacto"
+            data-testid="parada-remover"
+            aria-label={`Remover ${rotulo}`}
+            onClick={() => removerParadaNaTabela(indice)}
+          >
+            ✕
+          </Botao>
+        </td>
+      </tr>
+    );
+  }
 }
