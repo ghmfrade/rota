@@ -1,12 +1,14 @@
 import { expect, test } from "@playwright/test";
 import fixturaValida from "../fixtures/tela-inicial-carregar-valido.json";
 
-// E2E da etapa Identificação (Spec 04 §5; TASK-015). Cobre os dois modos de
-// entrada: carregado (identidade do JSON) e novo (seleção das listas estáticas —
-// RN-016). Prova que `codigo`/`empresa` não são editáveis (Spec 04 §5), que o
-// `tipo` é editável e que trocá-lo reconverte os Serviços incompatíveis à forma
-// convencional com aviso, sem bloquear (RN-023/DEC-034). Nenhum fluxo chama o
-// OSRM (Spec 04 §3.1 item 6); o único recurso de rede é o bundle estático.
+// E2E da etapa Identificação (Spec 04 §5; TASK-015; TASK-075/DEC-064). Cobre
+// os dois modos de entrada: carregado (identidade do JSON) e novo (seleção
+// das listas estáticas — RN-016, com pré-visualização trocável e confirmação
+// explícita antes de congelar). Prova que `codigo`/`empresa` não são
+// editáveis (Spec 04 §5), que o `tipo` é editável e que trocá-lo reconverte
+// os Serviços incompatíveis à forma convencional com aviso, sem bloquear
+// (RN-023/DEC-034). Nenhum fluxo chama o OSRM (Spec 04 §3.1 item 6); o único
+// recurso de rede é o bundle estático.
 
 async function carregarDocumentoValido(page: import("@playwright/test").Page) {
   await page.goto("/");
@@ -76,7 +78,7 @@ test.describe("Identificação — modo carregado", () => {
 });
 
 test.describe("Identificação — modo novo (criar do zero)", () => {
-  test("seleciona o Autos das listas; identidade populada e travada", async ({
+  test("escolher o Autos exibe a pré-visualização sem criar o documento; confirmar comita e trava (DEC-064)", async ({
     page,
   }) => {
     await criarDoZero(page);
@@ -86,19 +88,44 @@ test.describe("Identificação — modo novo (criar do zero)", () => {
     await expect(page.getByTestId("cabecalho-codigo")).toContainText(
       "a definir",
     );
+    // Sem candidato, "Confirmar Autos" está desabilitado (caso inválido).
+    await expect(page.getByTestId("confirmar-autos")).toBeDisabled();
 
-    // Seleciona o Autos de código "1" (existe nas listas estáticas — RN-016).
+    // Seleciona o Autos de código "1" (existe nas listas estáticas — RN-016):
+    // só popula a pré-visualização, NÃO cria o documento ainda.
     await page.getByTestId("seletor-autos").selectOption("1");
 
-    await expect(page.getByTestId("campo-codigo")).toContainText("1");
+    const previa = page.getByTestId("previa-autos");
+    await expect(previa).toBeVisible();
+    await expect(previa).toContainText("1");
+    await expect(page.getByTestId("selo-situacao-previa")).toBeVisible();
+    // Ainda não comitado: sem campo travado nem cabeçalho atualizado.
+    await expect(page.getByTestId("campo-codigo")).toHaveCount(0);
+    await expect(page.getByTestId("cabecalho-codigo")).toContainText(
+      "a definir",
+    );
+
+    // Trocar a seleção antes de confirmar atualiza a pré-visualização, livre.
+    await page.getByTestId("seletor-autos").selectOption("2");
+    await expect(previa).toContainText("2");
+
+    // "Confirmar Autos" cria o documento: identidade travada, status proposta.
+    await page.getByTestId("confirmar-autos").click();
+
+    await expect(page.getByTestId("campo-codigo")).toContainText("2");
     await expect(page.getByTestId("campo-empresa")).not.toBeEmpty();
     // Documento novo nasce como proposta (RN-011).
     await expect(page.getByTestId("selo-status-identificacao")).toContainText(
       "proposta",
     );
-    // Cabeçalho reflete a identidade recém-escolhida.
-    await expect(page.getByTestId("cabecalho-codigo")).toContainText("1");
+    // Cabeçalho reflete a identidade recém-confirmada.
+    await expect(page.getByTestId("cabecalho-codigo")).toContainText("2");
     await expect(page.getByTestId("selo-status")).toBeVisible();
+
+    // Depois de confirmado, o seletor não é mais renderizado — sem troca
+    // (Spec 04 §5).
+    await expect(page.getByTestId("seletor-autos")).toHaveCount(0);
+    await expect(page.getByTestId("confirmar-autos")).toHaveCount(0);
 
     // Código/empresa travados: sem campo de edição.
     await expect(
@@ -106,11 +133,24 @@ test.describe("Identificação — modo novo (criar do zero)", () => {
     ).toHaveCount(0);
   });
 
+  test("Autos operante reforça a recomendação de carregar o JSON vigente (Spec 04 §3.1)", async ({
+    page,
+  }) => {
+    await criarDoZero(page);
+    await page.getByTestId("seletor-autos").selectOption("1");
+
+    // Todos os Autos das listas estáticas são operantes (dado atual — o
+    // reforço é o ramo exercitável em E2E; o ramo "não operante" é coberto
+    // por teste unitário do helper puro).
+    await expect(page.getByTestId("reforco-operante")).toBeVisible();
+  });
+
   test("trocar o tipo no modo novo ajusta o tipo sem aviso (não há Serviços)", async ({
     page,
   }) => {
     await criarDoZero(page);
     await page.getByTestId("seletor-autos").selectOption("1");
+    await page.getByTestId("confirmar-autos").click();
 
     await page.getByTestId("select-tipo").selectOption("Rodoviário");
     await expect(page.getByTestId("cabecalho-formulario")).toContainText(

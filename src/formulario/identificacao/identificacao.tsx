@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { TIPOS_DE_AUTOS } from "@/shared/contrato";
 import {
   carregarListasAutosEmpresas,
-  nomeDaEmpresa,
   type ListasAutosEmpresas,
 } from "@/shared/dados-estaticos";
 import type { TipoDeAutos } from "@/shared/tipificacao";
@@ -13,20 +12,27 @@ import {
   type IdentidadeAutos,
   type SessaoFormulario,
 } from "@/formulario/sessao";
-import { Painel, Select, Selo } from "@/shared/ui";
+import { Botao, Painel, Select, Selo } from "@/shared/ui";
 import {
   aplicarTrocaDeTipoNoDocumento,
   aplicarTrocaDeTipoEmConstrucao,
   type AlteracaoDeServico,
 } from "./reconversao";
 import { servicosEmConstrucaoDaSessao } from "@/formulario/sessao";
+import {
+  identidadeDeAutosEstatico,
+  preVisualizacaoDeAutos,
+  type PreVisualizacaoAutos,
+} from "./pre-visualizacao";
 
-// Etapa Identificação do Formulário (Spec 04 §5; TASK-015). Exibe/edita a
-// identidade do Autos:
+// Etapa Identificação do Formulário (Spec 04 §5; TASK-015; TASK-075/DEC-064).
+// Exibe/edita a identidade do Autos:
 // - `codigo` e `empresa` vêm das listas estáticas (RN-016) e são NÃO EDITÁVEIS
 //   depois de criado o documento — no modo carregado já vêm do JSON; no modo
-//   novo, a seleção do Autos das listas é o ato de "criar" o documento, e a
-//   partir daí ficam travados.
+//   novo, escolher o Autos no dropdown só popula uma PRÉ-VISUALIZAÇÃO
+//   (candidato trocável livremente); o ato de "criar" o documento é o clique
+//   em "Confirmar Autos" (DEC-064) — só aí a identidade é comitada e passa a
+//   ficar travada.
 // - `tipo` é EDITÁVEL a qualquer momento (Spec 04 §5): ao trocá-lo, os Serviços
 //   com característica incompatível são reconvertidos à forma convencional do
 //   novo tipo, com AVISO listando o que mudou e SEM jamais bloquear
@@ -36,7 +42,9 @@ import { servicosEmConstrucaoDaSessao } from "@/formulario/sessao";
 //   TASK-007), nunca aqui.
 //
 // A identidade é estado de sessão efêmero elevado ao container (não persiste —
-// NEG-004/RN-096): toda mudança chama `aoAtualizarSessao`.
+// NEG-004/RN-096): toda mudança chama `aoAtualizarSessao`. O candidato da
+// pré-visualização é estado LOCAL do componente (nem sessão, nem contrato) —
+// descartado se o usuário trocar a seleção ou sair sem confirmar.
 
 interface PropsEtapaIdentificacao {
   sessao: SessaoFormulario;
@@ -52,6 +60,12 @@ export function EtapaIdentificacao({
   // Aviso da última troca de tipo que reconverteu Serviços (Spec 04 §5). Zerado
   // quando a troca não altera nenhum Serviço.
   const [reconversao, definirReconversao] = useState<AlteracaoDeServico[]>([]);
+  // Autos candidato do seletor (modo novo, antes da confirmação — DEC-064):
+  // estado LOCAL, não comitado na sessão. Trocar a seleção livremente só
+  // atualiza este candidato, sem efeito colateral.
+  const [codigoCandidato, definirCodigoCandidato] = useState<string | null>(
+    null,
+  );
 
   // As listas só são necessárias para o seletor de Autos do modo novo; ainda
   // assim, carregá-las aqui é barato (import dinâmico memoizado, sem rede —
@@ -74,17 +88,20 @@ export function EtapaIdentificacao({
 
   const identidade = identidadeDaSessao(sessao);
 
-  function aoSelecionarAutos(codigo: string) {
-    if (!listas) return;
-    const autos = listas.autos.find((a) => a.codigo === codigo);
-    if (!autos) return;
-    const empresa = nomeDaEmpresa(listas, autos.empresa_id) ?? autos.empresa_id;
-    const identidadeNova: IdentidadeAutos = {
-      codigo: autos.codigo,
-      empresa,
-      tipo: autos.tipo,
-      status: "proposta",
-    };
+  // Escolher no dropdown só atualiza o candidato local (DEC-064) — NÃO comita
+  // a sessão. Trocar a seleção antes de confirmar é livre, sem efeito
+  // colateral.
+  function aoEscolherCandidato(codigo: string) {
+    definirCodigoCandidato(codigo);
+  }
+
+  // "Confirmar Autos" é o ato que cria o documento (Spec 04 §5; DEC-064):
+  // comita a identidade na sessão, congelando `codigo`/`empresa` a partir
+  // daqui.
+  function aoConfirmarAutos() {
+    if (!listas || !codigoCandidato) return;
+    const identidadeNova = identidadeDeAutosEstatico(listas, codigoCandidato);
+    if (!identidadeNova) return;
     definirReconversao([]);
     aoAtualizarSessao({ modo: "novo", identidade: identidadeNova });
   }
@@ -119,14 +136,36 @@ export function EtapaIdentificacao({
     });
   }
 
+  const previa =
+    listas && codigoCandidato
+      ? preVisualizacaoDeAutos(listas, codigoCandidato)
+      : undefined;
+
   return (
     <div data-testid="etapa-identificacao">
       {identidade === undefined ? (
-        <SeletorDeAutos
-          listas={listas}
-          erroListas={erroListas}
-          aoSelecionar={aoSelecionarAutos}
-        />
+        <>
+          <SeletorDeAutos
+            listas={listas}
+            erroListas={erroListas}
+            codigoCandidato={codigoCandidato}
+            aoSelecionar={aoEscolherCandidato}
+          />
+          {listas && (
+            <>
+              {previa && <PreVisualizacaoDoCandidato previa={previa} />}
+              <Botao
+                variante="primario"
+                className="mt-4"
+                data-testid="confirmar-autos"
+                disabled={!previa}
+                onClick={aoConfirmarAutos}
+              >
+                Confirmar Autos
+              </Botao>
+            </>
+          )}
+        </>
       ) : (
         <IdentidadeEditavel
           sessao={sessao}
@@ -140,15 +179,17 @@ export function EtapaIdentificacao({
 }
 
 // Seleção do Autos das listas estáticas (RN-016; Spec 04 §3.2/§5), exibida no
-// modo novo antes de a identidade ser escolhida. Escolher um Autos fixa
-// `codigo`+`empresa`+`tipo` de uma vez (é um registro único das listas).
+// modo novo antes da confirmação. Escolher um Autos só popula o candidato da
+// pré-visualização (DEC-064) — não fixa nada ainda; a troca é livre.
 function SeletorDeAutos({
   listas,
   erroListas,
+  codigoCandidato,
   aoSelecionar,
 }: {
   listas: ListasAutosEmpresas | null;
   erroListas: string | null;
+  codigoCandidato: string | null;
   aoSelecionar: (codigo: string) => void;
 }) {
   if (erroListas) {
@@ -179,7 +220,7 @@ function SeletorDeAutos({
       <Select
         rotulo="Autos"
         data-testid="seletor-autos"
-        defaultValue=""
+        value={codigoCandidato ?? ""}
         onChange={(evento) => {
           if (evento.target.value) aoSelecionar(evento.target.value);
         }}
@@ -193,6 +234,67 @@ function SeletorDeAutos({
           </option>
         ))}
       </Select>
+    </Painel>
+  );
+}
+
+// Pré-visualização do Autos candidato (TASK-075; DEC-064): exibe os dados do
+// registro escolhido sem criar o documento. `operante: true` reforça a
+// recomendação de carregar o JSON vigente (Spec 04 §3.1/§3.2) em vez de criar
+// do zero. "Confirmar Autos" (renderizado pelo pai) é o único gesto que
+// comita a identidade.
+function PreVisualizacaoDoCandidato({
+  previa,
+}: {
+  previa: PreVisualizacaoAutos;
+}) {
+  return (
+    <Painel className="mt-4" data-testid="previa-autos">
+      <dl className="grid gap-4">
+        <div>
+          <dt className="text-xs text-cinza-500">Código do Autos</dt>
+          <dd className="text-sm text-cinza-700">{previa.codigo}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-cinza-500">Linha</dt>
+          <dd className="text-sm text-cinza-700">{previa.denominacaoLinha}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-cinza-500">Empresa</dt>
+          <dd className="text-sm text-cinza-700">{previa.empresa}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-cinza-500">Tipo</dt>
+          <dd className="text-sm text-cinza-700">{previa.tipo}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-cinza-500">Situação</dt>
+          <dd>
+            <Selo
+              tom={previa.operante ? "sucesso" : "neutro"}
+              data-testid="selo-situacao-previa"
+            >
+              {previa.operante ? "operante" : "não operante"}
+            </Selo>
+          </dd>
+        </div>
+      </dl>
+
+      {previa.operante && (
+        <Painel
+          tom="informativo"
+          elevacao="plana"
+          role="status"
+          data-testid="reforco-operante"
+          className="mt-4"
+        >
+          <p className="text-sm">
+            Este Autos já opera. Considere carregar o JSON vigente em vez de
+            criar um documento do zero — sem o arquivo anterior, o Comparador
+            tratará tudo como novo.
+          </p>
+        </Painel>
+      )}
     </Painel>
   );
 }

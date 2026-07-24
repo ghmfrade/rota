@@ -7,3 +7,8 @@ export {
   type ResultadoDaTrocaDeTipo,
   type ResultadoDaTrocaEmConstrucao,
 } from "./reconversao";
+export {
+  preVisualizacaoDeAutos,
+  identidadeDeAutosEstatico,
+  type PreVisualizacaoAutos,
+} from "./pre-visualizacao";

@@ -1367,12 +1367,14 @@ test.describe("TASK-096 — criar Local num Serviço do fluxo criar-do-zero JÁ 
       rota.fulfill({ contentType: "image/png", body: PNG_1x1 }),
     );
 
-    // Criar do zero (Identificação) — Spec 04 §5; DEC-064.
+    // Criar do zero (Identificação) — Spec 04 §5; TASK-075/DEC-064: a
+    // seleção só popula a pré-visualização, "Confirmar Autos" comita.
     await page.goto("/");
     await page.getByTestId("acao-criar-zero").getByRole("button").click();
     await page.getByTestId("confirmar-criar-zero").click();
     await expect(page.getByTestId("layout-formulario")).toBeVisible();
     await page.getByTestId("seletor-autos").selectOption("1");
+    await page.getByTestId("confirmar-autos").click();
     await page.getByTestId("select-tipo").selectOption("Rodoviário");
 
     // Serviço unidirecional "Ida" (DEC-035) — só precisa do necessário para o

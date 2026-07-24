@@ -15,9 +15,10 @@ async function novoAutosRodoviario(page: import("@playwright/test").Page) {
   await page.getByTestId("acao-criar-zero").getByRole("button").click();
   await page.getByTestId("confirmar-criar-zero").click();
   await expect(page.getByTestId("layout-formulario")).toBeVisible();
-  // Seleciona um Autos das listas e fixa o tipo Rodoviário (dropdown de
-  // característica vira o conjunto rodoviário; padrão CR).
+  // Seleciona um Autos das listas, confirma (TASK-075/DEC-064) e fixa o tipo
+  // Rodoviário (dropdown de característica vira o conjunto rodoviário; padrão CR).
   await page.getByTestId("seletor-autos").selectOption("1");
+  await page.getByTestId("confirmar-autos").click();
   await page.getByTestId("select-tipo").selectOption("Rodoviário");
   // Navega para a etapa Serviços (stepper de navegação livre — RN-078).
   await page.getByTestId("etapa-botao").filter({ hasText: "Serviços" }).click();
