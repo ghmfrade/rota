@@ -15,6 +15,7 @@ import {
   limparSecoesAposEdicaoDeParadas,
   MENSAGEM_FORA_DE_SP as MENSAGEM_FORA_DE_SP_SECAO,
   nomeExibicaoSecao,
+  redefinirSecao,
   type RecursosMunicipio,
   type Sentido,
 } from "@/formulario/secoes";
@@ -148,6 +149,11 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
   const [servicoSelecionado, definirServicoSelecionado] = useState<string | null>(null);
   const [sentidoSelecionado, definirSentidoSelecionado] = useState<Sentido | null>(null);
   const [recalculando, definirRecalculando] = useState(false);
+  // Recusa efêmera do "redefinir Seção" (TASK-100; DEC-080): guarda de
+  // regressão para destino fora de SP (RN-029) — só alcançável se o ponto de
+  // origem já não estivesse em SP, o que não deveria ocorrer em documento
+  // válido. Nunca integra a sessão/documento (RN-096).
+  const [mensagemRedefinirSecao, definirMensagemRedefinirSecao] = useState<string | null>(null);
   // Violações da ÚLTIMA tentativa de montagem por itinerário (TASK-047; RN-034/
   // 035/036) — feedback efêmero de por que o recálculo não ocorreu; nunca vai
   // para a sessão/documento (não é pendência de §11, que só cobre itinerário
@@ -915,6 +921,49 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     definirRecalculando(false);
   }
 
+  /**
+   * Botão "redefinir Seção" na linha da tabela lateral (TASK-100; DEC-080):
+   * colapsa TODOS os pontos da Seção na coordenada do Serviço/sentido em edição
+   * (`linhaAtual.servicoUuid`/`sentidoSelecionado` — o ponto visualizado na
+   * linha onde o clique ocorreu). Confirmação explícita via `window.confirm`
+   * (mesmo padrão de `etapa-viagens.tsx`); só o OK aplica. Reusa `redefinirSecao`
+   * (variante do motor de translação com destino fixo) e delega o commit +
+   * recálculo em cascata multi-Serviço a `aoTransladarSecao`, exatamente como o
+   * arrasto da TASK-078 — sem duplicar a lógica de RN-052/054..057/048.
+   */
+  function redefinirSecaoNaTabela(secao: Secao) {
+    if (!linhaAtual || !sentidoSelecionado || !recursosMunicipio) return;
+    const entrada = secao.servicos.find((s) => s.servico_uuid === linhaAtual.servicoUuid);
+    const destino =
+      sentidoSelecionado === "ida" ? entrada?.geolocalizacao_ida : entrada?.geolocalizacao_volta;
+    // Guarda defensiva: a Seção é parada do itinerário corrente, então o
+    // Serviço/sentido em edição sempre contribuiu um ponto (RN-026). Sem ponto
+    // de origem, não há destino previsível — não faz nada.
+    if (!destino) return;
+
+    const confirmado =
+      typeof window === "undefined" ||
+      window.confirm(
+        "Gostaria de redefinir todas as geolocalizações desta seção em todos os serviços e sentidos?",
+      );
+    if (!confirmado) return;
+
+    const resultado = redefinirSecao({
+      secao,
+      destino,
+      features: recursosMunicipio.features,
+      nomes: recursosMunicipio.nomes,
+    });
+    if (!resultado.ok) {
+      // Destino fora de SP → recusa INTEGRAL: nenhum ponto se move (não
+      // chamamos `aoTransladarSecao`, a sessão fica intacta).
+      definirMensagemRedefinirSecao(MENSAGEM_FORA_DE_SP_SECAO);
+      return;
+    }
+    definirMensagemRedefinirSecao(null);
+    void aoTransladarSecao(resultado.secao);
+  }
+
   function aoCriarLocal(local: Local, posicaoNaLinha?: Coordenada) {
     if (!linhaAtual) return;
     const locaisAtualizados = [...linhaAtual.locais, local];
@@ -1202,6 +1251,16 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
                 </p>
               )}
 
+              {mensagemRedefinirSecao && (
+                <p
+                  role="alert"
+                  data-testid="mensagem-redefinir-secao"
+                  className="text-sm text-erro"
+                >
+                  {mensagemRedefinirSecao}
+                </p>
+              )}
+
               {descartePontoDeRotaMapa[
                 chaveItinerario(linhaAtual.servicoUuid, sentidoSelecionado)
               ] && (
@@ -1241,6 +1300,7 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
                       <th scope="col">Cidade - Nome</th>
                       <th scope="col">Tipo</th>
                       <th scope="col">Mover</th>
+                      <th scope="col">Redefinir</th>
                       <th scope="col">Remover</th>
                     </tr>
                   </thead>
@@ -1290,7 +1350,7 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     const rotuloBotao = ehSecao ? "Criar Seção" : "Criar Local";
     return (
       <tr key="linha-formulario-criacao" ref={refLinhaFormularioCriacao}>
-        <td colSpan={4} className="p-2">
+        <td colSpan={5} className="p-2">
           <Painel
             tom="padrao"
             elevacao="flutuante"
@@ -1399,6 +1459,9 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
               </Botao>
             </div>
           </td>
+          {/* Coluna "Redefinir" (TASK-100): vazia em pontos de rota — a ação
+              existe só em linhas de Seção. */}
+          <td />
           <td>
             <Botao
               variante="fantasma"
@@ -1428,6 +1491,10 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
             return local ? nomeExibicaoLocal(local) : parada.localUuid;
           })();
     const tipoParada = parada.tipo === "secao" ? "Seção" : "Local de parada";
+    // Objeto da Seção para o botão "redefinir" (TASK-100); `undefined` em
+    // linhas de Local — a ação existe só em Seções (DEC-080).
+    const secaoDaParada =
+      parada.tipo === "secao" ? secoes.find((s) => s.uuid === parada.secaoUuid) : undefined;
     const chaveSelecaoParada = chaveSelecaoDaParada(parada);
     const paradaSelecionada = selecao?.chave === chaveSelecaoParada;
     return (
@@ -1494,6 +1561,22 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
               ↓
             </Botao>
           </div>
+        </td>
+        <td>
+          {/* Botão "redefinir Seção" (TASK-100; DEC-080): só em linhas de
+              Seção, entre "Mover" e "Remover"; colapsa todos os pontos da
+              Seção no ponto do Serviço/sentido em edição, sob confirmação. */}
+          {secaoDaParada && (
+            <Botao
+              variante="fantasma"
+              tamanho="compacto"
+              data-testid="redefinir-secao"
+              aria-label={`Redefinir geolocalizações de ${rotulo}`}
+              onClick={() => redefinirSecaoNaTabela(secaoDaParada)}
+            >
+              ↻
+            </Botao>
+          )}
         </td>
         <td>
           <Botao

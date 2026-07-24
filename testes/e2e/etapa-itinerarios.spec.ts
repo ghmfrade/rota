@@ -875,7 +875,10 @@ test.describe("Etapa Seções, Locais e Itinerários — sincronização de sele
     await expect(marcadores).toHaveCount(3);
 
     const linhas = page.getByTestId("tabela-paradas").getByTestId("parada-item");
-    await linhas.nth(1).click();
+    // Clica no rótulo (não no meio bruto da linha — a coluna "Redefinir" da
+    // TASK-100 desloca o centro geométrico da linha para cima de um botão, e o
+    // `<tr>` ignora cliques em botões por design).
+    await linhas.nth(1).getByTestId("parada-rotulo").click();
 
     await expect(linhas.nth(1)).toHaveAttribute("aria-current", "true");
     await expect(marcadores.nth(1)).toHaveClass(/marcador-mapa--selecionado/);
@@ -884,7 +887,7 @@ test.describe("Etapa Seções, Locais e Itinerários — sincronização de sele
     expect(chamadasOsrm).toBe(0);
 
     // Clicar de novo desseleciona (toggle) — o realce some dos dois lados.
-    await linhas.nth(1).click();
+    await linhas.nth(1).getByTestId("parada-rotulo").click();
     await expect(linhas.nth(1)).not.toHaveAttribute("aria-current", "true");
     await expect(marcadores.nth(1)).not.toHaveClass(/marcador-mapa--selecionado/);
     expect(chamadasOsrm).toBe(0);
@@ -902,8 +905,10 @@ test.describe("Etapa Seções, Locais e Itinerários — sincronização de sele
     await abrirEtapaVolta(page);
 
     const linhas = page.getByTestId("tabela-paradas").getByTestId("parada-item");
-    // nth(1) é a 2ª linha da tabela — `:nth-child(2)`, portanto par.
-    await linhas.nth(1).click();
+    // nth(1) é a 2ª linha da tabela — `:nth-child(2)`, portanto par. Clica no
+    // rótulo (não no meio bruto da linha — TASK-100 desloca o centro
+    // geométrico para cima do botão "Redefinir", que o `<tr>` ignora).
+    await linhas.nth(1).getByTestId("parada-rotulo").click();
     await expect(linhas.nth(1)).toHaveAttribute("aria-current", "true");
     await expect(linhas.nth(1)).toHaveCSS("background-color", "rgb(219, 234, 254)");
   });
@@ -1563,5 +1568,73 @@ test.describe("Mapa — distinção de gesto por botão numa Seção real (TASK-
     // O `contextmenu` nativo do navegador segue suprimido (DEC-079) e o menu
     // Seção/Local da DEC-055 (superfície distinta) não abre neste gesto.
     await expect(page.getByRole("menuitem")).toHaveCount(0);
+  });
+});
+
+// TASK-100 (DEC-080) — botão "redefinir Seção" na tabela lateral, num browser
+// real: a Seção "Terminal Santos" (compartilhada pelos 2 Serviços do fixture
+// `carregar-multi-servico`) já chega diferenciada — cada Serviço/sentido tem
+// sua própria geolocalização (Ida ≠ Volta em ambos, RN-026/027) — sem precisar
+// de um arrasto prévio para provar a convergência. Redefinir a colapsa na
+// coordenada do Serviço/sentido em edição (0001-1SU/Volta) e dispara a cascata
+// de recálculo (RN-052) dos 4 itinerários que a referenciam (2 Serviços ×
+// Ida/Volta), igual à cascata da TASK-078.
+test.describe("Tabela lateral — redefinir Seção (TASK-100; DEC-080)", () => {
+  test("OK aplica: confirma o diálogo, converge os pontos e recalcula os 4 itinerários afetados", async ({
+    page,
+  }) => {
+    let chamadasOsrm = 0;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamadasOsrm += 1;
+      return rota.fulfill(respostaOsrmGenericaOk(rota.request().url()));
+    });
+
+    await abrirEtapaVolta(page);
+
+    // Volta: Praia Grande, São Vicente, Santos (índice 2) — mesma ordem usada
+    // nos demais testes deste arquivo.
+    const linhaSantos = page
+      .getByTestId("tabela-paradas")
+      .getByTestId("parada-item")
+      .nth(2);
+    await expect(linhaSantos).toContainText("Santos");
+
+    let mensagemDialogo = "";
+    page.once("dialog", (dialogo) => {
+      mensagemDialogo = dialogo.message();
+      void dialogo.accept();
+    });
+    await linhaSantos.getByTestId("redefinir-secao").click();
+    await expect.poll(() => mensagemDialogo).toBe(
+      "Gostaria de redefinir todas as geolocalizações desta seção em todos os serviços e sentidos?",
+    );
+
+    await expect(page.getByTestId("recalculando-rota")).toHaveCount(0);
+    await expect.poll(() => chamadasOsrm).toBe(4);
+    await expect(page.getByTestId("mensagem-redefinir-secao")).toHaveCount(0);
+    await expect(
+      page.locator('[data-testid="parada-item"][data-estado="local-extremo"]'),
+    ).toHaveCount(0);
+  });
+
+  test("Cancelar não altera nada nem chama o OSRM", async ({ page }) => {
+    let chamadasOsrm = 0;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamadasOsrm += 1;
+      return rota.fulfill(respostaOsrmGenericaOk(rota.request().url()));
+    });
+
+    await abrirEtapaVolta(page);
+
+    const linhaSantos = page
+      .getByTestId("tabela-paradas")
+      .getByTestId("parada-item")
+      .nth(2);
+
+    page.once("dialog", (dialogo) => void dialogo.dismiss());
+    await linhaSantos.getByTestId("redefinir-secao").click();
+    await page.waitForTimeout(200); // margem para um recálculo indevido aparecer, se houver
+
+    expect(chamadasOsrm).toBe(0);
   });
 });

@@ -1145,7 +1145,7 @@ describe("EtapaItinerarios — sincronização de seleção tabela↔mapa (TASK-
     resultado.desmontar();
   });
 
-  test("[follow-up TASK-091] quatro cabeçalhos, vocabulário de Tipo e aria-label do X coexistem para Seção, Local e ponto de rota", async () => {
+  test("[follow-up TASK-091/TASK-100] cinco cabeçalhos, vocabulário de Tipo e aria-label do X coexistem para Seção, Local e ponto de rota", async () => {
     const documento = documentoExemploMinimo();
     const servico = documento.autos.servicos[0];
     const local = servico.locais[0];
@@ -1168,7 +1168,7 @@ describe("EtapaItinerarios — sincronização de seleção tabela↔mapa (TASK-
     const cabecalhos = Array.from(tabela.querySelectorAll("thead th")).map(
       (th) => th.textContent,
     );
-    expect(cabecalhos).toEqual(["Cidade - Nome", "Tipo", "Mover", "Remover"]);
+    expect(cabecalhos).toEqual(["Cidade - Nome", "Tipo", "Mover", "Redefinir", "Remover"]);
 
     const linhas = tabela.querySelectorAll("tbody > tr");
     expect(Array.from(linhas).map((linha) => linha.getAttribute("data-testid"))).toEqual([
@@ -1197,6 +1197,12 @@ describe("EtapaItinerarios — sincronização de seleção tabela↔mapa (TASK-
     expect(
       linhaPonto.querySelector('[data-testid="remover-ponto-rota"]')?.getAttribute("aria-label"),
     ).toBe("Remover Ponto de Rota 1");
+
+    // TASK-100/DEC-080: botão "redefinir" só nas linhas de Seção.
+    expect(linhaSecaoA.querySelector('[data-testid="redefinir-secao"]')).not.toBeNull();
+    expect(linhaSecaoB.querySelector('[data-testid="redefinir-secao"]')).not.toBeNull();
+    expect(linhaLocal.querySelector('[data-testid="redefinir-secao"]')).toBeNull();
+    expect(linhaPonto.querySelector('[data-testid="redefinir-secao"]')).toBeNull();
 
     resultado.desmontar();
   });
@@ -1758,6 +1764,126 @@ describe("EtapaItinerarios — cascata de translação de Seção (TASK-078; DEC
     const estados = Object.values(sessaoFinal.estadosRotaViva ?? {});
     expect(estados.some((e) => e.situacao === "recalculada")).toBe(true);
     expect(estados.some((e) => e.situacao === "sem-rota")).toBe(true);
+
+    resultado.desmontar();
+  });
+});
+
+// TASK-100 (DEC-080): botão "redefinir Seção" na tabela lateral — colapsa
+// TODOS os pontos da Seção (todos os Serviços/sentidos) na coordenada do
+// Serviço/sentido em edição no momento do clique, sob confirmação explícita.
+// Reusa a MESMA cascata de recálculo/reconciliação multi-Serviço da TASK-078
+// (`aoTransladarSecao`) — só a origem da Seção transladada muda (destino fixo,
+// não vetor de arrasto). Fixture `bidirecional-multi-servico`: a Seção "1111"
+// (Terminal Santos) é a 1ª parada de todos os 4 itinerários (Ida+Volta dos 2
+// Serviços); seus pontos de Ida (-23.9608,-46.3339) e Volta (-23.9611,-46.3342)
+// NÃO coincidem — o reset move Volta para a coordenada de Ida, uma mudança real
+// que dispara a cascata.
+describe("EtapaItinerarios — redefinir Seção (TASK-100; DEC-080)", () => {
+  const SERVICO_A_UUID = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
+  const SERVICO_B_UUID = "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb";
+  const SECAO_TERMINAL_SANTOS_UUID = "11111111-1111-4111-8111-111111111111";
+
+  async function montarBidirecionalMultiServico() {
+    const { documentoBidirecionalMultiServico } = await import("../../fixtures");
+    const documento = documentoBidirecionalMultiServico();
+    return montarSessaoNaEtapa(
+      { modo: "carregado", documento, alertasImportacao: [] },
+      SERVICO_A_UUID,
+      "ida",
+    );
+  }
+
+  test("OK aplica: todas as contribuições da Seção convergem para o ponto do Serviço/sentido em edição e a cascata recalcula os 4 itinerários afetados", async () => {
+    vi.stubGlobal("fetch", respostaOsrmGenericaMock());
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { obterSessao, resultado } = await montarBidirecionalMultiServico();
+    const sessaoInicial = obterSessao() as Extract<SessaoFormulario, { modo: "carregado" }>;
+    const secaoOriginal = sessaoInicial.documento.autos.secoes.find(
+      (s) => s.uuid === SECAO_TERMINAL_SANTOS_UUID,
+    )!;
+    const destinoEsperado = secaoOriginal.servicos.find(
+      (s) => s.servico_uuid === SERVICO_A_UUID,
+    )!.geolocalizacao_ida!;
+
+    // 1ª parada da Ida do Serviço A (linhaAtual/sentidoSelecionado do mount) é
+    // a Seção "Terminal Santos" — 1º botão "redefinir-secao" da tabela.
+    const botao = resultado.container.querySelector('[data-testid="redefinir-secao"]')!;
+    await act(async () => {
+      botao.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await flush(20);
+    });
+
+    expect(window.confirm).toHaveBeenCalledWith(
+      "Gostaria de redefinir todas as geolocalizações desta seção em todos os serviços e sentidos?",
+    );
+    expect(fetch).toHaveBeenCalledTimes(4);
+
+    const sessaoFinal = obterSessao();
+    if (sessaoFinal.modo !== "carregado") throw new Error("sessão não carregada");
+    const secaoFinal = sessaoFinal.documento.autos.secoes.find(
+      (s) => s.uuid === SECAO_TERMINAL_SANTOS_UUID,
+    )!;
+    // UUID da Seção e de cada `servico_uuid` preservados (RN-004).
+    expect(secaoFinal.uuid).toBe(secaoOriginal.uuid);
+    expect(secaoFinal.servicos.map((s) => s.servico_uuid).sort()).toEqual(
+      [SERVICO_A_UUID, SERVICO_B_UUID].sort(),
+    );
+    // Todas as contribuições (Ida e Volta, dos 2 Serviços) coincidem no destino.
+    for (const entrada of secaoFinal.servicos) {
+      expect(entrada.geolocalizacao_ida).toEqual(destinoEsperado);
+      expect(entrada.geolocalizacao_volta).toEqual(destinoEsperado);
+    }
+
+    resultado.desmontar();
+  });
+
+  test("[inválido] Cancelar não altera nada e não chama OSRM", async () => {
+    vi.stubGlobal("fetch", respostaOsrmGenericaMock());
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    const { obterSessao, resultado } = await montarBidirecionalMultiServico();
+    const sessaoInicial = obterSessao() as Extract<SessaoFormulario, { modo: "carregado" }>;
+    const secaoOriginal = sessaoInicial.documento.autos.secoes.find(
+      (s) => s.uuid === SECAO_TERMINAL_SANTOS_UUID,
+    )!;
+
+    const botao = resultado.container.querySelector('[data-testid="redefinir-secao"]')!;
+    await act(async () => {
+      botao.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await flush(20);
+    });
+
+    expect(window.confirm).toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+
+    const sessaoFinal = obterSessao();
+    if (sessaoFinal.modo !== "carregado") throw new Error("sessão não carregada");
+    const secaoFinal = sessaoFinal.documento.autos.secoes.find(
+      (s) => s.uuid === SECAO_TERMINAL_SANTOS_UUID,
+    )!;
+    expect(secaoFinal).toEqual(secaoOriginal);
+
+    resultado.desmontar();
+  });
+
+  test("botão de redefinir está ausente nas linhas de Local (asserção negativa) — só aparece em linhas de Seção", async () => {
+    vi.stubGlobal("fetch", respostaOsrmGenericaMock());
+    const { resultado } = await montarSessaoNaEtapa(
+      sessaoBidirecionalParaEspelho(),
+      SERVICO_UUID,
+      "ida",
+    );
+
+    // Fixture (Spec 02 §15): Ida = SecaoA, SecaoB, Local, SecaoC (4 paradas).
+    const linhas = resultado.container.querySelectorAll('[data-testid="parada-item"]');
+    expect(linhas).toHaveLength(4);
+    const temBotaoRedefinir = (linha: Element) =>
+      linha.querySelector('[data-testid="redefinir-secao"]') !== null;
+
+    expect(temBotaoRedefinir(linhas[0])).toBe(true); // SecaoA
+    expect(temBotaoRedefinir(linhas[1])).toBe(true); // SecaoB
+    expect(temBotaoRedefinir(linhas[2])).toBe(false); // Local
+    expect(temBotaoRedefinir(linhas[3])).toBe(true); // SecaoC
 
     resultado.desmontar();
   });

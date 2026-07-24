@@ -291,6 +291,52 @@ export function transladarSecao(entrada: EntradaTransladarSecao): ResultadoTrans
   return { ok: true, secao: { ...entrada.secao, servicos, municipio: municipio.nome } };
 }
 
+// ---------------------------------------------------------------------------
+// 5) Redefinir a Seção — colapsar TODOS os pontos num só (TASK-100; DEC-080;
+//    RN-004, RN-027, RN-029, RN-052)
+// ---------------------------------------------------------------------------
+
+export interface EntradaRedefinirSecao extends RecursosMunicipio {
+  secao: Secao;
+  destino: Ponto;
+}
+
+/**
+ * Botão "redefinir Seção" na tabela lateral (TASK-100; DEC-080, opção B da
+ * Q-058): devolve TODOS os pontos já contribuídos à Seção (todas as entradas de
+ * `secao.servicos[]`, Ida e Volta) para uma ÚNICA coordenada — `destino`, o
+ * ponto do Serviço/sentido em edição no momento do clique. É uma variante do
+ * motor de translação (`transladarSecao`) com destino FIXO em vez de vetor de
+ * arrasto: cada `geolocalizacao_ida/volta` EXISTENTE recebe o mesmo `destino`,
+ * preservando a presença/ausência de cada campo por sentido (RN-026 — nunca
+ * cria o campo do sentido oposto). Após o colapso todos os pontos coincidem, de
+ * modo que o invariante dos 350 m (RN-027) é trivialmente satisfeito (distância
+ * zero ao centroide) — sem checagem. O município é re-derivado do ponto único
+ * (RN-029); destino fora de SP → recusa integral, nenhum ponto se move (guarda
+ * de regressão: `destino` é sempre um ponto já pertencente ao cluster de um
+ * documento válido, portanto já em SP). `secao.uuid` e cada `servico_uuid` de
+ * `secao.servicos[]` são preservados (RN-004) — a operação nunca cria nem
+ * descarta entradas.
+ */
+export function redefinirSecao(entrada: EntradaRedefinirSecao): ResultadoTransladarSecao {
+  const servicos: SecaoServico[] = entrada.secao.servicos.map((s) => ({
+    servico_uuid: s.servico_uuid,
+    geolocalizacao_ida: s.geolocalizacao_ida
+      ? { latitude: entrada.destino.latitude, longitude: entrada.destino.longitude }
+      : undefined,
+    geolocalizacao_volta: s.geolocalizacao_volta
+      ? { latitude: entrada.destino.latitude, longitude: entrada.destino.longitude }
+      : undefined,
+  }));
+
+  const municipio = derivarMunicipio(entrada.destino, entrada.features, entrada.nomes);
+  if (!municipio.encontrado) {
+    return { ok: false, motivo: "fora_de_sp" };
+  }
+
+  return { ok: true, secao: { ...entrada.secao, servicos, municipio: municipio.nome } };
+}
+
 export function revalidarArrasto(entrada: EntradaRevalidarArrasto): ResultadoArrasto {
   const pontosSemAlvo = coletarPontos(entrada.secao, {
     servicoUuid: entrada.servicoUuid,

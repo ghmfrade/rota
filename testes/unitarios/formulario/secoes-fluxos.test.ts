@@ -9,6 +9,7 @@ import {
   MENSAGEM_RECUSA_350M_SECAO,
   nomeExibicaoSecao,
   pontosOfertadosParaReuso,
+  redefinirSecao,
   revalidarArrasto,
   transladarSecao,
   type RecursosMunicipio,
@@ -483,6 +484,129 @@ describe("transladarSecao (TASK-078; DEC-061/079; RN-004, RN-027, RN-029)", () =
     const copia = structuredClone(base);
     transladarSecao({ secao: base, vetor: ponto(100), ...RECURSOS });
     expect(base).toEqual(copia);
+  });
+});
+
+describe("redefinirSecao (TASK-100; DEC-080; RN-004, RN-026, RN-027, RN-029)", () => {
+  it("colapsa todas as contribuições (2 Serviços × Ida/Volta) na mesma coordenada de destino", () => {
+    const base = novaSecaoBase(); // SERVICO_A, ida, ponto(0)
+    const comVolta = contribuirParaSecaoExistente({
+      secao: base,
+      servicoUuid: SERVICO_A,
+      sentido: "volta",
+      bidirecional: false,
+      ponto: ponto(100),
+      ...RECURSOS,
+    });
+    expect(comVolta.ok).toBe(true);
+    if (!comVolta.ok) return;
+    const comSegundoServico = contribuirParaSecaoExistente({
+      secao: comVolta.secao,
+      servicoUuid: SERVICO_B,
+      sentido: "ida",
+      bidirecional: true,
+      ponto: ponto(50),
+      ...RECURSOS,
+    });
+    expect(comSegundoServico.ok).toBe(true);
+    if (!comSegundoServico.ok) return;
+    const clusterOriginal = comSegundoServico.secao;
+
+    const destino = ponto(300); // o ponto do Serviço/sentido em edição no clique
+    const resultado = redefinirSecao({ secao: clusterOriginal, destino, ...RECURSOS });
+    expect(resultado.ok).toBe(true);
+    if (!resultado.ok) return;
+
+    const entradaA = resultado.secao.servicos.find((s) => s.servico_uuid === SERVICO_A)!;
+    const entradaB = resultado.secao.servicos.find((s) => s.servico_uuid === SERVICO_B)!;
+    expect(entradaA.geolocalizacao_ida).toEqual(destino);
+    expect(entradaA.geolocalizacao_volta).toEqual(destino);
+    expect(entradaB.geolocalizacao_ida).toEqual(destino);
+    expect(entradaB.geolocalizacao_volta).toEqual(destino);
+  });
+
+  it("preserva a AUSÊNCIA de sentido de um Serviço unidirecional (RN-026) — não cria o campo oposto", () => {
+    const base = novaSecaoBase(); // SERVICO_A, unidirecional, só "ida"
+    const resultado = redefinirSecao({ secao: base, destino: ponto(200), ...RECURSOS });
+    expect(resultado.ok).toBe(true);
+    if (!resultado.ok) return;
+    const entradaA = resultado.secao.servicos.find((s) => s.servico_uuid === SERVICO_A)!;
+    expect(entradaA.geolocalizacao_ida).toEqual(ponto(200));
+    expect(entradaA.geolocalizacao_volta).toBeUndefined();
+  });
+
+  it("preserva a uuid da Seção e cada servico_uuid (RN-004) — round-trip da identidade", () => {
+    const base = novaSecaoBase();
+    const comSegundo = contribuirParaSecaoExistente({
+      secao: base,
+      servicoUuid: SERVICO_B,
+      sentido: "ida",
+      bidirecional: false,
+      ponto: ponto(300),
+      ...RECURSOS,
+    });
+    expect(comSegundo.ok).toBe(true);
+    if (!comSegundo.ok) return;
+
+    const resultado = redefinirSecao({
+      secao: comSegundo.secao,
+      destino: ponto(0),
+      ...RECURSOS,
+    });
+    expect(resultado.ok).toBe(true);
+    if (!resultado.ok) return;
+    expect(resultado.secao.uuid).toBe(comSegundo.secao.uuid);
+    expect(resultado.secao.servicos.map((s) => s.servico_uuid).sort()).toEqual(
+      [SERVICO_A, SERVICO_B].sort(),
+    );
+  });
+
+  it("nunca é recusada por 350 m — todos os pontos coincidem após o reset", () => {
+    const base = novaSecaoBase();
+    const comSegundo = contribuirParaSecaoExistente({
+      secao: base,
+      servicoUuid: SERVICO_B,
+      sentido: "ida",
+      bidirecional: false,
+      ponto: ponto(700), // no limite dos 350 m do centroide
+      ...RECURSOS,
+    });
+    expect(comSegundo.ok).toBe(true);
+    if (!comSegundo.ok) return;
+
+    const resultado = redefinirSecao({
+      secao: comSegundo.secao,
+      destino: ponto(10_000),
+      ...RECURSOS,
+    });
+    expect(resultado.ok || (resultado as { motivo: string }).motivo).not.toBe("350m");
+  });
+
+  it("re-deriva o município do ponto de destino único", () => {
+    const base = novaSecaoBase();
+    const resultado = redefinirSecao({ secao: base, destino: ponto(200), ...RECURSOS });
+    expect(resultado.ok && resultado.secao.municipio).toBe("Cidade Teste");
+  });
+
+  it("inválido: destino fora de SP recusa o reset INTEIRO — nenhum ponto se move (retorno inalterado)", () => {
+    const base = novaSecaoBase();
+    const resultado = redefinirSecao({ secao: base, destino: PONTO_FORA_DE_SP, ...RECURSOS });
+    expect(resultado).toEqual({ ok: false, motivo: "fora_de_sp" });
+  });
+
+  it("não muta a Seção recebida", () => {
+    const base = novaSecaoBase();
+    const copia = structuredClone(base);
+    redefinirSecao({ secao: base, destino: ponto(100), ...RECURSOS });
+    expect(base).toEqual(copia);
+  });
+
+  it("no-op visível: Seção com um único Serviço/sentido já no destino não gera erro nem muda a coordenada", () => {
+    const base = novaSecaoBase(); // único ponto: ponto(0)
+    const resultado = redefinirSecao({ secao: base, destino: ponto(0), ...RECURSOS });
+    expect(resultado.ok).toBe(true);
+    if (!resultado.ok) return;
+    expect(resultado.secao.servicos[0].geolocalizacao_ida).toEqual(ponto(0));
   });
 });
 
