@@ -359,7 +359,11 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
 
       // Clique direito (contextmenu): sobre e fora da linha são callbacks
       // mutuamente exclusivos (TASK-065/DEC-055). A âncora de viewport é
-      // efêmera e serve somente para posicionar o menu Seção/Local.
+      // efêmera e serve somente para posicionar o menu Seção/Local. Sobre a
+      // linha, a coordenada entregue é a PROJETADA no traçado (DEC-078,
+      // TASK-098), estendendo ao botão direito a mesma simetria que a
+      // DEC-072 já aplica ao clique esquerdo; sem projeção possível (linha
+      // degenerada) degrada para a coordenada bruta, sem descartar o clique.
       mapa.on("contextmenu", (evento) => {
         const posicao = {
           lng: evento.lngLat.lng,
@@ -370,7 +374,8 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
           y: evento.originalEvent.clientY,
         };
         if (aoClicarDireitoNaLinhaRef.current && consultarLinha(evento)) {
-          aoClicarDireitoNaLinhaRef.current(posicao, ancoraTela);
+          const posicaoProjetada = projetarSobreLinhas(posicao) ?? posicao;
+          aoClicarDireitoNaLinhaRef.current(posicaoProjetada, ancoraTela);
           return;
         }
         aoClicarDireitoRef.current?.(posicao, ancoraTela);

@@ -1182,6 +1182,120 @@ test.describe("Etapa Seções, Locais e Itinerários — feedback de montagem in
     // chamadas, não mais 1.
     expect(chamadasOsrm).toBe(2);
   });
+
+  test("TASK-098/DEC-078: clique direito PERTO (não exatamente sobre) a linha entrega a Seção com a coordenada PROJETADA no traçado, não a bruta do cursor", async ({
+    page,
+  }) => {
+    let chamadasOsrm = 0;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamadasOsrm += 1;
+      return rota.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          code: "Ok",
+          routes: [
+            {
+              geometry: { type: "LineString", coordinates: [[-46.402, -24.0081], [-46.3339, -23.9608]] },
+              legs: [
+                { distance: 6100, duration: 750, steps: [{ name: "Via 1" }] },
+                { distance: 8000, duration: 1080, steps: [{ name: "Via 2" }] },
+                { distance: 1000, duration: 120, steps: [{ name: "Via 3" }] },
+              ],
+            },
+          ],
+        }),
+      });
+    });
+
+    await abrirEtapaVolta(page);
+
+    const mapa = page.getByTestId("mapa-base");
+    const marcadores = mapa.locator(
+      ".maplibregl-marker:not(.marcador-mapa--fantasma)",
+    );
+    await marcadores.first().waitFor();
+    await expect(mapa).toBeVisible();
+    await mapa.scrollIntoViewIfNeeded();
+
+    const caixaInicialA = await marcadores.nth(0).boundingBox();
+    const caixaInicialB = await marcadores.nth(1).boundingBox();
+    if (!caixaInicialA || !caixaInicialB) throw new Error("marcador sem bounding box");
+    const meioInicial = {
+      x:
+        (caixaInicialA.x +
+          caixaInicialA.width / 2 +
+          caixaInicialB.x +
+          caixaInicialB.width / 2) /
+        2,
+      y:
+        (caixaInicialA.y +
+          caixaInicialA.height / 2 +
+          caixaInicialB.y +
+          caixaInicialB.height / 2) /
+        2,
+    };
+    await page.mouse.move(meioInicial.x, meioInicial.y);
+    for (let passo = 0; passo < 6; passo += 1) {
+      await page.mouse.wheel(0, -500);
+      await page.waitForTimeout(250);
+    }
+    await page.waitForTimeout(500);
+
+    const caixaA = await marcadores.nth(0).boundingBox();
+    const caixaB = await marcadores.nth(1).boundingBox();
+    if (!caixaA || !caixaB) throw new Error("marcador sem bounding box");
+    const centroA = { x: caixaA.x + caixaA.width / 2, y: caixaA.y + caixaA.height / 2 };
+    const centroB = { x: caixaB.x + caixaB.width / 2, y: caixaB.y + caixaB.height / 2 };
+    // Ponto exatamente SOBRE a linha (85% do segmento, mesmo alvo da TASK-067).
+    const pontoNaLinha = {
+      x: centroA.x + (centroB.x - centroA.x) * 0.85,
+      y: centroA.y + (centroB.y - centroA.y) * 0.85,
+    };
+    // Desloca o clique alguns pixels na perpendicular do segmento — ainda
+    // dentro da tolerância de 6 px do hit-test (`TOLERANCIA_PX` em mapa.tsx),
+    // mas fora da linha exata. Antes da DEC-078, a Seção nasceria neste ponto
+    // deslocado; depois, nasce projetada de volta em `pontoNaLinha`.
+    const dx = centroB.x - centroA.x;
+    const dy = centroB.y - centroA.y;
+    const comprimento = Math.hypot(dx, dy);
+    const perpX = -dy / comprimento;
+    const perpY = dx / comprimento;
+    const deslocamentoPx = 3;
+    const pontoClicado = {
+      x: pontoNaLinha.x + perpX * deslocamentoPx,
+      y: pontoNaLinha.y + perpY * deslocamentoPx,
+    };
+
+    await page.mouse.click(pontoClicado.x, pontoClicado.y, { button: "right" });
+    await page.getByRole("menuitem", { name: "Seção" }).click();
+    await page.getByTestId("nome-secao-input").fill("Seção Projetada E2E");
+    await page.getByTestId("confirmar-criar-secao").click();
+
+    await expect(page.getByTestId("tabela-paradas").getByTestId("parada-item")).toHaveCount(4);
+    await expect(page.getByTestId("avisos-montagem-invalida")).toHaveCount(0);
+    expect(chamadasOsrm).toBe(2);
+
+    const novoMarcador = mapa.locator(".marcador-mapa-quadrado").last();
+    const caixaNovoMarcador = await novoMarcador.boundingBox();
+    if (!caixaNovoMarcador) throw new Error("novo marcador sem bounding box");
+    const centroNovoMarcador = {
+      x: caixaNovoMarcador.x + caixaNovoMarcador.width / 2,
+      y: caixaNovoMarcador.y + caixaNovoMarcador.height / 2,
+    };
+
+    const distanciaAtePontoNaLinha = Math.hypot(
+      centroNovoMarcador.x - pontoNaLinha.x,
+      centroNovoMarcador.y - pontoNaLinha.y,
+    );
+    const distanciaAtePontoClicado = Math.hypot(
+      centroNovoMarcador.x - pontoClicado.x,
+      centroNovoMarcador.y - pontoClicado.y,
+    );
+    // A Seção nasce mais perto da linha (projeção) do que do pixel bruto onde
+    // o botão direito foi clicado — a assinatura visual da DEC-078.
+    expect(distanciaAtePontoNaLinha).toBeLessThan(distanciaAtePontoClicado);
+    expect(distanciaAtePontoNaLinha).toBeLessThan(deslocamentoPx);
+  });
 });
 
 test.describe('TASK-094 — Local nasce unidirecional; o "X" remove a entidade (DEC-075/DEC-076)', () => {

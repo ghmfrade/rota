@@ -178,6 +178,25 @@ describe("Mapa — hit-test do clique direito (TASK-065/067; DEC-055)", () => {
     expect(montagem.aoClicarDireitoNaLinha).not.toHaveBeenCalled();
     montagem.resultado.desmontar();
   });
+
+  test("contextmenu SOBRE a linha entrega a coordenada PROJETADA, com a mesma paridade do clique esquerdo (DEC-078/TASK-098)", async () => {
+    const aoClicarDireitoNaLinha = vi.fn();
+    const resultado = renderizar(
+      <Mapa linhas={[LINHA]} aoClicarDireitoNaLinha={aoClicarDireitoNaLinha} />,
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    if (!dublê.instancia) throw new Error("Mapa MapLibre não inicializado no teste");
+    dublê.instancia.acertos = [{ layer: { id: "linhas-mapa-camada" } }];
+
+    act(() => dublê.instancia?.handlers.get("contextmenu")?.(EVENTO));
+
+    const projetada = { lng: -46.4, lat: -23.9 };
+    expect(aoClicarDireitoNaLinha).toHaveBeenCalledWith(projetada, { x: 180, y: 190 });
+    resultado.desmontar();
+  });
 });
 
 describe("Mapa — affordance de hover sobre a linha (TASK-069; DEC-072)", () => {
