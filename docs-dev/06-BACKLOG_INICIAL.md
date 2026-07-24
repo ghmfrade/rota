@@ -1683,9 +1683,11 @@ A Spec 04 §7.3 item 6 manda que clicar sobre a linha crie um vértice, e a TASK
 
 ---
 
-## TASK-070 — Clicar sobre o vértice remove o ponto de rota (exclusivo do ponto de rota)
+## TASK-070 — Clicar sobre o vértice remove o ponto de rota (exclusivo do ponto de rota) — **CANCELADA (2026-07-24)**
 
-## Objetivo
+> **CANCELADA por decisão do responsável (2026-07-24): NÃO IMPLEMENTAR.** O botão "Remover" da tabela lateral já cobre a remoção de ponto de rota de forma simples e suficiente; o gesto de clique no mapa acrescentaria complexidade e risco (distinguir clique de arraste, remoção acidental) sem ganho percebido de uso. O texto abaixo é mantido só como registro histórico do que foi analisado — não descreve trabalho pendente. Referências cruzadas em outras tasks/documentos (TASK-078, TASK-097, TASK-099, `19-STATUS_EXECUCAO.md`) foram atualizadas para não depender mais desta task. A parte da DEC-057 que previa este gesto está marcada como cancelada em `10-DECISION_LOG.md`.
+
+## Objetivo (histórico — não implementar)
 
 Clicar (sem arrastar) sobre um vértice de ponto de rota **remove** aquele ponto e dispara o recálculo, no padrão consagrado dos editores de rota. Clicar num marcador de **Seção ou Local não remove nada** — a remoção de parada continua **só pela tabela lateral**.
 
@@ -2105,9 +2107,11 @@ Relato do responsável (2026-07-17): "só de escolher o Autos já congela ID e e
 
 ---
 
-## TASK-076 — Ida e Volta visíveis no mesmo mapa: abas de sentido ativo, numeração na ordem da viagem, Volta tracejada e dois painéis de descrição (DEC-062)
+## TASK-076 — Ida e Volta visíveis no mesmo mapa: abas de sentido ativo, numeração na ordem da viagem, Volta tracejada e dois painéis de descrição (DEC-062) — **CANCELADA (2026-07-24)**
 
-## Objetivo
+> **CANCELADA por decisão do responsável (2026-07-24): NÃO IMPLEMENTAR.** A troca entre Ida e Volta pela aba já é simples e a informação de cada sentido já está bem estruturada; não há ganho percebido em exibir os dois sentidos simultaneamente no mesmo mapa, e a task era o maior refactor pendente do backlog (complexidade 5). O texto abaixo é mantido só como registro histórico do que foi analisado — não descreve trabalho pendente. Referências cruzadas em outras tasks/documentos (TASK-077, TASK-078, TASK-093, TASK-097, TASK-099, `19-STATUS_EXECUCAO.md`) foram atualizadas para não depender mais desta task. A DEC-062 está marcada como cancelada em `10-DECISION_LOG.md`.
+
+## Objetivo (histórico — não implementar)
 
 Um **único mapa** exibe simultaneamente os marcadores e as rotas de Ida e de Volta (Ida em linha cheia, Volta **tracejada**, cores próprias por sentido), com **checklist de visibilidade** por sentido. O **sentido ativo** é escolhido por **botão tipo aba** (Ida/Volta) e rege a tabela lateral (Seções, Locais e pontos de rota do sentido ativo, na ordem em que o veículo passa). Os itens ficam **numerados (1, 2, 3…) na ordem da viagem** nos marcadores do mapa, conforme a tabela lateral do sentido ativo; o ponto do sentido **inativo** de uma Seção aparece na mesma tonalidade, levemente acinzentado, em **segundo plano** (ativo sempre à frente). Os **dois painéis de descrição textual** (Ida e Volta) aparecem embaixo, cada um com copiar / recalcular / ver itens estruturados (Spec 04 §7.4).
 
@@ -2290,28 +2294,29 @@ Pedido do responsável (2026-07-17): "ABCD sempre volta DCBA — não sendo nece
 
 ---
 
-## TASK-078 — Gesto de realocação de Seção inteira (translação rígida de todos os pontos do cluster) (DEC-061)
+## TASK-078 — Gesto de realocação de Seção: botão esquerdo move o cluster inteiro, botão direito move só o ponto do serviço/sentido corrente (DEC-061/DEC-079)
 
 ## Objetivo
 
-O usuário passa a poder **mover uma Seção inteira** no mapa: um gesto explícito de realocação exibe todos os pontos contribuídos à Seção (todas as entradas de `secao.servicos[]`, Ida e Volta) e arrasta o conjunto todo pelo **mesmo vetor** — preservando o invariante dos 350 m por construção, re-derivando o município do novo centroide e disparando o recálculo das rotas de todos os itinerários que a referenciam. Corrige a impossibilidade prática de realocar uma Seção mal posicionada sem destruir sua UUID.
+O usuário passa a poder **mover uma Seção inteira** no mapa, arrastando um marcador dela com o **botão esquerdo**: o gesto move todos os pontos contribuídos à Seção (todas as entradas de `secao.servicos[]`, Ida e Volta) pelo **mesmo vetor** — preservando o invariante dos 350 m por construção, re-derivando o município do novo centroide e disparando o recálculo das rotas de todos os itinerários que a referenciam. O arrasto com o **botão direito** continua movendo **só o ponto visualizado** (a contribuição do Serviço × sentido corrente), sob a regra dos 350 m — o mesmo comportamento de hoje, só migrado de botão. Corrige a impossibilidade prática de realocar uma Seção mal posicionada sem destruir sua UUID, sem exigir uma etapa própria de "entrar em modo".
 
 ## Contexto
 
-Relato do responsável (2026-07-17): mover uma Seção hoje exige arrastar ponto a ponto, cada um preso aos 350 m do centroide do conjunto — "impraticável". A proposta dele: entrar no modo de realocação pela própria Seção (ex.: duplo clique no marcador), os demais pontos aparecem em cor neutra, arrastar move todos juntos, com gesto de cancelamento. A translação rígida não viola RN-027 (distâncias ao centroide inalteradas); o que muda é o **lugar** da Seção — por isso a operação é deliberada e distinta do arrasto simples, que continua recusando >350 m (DEC-044 permanece). O desenho exato do gesto (duplo clique × item no menu de contexto do marcador; cancelar por `Esc`) é design sob DEC-050/doc 18, fixado na `/analisar-task` conforme a decisão da Q-041.
+Relato do responsável (2026-07-17): mover uma Seção hoje exige arrastar ponto a ponto, cada um preso aos 350 m do centroide do conjunto — "impraticável". A proposta original (Q-041/**DEC-061**) previa um **modo** de realocação (ex.: duplo clique no marcador entra no modo, os demais pontos aparecem em cor neutra, arrastar move todos juntos, `Esc` cancela o modo). Reavaliando o backlog em uso real (2026-07-24), o responsável simplificou o desenho (Q-057/**DEC-079**): **não há mais modo** — o **botão do mouse** usado no arrasto já distingue os dois gestos diretamente. Botão **esquerdo** arrasta **todos** os pontos da Seção (translação rígida); botão **direito** arrasta **exclusivamente** o ponto do Serviço/sentido corrente (350 m — DEC-044, inalterada). A translação rígida não viola RN-027 (distâncias ao centroide inalteradas); o que muda é o **lugar** da Seção. A DEC-079 supera só o **mecanismo de entrada** da DEC-061 (o modo); as consequências de confirmação (município, recálculo em cascata, UUID preservada) permanecem as mesmas fixadas pela DEC-061.
 
 ## Fora de escopo
 
-- Afrouxar/alterar a regra dos 350 m do arrasto individual (DEC-044 e RN-027 intocadas).
+- Afrouxar/alterar a regra dos 350 m do arrasto individual (DEC-044 e RN-027 intocadas — só migra do botão padrão para o botão direito).
 - Mover Locais em conjunto (Local é pareado, por Serviço — o arrasto atual basta).
 - Qualquer mudança de contrato (nenhum campo novo; as coordenadas mudam pelos caminhos existentes).
 - Re-anexar itinerários/horários além do que os caminhos de recálculo existentes já fazem (TASK-046/066 reusadas).
+- **Redefinir todos os pontos da Seção para um único lugar** ("resetar" a Seção) — é a **TASK-100**, gesto distinto (botão de refresh na tabela lateral, não um arrasto no mapa).
 
 ## Specs fonte
 
 - Spec 02 §5.1/§5.2 (contribuições e clustering)
 - Spec 03 §7.2 (invariante dos 350 m — preservado por construção), §2.3 (município derivado)
-- Spec 04 §7.1 (arrasto por ponto — inalterado; a realocação é gesto novo, conforme Q-041), §14 (mensagens)
+- Spec 04 §7.1 (arrasto por ponto — o botão direito reusa este gesto; o botão esquerdo passa a ser a translação, conforme Q-057/DEC-079), §14 (mensagens)
 
 ## Regras envolvidas
 
@@ -2331,52 +2336,57 @@ Relato do responsável (2026-07-17): mover uma Seção hoje exige arrastar ponto
 
 ## Critérios de aceite
 
-- [ ] O gesto decidido na Q-041 entra no modo de realocação da Seção; todos os pontos do cluster ficam visíveis (cor neutra) durante o modo.
-- [ ] Arrastar move todos os pontos pelo mesmo vetor; soltar confirma; o gesto de cancelamento decidido restaura as posições originais sem efeito.
-- [ ] Ao confirmar: município re-derivado do novo centroide (RN-029); destino fora de SP → recusa com a mensagem existente, sem mover nada.
-- [ ] Nenhuma recusa por 350 m é possível na translação (invariante preservado — teste com cluster no limite).
-- [ ] Todos os itinerários (de todos os Serviços) que referenciam a Seção têm a rota recalculada (RN-052) e a matriz reconciliada (RN-054..057); falha de OSRM em um deles → `sem-rota` daquele itinerário (RN-048), sem apagar a última rota válida.
-- [ ] A UUID da Seção e as entradas de `secao.servicos[]` são preservadas (round-trip).
-- [ ] O arrasto simples de um ponto continua com o comportamento atual (DEC-044) — regressão-guarda.
+- [ ] Arrastar um marcador de Seção com o **botão esquerdo** move todos os pontos do cluster pelo mesmo vetor (translação rígida); os demais pontos ficam visíveis em cor neutra durante o arrasto, sem etapa prévia de "entrar em modo".
+- [ ] Arrastar o mesmo marcador com o **botão direito** move **só** o ponto do Serviço/sentido corrente, sob a regra dos 350 m (DEC-044) — comportamento idêntico ao arrasto de hoje, só acessível pelo botão direito.
+- [ ] Soltar o botão esquerdo confirma a translação; soltar sem deslocamento efetivo, ou `Esc` durante o arrasto, cancela e restaura as posições originais sem efeito.
+- [ ] O `contextmenu` nativo do navegador **não** abre ao soltar o botão direito sobre um marcador de Seção durante o arrasto (suprimido); fora de um arrasto, o botão direito sobre a **linha vazia** continua abrindo o menu Seção/Local da DEC-055 — as duas superfícies não colidem.
+- [ ] Ao confirmar a translação: município re-derivado do novo centroide (RN-029); destino fora de SP → recusa com a mensagem existente, sem mover nada.
+- [ ] Nenhuma recusa por 350 m é possível na translação pelo botão esquerdo (invariante preservado — teste com cluster no limite).
+- [ ] Todos os itinerários (de todos os Serviços) que referenciam a Seção têm a rota recalculada (RN-052) e a matriz reconciliada (RN-054..057) após a translação; falha de OSRM em um deles → `sem-rota` daquele itinerário (RN-048), sem apagar a última rota válida.
+- [ ] A UUID da Seção e as entradas de `secao.servicos[]` são preservadas (round-trip) nos dois gestos.
+- [ ] O arrasto pelo botão direito (ponto único) continua com o comportamento atual (DEC-044) — regressão-guarda.
 - [ ] Nenhum `data-testid`/`aria-*` existente alterado; E2E atuais verdes.
 
 ## Casos válidos
 
-- Seção com 4 pontos (2 Serviços × Ida/Volta) transladada 5 km: os 4 pontos mantêm as distâncias relativas; município muda; as rotas dos 2 Serviços recalculam.
-- Cancelar no meio do gesto: nada muda, nenhuma chamada OSRM.
+- Seção com 4 pontos (2 Serviços × Ida/Volta), arrastada 5 km pelo **botão esquerdo**: os 4 pontos mantêm as distâncias relativas; município muda; as rotas dos 2 Serviços recalculam.
+- O mesmo marcador arrastado pelo **botão direito** move só a contribuição do Serviço/sentido corrente, sob 350 m — sem afetar os demais pontos da Seção.
+- Cancelar no meio do arrasto com o botão esquerdo (soltar sem deslocamento, ou `Esc`): nada muda, nenhuma chamada OSRM.
 
 ## Casos inválidos
 
-- Translação para fora de SP → recusa integral (nenhum ponto movido).
-- OSRM falha no recálculo de um dos itinerários afetados → aquele itinerário em `sem-rota` com pendência; os demais seguem.
+- Translação pelo botão esquerdo para fora de SP → recusa integral (nenhum ponto movido).
+- Arrasto pelo botão direito além de 350 m do centroide → recusa só a mensagem da Spec 04 §14 (DEC-044), sem afetar os demais pontos da Seção.
+- OSRM falha no recálculo de um dos itinerários afetados pela translação → aquele itinerário em `sem-rota` com pendência; os demais seguem.
 
 ## Testes esperados
 
-- Unitários: função pura de translação (vetor aplicado a todas as contribuições; invariante 350 m preservado; município re-derivado; fora de SP recusa).
-- Integração: confirmar dispara recálculo por itinerário afetado (OSRM mockado; contagem de chamadas); cancelamento não dispara nada.
-- E2E: realocar uma Seção usada por um Serviço e ver rota/tabela atualizarem (OSRM/tiles mockados).
+- Unitários: função pura de translação (vetor aplicado a todas as contribuições; invariante 350 m preservado; município re-derivado; fora de SP recusa); distinção de botão no handler de arrasto (`event.button`/`originalEvent.button`) roteando para translação (esquerdo) ou arrasto individual (direito); supressão do `contextmenu` nativo durante o arrasto com o botão direito, sem interferir no `contextmenu` da DEC-055 sobre a linha vazia.
+- Integração: confirmar a translação dispara recálculo por itinerário afetado (OSRM mockado; contagem de chamadas); cancelamento não dispara nada; o arrasto pelo botão direito continua recalculando só o itinerário do Serviço/sentido corrente.
+- E2E: realocar uma Seção usada por um Serviço com o botão esquerdo e ver rota/tabela atualizarem; arrastar o mesmo marcador com o botão direito e ver só o ponto do sentido corrente mudar (OSRM/tiles mockados).
 
 ## Arquivos prováveis
 
-- `src/formulario/secoes/fluxos-secao.ts` (função pura `transladarSecao`)
-- `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (modo de realocação, pontos em cor neutra)
+- `src/formulario/secoes/fluxos-secao.ts` (função pura `transladarSecao`, reusada)
+- `src/shared/mapa/mapa.tsx` (distinguir o botão do `mousedown`/`dragstart` do marcador de Seção; suprimir `contextmenu` nativo durante o arrasto com o botão direito)
+- `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (pontos do cluster em cor neutra durante o arrasto com o botão esquerdo)
 - `src/formulario/itinerarios/etapa-itinerarios.tsx` (commit + recálculo em cascata dos itinerários afetados)
-- `docs-dev/18-DESIGN_SYSTEM.md` (estado visual do modo, cor neutra)
+- `docs-dev/18-DESIGN_SYSTEM.md` (estado visual do arrasto de cluster, cor neutra — sem o estado de "modo" que a DEC-061 prévia)
 
 ## Riscos
 
 - **Cascata de recálculo multi-Serviço** é caminho novo (hoje o recálculo é do itinerário corrente): definir na análise se recalcula na hora (várias chamadas OSRM) ou marca os itinerários como desatualizados com pendência — decisão de UX a alinhar na `/analisar-task` (sem inventar regra: RN-052 manda recalcular ao editar coordenada).
-- Conflito de gesto com DEC-055 (clique direito = menu) e TASK-070 (clique no vértice remove): o gesto de entrada/cancelamento não pode colidir — por isso a Q-041 deixa o desenho para o design sob DEC-050.
+- **Suprimir o `contextmenu` nativo do navegador** durante o arrasto com o botão direito é o risco técnico principal desta task (Q-057/DEC-079): sem isso, soltar o botão direito ao final do arrasto abriria o menu do navegador (ou, se mal implementado, o menu Seção/Local da DEC-055) em vez de só confirmar o movimento do ponto.
 - Serviço em construção (modo novo): pontos vivem em `secoesEmConstrucao` — cobrir os dois modos.
-- **Arrasto sobre a linha da rota** (acrescentado em 2026-07-24): o gesto desta task é, por definição, um arrasto no mapa — e a translação de uma Seção acontece justamente em cima do traçado, onde a **TASK-097** documenta que o arrasto é hoje revertido pelo re-render do hover. Sem a 097, o modo de realocação nasce quebrado exatamente no caso central. **Dependência dura: 097 antes da 078.**
+- **Arrasto sobre a linha da rota**: a translação de uma Seção pode acontecer em cima do traçado, onde a **TASK-097** (já entregue) corrigiu a reversão do arrasto pelo re-render do hover — o invariante entregue por ela deve seguir valendo para os dois botões.
 
 ## Dependências
 
-- **DEC-061** (decidida — task liberada). Recomendado: após o ramo pendente do mapa (TASK-064..071). **Requer a TASK-097** (arrasto sobre a linha deixa de ser revertido — ver Riscos).
+- **DEC-061** (consequências de confirmação) e **DEC-079** (mecanismo de gesto por botão, Q-057) — ambas decididas, task liberada. **TASK-097 entregue** (`6b1360f`, 2026-07-24) — dependência dura já cumprida. Sem dependência das TASK-070/076 (canceladas em 2026-07-24).
 
 ## Perguntas em aberto
 
-- Nenhuma (Q-041 decidida pela DEC-061). O gesto exato (entrada no modo/cancelamento) fecha na `/analisar-task` sob DEC-050 — candidato: item "Mover Seção" em menu de contexto do marcador, `Esc` cancela.
+- Nenhuma. Q-041 decidida pela DEC-061 (consequências de confirmação); Q-057 decidida pela DEC-079 (mecanismo de gesto por botão, sem modo).
 
 ---
 
@@ -4759,7 +4769,7 @@ Aqui "inválido" é o que **reprova a entrega**, não entrada de usuário — a 
 
 ## Riscos
 
-- **Conflito de merge — o risco principal.** `etapa-itinerarios.tsx` é editado por **TASK-097, 070, 076, 078** e (indiretamente) **098**; um rename de 59 pontos atravessado no meio dessa fila cria conflito em arquivo grande, num diff que ninguém quer reler. **Restrição dura de sequenciamento: esta task roda DEPOIS de 097, 098, 070, 076 e 078.** Registrado na ordem recomendada do `19-STATUS_EXECUCAO.md` §5.
+- **Conflito de merge — o risco principal.** `etapa-itinerarios.tsx` é editado por **TASK-097, 078** e (indiretamente) **098, 100**; um rename de 59 pontos atravessado no meio dessa fila cria conflito em arquivo grande, num diff que ninguém quer reler. **Restrição dura de sequenciamento: esta task roda DEPOIS de 097, 098, 078 e 100.** (As TASK-070 e TASK-076, que também tocavam este arquivo, foram **canceladas em 2026-07-24** — deixam de fazer parte desta restrição.) Registrado na ordem recomendada do `19-STATUS_EXECUCAO.md` §5.
 - **Rename cego.** Substituição por texto sem limite de palavra pode alcançar identificadores vizinhos. Usar rename simbólico da IDE/TS ou `\baoAtualizarSessao\b`, e conferir com `git diff --stat` que só os 11 arquivos previstos aparecem.
 - **Vazamento silencioso de escopo.** Renomear código convida a "melhorar de passagem". O diff só pode conter identificador + comentários que o citam.
 - **Ganho é preventivo, não corretivo.** Nenhum bug é fechado aqui; se a fila de prioridades apertar, esta task cede lugar sempre.
@@ -4767,5 +4777,101 @@ Aqui "inválido" é o que **reprova a entrega**, não entrada de usuário — a 
 ## Perguntas em aberto
 
 Nenhuma Q-xxx. Pendência **operacional**, não de domínio: o responsável confirma `aoDefinirSessao` (ou indica outro nome) antes da implementação — decisão de código, que por `docs-dev/04` não gera Q-xxx nem DEC-xxx.
+
+## TASK-100 — Botão "redefinir Seção": todos os pontos do cluster voltam para o ponto do serviço/sentido em edição (DEC-080)
+
+## Objetivo
+
+Uma nova ação, disponível **só nas linhas de Seção** da tabela lateral, devolve **todos** os pontos daquela Seção (todas as entradas de `secao.servicos[]`, Ida e Volta, de todos os Serviços) para uma **única coordenada** — a do ponto do Serviço/sentido em edição no momento do clique —, com confirmação explícita antes de aplicar. Permite ao usuário desfazer de uma vez a diferenciação manual entre pontos e recomeçar a redesenhar a Seção a partir de um único lugar.
+
+## Contexto
+
+Pedido novo do responsável (2026-07-24), decidido pela **DEC-080** (Q-058): depois de usar o gesto de arrasto individual (por Serviço/sentido, DEC-044) ou a translação inteira da Seção (TASK-078/DEC-061/DEC-079) para posicionar os pontos, o usuário às vezes quer **desfazer toda a diferenciação** entre Serviços/sentidos de uma Seção e recomeçar do zero, sem ajustar cada contribuição manualmente uma a uma. Um botão de refresh na linha da Seção na tabela lateral abre uma confirmação; ao confirmar, todos os pontos do cluster colapsam na coordenada do ponto que estava sendo editado/visualizado no momento do clique (a Seção some do "desalinhamento" e RN-027 fica trivialmente satisfeita — distância zero ao centroide). Reusa o motor de translação introduzido pela TASK-078, aplicado com um destino fixo (o ponto de origem) em vez de um vetor de arrasto.
+
+## Fora de escopo
+
+- **Mover a Seção para um lugar novo escolhido pelo usuário** — isso é a TASK-078 (arrasto pelo botão esquerdo). Esta task só colapsa os pontos existentes num deles; não abre nenhum gesto de arrasto ou escolha de coordenada nova.
+- **Desfazer/histórico** (Ctrl+Z) do reset — não previsto em spec nenhuma; a confirmação explícita (OK/Cancelar) é a única proteção contra acidente, por decisão da DEC-080. Não inventar undo.
+- **Reset de Local** — Local é pareado por Serviço (Ida/Volta), não tem múltiplas contribuições divergentes por Serviço como a Seção; fora de escopo (mesma exclusão já aplicada à TASK-078).
+- Qualquer mudança de contrato JSON (nenhum campo novo; as coordenadas mudam pelos caminhos existentes de `secao.servicos[]`).
+- Alterar a ordem, o alinhamento ou as demais colunas da tabela lateral além de acrescentar o botão novo — as colunas existentes (nome, tipo, mover, remover) preservam posição e largura.
+
+## Specs fonte
+
+- Spec 02 §5.1/§5.2 (contribuições e clustering — a operação de reset é nova; nenhuma spec a descreve, por isso a DEC-080)
+- Spec 03 §2.3 (município derivado do ponto/centroide), §7.2 (invariante dos 350 m)
+- Spec 04 §7 (tabela lateral — layout e colunas), §14 (mensagens de recusa, ex. fora de SP)
+
+## Regras envolvidas
+
+- RN-027 (350 m — trivialmente satisfeita após o reset: todos os pontos coincidem)
+- RN-029 (município re-derivado do ponto único; fora de SP → recusa integral, nenhum ponto movido)
+- RN-004/001 (UUID da Seção e das entradas de `secao.servicos[]` preservadas)
+- RN-052 (mover coordenadas recalcula as rotas dos itinerários afetados — de **todos** os Serviços que usam a Seção)
+- RN-054..057 (matrizes dos Serviços afetados reconciliadas)
+
+## Entidades afetadas
+
+- Seção (todas as contribuições), Rota/Itinerário/matriz dos Serviços que a referenciam
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] A linha de uma Seção na tabela lateral exibe um botão de **refresh**, posicionado **depois** dos botões de mover (subir/descer) e **antes** do "X" de remover; o botão **não** aparece nas linhas de Local nem de ponto de rota.
+- [ ] Clicar no botão abre uma janela de confirmação com o texto "Gostaria de redefinir todas as geolocalizações desta seção em todos os serviços e sentidos?" e as ações **OK** e **Cancelar**.
+- [ ] **Cancelar** (ou fechar a janela) não altera nada; nenhuma chamada OSRM.
+- [ ] **OK** aplica: todas as entradas de `secao.servicos[]` (Ida e Volta, todos os Serviços) passam a ter a mesma geolocalização — a do ponto do Serviço/sentido em edição no momento do clique.
+- [ ] Após confirmar: município re-derivado do ponto único (RN-029); destino fora de SP → recusa integral com a mensagem existente, nenhum ponto movido (caso só alcançável se o ponto de origem já não estivesse em SP, o que não deveria ocorrer em documento válido — regressão-guarda).
+- [ ] Todos os itinerários (de todos os Serviços) que referenciam a Seção têm a rota recalculada (RN-052) e a matriz reconciliada (RN-054..057); falha de OSRM em um deles → `sem-rota` daquele itinerário (RN-048), sem apagar a última rota válida dos demais.
+- [ ] A UUID da Seção e as entradas de `secao.servicos[]` são preservadas (round-trip).
+- [ ] As colunas da tabela lateral permanecem alinhadas com a coluna nova — larguras e cabeçalhos das colunas existentes não mudam.
+- [ ] Nenhum `data-testid`/`aria-*` existente alterado; E2E atuais verdes.
+
+## Casos válidos
+
+- Seção com 4 pontos (2 Serviços × Ida/Volta) já diferenciados manualmente: clicar em refresh na linha da Seção, confirmar → os 4 pontos passam a coincidir na coordenada do ponto do Serviço/sentido que estava em edição; município re-derivado; as rotas dos 2 Serviços recalculam.
+- Cancelar a confirmação: nenhum ponto muda, nenhuma chamada OSRM.
+
+## Casos inválidos
+
+- Seção com um único Serviço/sentido (pontos já coincidentes): reset é um no-op visível (confirma, mas nenhuma coordenada muda) — sem erro.
+- OSRM falha no recálculo de um dos itinerários afetados → aquele itinerário em `sem-rota` com pendência; os demais seguem.
+
+## Testes esperados
+
+- Unitários: função pura de reset (todas as contribuições recebem a coordenada de origem; UUID preservada; município re-derivado; fora de SP recusa) — variante do motor de translação da TASK-078 com destino fixo.
+- Integração: confirmar dispara recálculo por itinerário afetado (OSRM mockado; contagem de chamadas); cancelar não dispara nada; botão de refresh ausente em linhas de Local/ponto de rota (asserção negativa).
+- E2E: diferenciar pontos de uma Seção entre dois Serviços, clicar em refresh, confirmar, e ver os pontos/rotas convergirem (OSRM/tiles mockados).
+
+## Arquivos prováveis
+
+- `src/formulario/secoes/fluxos-secao.ts` (função pura de reset, reusando o motor de translação da TASK-078)
+- `src/shared/ui/` (componente de diálogo de confirmação, se ainda não houver um genérico reusável — conferir no design system, doc 18, antes de criar novo)
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (botão na linha de Seção da tabela; commit + recálculo em cascata dos itinerários afetados)
+- `docs-dev/18-DESIGN_SYSTEM.md` (ícone de refresh, posição na linha da tabela — doc 18 §6 se exigir token novo)
+
+## Riscos
+
+- **Depende da TASK-078** para o motor de translação em cascata (recálculo multi-Serviço, reconciliação de matrizes) — não duplicar essa lógica; reusar a função pura que a 078 introduz.
+- **Confirmação é a única proteção contra reset acidental** — sem undo (fora de escopo, DEC-080); garantir que o texto da confirmação seja claro sobre o alcance (todos os serviços e sentidos, não só o corrente).
+- Serviço em construção (modo novo): pontos vivem em `secoesEmConstrucao` — cobrir os dois modos.
+- Layout da tabela: acrescentar uma coluna/botão sem quebrar o alinhamento das demais colunas em todas as densidades já suportadas pela DEC-073.
+
+## Dependências
+
+- **DEC-080** (decidida — task liberada). **Requer a TASK-078** (motor de translação em cascata multi-Serviço) — recomendado implementar depois dela, reusando a mesma função pura.
+
+## Perguntas em aberto
+
+- Nenhuma (Q-058 decidida pela DEC-080).
+
+---
 
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.
