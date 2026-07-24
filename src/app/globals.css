@@ -128,6 +128,13 @@
   outline-offset: 2px;
 }
 
+/* Reduzir movimento é neutralizar TRANSIÇÃO e ANIMAÇÃO — nunca `transform`.
+   O `transform: none !important` que morava aqui atingia também o transform
+   ESTÁTICO de posicionamento, e o MapLibre posiciona todo marcador por
+   `transform: translate(...)` inline sobre um elemento `position: absolute;
+   top: 0; left: 0` (`.maplibregl-marker`): com ele, Seção, Local e ponto de
+   rota eram empilhados no canto superior esquerdo do mapa, enquanto a linha
+   da rota (canvas WebGL, imune a CSS) continuava correta. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -135,6 +142,5 @@
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transform: none !important;
   }
 }
