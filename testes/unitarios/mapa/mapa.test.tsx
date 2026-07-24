@@ -12,8 +12,13 @@ const dublê = vi.hoisted(() => ({
   marcadores: [] as Array<{
     elemento: HTMLElement;
     arrastavel: boolean;
+    posicao: [number, number] | null;
+    posicoesRecebidas: Array<[number, number]>;
+    handlers: Map<string, () => void>;
+    removido: boolean;
     setDraggable: (valor: boolean) => void;
     setLngLat: (valor: [number, number]) => unknown;
+    getLngLat: () => { lng: number; lat: number };
     getElement: () => HTMLElement;
   }>,
 }));
@@ -56,9 +61,16 @@ vi.mock("maplibre-gl", () => ({
 
     remove() {}
   },
+  // O dublê de `Marker` registra os handlers (`dragstart`/`dragend`) e grava
+  // TODAS as posições recebidas por `setLngLat` — é sobre esse histórico que a
+  // TASK-097 prova que o marcador em arrasto não é reposicionado pela prop.
   Marker: class {
     elemento: HTMLElement;
     arrastavel: boolean;
+    posicao: [number, number] | null = null;
+    posicoesRecebidas: Array<[number, number]> = [];
+    handlers = new globalThis.Map<string, () => void>();
+    removido = false;
 
     constructor(opcoes: { element?: HTMLElement; draggable?: boolean } = {}) {
       this.elemento = opcoes.element ?? document.createElement("div");
@@ -70,16 +82,27 @@ vi.mock("maplibre-gl", () => ({
       this.arrastavel = valor;
     }
 
-    setLngLat() {
+    setLngLat(valor: [number, number]) {
+      this.posicao = valor;
+      this.posicoesRecebidas.push(valor);
       return this;
+    }
+
+    getLngLat() {
+      return { lng: this.posicao?.[0] ?? 0, lat: this.posicao?.[1] ?? 0 };
     }
 
     addTo() {
       return this;
     }
 
-    on() {}
-    remove() {}
+    on(nome: string, handler: () => void) {
+      this.handlers.set(nome, handler);
+    }
+
+    remove() {
+      this.removido = true;
+    }
 
     getElement() {
       return this.elemento;
@@ -427,6 +450,204 @@ describe("Mapa — realce de seleção (TASK-064; Spec 04 §7)", () => {
         dublê.marcadores[0].elemento.dispatchEvent(new MouseEvent("click", { bubbles: true }));
       }),
     ).not.toThrow();
+    resultado.desmontar();
+  });
+});
+
+// TASK-097 — o re-render provocado pelo hover sobre a linha (TASK-069/DEC-072)
+// reposicionava o marcador em pleno arrasto, e o `dragend` lia a coordenada
+// antiga: o gesto virava no-op, violando a Spec 04 §7.3 itens 4/5/6 e a
+// RN-052 ("recalcular no soltar de cada gesto").
+describe("Mapa — arrasto não é revertido pelo re-render (TASK-097; RN-052)", () => {
+  const M1: MarcadorMapa = {
+    id: "ponto-rota-0",
+    posicao: { lng: -46.45, lat: -23.88 },
+    forma: "circulo",
+    tamanho: "pequeno",
+    arrastavel: true,
+  };
+  const M2: MarcadorMapa = {
+    id: "secao-1",
+    posicao: { lng: -46.5, lat: -23.9 },
+    forma: "quadrado",
+    arrastavel: true,
+  };
+
+  async function esperarEfeitos() {
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  }
+
+  async function montarComMarcadores(
+    marcadores: readonly MarcadorMapa[],
+    extras: {
+      linhas?: readonly LinhaMapa[];
+      aoMoverSobreLinha?: (p: { lng: number; lat: number } | null) => void;
+    } = {},
+  ) {
+    dublê.marcadores.length = 0;
+    const resultado = renderizar(<Mapa marcadores={marcadores} {...extras} />);
+    await esperarEfeitos();
+    act(() => dublê.instancia?.handlers.get("load")?.(EVENTO));
+    return resultado;
+  }
+
+  test("re-render durante o arrasto não reposiciona o marcador arrastado, mas sincroniza os demais", async () => {
+    const resultado = await montarComMarcadores([M1, M2]);
+    const [arrastado, outro] = dublê.marcadores;
+    expect(arrastado.posicoesRecebidas).toHaveLength(1);
+
+    act(() => arrastado.handlers.get("dragstart")?.());
+
+    // Re-render idêntico ao que o hover provoca a cada `mousemove`: array de
+    // marcadores novo, mesmas posições.
+    resultado.rerenderizar(<Mapa marcadores={[{ ...M1 }, { ...M2 }]} />);
+    await esperarEfeitos();
+
+    // (a) o marcador em arrasto NÃO recebeu `setLngLat` de novo…
+    expect(arrastado.posicoesRecebidas).toHaveLength(1);
+    // (b) …e o outro marcador foi sincronizado normalmente no mesmo render.
+    expect(outro.posicoesRecebidas).toHaveLength(2);
+    resultado.desmontar();
+  });
+
+  test("`dragend` entrega a coordenada solta e devolve o marcador à posição da prop antes disso", async () => {
+    let posicaoNoMomentoDoCallback: [number, number] | null = null;
+    const aoArrastar = vi.fn(() => {
+      posicaoNoMomentoDoCallback = dublê.marcadores[0].posicao;
+    });
+    const resultado = await montarComMarcadores([{ ...M1, aoArrastar }]);
+    const arrastado = dublê.marcadores[0];
+
+    act(() => arrastado.handlers.get("dragstart")?.());
+    // O MapLibre move o elemento por fora do nosso código durante o gesto.
+    arrastado.posicao = [-46.4, -23.9];
+    act(() => arrastado.handlers.get("dragend")?.());
+
+    // A coordenada entregue é a de ONDE O USUÁRIO SOLTOU (RN-052), não a
+    // anterior — este é o defeito que a task corrige.
+    expect(aoArrastar).toHaveBeenCalledWith({ lng: -46.4, lat: -23.9 });
+    // A reversão para a posição da prop acontece ANTES do callback: é ela que
+    // garante a recusa de 350 m devolvendo o marcador (DEC-044) mesmo quando a
+    // recusa não gera render.
+    expect(posicaoNoMomentoDoCallback).toEqual([-46.45, -23.88]);
+    resultado.desmontar();
+  });
+
+  test("terminado o arrasto, um render seguinte volta a sincronizar o marcador", async () => {
+    const resultado = await montarComMarcadores([M1]);
+    const arrastado = dublê.marcadores[0];
+
+    act(() => arrastado.handlers.get("dragstart")?.());
+    arrastado.posicao = [-46.4, -23.9];
+    act(() => arrastado.handlers.get("dragend")?.());
+    const aposGesto = arrastado.posicoesRecebidas.length;
+
+    // Recálculo que reancora o ponto de rota sobre a nova rota (Spec 03 §3.6).
+    resultado.rerenderizar(
+      <Mapa marcadores={[{ ...M1, posicao: { lng: -46.41, lat: -23.91 } }]} />,
+    );
+    await esperarEfeitos();
+
+    expect(arrastado.posicoesRecebidas).toHaveLength(aposGesto + 1);
+    expect(arrastado.posicao).toEqual([-46.41, -23.91]);
+    resultado.desmontar();
+  });
+
+  test("[inválido] `mousemove` sobre a linha durante o arrasto não emite hover nem muda o cursor", async () => {
+    const aoMoverSobreLinha = vi.fn();
+    const resultado = await montarComMarcadores([M1], {
+      linhas: [LINHA],
+      aoMoverSobreLinha,
+    });
+    if (!dublê.instancia) throw new Error("Mapa MapLibre não inicializado no teste");
+    dublê.instancia.acertos = [{ layer: { id: "linhas-mapa-camada" } }];
+
+    act(() => dublê.marcadores[0].handlers.get("dragstart")?.());
+    aoMoverSobreLinha.mockClear();
+    dublê.instancia.canvas.style.cursor = "";
+
+    act(() => dublê.instancia?.handlers.get("mousemove")?.(EVENTO));
+    act(() => {
+      resultado.container
+        .querySelector('[data-testid="mapa-base"]')
+        ?.dispatchEvent(new MouseEvent("mouseleave"));
+    });
+
+    expect(aoMoverSobreLinha).not.toHaveBeenCalled();
+    expect(dublê.instancia.canvas.style.cursor).toBe("");
+    resultado.desmontar();
+  });
+
+  test("`dragstart` limpa o fantasma já visível; depois do `dragend` o hover volta a funcionar", async () => {
+    const aoMoverSobreLinha = vi.fn();
+    const resultado = await montarComMarcadores([M1], {
+      linhas: [LINHA],
+      aoMoverSobreLinha,
+    });
+    if (!dublê.instancia) throw new Error("Mapa MapLibre não inicializado no teste");
+    dublê.instancia.acertos = [{ layer: { id: "linhas-mapa-camada" } }];
+
+    const projetada = { lng: -46.4, lat: -23.9 };
+    act(() => dublê.instancia?.handlers.get("mousemove")?.(EVENTO));
+    expect(aoMoverSobreLinha).toHaveBeenLastCalledWith(projetada);
+    expect(dublê.instancia.canvas.style.cursor).toBe("pointer");
+
+    act(() => dublê.marcadores[0].handlers.get("dragstart")?.());
+    expect(aoMoverSobreLinha).toHaveBeenLastCalledWith(null);
+    expect(dublê.instancia.canvas.style.cursor).toBe("");
+
+    // Não-regressão da TASK-069/DEC-072: encerrado o gesto, o fantasma
+    // reaparece ao passar sobre a linha.
+    act(() => dublê.marcadores[0].handlers.get("dragend")?.());
+    act(() => dublê.instancia?.handlers.get("mousemove")?.(EVENTO));
+    expect(aoMoverSobreLinha).toHaveBeenLastCalledWith(projetada);
+    expect(dublê.instancia.canvas.style.cursor).toBe("pointer");
+    resultado.desmontar();
+  });
+
+  test("[inválido] marcador removido no meio do arrasto não deixa a guarda presa", async () => {
+    const resultado = await montarComMarcadores([M1, M2]);
+    act(() => dublê.marcadores[0].handlers.get("dragstart")?.());
+
+    // O ponto de rota some da lista durante o gesto (ex.: recálculo que o
+    // descarta): o `dragend` nunca chega.
+    resultado.rerenderizar(<Mapa marcadores={[{ ...M2 }]} />);
+    await esperarEfeitos();
+    expect(dublê.marcadores[0].removido).toBe(true);
+
+    // Um marcador de MESMO id volta à lista e precisa voltar a ser sincronizado.
+    resultado.rerenderizar(<Mapa marcadores={[{ ...M1 }, { ...M2 }]} />);
+    await esperarEfeitos();
+    const recriado = dublê.marcadores[2];
+    resultado.rerenderizar(
+      <Mapa marcadores={[{ ...M1, posicao: { lng: -46.42, lat: -23.87 } }, { ...M2 }]} />,
+    );
+    await esperarEfeitos();
+
+    expect(recriado.posicao).toEqual([-46.42, -23.87]);
+    resultado.desmontar();
+  });
+
+  test("[RN-097] consumidor sem arrasto e sem `aoMoverSobreLinha` sincroniza como antes", async () => {
+    const semArrasto: MarcadorMapa = {
+      id: "secao-1",
+      posicao: { lng: 1, lat: 1 },
+      forma: "quadrado",
+    };
+    const resultado = await montarComMarcadores([semArrasto]);
+    expect(dublê.marcadores[0].posicoesRecebidas).toEqual([[1, 1]]);
+
+    resultado.rerenderizar(<Mapa marcadores={[{ ...semArrasto, posicao: { lng: 2, lat: 3 } }]} />);
+    await esperarEfeitos();
+
+    expect(dublê.marcadores).toHaveLength(1);
+    expect(dublê.marcadores[0].posicoesRecebidas).toEqual([
+      [1, 1],
+      [2, 3],
+    ]);
     resultado.desmontar();
   });
 });

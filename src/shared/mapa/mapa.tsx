@@ -216,6 +216,11 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
   const mapaRef = useRef<MapaMaplibre | null>(null);
   const marcadoresRef = useRef<Map<string, Marker>>(new Map());
   const prontoRef = useRef(false);
+  // Id do marcador em arrasto (TASK-097). Vive em `ref` justamente para NÃO
+  // provocar render: o defeito corrigido aqui nasce de um re-render por
+  // `mousemove` que reposicionava o marcador em pleno gesto. `null` = nenhum
+  // arrasto em curso. Efêmero, nunca exportado (RN-096).
+  const arrastandoRef = useRef<string | null>(null);
 
   // Refs de props usadas dentro de handlers do mapa, para sempre chamar a
   // versão mais recente sem reassinar os listeners.
@@ -324,8 +329,16 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
       // Hover é somente affordance de UI: usa o mesmo hit-test e a mesma
       // projeção do clique, sem editar estado de domínio nem chamar OSRM
       // (TASK-069, RN-052, DEC-072).
+      //
+      // Durante um arrasto o hover fica SUSPENSO (TASK-097): o MapLibre move o
+      // marcador ouvindo o mesmo `mousemove` do mapa, e emitir a projeção aqui
+      // provocava um re-render por evento — que reposicionava o marcador em
+      // pleno gesto e fazia o `dragend` ler a coordenada antiga. Suspender é
+      // também o comportamento correto de UI: durante o arrasto não se
+      // pré-visualiza a criação de um vértice novo.
       mapa.on("mousemove", (evento) => {
         if (!aoMoverSobreLinhaRef.current) return;
+        if (arrastandoRef.current !== null) return;
         const posicao = { lng: evento.lngLat.lng, lat: evento.lngLat.lat };
         const posicaoProjetada = consultarLinha(evento)
           ? projetarSobreLinhas(posicao)
@@ -336,6 +349,9 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
 
       limparHoverLinha = () => {
         if (!aoMoverSobreLinhaRef.current) return;
+        // Sair do container durante um arrasto não zera o cursor do gesto
+        // (TASK-097): o fantasma já foi limpo no `dragstart`.
+        if (arrastandoRef.current !== null) return;
         mapa.getCanvas().style.cursor = "";
         aoMoverSobreLinhaRef.current(null);
       };
@@ -372,6 +388,10 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
     return () => {
       cancelado = true;
       prontoRef.current = false;
+      // Um arrasto interrompido pelo unmount nunca emite `dragend`: sem esta
+      // limpeza o id ficaria retido e o marcador de mesmo id numa remontagem
+      // deixaria de ser sincronizado para sempre (TASK-097).
+      arrastandoRef.current = null;
       if (limparHoverLinha) {
         container.removeEventListener("mouseleave", limparHoverLinha);
       }
@@ -425,6 +445,10 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
     // Remove marcadores que não estão mais presentes.
     vivos.forEach((marcador, id) => {
       if (!idsDesejados.has(id)) {
+        // Marcador removido no meio do próprio arrasto não emite `dragend`
+        // (TASK-097): liberar o id aqui evita deixar a guarda abaixo ligada
+        // para sempre.
+        if (arrastandoRef.current === id) arrastandoRef.current = null;
         marcador.remove();
         vivos.delete(id);
       }
@@ -434,7 +458,14 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
       const existente = vivos.get(spec.id);
       if (existente) {
         existente.setDraggable(spec.arrastavel ?? false);
-        existente.setLngLat([spec.posicao.lng, spec.posicao.lat]);
+        // Enquanto ESTE marcador está em arrasto, a posição na tela pertence
+        // ao gesto, não à prop (TASK-097; Spec 04 §7.3 itens 4/5/6, RN-052):
+        // `Marker.setLngLat` do MapLibre reposiciona sem checar arrasto, e o
+        // `dragend` passava a ler a coordenada antiga — o gesto virava no-op.
+        // Os demais marcadores seguem sincronizados normalmente neste render.
+        if (arrastandoRef.current !== spec.id) {
+          existente.setLngLat([spec.posicao.lng, spec.posicao.lat]);
+        }
         if (spec.forma === "circulo" || spec.forma === "quadrado") {
           atualizarElementoCustomizado(
             existente.getElement(),
@@ -466,9 +497,32 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
               draggable: spec.arrastavel ?? false,
             });
       marcador.setLngLat([spec.posicao.lng, spec.posicao.lat]).addTo(mapa);
+      // Estado de arrasto derivado dos eventos do próprio `Marker` (TASK-097).
+      marcador.on("dragstart", () => {
+        arrastandoRef.current = spec.id;
+        // Fantasma já desenhado antes do gesto não pode ficar congelado na
+        // tela durante todo o arrasto: limpa uma vez aqui, e o hover volta a
+        // funcionar sozinho no primeiro `mousemove` depois do `dragend`.
+        if (aoMoverSobreLinhaRef.current) {
+          mapa.getCanvas().style.cursor = "";
+          aoMoverSobreLinhaRef.current(null);
+        }
+      });
       marcador.on("dragend", () => {
+        arrastandoRef.current = null;
         const { lng, lat } = marcador.getLngLat();
         const atual = marcadoresRefProp.current.find((m) => m.id === spec.id);
+        // Devolve o marcador à posição da prop ANTES de entregar a coordenada
+        // solta. Se o gesto for aceito, o consumidor comita a posição nova no
+        // mesmo flush do React (antes do paint) e o marcador segue onde foi
+        // solto; se for recusado — 350 m de Seção/Local (DEC-044, RN-027/032)
+        // —, o marcador volta ao lugar antigo mesmo quando a recusa não gera
+        // render (mensagem idêntica à anterior faz o React descartar o
+        // update). Sem isto, a correção acima trocaria a reversão indevida do
+        // gesto legítimo por uma recusa que não reverte.
+        if (atual) {
+          marcador.setLngLat([atual.posicao.lng, atual.posicao.lat]);
+        }
         atual?.aoArrastar?.({ lng, lat });
       });
       // Clique no marcador (sem arrastar) — sincronização mapa→tabela

@@ -72,6 +72,7 @@ interface PropsEditorCapturadas {
   locaisInvalidos?: readonly string[];
   selecaoAtual?: string | null;
   aoSelecionarMarcador?: (chave: string) => void;
+  aoMoverPontoDeRota?: (indice: number, posicao: Coordenada) => void;
 }
 
 const editorCapturado = vi.hoisted<{ props: PropsEditorCapturadas | null }>(() => ({
@@ -339,6 +340,21 @@ async function montarEtapa(
   );
 }
 
+/** Todas as UUIDs de entidade do documento, em ordem estável — base das
+ * asserções de RN-004 (editar coordenada nunca troca identidade). */
+function uuidsDoDocumento(sessao: SessaoFormulario): string[] {
+  if (sessao.modo !== "carregado") return [];
+  const documento = sessao.documento;
+  const uuids = [
+    ...documento.autos.secoes.map((secao) => secao.uuid),
+    ...documento.autos.servicos.flatMap((servico) => [
+      servico.uuid,
+      ...(servico.locais ?? []).map((local) => local.uuid),
+    ]),
+  ];
+  return uuids.sort();
+}
+
 async function removerParada(resultado: ResultadoRenderizacao, indice: number) {
   const botoes = resultado.container.querySelectorAll<HTMLButtonElement>(
     '[data-testid="parada-remover"]',
@@ -533,6 +549,63 @@ describe("EtapaItinerarios — lista lateral intercalada (TASK-079/DEC-060)", ()
 
     expect(resultado.container.querySelector('[data-testid="ponto-rota-item"]')).not.toBeNull();
     expect(resultado.container.querySelector('[data-testid="mensagem-sem-rota"]')).not.toBeNull();
+    resultado.desmontar();
+  });
+
+  // TASK-097 — o defeito corrigido na primitiva fazia o `dragend` entregar a
+  // coordenada ANTIGA; aqui se fixa o outro extremo do caminho: a coordenada
+  // solta atravessa `aoMoverPontoDeRota` e chega ao recálculo (RN-052).
+  test("[TASK-097][RN-052] soltar o vértice recalcula com a coordenada NOVA, preservando as UUIDs", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      json: () =>
+        Promise.resolve({
+          code: "Ok",
+          routes: [
+            {
+              geometry: {
+                type: "LineString",
+                coordinates: [
+                  [-46.3339, -23.9608],
+                  [-46.4025, -24.0084],
+                ],
+              },
+              legs: [
+                { distance: 8000, duration: 1080, steps: [{ name: "Via 1" }] },
+                { distance: 6000, duration: 720, steps: [{ name: "Via 2" }] },
+              ],
+            },
+          ],
+        }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { obterSessao, resultado } = await montarEtapa(1);
+    const chave = chaveItinerario(SERVICO_UUID, "ida");
+    const uuidsAntes = uuidsDoDocumento(obterSessao());
+    fetchMock.mockClear();
+
+    // Coordenada de onde o usuário SOLTOU o vértice, sobre a linha da rota.
+    const solta: Coordenada = { lng: -46.39, lat: -23.985 };
+    act(() => editorCapturado.props?.aoMoverPontoDeRota?.(0, solta));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(obterSessao().pontosDeRotaEmEdicao?.[chave]).toEqual([
+      { apos_parada_ordem: 1, latitude: solta.lat, longitude: solta.lng },
+    ]);
+    // Um único recálculo, com a coordenada nova entre as paradas (RN-051:
+    // ponto de rota entra como pass-through, via `waypoints`).
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain(`${solta.lng},${solta.lat}`);
+    expect(url).not.toContain("-46.38,-23.97");
+    // 3 paradas + 1 ponto de rota após a parada 1: A(0), ponto(1), B(2), C(3).
+    expect(new URL(url).searchParams.get("waypoints")).toBe("0;2;3");
+    // RN-004 — mover coordenada nunca toca identidade de Seção/Local.
+    expect(uuidsDoDocumento(obterSessao())).toEqual(uuidsAntes);
     resultado.desmontar();
   });
 });

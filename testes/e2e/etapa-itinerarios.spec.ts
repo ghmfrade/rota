@@ -607,6 +607,118 @@ test.describe("Etapa Seções, Locais e Itinerários — gesto de ponto de rota 
     );
   });
 
+  // TASK-097 — arrastar o vértice SOBRE a linha era silenciosamente revertido:
+  // o hover (TASK-069/DEC-072) re-renderizava a cada `mousemove` e
+  // `sincronizarMarcadores` devolvia o marcador à posição da prop, de modo que
+  // o `dragend` lia a coordenada antiga e nada recalculava (Spec 04 §7.3 itens
+  // 4/5/6; RN-052).
+  test("TASK-097: arrastar o vértice SOBRE a linha aplica a coordenada solta e recalcula", async ({
+    page,
+  }) => {
+    await page.route("https://router.project-osrm.org/**", (rota) =>
+      rota.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          code: "Ok",
+          routes: [
+            {
+              geometry: {
+                type: "LineString",
+                coordinates: [
+                  [-46.402, -24.0081],
+                  [-46.396, -23.98],
+                  [-46.3915, -23.9629],
+                  [-46.3342, -23.9611],
+                ],
+              },
+              legs: [
+                { distance: 3000, duration: 400, steps: [{ name: "Via forçada" }] },
+                { distance: 3500, duration: 460, steps: [{ name: "Via forçada" }] },
+                { distance: 8000, duration: 1080, steps: [{ name: "Via 2" }] },
+              ],
+            },
+          ],
+        }),
+      }),
+    );
+
+    await abrirEtapaVolta(page);
+
+    const mapa = page.getByTestId("mapa-base");
+    await expect(mapa).toBeVisible();
+    const marcadores = mapa.locator(".maplibregl-marker");
+    await expect(marcadores).toHaveCount(3);
+    await mapa.scrollIntoViewIfNeeded();
+
+    // Mesma aproximação do cenário de criação acima: no zoom inicial os três
+    // marcadores cobrem o segmento inteiro, então amplia-se em torno do meio
+    // do primeiro trecho para expor a linha nua.
+    const caixaInicialA = await marcadores.nth(0).boundingBox();
+    const caixaInicialB = await marcadores.nth(1).boundingBox();
+    if (!caixaInicialA || !caixaInicialB) throw new Error("marcador sem bounding box");
+    const meioInicial = {
+      x: (caixaInicialA.x + caixaInicialA.width / 2 + caixaInicialB.x + caixaInicialB.width / 2) / 2,
+      y: (caixaInicialA.y + caixaInicialA.height / 2 + caixaInicialB.y + caixaInicialB.height / 2) / 2,
+    };
+    await page.mouse.move(meioInicial.x, meioInicial.y);
+    for (let passo = 0; passo < 6; passo += 1) {
+      await page.mouse.wheel(0, -500);
+      await page.waitForTimeout(250);
+    }
+    await page.waitForTimeout(500);
+
+    const caixaA = await marcadores.nth(0).boundingBox();
+    const caixaB = await marcadores.nth(1).boundingBox();
+    if (!caixaA || !caixaB) throw new Error("marcador sem bounding box");
+    const centroA = { x: caixaA.x + caixaA.width / 2, y: caixaA.y + caixaA.height / 2 };
+    const centroB = { x: caixaB.x + caixaB.width / 2, y: caixaB.y + caixaB.height / 2 };
+    const meio = { x: (centroA.x + centroB.x) / 2, y: (centroA.y + centroB.y) / 2 };
+
+    await page.mouse.click(meio.x, meio.y);
+    const linhaPonto = page.getByTestId("tabela-paradas").getByTestId("ponto-rota-item");
+    await expect(linhaPonto).toHaveCount(1);
+    const textoAntes = (await linhaPonto.textContent()) ?? "";
+
+    // O vértice é o único marcador "pequeno" do mapa (DEC-069).
+    const vertice = mapa.locator(".marcador-mapa--pequeno");
+    await expect(vertice).toHaveCount(1);
+    const caixaVertice = await vertice.boundingBox();
+    if (!caixaVertice) throw new Error("vértice sem bounding box");
+    const origem = {
+      x: caixaVertice.x + caixaVertice.width / 2,
+      y: caixaVertice.y + caixaVertice.height / 2,
+    };
+    // Destino AINDA SOBRE a linha (25% em direção à Seção A): o trajeto inteiro
+    // do arrasto passa dentro da tolerância de 6 px do traçado, que é
+    // exatamente a condição que disparava a reversão.
+    const destino = {
+      x: origem.x + (centroA.x - origem.x) * 0.25,
+      y: origem.y + (centroA.y - origem.y) * 0.25,
+    };
+
+    const requisicaoArrasto = page.waitForRequest("**/route/v1/driving/**");
+    await page.mouse.move(origem.x, origem.y);
+    await page.mouse.down();
+    // Vários passos: cada `mousemove` sobre a linha é um re-render do hover —
+    // o mecanismo que revertia o gesto.
+    await page.mouse.move(destino.x, destino.y, { steps: 12 });
+    await page.mouse.up();
+
+    // O soltar recalculou (RN-052) e a coordenada listada mudou: o gesto NÃO
+    // foi revertido.
+    await requisicaoArrasto;
+    await expect(linhaPonto).not.toHaveText(textoAntes);
+    await expect(page.getByTestId("mensagem-sem-rota")).toHaveCount(0);
+    await expect(
+      page.locator(
+        '[data-testid="painel-pendencias"] [data-testid="pendencia-item"][data-severidade="bloqueante"]',
+      ),
+    ).toHaveCount(0);
+    // O gesto move o vértice, nunca o remove nem cria parada nova (RN-042).
+    await expect(linhaPonto).toHaveCount(1);
+    await expect(page.getByTestId("tabela-paradas").getByTestId("parada-item")).toHaveCount(3);
+  });
+
   test("TASK-071: ponto de rota sobrevive a um recálculo que falha; o recálculo seguinte bem-sucedido o reaplica", async ({
     page,
   }) => {

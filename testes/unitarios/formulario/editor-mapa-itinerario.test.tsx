@@ -389,6 +389,24 @@ describe("EditorMapaItinerario — gesto de ponto de rota (TASK-063; Spec 04 §7
     desmontar();
   });
 
+  // TASK-097 — a supressão do hover durante o arrasto mora inteiramente na
+  // primitiva `shared/mapa` (que conhece `dragstart`/`dragend`); aqui se fixa o
+  // lado do consumidor: o fantasma é função EXCLUSIVA de `aoMoverSobreLinha`,
+  // então basta a primitiva não emitir para ele não aparecer. Nenhum sinal de
+  // arrasto atravessa a fronteira dos módulos.
+  it("TASK-097: o gesto de arrasto, por si, não monta fantasma algum", () => {
+    const linha: LinhaMapa = { id: "rota-ativa", pontos: [P0_COORD, P_LONGE] };
+    const { desmontar } = montar({ linhaRota: linha, pontosDeRota: PONTOS_DE_ROTA });
+    const vertice0 = (capturado.props?.marcadores ?? []).find((m) => m.id === "ponto-rota-0");
+
+    act(() => vertice0?.aoArrastar?.({ lng: -50, lat: -22.55 }));
+
+    expect(
+      (capturado.props?.marcadores ?? []).some((m) => m.id === "ponto-rota-fantasma"),
+    ).toBe(false);
+    desmontar();
+  });
+
   it("TASK-079 remove a sub-lista própria sem remover os vértices do mapa", () => {
     const { container, desmontar } = montar({ pontosDeRota: PONTOS_DE_ROTA });
 
