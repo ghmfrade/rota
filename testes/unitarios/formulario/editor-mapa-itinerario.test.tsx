@@ -94,6 +94,7 @@ const LOCAL_BI: Local = {
 function montar(props?: Partial<Parameters<typeof EditorMapaItinerario>[0]>) {
   const aoIniciarCriacaoParada = vi.fn();
   const aoAtualizarSecao = vi.fn();
+  const aoTransladarSecao = vi.fn();
   const aoAtualizarLocal = vi.fn();
   const aoCriarPontoDeRota = vi.fn();
   const aoMoverPontoDeRota = vi.fn();
@@ -107,6 +108,7 @@ function montar(props?: Partial<Parameters<typeof EditorMapaItinerario>[0]>) {
       recursosMunicipio={RECURSOS}
       aoIniciarCriacaoParada={aoIniciarCriacaoParada}
       aoAtualizarSecao={aoAtualizarSecao}
+      aoTransladarSecao={aoTransladarSecao}
       aoAtualizarLocal={aoAtualizarLocal}
       aoCriarPontoDeRota={aoCriarPontoDeRota}
       aoMoverPontoDeRota={aoMoverPontoDeRota}
@@ -118,6 +120,7 @@ function montar(props?: Partial<Parameters<typeof EditorMapaItinerario>[0]>) {
     ...utils,
     aoIniciarCriacaoParada,
     aoAtualizarSecao,
+    aoTransladarSecao,
     aoAtualizarLocal,
     aoCriarPontoDeRota,
     aoMoverPontoDeRota,
@@ -265,12 +268,12 @@ describe("EditorMapaItinerario — roteamento do gesto (DEC-055/TASK-065)", () =
 });
 
 describe("EditorMapaItinerario — casos inválidos (comportamento preservado)", () => {
-  it("arrasto de Seção além de 350 m: recusa e NENHUM aoAtualizarSecao", () => {
+  it("arrasto de Seção pelo botão DIREITO (ponto único) além de 350 m: recusa e NENHUM aoAtualizarSecao (DEC-044/079)", () => {
     const { container, aoAtualizarSecao, desmontar } = montar();
     const marcadorSecao = (capturado.props?.marcadores ?? []).find(
       (m) => m.id === `secao-${SECAO_DUPLA.uuid}`,
     );
-    act(() => marcadorSecao?.aoArrastar?.(P_LONGE));
+    act(() => marcadorSecao?.aoArrastarComBotaoDireito?.(P_LONGE));
 
     expect(aoAtualizarSecao).not.toHaveBeenCalled();
     expect(container.querySelector('[data-testid="mensagem-recusa-secao"]')).not.toBeNull();
@@ -414,6 +417,103 @@ describe("EditorMapaItinerario — gesto de ponto de rota (TASK-063; Spec 04 §7
     expect(container.querySelector('[data-testid="ponto-rota-item"]')).toBeNull();
     expect(container.querySelector('[data-testid="tabela-paradas"]')).toBeNull();
     expect((capturado.props?.marcadores ?? []).filter((m) => m.id.startsWith("ponto-rota-"))).toHaveLength(2);
+    desmontar();
+  });
+});
+
+// TASK-078 (DEC-061/079) — o botão do mouse distingue o gesto sobre o
+// marcador de Seção: esquerdo (`aoArrastar`, arrasto nativo) move a Seção
+// INTEIRA (translação rígida); direito (`aoArrastarComBotaoDireito`, coberto
+// acima) continua movendo só o ponto do Serviço/sentido corrente (DEC-044).
+describe("EditorMapaItinerario — translação de Seção pelo botão esquerdo (TASK-078; DEC-061/079)", () => {
+  const DESTINO: Coordenada = { lng: -55, lat: -25 }; // dentro do polígono demo
+  const VETOR = { latitude: -25 - P0.latitude, longitude: -55 - P0.longitude };
+
+  it("translada TODOS os pontos do cluster (2 Serviços) pelo MESMO vetor e chama aoTransladarSecao", () => {
+    const { aoTransladarSecao, aoAtualizarSecao, desmontar } = montar();
+    const marcadorSecao = (capturado.props?.marcadores ?? []).find(
+      (m) => m.id === `secao-${SECAO_DUPLA.uuid}`,
+    );
+
+    act(() => marcadorSecao?.aoArrastar?.(DESTINO));
+
+    expect(aoTransladarSecao).toHaveBeenCalledTimes(1);
+    expect(aoAtualizarSecao).not.toHaveBeenCalled();
+    const secaoTransladada = aoTransladarSecao.mock.calls[0][0] as Secao;
+    expect(secaoTransladada.uuid).toBe(SECAO_DUPLA.uuid);
+    for (const entrada of secaoTransladada.servicos) {
+      expect(entrada.geolocalizacao_ida).toEqual({
+        latitude: P0.latitude + VETOR.latitude,
+        longitude: P0.longitude + VETOR.longitude,
+      });
+    }
+    desmontar();
+  });
+
+  it("[inválido] soltar sem deslocamento efetivo (vetor nulo) não chama aoTransladarSecao — sem efeito", () => {
+    const { aoTransladarSecao, desmontar } = montar();
+    const marcadorSecao = (capturado.props?.marcadores ?? []).find(
+      (m) => m.id === `secao-${SECAO_DUPLA.uuid}`,
+    );
+
+    act(() => marcadorSecao?.aoArrastar?.(P0_COORD));
+
+    expect(aoTransladarSecao).not.toHaveBeenCalled();
+    desmontar();
+  });
+
+  it("[inválido] destino fora de SP recusa a translação INTEIRA — nenhuma chamada, mensagem exibida", () => {
+    const { container, aoTransladarSecao, desmontar } = montar();
+    const marcadorSecao = (capturado.props?.marcadores ?? []).find(
+      (m) => m.id === `secao-${SECAO_DUPLA.uuid}`,
+    );
+
+    act(() => marcadorSecao?.aoArrastar?.({ lng: 80, lat: 80 }));
+
+    expect(aoTransladarSecao).not.toHaveBeenCalled();
+    expect(container.querySelector('[data-testid="mensagem-recusa-secao"]')).not.toBeNull();
+    desmontar();
+  });
+
+  it("[inválido] sem aoTransladarSecao, o arrasto pelo botão esquerdo não lança erro", () => {
+    const { desmontar } = montar({ aoTransladarSecao: undefined });
+    const marcadorSecao = (capturado.props?.marcadores ?? []).find(
+      (m) => m.id === `secao-${SECAO_DUPLA.uuid}`,
+    );
+
+    expect(() => act(() => marcadorSecao?.aoArrastar?.(DESTINO))).not.toThrow();
+    desmontar();
+  });
+
+  it("revela os demais pontos do cluster em cor neutra ao iniciar o arrasto, e some ao finalizar", () => {
+    const { desmontar } = montar();
+    const marcadorSecao = (capturado.props?.marcadores ?? []).find(
+      (m) => m.id === `secao-${SECAO_DUPLA.uuid}`,
+    );
+
+    expect(
+      (capturado.props?.marcadores ?? []).some((m) => m.id.startsWith("secao-cluster-")),
+    ).toBe(false);
+
+    act(() => marcadorSecao?.aoIniciarArrasto?.());
+
+    const clusters = (capturado.props?.marcadores ?? []).filter((m) =>
+      m.id.startsWith("secao-cluster-"),
+    );
+    // Só o ponto do OUTRO Serviço aparece — o Serviço/sentido corrente já é o
+    // próprio marcador ativo (não se duplica).
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0]).toMatchObject({
+      posicao: P0_COORD,
+      forma: "quadrado",
+      fantasma: true,
+    });
+    expect(clusters[0].cor).not.toBe(COR_SECAO);
+
+    act(() => marcadorSecao?.aoFinalizarArrasto?.());
+    expect(
+      (capturado.props?.marcadores ?? []).some((m) => m.id.startsWith("secao-cluster-")),
+    ).toBe(false);
     desmontar();
   });
 });

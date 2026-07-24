@@ -59,6 +59,14 @@ vi.mock("maplibre-gl", () => ({
       return this.canvas;
     }
 
+    // Identidade (sem escala) — suficiente para os testes do arrasto por
+    // botão direito (TASK-078): o container do teste tem
+    // `getBoundingClientRect()` zerado (jsdom), então o pixel do evento vira
+    // a lngLat diretamente, facilitando as asserções.
+    unproject([x, y]: [number, number]) {
+      return { lng: x, lat: y };
+    }
+
     remove() {}
   },
   // O dublê de `Marker` registra os handlers (`dragstart`/`dragend`) e grava
@@ -667,6 +675,177 @@ describe("Mapa — arrasto não é revertido pelo re-render (TASK-097; RN-052)",
       [1, 1],
       [2, 3],
     ]);
+    resultado.desmontar();
+  });
+});
+
+// TASK-078 (DEC-079) — o botão do mouse distingue o gesto sobre um marcador
+// de Seção: esquerdo (nativo do MapLibre) continua chamando `aoArrastar`;
+// direito é um segundo arrasto, implementado aqui do zero (o MapLibre só
+// arrasta nativamente no botão esquerdo), com supressão do `contextmenu`
+// nativo e cancelamento por `Esc` — igual ao gesto nativo.
+describe("Mapa — arrasto por botão direito (TASK-078; DEC-079)", () => {
+  const M: MarcadorMapa = {
+    id: "secao-1",
+    posicao: { lng: 10, lat: 20 },
+    forma: "quadrado",
+    arrastavel: true,
+  };
+
+  async function montarComMarcador(marcador: MarcadorMapa) {
+    dublê.marcadores.length = 0;
+    const resultado = renderizar(<Mapa marcadores={[marcador]} />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    act(() => dublê.instancia?.handlers.get("load")?.(EVENTO));
+    return resultado;
+  }
+
+  function arrastarComBotaoDireito(elemento: HTMLElement, de: [number, number], para: [number, number]) {
+    act(() => {
+      elemento.dispatchEvent(
+        new MouseEvent("mousedown", { button: 2, clientX: de[0], clientY: de[1], bubbles: true }),
+      );
+    });
+    act(() => {
+      document.dispatchEvent(
+        new MouseEvent("mousemove", { clientX: para[0], clientY: para[1] }),
+      );
+    });
+    act(() => {
+      document.dispatchEvent(new MouseEvent("mouseup", { clientX: para[0], clientY: para[1] }));
+    });
+  }
+
+  test("botão direito entrega a posição solta via `aoArrastarComBotaoDireito`, sem chamar `aoArrastar`", async () => {
+    const aoArrastar = vi.fn();
+    const aoArrastarComBotaoDireito = vi.fn();
+    const resultado = await montarComMarcador({ ...M, aoArrastar, aoArrastarComBotaoDireito });
+    const elemento = dublê.marcadores[0].elemento;
+
+    arrastarComBotaoDireito(elemento, [10, 20], [40, 60]);
+
+    expect(aoArrastarComBotaoDireito).toHaveBeenCalledWith({ lng: 40, lat: 60 });
+    expect(aoArrastar).not.toHaveBeenCalled();
+    resultado.desmontar();
+  });
+
+  test("botão esquerdo (arrasto nativo) não é afetado por `aoArrastarComBotaoDireito` presente — continua chamando `aoArrastar`", async () => {
+    const aoArrastar = vi.fn();
+    const aoArrastarComBotaoDireito = vi.fn();
+    const resultado = await montarComMarcador({ ...M, aoArrastar, aoArrastarComBotaoDireito });
+    const arrastado = dublê.marcadores[0];
+
+    act(() => arrastado.handlers.get("dragstart")?.());
+    arrastado.posicao = [99, 99];
+    act(() => arrastado.handlers.get("dragend")?.());
+
+    expect(aoArrastar).toHaveBeenCalledWith({ lng: 99, lat: 99 });
+    expect(aoArrastarComBotaoDireito).not.toHaveBeenCalled();
+    resultado.desmontar();
+  });
+
+  test("mousedown com botão direito é ignorado quando o marcador não tem `aoArrastarComBotaoDireito`", async () => {
+    const resultado = await montarComMarcador(M);
+    const elemento = dublê.marcadores[0].elemento;
+
+    expect(() => arrastarComBotaoDireito(elemento, [10, 20], [40, 60])).not.toThrow();
+    resultado.desmontar();
+  });
+
+  test("`contextmenu` nativo é suprimido sobre um marcador com `aoArrastarComBotaoDireito` (risco técnico da task)", async () => {
+    const resultado = await montarComMarcador({ ...M, aoArrastarComBotaoDireito: vi.fn() });
+    const elemento = dublê.marcadores[0].elemento;
+
+    const evento = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    act(() => {
+      elemento.dispatchEvent(evento);
+    });
+
+    expect(evento.defaultPrevented).toBe(true);
+    resultado.desmontar();
+  });
+
+  test("[inválido] `contextmenu` NÃO é suprimido sobre marcador sem `aoArrastarComBotaoDireito` (não colide com o menu do mapa — DEC-055)", async () => {
+    const resultado = await montarComMarcador(M);
+    const elemento = dublê.marcadores[0].elemento;
+
+    const evento = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    act(() => {
+      elemento.dispatchEvent(evento);
+    });
+
+    expect(evento.defaultPrevented).toBe(false);
+    resultado.desmontar();
+  });
+
+  test("`aoIniciarArrasto`/`aoFinalizarArrasto` acompanham o arrasto nativo (esquerdo) do início ao fim", async () => {
+    const aoIniciarArrasto = vi.fn();
+    const aoFinalizarArrasto = vi.fn();
+    const resultado = await montarComMarcador({ ...M, aoIniciarArrasto, aoFinalizarArrasto });
+    const arrastado = dublê.marcadores[0];
+
+    act(() => arrastado.handlers.get("dragstart")?.());
+    expect(aoIniciarArrasto).toHaveBeenCalledTimes(1);
+    expect(aoFinalizarArrasto).not.toHaveBeenCalled();
+
+    act(() => arrastado.handlers.get("dragend")?.());
+    expect(aoFinalizarArrasto).toHaveBeenCalledTimes(1);
+    resultado.desmontar();
+  });
+
+  test("`Esc` durante o arrasto nativo cancela: reverte a posição e NÃO chama `aoArrastar` (mas chama `aoFinalizarArrasto`)", async () => {
+    const aoArrastar = vi.fn();
+    const aoFinalizarArrasto = vi.fn();
+    const resultado = await montarComMarcador({ ...M, aoArrastar, aoFinalizarArrasto });
+    const arrastado = dublê.marcadores[0];
+
+    act(() => arrastado.handlers.get("dragstart")?.());
+    arrastado.posicao = [999, 999];
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+    // O `keydown` já reverte a posição visual imediatamente.
+    expect(arrastado.posicao).toEqual([10, 20]);
+
+    act(() => arrastado.handlers.get("dragend")?.());
+
+    expect(aoArrastar).not.toHaveBeenCalled();
+    expect(aoFinalizarArrasto).toHaveBeenCalledTimes(1);
+    expect(arrastado.posicao).toEqual([10, 20]);
+    resultado.desmontar();
+  });
+
+  test("`Esc` durante o arrasto por botão DIREITO cancela: NÃO chama `aoArrastarComBotaoDireito`", async () => {
+    const aoArrastarComBotaoDireito = vi.fn();
+    const resultado = await montarComMarcador({ ...M, aoArrastarComBotaoDireito });
+    const elemento = dublê.marcadores[0].elemento;
+
+    act(() => {
+      elemento.dispatchEvent(
+        new MouseEvent("mousedown", { button: 2, clientX: 10, clientY: 20, bubbles: true }),
+      );
+    });
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+    act(() => {
+      document.dispatchEvent(new MouseEvent("mouseup", { clientX: 77, clientY: 88 }));
+    });
+
+    expect(aoArrastarComBotaoDireito).not.toHaveBeenCalled();
+    resultado.desmontar();
+  });
+
+  test("[inválido] `Esc` sem arrasto em curso não lança e não afeta nada", async () => {
+    const resultado = await montarComMarcador(M);
+    expect(() =>
+      act(() => {
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      }),
+    ).not.toThrow();
     resultado.desmontar();
   });
 });

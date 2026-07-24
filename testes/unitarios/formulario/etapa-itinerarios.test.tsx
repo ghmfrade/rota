@@ -64,11 +64,13 @@ vi.mock("@/shared/dados-estaticos", () => ({
 // `aoCriarLocal`) — o filho só REPORTA a intenção via `aoIniciarCriacaoParada`;
 // quem cria e confirma é o host, através da linha-formulário real na tabela.
 interface PropsEditorCapturadas {
+  secoes?: readonly Secao[];
   aoIniciarCriacaoParada: (
     tipo: "secao" | "local",
     posicao: Coordenada,
     posicaoNaLinha?: Coordenada,
   ) => void;
+  aoTransladarSecao?: (secao: Secao) => void;
   locaisInvalidos?: readonly string[];
   selecaoAtual?: string | null;
   aoSelecionarMarcador?: (chave: string) => void;
@@ -1599,6 +1601,163 @@ describe("EtapaItinerarios — espelhamento Ida↔Volta (TASK-077; DEC-063/071)"
     const voltaPromovida = servicoPromovido?.itinerarios.find((i) => i.sentido === "volta");
     expect(idaPromovida?.paradas.map((p) => p.secao_uuid)).toEqual([SECAO_A_UUID, SECAO_B_UUID]);
     expect(voltaPromovida?.paradas.map((p) => p.secao_uuid)).toEqual([SECAO_B_UUID, SECAO_A_UUID]);
+
+    resultado.desmontar();
+  });
+});
+
+// TASK-078 (DEC-061/079) — translação rígida de uma Seção inteira dispara a
+// CASCATA de recálculo de TODOS os itinerários (de TODOS os Serviços,
+// completos e em construção, Ida e Volta) que referenciam a Seção — não só o
+// Serviço/sentido em foco na etapa (o `EditorMapaItinerario`, mockado aqui,
+// só relata a translação via `aoTransladarSecao`; o host resolve a cascata).
+// Fixture `bidirecional-multi-servico`: a Seção "1111" (Terminal Santos) é
+// contribuída pelos DOIS Serviços (Ida+Volta); a Seção "3333" (Rodoviária
+// Praia Grande) só pelo Serviço A (Ida+Volta) — usada para provar que a
+// cascata é SELETIVA (só recalcula quem referencia a Seção transladada).
+describe("EtapaItinerarios — cascata de translação de Seção (TASK-078; DEC-061/079)", () => {
+  const SERVICO_A_UUID = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
+  const SERVICO_B_UUID = "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb";
+  const SECAO_SO_SERVICO_A_UUID = "33333333-3333-4333-8333-333333333333";
+
+  function transladar(secao: Secao, deltaLat: number, deltaLon: number): Secao {
+    return {
+      ...secao,
+      servicos: secao.servicos.map((s) => ({
+        ...s,
+        geolocalizacao_ida: s.geolocalizacao_ida && {
+          latitude: s.geolocalizacao_ida.latitude + deltaLat,
+          longitude: s.geolocalizacao_ida.longitude + deltaLon,
+        },
+        geolocalizacao_volta: s.geolocalizacao_volta && {
+          latitude: s.geolocalizacao_volta.latitude + deltaLat,
+          longitude: s.geolocalizacao_volta.longitude + deltaLon,
+        },
+      })),
+    };
+  }
+
+  async function montarBidirecionalMultiServico() {
+    const { documentoBidirecionalMultiServico } = await import("../../fixtures");
+    const documento = documentoBidirecionalMultiServico();
+    return montarSessaoNaEtapa(
+      { modo: "carregado", documento, alertasImportacao: [] },
+      SERVICO_A_UUID,
+      "ida",
+    );
+  }
+
+  test("translação de Seção usada por 2 Serviços (Ida+Volta) recalcula os 4 itinerários — 4 chamadas OSRM", async () => {
+    vi.stubGlobal("fetch", respostaOsrmGenericaMock());
+    const { obterSessao, resultado } = await montarBidirecionalMultiServico();
+    const sessaoInicial = obterSessao() as Extract<SessaoFormulario, { modo: "carregado" }>;
+    const secaoOriginal = sessaoInicial.documento.autos.secoes.find(
+      (s) => s.uuid === "11111111-1111-4111-8111-111111111111",
+    )!;
+    const secaoTransladada = transladar(secaoOriginal, 0.001, 0.001);
+
+    await act(async () => {
+      editorCapturado.props?.aoTransladarSecao?.(secaoTransladada);
+      await flush(20);
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(4);
+
+    const sessaoFinal = obterSessao();
+    if (sessaoFinal.modo !== "carregado") throw new Error("sessão não carregada");
+    const secaoFinal = sessaoFinal.documento.autos.secoes.find(
+      (s) => s.uuid === secaoOriginal.uuid,
+    )!;
+    // UUID da Seção e de cada `servico_uuid` preservados (RN-004/007).
+    expect(secaoFinal.uuid).toBe(secaoOriginal.uuid);
+    expect(secaoFinal.servicos.map((s) => s.servico_uuid).sort()).toEqual(
+      secaoOriginal.servicos.map((s) => s.servico_uuid).sort(),
+    );
+    // Geolocalizações refletem a translação (não a original).
+    expect(secaoFinal.servicos[0].geolocalizacao_ida).toEqual(
+      secaoTransladada.servicos.find(
+        (s) => s.servico_uuid === secaoFinal.servicos[0].servico_uuid,
+      )?.geolocalizacao_ida,
+    );
+
+    resultado.desmontar();
+  });
+
+  test("translação de Seção usada só pelo Serviço A recalcula APENAS os itinerários do Serviço A — 2 chamadas OSRM, Serviço B intocado", async () => {
+    vi.stubGlobal("fetch", respostaOsrmGenericaMock());
+    const { obterSessao, resultado } = await montarBidirecionalMultiServico();
+    const sessaoInicial = obterSessao() as Extract<SessaoFormulario, { modo: "carregado" }>;
+    const secaoOriginal = sessaoInicial.documento.autos.secoes.find(
+      (s) => s.uuid === SECAO_SO_SERVICO_A_UUID,
+    )!;
+    const rotaServicoAIdaAntes = sessaoInicial.documento.autos.servicos
+      .find((s) => s.uuid === SERVICO_A_UUID)!
+      .itinerarios.find((i) => i.sentido === "ida")!.rota;
+    const rotaServicoBIdaAntes = sessaoInicial.documento.autos.servicos
+      .find((s) => s.uuid === SERVICO_B_UUID)!
+      .itinerarios.find((i) => i.sentido === "ida")!.rota;
+    const secaoTransladada = transladar(secaoOriginal, 0.001, 0.001);
+
+    await act(async () => {
+      editorCapturado.props?.aoTransladarSecao?.(secaoTransladada);
+      await flush(20);
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+
+    const sessaoFinal = obterSessao();
+    if (sessaoFinal.modo !== "carregado") throw new Error("sessão não carregada");
+    const servicoA = sessaoFinal.documento.autos.servicos.find((s) => s.uuid === SERVICO_A_UUID)!;
+    const servicoB = sessaoFinal.documento.autos.servicos.find((s) => s.uuid === SERVICO_B_UUID)!;
+    // Serviço A: os DOIS sentidos recalcularam (a Seção está nos dois) — a
+    // rota nova difere da original (RN-052).
+    expect(servicoA.itinerarios.find((i) => i.sentido === "ida")!.rota).not.toEqual(
+      rotaServicoAIdaAntes,
+    );
+    expect(servicoA.itinerarios.find((i) => i.sentido === "volta")!.rota).toBeDefined();
+    // Serviço B não referencia a Seção transladada: rota intocada.
+    expect(servicoB.itinerarios.find((i) => i.sentido === "ida")!.rota).toEqual(
+      rotaServicoBIdaAntes,
+    );
+
+    resultado.desmontar();
+  });
+
+  test("[inválido] uma falha de OSRM num itinerário da cascata não impede os demais (RN-048)", async () => {
+    // O cliente OSRM faz 1 retry automático por falha de rede (`cliente-osrm.ts`
+    // §3.5) — falhar as DUAS tentativas do 1º itinerário da cascata garante que
+    // ELE (e só ele) termine em `sem-rota`, provando que a falha não propaga.
+    let chamada = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((...args: Parameters<typeof fetch>) => {
+        chamada += 1;
+        if (chamada <= 2) return Promise.reject(new Error("falha de rede simulada"));
+        return respostaOsrmGenericaMock()(...args);
+      }),
+    );
+    const { obterSessao, resultado } = await montarBidirecionalMultiServico();
+    const sessaoInicial = obterSessao() as Extract<SessaoFormulario, { modo: "carregado" }>;
+    const secaoOriginal = sessaoInicial.documento.autos.secoes.find(
+      (s) => s.uuid === "11111111-1111-4111-8111-111111111111",
+    )!;
+    const secaoTransladada = transladar(secaoOriginal, 0.001, 0.001);
+
+    await act(async () => {
+      editorCapturado.props?.aoTransladarSecao?.(secaoTransladada);
+      await flush(20);
+    });
+
+    // 4 itinerários × 1 tentativa, mais 1 retry do 1º (2 tentativas): 5.
+    expect(fetch).toHaveBeenCalledTimes(5);
+    const sessaoFinal = obterSessao();
+    // A sessão segue viva (nenhum crash interrompe a cascata inteira) — ao
+    // menos um itinerário completou o recálculo apesar da 1ª falha, e ao
+    // menos um ficou `sem-rota` (RN-048: sem apagar a última rota válida —
+    // aqui não havia uma prévia, então o itinerário simplesmente não grava).
+    const estados = Object.values(sessaoFinal.estadosRotaViva ?? {});
+    expect(estados.some((e) => e.situacao === "recalculada")).toBe(true);
+    expect(estados.some((e) => e.situacao === "sem-rota")).toBe(true);
 
     resultado.desmontar();
   });

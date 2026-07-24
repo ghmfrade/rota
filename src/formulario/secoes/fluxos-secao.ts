@@ -241,6 +241,56 @@ export type ResultadoArrasto =
  * a Seção; quem quer uma Seção nova usa o fluxo normal de clique. Por isso
  * `nomeSecao` serve só para compor a mensagem, não uma oferta.
  */
+// ---------------------------------------------------------------------------
+// 4) Realocar a Seção inteira — translação rígida (Spec 04 §7.1; DEC-061/079;
+//    RN-004, RN-027, RN-029, RN-052)
+// ---------------------------------------------------------------------------
+
+export interface EntradaTransladarSecao extends RecursosMunicipio {
+  secao: Secao;
+  vetor: Ponto;
+}
+
+export type ResultadoTransladarSecao =
+  | { ok: true; secao: Secao }
+  | { ok: false; motivo: "fora_de_sp" };
+
+/**
+ * Arrasto com o botão ESQUERDO de um marcador de Seção (DEC-079, superando o
+ * mecanismo de "modo" da DEC-061): move TODOS os pontos já contribuídos à
+ * Seção (todas as entradas de `secao.servicos[]`, Ida e Volta) pelo MESMO
+ * vetor — translação rígida. As distâncias entre os pontos do cluster não
+ * mudam, então o invariante dos 350 m (RN-027) é preservado por construção,
+ * sem checagem: só o município (RN-029, re-derivado do novo centroide) pode
+ * recusar, e só a Seção inteira (destino fora de SP → nenhum ponto se move).
+ * `secao.uuid` e cada `servico_uuid` de `secao.servicos[]` são preservados
+ * (RN-004) — a operação nunca cria nem descarta entradas.
+ */
+export function transladarSecao(entrada: EntradaTransladarSecao): ResultadoTransladarSecao {
+  const transladar = (ponto: Ponto): Ponto => ({
+    latitude: ponto.latitude + entrada.vetor.latitude,
+    longitude: ponto.longitude + entrada.vetor.longitude,
+  });
+
+  const servicos: SecaoServico[] = entrada.secao.servicos.map((s) => ({
+    servico_uuid: s.servico_uuid,
+    geolocalizacao_ida: s.geolocalizacao_ida ? transladar(s.geolocalizacao_ida) : undefined,
+    geolocalizacao_volta: s.geolocalizacao_volta ? transladar(s.geolocalizacao_volta) : undefined,
+  }));
+
+  const clusterResultante = coletarPontos({ ...entrada.secao, servicos });
+  const municipio = derivarMunicipio(
+    pontoDecisorSecao(clusterResultante),
+    entrada.features,
+    entrada.nomes,
+  );
+  if (!municipio.encontrado) {
+    return { ok: false, motivo: "fora_de_sp" };
+  }
+
+  return { ok: true, secao: { ...entrada.secao, servicos, municipio: municipio.nome } };
+}
+
 export function revalidarArrasto(entrada: EntradaRevalidarArrasto): ResultadoArrasto {
   const pontosSemAlvo = coletarPontos(entrada.secao, {
     servicoUuid: entrada.servicoUuid,

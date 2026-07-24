@@ -64,7 +64,29 @@ export interface MarcadorMapa {
    * de `invalido` (outline em vez de borda), para que os dois coexistam sem
    * que um mascare o outro (DEC-070). Nunca persistido (RN-096). */
   selecionado?: boolean;
+  /** Solto ao final do arrasto NATIVO do marcador (botão ESQUERDO — o único
+   * que o MapLibre arrasta nativamente), com a posição nova. */
   aoArrastar?: (posicao: Coordenada) => void;
+  /**
+   * Arrasto com o botão DIREITO (TASK-078; DEC-079) — gesto independente do
+   * nativo acima, pois o MapLibre só arrasta marcadores no botão esquerdo.
+   * Opt-in: presente ⇒ o `mousedown` com botão direito sobre o marcador
+   * inicia um arrasto próprio (tracking de `mousemove`/`mouseup` no
+   * documento) que entrega a posição solta aqui, e o `contextmenu` nativo do
+   * navegador fica suprimido sobre este marcador (não interfere no
+   * `contextmenu` do mapa — DEC-055 — que só existe sobre a linha/mapa
+   * vazio, superfície distinta). Ausente: nenhum gesto adicional no botão
+   * direito, comportamento de hoje.
+   */
+  aoArrastarComBotaoDireito?: (posicao: Coordenada) => void;
+  /** Início do arrasto NATIVO (botão esquerdo) — opt-in, usado pelo
+   * consumidor para exibir UI efêmera durante o gesto (ex.: os demais pontos
+   * do cluster de uma Seção em cor neutra, TASK-078/DEC-079). */
+  aoIniciarArrasto?: () => void;
+  /** Fim do arrasto NATIVO (botão esquerdo) — sempre chamado ao soltar,
+   * inclusive em cancelamento (`Esc`/sem deslocamento), para o consumidor
+   * encerrar a UI efêmera aberta em `aoIniciarArrasto`. */
+  aoFinalizarArrasto?: () => void;
   /** Clicar no marcador (não arrastar) — sincronização de seleção mapa→tabela
    * (TASK-064). Opt-in: sem esta prop, o marcador não reage a clique. */
   aoSelecionar?: () => void;
@@ -221,6 +243,14 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
   // `mousemove` que reposicionava o marcador em pleno gesto. `null` = nenhum
   // arrasto em curso. Efêmero, nunca exportado (RN-096).
   const arrastandoRef = useRef<string | null>(null);
+  // Cancelamento por `Esc` do arrasto em curso (TASK-078; DEC-079: "soltar
+  // sem deslocamento efetivo, ou Esc durante o arrasto, cancela e restaura
+  // as posições originais sem efeito"). Setado no `keydown`, consumido no
+  // fim do gesto (`dragend` nativo ou `mouseup` do arrasto por botão
+  // direito) — o marcador já é revertido à posição da prop nos dois pontos
+  // de término (mesmo padrão de reversão da TASK-097), então cancelar aqui
+  // só precisa suprimir a chamada ao callback do domínio.
+  const canceladoRef = useRef(false);
 
   // Refs de props usadas dentro de handlers do mapa, para sempre chamar a
   // versão mais recente sem reassinar os listeners.
@@ -264,6 +294,22 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
 
     // Cópia estável do Map de marcadores vivos, para uso seguro na limpeza.
     const marcadoresVivos = marcadoresRef.current;
+
+    // `Esc` cancela o arrasto em curso, qualquer que seja o botão (TASK-078;
+    // DEC-079) — reverte o marcador à posição da prop e marca o cancelamento
+    // para o handler de fim de gesto suprimir o callback do domínio.
+    const aoTeclaEsc = (evento: KeyboardEvent) => {
+      if (evento.key !== "Escape") return;
+      const id = arrastandoRef.current;
+      if (id === null) return;
+      const marcador = marcadoresRef.current.get(id);
+      const atual = marcadoresRefProp.current.find((m) => m.id === id);
+      if (marcador && atual) {
+        marcador.setLngLat([atual.posicao.lng, atual.posicao.lat]);
+      }
+      canceladoRef.current = true;
+    };
+    document.addEventListener("keydown", aoTeclaEsc);
 
     void (async () => {
       const maplibregl = await import("maplibre-gl");
@@ -397,6 +443,7 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
       // limpeza o id ficaria retido e o marcador de mesmo id numa remontagem
       // deixaria de ser sincronizado para sempre (TASK-097).
       arrastandoRef.current = null;
+      document.removeEventListener("keydown", aoTeclaEsc);
       if (limparHoverLinha) {
         container.removeEventListener("mouseleave", limparHoverLinha);
       }
@@ -503,8 +550,10 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
             });
       marcador.setLngLat([spec.posicao.lng, spec.posicao.lat]).addTo(mapa);
       // Estado de arrasto derivado dos eventos do próprio `Marker` (TASK-097).
+      // O MapLibre só arrasta nativamente no botão ESQUERDO.
       marcador.on("dragstart", () => {
         arrastandoRef.current = spec.id;
+        canceladoRef.current = false;
         // Fantasma já desenhado antes do gesto não pode ficar congelado na
         // tela durante todo o arrasto: limpa uma vez aqui, e o hover volta a
         // funcionar sozinho no primeiro `mousemove` depois do `dragend`.
@@ -512,9 +561,12 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
           mapa.getCanvas().style.cursor = "";
           aoMoverSobreLinhaRef.current(null);
         }
+        marcadoresRefProp.current.find((m) => m.id === spec.id)?.aoIniciarArrasto?.();
       });
       marcador.on("dragend", () => {
         arrastandoRef.current = null;
+        const cancelado = canceladoRef.current;
+        canceladoRef.current = false;
         const { lng, lat } = marcador.getLngLat();
         const atual = marcadoresRefProp.current.find((m) => m.id === spec.id);
         // Devolve o marcador à posição da prop ANTES de entregar a coordenada
@@ -528,7 +580,71 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
         if (atual) {
           marcador.setLngLat([atual.posicao.lng, atual.posicao.lat]);
         }
+        atual?.aoFinalizarArrasto?.();
+        // `Esc` cancelado (TASK-078/DEC-079): a posição já foi revertida
+        // acima (e, antes disso, no `keydown`) — só falta suprimir o
+        // callback de domínio, exatamente como "soltar sem deslocamento".
+        if (cancelado) return;
         atual?.aoArrastar?.({ lng, lat });
+      });
+      // Arrasto com o botão DIREITO (TASK-078; DEC-079) — opt-in via
+      // `aoArrastarComBotaoDireito`. O MapLibre não oferece esse gesto
+      // nativamente (só arrasta no botão esquerdo), então o `mousedown`/
+      // `mousemove`/`mouseup` são tratados aqui, reaproveitando o MESMO
+      // `arrastandoRef` (TASK-097) para suspender o hover da linha e a
+      // reconciliação por prop deste marcador enquanto o gesto está ativo.
+      marcador.getElement().addEventListener("mousedown", (evento) => {
+        if (evento.button !== 2) return;
+        const atual = marcadoresRefProp.current.find((m) => m.id === spec.id);
+        if (!atual?.aoArrastarComBotaoDireito) return;
+        evento.preventDefault();
+        arrastandoRef.current = spec.id;
+        canceladoRef.current = false;
+        if (aoMoverSobreLinhaRef.current) {
+          mapa.getCanvas().style.cursor = "";
+          aoMoverSobreLinhaRef.current(null);
+        }
+
+        const converterParaLngLat = (clientX: number, clientY: number): Coordenada => {
+          const retangulo = containerRef.current!.getBoundingClientRect();
+          const ponto = mapa.unproject([clientX - retangulo.left, clientY - retangulo.top]);
+          return { lng: ponto.lng, lat: ponto.lat };
+        };
+
+        const aoMover = (eventoMove: MouseEvent) => {
+          const posicao = converterParaLngLat(eventoMove.clientX, eventoMove.clientY);
+          marcador.setLngLat([posicao.lng, posicao.lat]);
+        };
+        const aoSoltar = (eventoUp: MouseEvent) => {
+          document.removeEventListener("mousemove", aoMover);
+          document.removeEventListener("mouseup", aoSoltar);
+          arrastandoRef.current = null;
+          const cancelado = canceladoRef.current;
+          canceladoRef.current = false;
+          const posicaoFinal = converterParaLngLat(eventoUp.clientX, eventoUp.clientY);
+          const atualNoSolto = marcadoresRefProp.current.find((m) => m.id === spec.id);
+          // Mesma reversão do `dragend` nativo acima — o marcador sempre
+          // volta à posição da prop antes de entregar a coordenada solta.
+          if (atualNoSolto) {
+            marcador.setLngLat([atualNoSolto.posicao.lng, atualNoSolto.posicao.lat]);
+          }
+          if (cancelado) return;
+          atualNoSolto?.aoArrastarComBotaoDireito?.(posicaoFinal);
+        };
+        document.addEventListener("mousemove", aoMover);
+        document.addEventListener("mouseup", aoSoltar);
+      });
+      // Suprime o `contextmenu` nativo do navegador sobre este marcador
+      // (risco técnico central da TASK-078/Q-057): sem isto, soltar o botão
+      // direito abriria o menu do navegador em vez de só confirmar o
+      // arrasto acima. Não intercepta o `contextmenu` do MAPA (DEC-055),
+      // que só dispara sobre a linha/mapa vazio — superfície distinta de um
+      // marcador já existente.
+      marcador.getElement().addEventListener("contextmenu", (evento) => {
+        const atual = marcadoresRefProp.current.find((m) => m.id === spec.id);
+        if (!atual?.aoArrastarComBotaoDireito) return;
+        evento.preventDefault();
+        evento.stopPropagation();
       });
       // Clique no marcador (sem arrastar) — sincronização mapa→tabela
       // (TASK-064). Lê o callback mais recente do spec vivo, como o

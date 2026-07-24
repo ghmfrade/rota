@@ -15,6 +15,7 @@ import {
   MENSAGEM_FORA_DE_SP,
   MENSAGEM_RECUSA_350M_SECAO,
   revalidarArrasto,
+  transladarSecao,
   type RecursosMunicipio,
   type Sentido,
 } from "@/formulario/secoes";
@@ -46,6 +47,10 @@ const COR_MARCADOR_SECAO = "#1d4ed8";
 const COR_MARCADOR_LOCAL = "#16a34a";
 const COR_MARCADOR_PENDENTE = "#d97706";
 const COR_MARCADOR_PONTO_DE_ROTA = "var(--color-ciano-500)";
+// Cor neutra dos demais pontos do cluster de uma Seção, visíveis só durante
+// a translação pelo botão esquerdo (TASK-078; DEC-079) — mesmo canal visual
+// do fantasma (opacidade aditiva, doc 18 §2), sem inventar CSS novo.
+const COR_MARCADOR_CLUSTER_NEUTRO = "var(--color-cinza-400)";
 
 const paraCoordenada = (p: Ponto): Coordenada => ({ lng: p.longitude, lat: p.latitude });
 const paraPonto = (c: Coordenada): Ponto => ({ latitude: c.lat, longitude: c.lng });
@@ -81,6 +86,11 @@ export interface PropsEditorMapaItinerario {
    * mantém o marcador laranja provisório no mapa até confirmar/cancelar. */
   posicaoCriacaoPendente?: Coordenada;
   aoAtualizarSecao: (secao: Secao) => void;
+  /** Confirmação da translação da Seção INTEIRA (arrasto pelo botão
+   * esquerdo — TASK-078; DEC-061/079): o host reconcilia a cascata de
+   * recálculo de TODOS os itinerários (de todos os Serviços) que referenciam
+   * a Seção — este componente não conhece outros Serviços, só o corrente. */
+  aoTransladarSecao?: (secao: Secao) => void;
   aoAtualizarLocal: (local: Local) => void;
   /** Rota ativa do itinerário (`estadoAtual.rota.geometria` convertida — Spec
    * 04 §7.3, RN-046/052), desenhada sobre o mapa; ausente quando `sem-rota`. */
@@ -118,6 +128,7 @@ export function EditorMapaItinerario({
   aoIniciarCriacaoParada,
   posicaoCriacaoPendente,
   aoAtualizarSecao,
+  aoTransladarSecao,
   aoAtualizarLocal,
   linhaRota,
   pontosDeRota = [],
@@ -133,6 +144,10 @@ export function EditorMapaItinerario({
     linha: LinhaMapa;
     posicao: Coordenada;
   } | null>(null);
+  // Seção em translação (arrasto pelo botão esquerdo — TASK-078; DEC-079):
+  // efêmero, só para revelar os demais pontos do cluster em cor neutra
+  // durante o gesto (aceite da task), nunca persistido (RN-096).
+  const [secaoEmTranslacaoUuid, definirSecaoEmTranslacaoUuid] = useState<string | null>(null);
 
   const marcadoresSecoes: MarcadorMapa[] = secoes.flatMap((secao) => {
     const entrada = secao.servicos.find((s) => s.servico_uuid === servicoUuid);
@@ -148,11 +163,54 @@ export function EditorMapaItinerario({
         cor: COR_MARCADOR_SECAO,
         arrastavel: true,
         selecionado: selecaoAtual === id,
-        aoArrastar: (posicao: Coordenada) => lidarArrastoSecao(secao, posicao),
+        // Botão ESQUERDO (nativo do MapLibre): translação da Seção inteira
+        // (DEC-079). Botão DIREITO (custom — TASK-078): continua movendo só
+        // o ponto do Serviço/sentido corrente (DEC-044, comportamento de
+        // hoje, só migrado de botão).
+        aoArrastar: (posicao: Coordenada) => lidarTransladarSecao(secao, ponto, posicao),
+        aoArrastarComBotaoDireito: (posicao: Coordenada) => lidarArrastoSecao(secao, posicao),
+        aoIniciarArrasto: () => definirSecaoEmTranslacaoUuid(secao.uuid),
+        aoFinalizarArrasto: () => definirSecaoEmTranslacaoUuid(null),
         aoSelecionar: () => aoSelecionarMarcador?.(id),
       },
     ];
   });
+
+  // Demais pontos do cluster da Seção em translação (TASK-078; DEC-061/079,
+  // aceite: "os demais pontos ficam visíveis em cor neutra durante o
+  // arrasto"), excluindo o ponto já mostrado como o marcador ativo acima.
+  // Estáticos nas posições ANTES do gesto (não seguem o vetor ao vivo — a
+  // TASK-097 corrigiu justamente um re-render em pleno arrasto reposicionar
+  // o marcador ativo; os pontos neutros, decorativos, não repetem o risco).
+  // Não-interativos (`fantasma`): reaproveita o canal visual já existente
+  // (opacidade aditiva) em vez de CSS novo (doc 18 regra 3/4).
+  const secaoEmTranslacao = secaoEmTranslacaoUuid
+    ? secoes.find((s) => s.uuid === secaoEmTranslacaoUuid)
+    : undefined;
+  const marcadoresClusterSecao: MarcadorMapa[] = secaoEmTranslacao
+    ? secaoEmTranslacao.servicos.flatMap((entradaCluster) => {
+        const pontosDaEntrada: { sentidoDoPonto: Sentido; ponto: Ponto }[] = [
+          ...(entradaCluster.geolocalizacao_ida
+            ? [{ sentidoDoPonto: "ida" as const, ponto: entradaCluster.geolocalizacao_ida }]
+            : []),
+          ...(entradaCluster.geolocalizacao_volta
+            ? [{ sentidoDoPonto: "volta" as const, ponto: entradaCluster.geolocalizacao_volta }]
+            : []),
+        ];
+        return pontosDaEntrada
+          .filter(
+            ({ sentidoDoPonto }) =>
+              !(entradaCluster.servico_uuid === servicoUuid && sentidoDoPonto === sentido),
+          )
+          .map(({ sentidoDoPonto, ponto }) => ({
+            id: `secao-cluster-${secaoEmTranslacao.uuid}-${entradaCluster.servico_uuid}-${sentidoDoPonto}`,
+            posicao: paraCoordenada(ponto),
+            forma: "quadrado" as const,
+            cor: COR_MARCADOR_CLUSTER_NEUTRO,
+            fantasma: true,
+          }));
+      })
+    : [];
 
   const locaisDoSentido = locais.filter((local) => geolocDoSentido(local, sentido));
 
@@ -240,6 +298,34 @@ export function EditorMapaItinerario({
     definirMenuCriacao(null);
   }
 
+  // Botão ESQUERDO (DEC-079): translação rígida da Seção inteira. `soltar
+  // sem deslocamento efetivo... cancela... sem efeito" (aceite da task) —
+  // vetor nulo não chama `transladarSecao` nem `aoTransladarSecao` (sem
+  // chamada OSRM para um gesto que não moveu nada).
+  function lidarTransladarSecao(secao: Secao, pontoOriginal: Ponto, posicaoSolta: Coordenada) {
+    const pontoNovo = paraPonto(posicaoSolta);
+    const vetor: Ponto = {
+      latitude: pontoNovo.latitude - pontoOriginal.latitude,
+      longitude: pontoNovo.longitude - pontoOriginal.longitude,
+    };
+    if (vetor.latitude === 0 && vetor.longitude === 0) return;
+
+    const resultado = transladarSecao({
+      secao,
+      vetor,
+      features: recursosMunicipio.features,
+      nomes: recursosMunicipio.nomes,
+    });
+    if (!resultado.ok) {
+      // Destino fora de SP → recusa INTEGRAL: nenhum ponto se move (o
+      // chamador não alterou `secoes`, o próximo render devolve o marcador).
+      definirMensagemSecao(MENSAGEM_FORA_DE_SP);
+      return;
+    }
+    definirMensagemSecao(null);
+    aoTransladarSecao?.(resultado.secao);
+  }
+
   function lidarArrastoSecao(secao: Secao, posicao: Coordenada) {
     const resultado = revalidarArrasto({
       secao,
@@ -307,6 +393,7 @@ export function EditorMapaItinerario({
         <Mapa
           marcadores={[
             ...marcadoresSecoes,
+            ...marcadoresClusterSecao,
             ...marcadoresLocais,
             ...marcadorPendente,
             ...marcadoresPontosDeRota,

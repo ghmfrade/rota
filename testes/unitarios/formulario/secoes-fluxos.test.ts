@@ -10,6 +10,7 @@ import {
   nomeExibicaoSecao,
   pontosOfertadosParaReuso,
   revalidarArrasto,
+  transladarSecao,
   type RecursosMunicipio,
 } from "@/formulario/secoes";
 
@@ -357,6 +358,131 @@ describe("revalidarArrasto (Spec 04 §7.1, §7.3; RN-027, RN-029)", () => {
     expect(MENSAGEM_FORA_DE_SP).toBe(
       "Não foi possível identificar o município deste ponto. Verifique se ele está dentro do Estado de São Paulo.",
     );
+  });
+});
+
+describe("transladarSecao (TASK-078; DEC-061/079; RN-004, RN-027, RN-029)", () => {
+  it("aplica o MESMO vetor a todas as contribuições (2 Serviços × Ida/Volta), preservando as distâncias relativas", () => {
+    const base = novaSecaoBase(); // SERVICO_A, ida, ponto(0)
+    const comVolta = contribuirParaSecaoExistente({
+      secao: base,
+      servicoUuid: SERVICO_A,
+      sentido: "volta",
+      bidirecional: false,
+      ponto: ponto(100),
+      ...RECURSOS,
+    });
+    expect(comVolta.ok).toBe(true);
+    if (!comVolta.ok) return;
+    const comSegundoServico = contribuirParaSecaoExistente({
+      secao: comVolta.secao,
+      servicoUuid: SERVICO_B,
+      sentido: "ida",
+      bidirecional: true,
+      ponto: ponto(50),
+      ...RECURSOS,
+    });
+    expect(comSegundoServico.ok).toBe(true);
+    if (!comSegundoServico.ok) return;
+    const clusterOriginal = comSegundoServico.secao;
+
+    // Vetor de translação: 1000 m de deslocamento em longitude (mesma técnica
+    // de escala do arquivo — 1 unidade de K = 1 metro no equador).
+    const vetor = ponto(1000);
+    const resultado = transladarSecao({ secao: clusterOriginal, vetor, ...RECURSOS });
+    expect(resultado.ok).toBe(true);
+    if (!resultado.ok) return;
+
+    const entradaA = resultado.secao.servicos.find((s) => s.servico_uuid === SERVICO_A)!;
+    const entradaB = resultado.secao.servicos.find((s) => s.servico_uuid === SERVICO_B)!;
+    expect(entradaA.geolocalizacao_ida).toEqual({
+      latitude: 0,
+      longitude: ponto(0).longitude + vetor.longitude,
+    });
+    expect(entradaA.geolocalizacao_volta).toEqual({
+      latitude: 0,
+      longitude: ponto(100).longitude + vetor.longitude,
+    });
+    expect(entradaB.geolocalizacao_ida).toEqual({
+      latitude: 0,
+      longitude: ponto(50).longitude + vetor.longitude,
+    });
+    expect(entradaB.geolocalizacao_volta).toEqual({
+      latitude: 0,
+      longitude: ponto(50).longitude + vetor.longitude,
+    });
+  });
+
+  it("preserva a uuid da Seção e cada servico_uuid (RN-004/007) — round-trip da identidade", () => {
+    const base = novaSecaoBase();
+    const comSegundo = contribuirParaSecaoExistente({
+      secao: base,
+      servicoUuid: SERVICO_B,
+      sentido: "ida",
+      bidirecional: false,
+      ponto: ponto(300),
+      ...RECURSOS,
+    });
+    expect(comSegundo.ok).toBe(true);
+    if (!comSegundo.ok) return;
+
+    const resultado = transladarSecao({
+      secao: comSegundo.secao,
+      vetor: ponto(500),
+      ...RECURSOS,
+    });
+    expect(resultado.ok).toBe(true);
+    if (!resultado.ok) return;
+    expect(resultado.secao.uuid).toBe(comSegundo.secao.uuid);
+    expect(resultado.secao.servicos.map((s) => s.servico_uuid).sort()).toEqual(
+      [SERVICO_A, SERVICO_B].sort(),
+    );
+  });
+
+  it("nunca é recusada por 350 m — cluster no limite dos 350 m segue aceito após a translação", () => {
+    const base = novaSecaoBase(); // ponto(0)
+    // 2º ponto no limite EXATO (350 m) — o cluster mais "apertado" possível.
+    const comSegundo = contribuirParaSecaoExistente({
+      secao: base,
+      servicoUuid: SERVICO_B,
+      sentido: "ida",
+      bidirecional: false,
+      ponto: ponto(700), // centroide em 350, ambos exatamente a 350 m dele
+      ...RECURSOS,
+    });
+    expect(comSegundo.ok).toBe(true);
+    if (!comSegundo.ok) return;
+
+    const resultado = transladarSecao({
+      secao: comSegundo.secao,
+      vetor: ponto(10_000),
+      ...RECURSOS,
+    });
+    // Sem checagem de 350 m: só pode falhar por município, nunca por "350m".
+    expect(resultado.ok || (resultado as { motivo: string }).motivo).not.toBe("350m");
+  });
+
+  it("re-deriva o município do novo centroide", () => {
+    const base = novaSecaoBase();
+    const resultado = transladarSecao({ secao: base, vetor: ponto(200), ...RECURSOS });
+    expect(resultado.ok && resultado.secao.municipio).toBe("Cidade Teste");
+  });
+
+  it("inválido: destino fora de SP recusa a translação INTEIRA — nenhum ponto se move (retorno inalterado)", () => {
+    const base = novaSecaoBase();
+    const vetorParaFora: Ponto = {
+      latitude: PONTO_FORA_DE_SP.latitude - base.servicos[0].geolocalizacao_ida!.latitude,
+      longitude: PONTO_FORA_DE_SP.longitude - base.servicos[0].geolocalizacao_ida!.longitude,
+    };
+    const resultado = transladarSecao({ secao: base, vetor: vetorParaFora, ...RECURSOS });
+    expect(resultado).toEqual({ ok: false, motivo: "fora_de_sp" });
+  });
+
+  it("não muta a Seção recebida", () => {
+    const base = novaSecaoBase();
+    const copia = structuredClone(base);
+    transladarSecao({ secao: base, vetor: ponto(100), ...RECURSOS });
+    expect(base).toEqual(copia);
   });
 });
 

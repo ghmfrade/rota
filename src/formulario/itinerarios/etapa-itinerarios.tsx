@@ -286,10 +286,16 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     return servico?.itinerarios.find((i) => i.sentido === sentido);
   }
 
-  function paradasDe(servicoUuid: string, sentido: Sentido): ParadaEmEdicao[] {
+  function paradasDe(
+    servicoUuid: string,
+    sentido: Sentido,
+    sessaoBase: SessaoFormulario = sessao,
+  ): ParadaEmEdicao[] {
     const chave = chaveItinerario(servicoUuid, sentido);
-    if (paradasEmEdicaoMapa[chave] !== undefined) return paradasEmEdicaoMapa[chave];
-    const itinerario = itinerarioCarregado(servicoUuid, sentido);
+    const mapaBase = sessaoBase.paradasEmEdicao ?? {};
+    if (mapaBase[chave] !== undefined) return mapaBase[chave];
+    const servico = servicosDaSessao(sessaoBase).find((s) => s.uuid === servicoUuid);
+    const itinerario = servico?.itinerarios.find((i) => i.sentido === sentido);
     return itinerario ? paradasEmEdicaoDeContrato(itinerario.paradas) : [];
   }
 
@@ -843,6 +849,72 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     );
   }
 
+  // Locais do Serviço `servicoUuid`, completo OU em construção — insumo da
+  // cascata de translação (abaixo), que precisa resolver rota de Serviços
+  // que não são necessariamente `linhaAtual`.
+  function locaisDoServico(sessaoBase: SessaoFormulario, servicoUuid: string): Local[] {
+    const completo = servicosDaSessao(sessaoBase).find((s) => s.uuid === servicoUuid);
+    if (completo) return completo.locais;
+    const emConstrucao = servicosEmConstrucaoDaSessao(sessaoBase).find((s) => s.uuid === servicoUuid);
+    return emConstrucao?.locais ?? [];
+  }
+
+  /**
+   * Confirmação da translação rígida de uma Seção INTEIRA (arrasto pelo
+   * botão esquerdo — TASK-078; DEC-061/079): grava a Seção transladada e
+   * dispara o recálculo (RN-052) e a reconciliação de matrizes (RN-054..057)
+   * de TODOS os itinerários — de TODOS os Serviços, completos e em
+   * construção, Ida e Volta — que referenciam a Seção, não só o Serviço/
+   * sentido em foco na etapa (o `EditorMapaItinerario` só conhece o corrente
+   * — Risco "cascata multi-Serviço" da análise). Sequencial (nunca em
+   * paralelo, para não correr sobre `sessaoRef` — mesmo padrão do espelho
+   * Ida↔Volta da TASK-077); falha de OSRM num itinerário não impede os
+   * demais (RN-048), tratada dentro de `recalcularERegistrar`.
+   */
+  async function aoTransladarSecao(secaoTransladada: Secao) {
+    const secoesAtualizadas = secoes.map((s) =>
+      s.uuid === secaoTransladada.uuid ? secaoTransladada : s,
+    );
+    const baseComSecoes = comSecoesAtualizadas(sessao, secoesAtualizadas);
+    sessaoRef.current = baseComSecoes;
+    aoAtualizarSessao(baseComSecoes);
+
+    const referenciaSecao = (paradas: readonly ParadaEmEdicao[]) =>
+      paradas.some((p) => p.tipo === "secao" && p.secaoUuid === secaoTransladada.uuid);
+
+    const alvos: { servicoUuid: string; sentido: Sentido; completo: boolean }[] = [];
+    for (const servico of servicosDaSessao(baseComSecoes)) {
+      for (const itinerario of servico.itinerarios) {
+        if (referenciaSecao(paradasDe(servico.uuid, itinerario.sentido, baseComSecoes))) {
+          alvos.push({ servicoUuid: servico.uuid, sentido: itinerario.sentido, completo: true });
+        }
+      }
+    }
+    for (const servico of servicosEmConstrucaoDaSessao(baseComSecoes)) {
+      for (const sentidoDoServico of sentidosDeDirecionalidade(servico.direcionalidade)) {
+        if (referenciaSecao(paradasDe(servico.uuid, sentidoDoServico, baseComSecoes))) {
+          alvos.push({ servicoUuid: servico.uuid, sentido: sentidoDoServico, completo: false });
+        }
+      }
+    }
+
+    definirRecalculando(true);
+    for (const alvo of alvos) {
+      const atual = sessaoRef.current;
+      await recalcularERegistrar(
+        alvo.servicoUuid,
+        alvo.sentido,
+        alvo.completo,
+        chaveItinerario(alvo.servicoUuid, alvo.sentido),
+        paradasDe(alvo.servicoUuid, alvo.sentido, atual),
+        pontosDeRotaDoItinerario(atual, alvo.servicoUuid, alvo.sentido),
+        secoesAtualizadas,
+        locaisDoServico(atual, alvo.servicoUuid),
+      );
+    }
+    definirRecalculando(false);
+  }
+
   function aoCriarLocal(local: Local, posicaoNaLinha?: Coordenada) {
     if (!linhaAtual) return;
     const locaisAtualizados = [...linhaAtual.locais, local];
@@ -1093,6 +1165,7 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
               aoIniciarCriacaoParada={iniciarCriacaoParada}
               posicaoCriacaoPendente={criacaoInline?.posicao}
               aoAtualizarSecao={aoCriarOuAtualizarSecao}
+              aoTransladarSecao={(secao) => void aoTransladarSecao(secao)}
               aoAtualizarLocal={aoAtualizarLocal}
               linhaRota={linhaRotaAtual}
               pontosDeRota={pontosDeRotaAtual}
