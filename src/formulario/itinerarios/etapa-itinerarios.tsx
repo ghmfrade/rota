@@ -405,6 +405,16 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
   // (novo/promovido; carregado/em-construção): a função devolvia `base`
   // calada e o Local era descartado enquanto a Parada já tinha sido
   // comitada, violando RN-036.
+  //
+  // INVARIANTE (o que faz os dois `.map()` abaixo NUNCA errarem o alvo):
+  // `linhaAtual` é derivada de `servicosDaSessao(sessao)`/
+  // `servicosEmConstrucaoDaSessao(sessao)` (ver a montagem de `linhas`, acima),
+  // e `base` é sempre essa MESMA `sessao` do render — ver a chamada de
+  // `aoComitarBase` em `aplicarNovasParadas`. Logo `linhaAtual.completo` sempre
+  // casa com a lista de `base` que contém `linhaAtual.servicoUuid`, e não
+  // existe estado em que o `.map()` não ache o Serviço. Quebrar esse pareamento
+  // (ex.: passar `sessaoRef.current` como base) ressuscita o descarte silencioso
+  // desta task SEM nenhum teste ficar vermelho.
   function comLocaisAtualizados(base: SessaoFormulario, locaisAtualizados: Local[]): SessaoFormulario {
     if (!linhaAtual) return base;
     if (linhaAtual.completo) {
@@ -665,6 +675,10 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
           )
         : undefined;
 
+    // `aoComitarBase` recebe a `sessao` DO RENDER, nunca `sessaoRef.current`:
+    // `comLocaisAtualizados` decide em qual lista gravar a partir de
+    // `linhaAtual`, que é derivada dessa mesma `sessao` (TASK-096). Trocar a
+    // base aqui desfaz esse pareamento e o Local volta a ser descartado calado.
     const base = opcoes.aoComitarBase ? opcoes.aoComitarBase(sessao) : sessao;
     const paradasMapa = { ...(base.paradasEmEdicao ?? {}), [chave]: novasParadas };
     const pontosDeRotaMapa = { ...(base.pontosDeRotaEmEdicao ?? {}), [chave]: [...pontosParaReaplicar] };

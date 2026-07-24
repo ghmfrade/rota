@@ -1945,7 +1945,13 @@ describe("EtapaItinerarios — gravar servico.locais[] pelo caminho unificado da
     resultado.desmontar();
   });
 
-  test('[arrasto] mover o marcador de um Local num Serviço promovido do modo "novo" atualiza geolocalizacao_ida preservando a UUID (RN-004) e rederiva o município (RN-029)', async () => {
+  // A rederivação do município (RN-029) NÃO é exercitada aqui: este teste
+  // injeta um `Local` já pronto direto em `aoAtualizarLocal`, como faz o mapa
+  // depois de `revalidarArrastoLocal` — quem deriva o município é aquele motor,
+  // coberto em `testes/unitarios/formulario/locais-fluxos.test.ts`. O que se
+  // afere aqui é só o destino da gravação: a coordenada nova sobrevive num
+  // Serviço promovido do modo "novo", com a MESMA UUID.
+  test('[arrasto] mover o marcador de um Local num Serviço promovido do modo "novo" atualiza geolocalizacao_ida preservando a UUID (RN-004)', async () => {
     vi.stubGlobal("fetch", respostaOsrmGenericaMock());
     const sessaoInicial = sessaoNovoServicoPromovido();
     const servicoInicial = sessaoInicial.servicos![0];
@@ -1986,6 +1992,10 @@ describe("EtapaItinerarios — gravar servico.locais[] pelo caminho unificado da
       (l) => l.uuid === "c2afe932-bf0f-4338-8ff4-63cd908b9033",
     )!;
     expect(localFinal).toBeDefined();
+    // RN-004 explícita: o arrasto ATUALIZA a entidade existente, não cria uma
+    // segunda com UUID nova.
+    expect(servicoFinal.locais).toHaveLength(1);
+    expect(localFinal.uuid).toBe("c2afe932-bf0f-4338-8ff4-63cd908b9033");
     expect(localFinal.geolocalizacao_ida).toEqual({ latitude: -23.5, longitude: -46.6 });
 
     resultado.desmontar();

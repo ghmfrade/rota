@@ -1230,8 +1230,12 @@ test.describe("TASK-096 — criar Local num Serviço do fluxo criar-do-zero JÁ 
       page.getByTestId("tabela-paradas").getByTestId("parada-item"),
     ).toHaveCount(3);
 
-    // Um clique adicional sobre a linha da rota ainda cria ponto de rota —
-    // terceiro sintoma relatado (o gesto silenciosamente descartado).
+    // A etapa continua aceitando gestos depois do Local: um novo clique cria
+    // mais uma Seção e a tabela chega a 4 paradas. É o contraponto do terceiro
+    // sintoma relatado (o mapa parava de responder), mas por um gesto de
+    // Seção — a criação de PONTO DE ROTA em si é aferida no teste de
+    // integração unitário (`etapa-itinerarios.test.tsx`, describe da TASK-096),
+    // que chama `aoCriarPontoDeRota` e compara `pontosDeRotaEmEdicao`.
     await mapa.click({
       button: "right",
       position: { x: caixa.width / 2, y: caixa.height / 2 + 60 },
