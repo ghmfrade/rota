@@ -3980,6 +3980,206 @@ Condição do parecer `14-REVISOES/TASK-077-20260722.md` (Problema 1), decidida 
 
 ---
 
+## TASK-094 — Local nasce unidirecional e o "X" da tabela remove a entidade Local inteira (DEC-075/DEC-076)
+
+## Objetivo
+
+Ao final, criar um Local num Serviço bidirecional gera **apenas** a geolocalização do sentido em edição (sem espelhamento Ida↔Volta), e o "X" da linha de um Local na tabela lateral remove a **entidade** de `servico.locais[]` junto com todas as Paradas que a referenciem. O gesto "Excluir ponto deste sentido" deixa de existir.
+
+## Contexto
+
+Após amadurecimento (responsável, 2026-07-23, DEC-075/DEC-076), o vínculo Ida↔Volta do Local não se sustenta: cada sentido lança seus próprios Locais, independentes. Hoje `camposDeCriacao` (`src/formulario/locais/fluxos-local.ts`) espelha os dois pontos em Serviço bidirecional (Spec 04 §7.2 antiga), e o único gesto de exclusão é `excluirSentidoDoLocal`, que **recusa** Local de ponto único (`ponto_unico`) — deixando a entidade **inapagável** e visível na lista mesmo sem Parada (lacuna deliberada da DEC-045, nunca retomada). Com o Local nascendo unidirecional, o gesto de excluir sentido perde a função e é substituído pela remoção da entidade. A Spec 04 §7.2 e §16 item 6 já foram atualizadas pelo responsável.
+
+## Fora de escopo
+
+- Formulário de nome inline na tabela — é a **TASK-095**.
+- Qualquer mudança no contrato JSON/schema (Spec 02 §7.1 já admite Local com um ou dois pontos — RN-031/032 intocadas).
+- Regra dos 350 m pareada (RN-032/Spec 03 §7.4): **permanece** no arrasto e nos leitores estáticos, aplicável a Locais legados com dois pontos — esta task não a remove nem a altera.
+- Espelhamento de **Seções** na criação (Spec 04 §7.1) e RN-030 — inalterados.
+- Remoção de **Seção** pelo "X" (segue removendo só a Parada — TASK-084/DEC-074) — inalterada.
+- Reconciliação de horários/matriz decorrente da remoção (é das TASK-046/088, já entregues e reutilizadas pelo caminho de remoção de Parada).
+
+## Specs fonte
+
+- Spec 04 §7.2 (Local nasce unidirecional; "X" remove a entidade — texto atualizado 2026-07-23)
+- Spec 04 §16 item 6 (criação espelhada só para Seções — texto atualizado 2026-07-23)
+- Spec 02 §7 / §7.1 (Local é entidade do Serviço; ao menos uma geolocalização)
+- Spec 02 §10.1 (Parada referencia XOR Seção/Local; extremos sempre Seção)
+
+## Regras envolvidas
+
+- RN-031 (Local pertence ao Serviço, sem tarifa, não compartilhado)
+- RN-032 (Local tem ao menos uma geolocalização; pareada dos 350 m só quando ambas presentes)
+- RN-033..036 (Parada XOR; ordem; extremos sempre Seção; Parada de sentido X exige `geolocalizacao_X`)
+- RN-096 (exportar JSON é o salvar; nada de estado de fluxo persistido)
+
+## Entidades afetadas
+
+- Local (criação unidirecional; remoção da entidade)
+- Parada (removida junto com o Local que referencia)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Criar um Local num Serviço **bidirecional** gera só a geolocalização do sentido em edição (`geolocalizacao_ida` XOR `geolocalizacao_volta`), nunca as duas espelhadas.
+- [ ] Criar um Local num Serviço **unidirecional** mantém o comportamento atual (só o ponto daquele sentido).
+- [ ] O "X" da linha de um Local na tabela lateral remove a entidade de `linhaAtual.locais` **e** todas as Paradas que a referenciam (nos dois sentidos, para Local legado com dois pontos).
+- [ ] O botão "Excluir ponto deste sentido" e o gesto `excluirSentidoDoLocal` deixam de existir na UI; os `data-testid` `excluir-sentido-*` são removidos junto com o gesto (não renomeados).
+- [ ] O "X" de **Seção** segue removendo apenas a Parada (comportamento atual preservado).
+- [ ] Nenhum campo novo no JSON; round-trip de UUID preservado (RN-004) para Locais que permanecem.
+- [ ] Remover o último Local de um itinerário não deixa entidade órfã em `servico.locais[]`.
+
+## Casos válidos
+
+- Serviço bidirecional, sentido em edição = Ida: clicar para criar Local "Padaria" → Local com só `geolocalizacao_ida`; a Volta não ganha ponto algum.
+- Local "Padaria" (só Ida) com uma Parada na Ida: "X" na sua linha → some da lista de Locais e a Parada sai do itinerário da Ida.
+- Local legado importado com Ida **e** Volta, com Parada em cada sentido: "X" → entidade removida e ambas as Paradas saem.
+
+## Casos inválidos
+
+- Tentar criar Local com a criação espelhando para o outro sentido → recusado (teste-guarda de `camposDeCriacao`).
+- "X" de Local que remova a Parada mas **deixe** a entidade em `servico.locais[]` → recusado (teste de remoção de entidade).
+- "X" de Local que remova também uma Seção ou Parada de Seção adjacente → recusado (só o Local-alvo e suas Paradas).
+
+## Testes esperados
+
+- Unitários: `camposDeCriacao` (bidirecional agora produz um ponto só); nova função pura de remoção de entidade Local (remove entidade + Paradas por `local_uuid`, preserva o resto); `excluirSentidoDoLocal` removida (e seus testes).
+- Integração (jsdom, dublê de `@/shared/mapa`): `EtapaItinerarios` — criar Local bidirecional gera um ponto; "X" de Local remove entidade e Parada; "X" de Seção inalterado; sem chamada de recálculo indevida.
+- E2E (`etapa-itinerarios.spec.ts`, tiles/OSRM mockados): fluxo criar Local → remover Local pelo "X"; ausência do botão "Excluir ponto deste sentido".
+- Snapshot/contrato JSON: documento exportado após remoção não contém o Local removido nem Paradas órfãs; UUIDs dos remanescentes preservadas.
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/locais/fluxos-local.ts` (`camposDeCriacao` sem espelho; `excluirSentidoDoLocal` obsoleta; nova função pura de remoção de entidade)
+- `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (remover botão "Excluir ponto deste sentido"; "X" do Local chama remoção de entidade)
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (`aoExcluirSentidoDeLocal` → remoção de entidade reutilizando `removerParadasDeLocal`)
+- `src/formulario/locais/editor-locais.tsx` e `src/app/editor-locais-demo/page.tsx` (editor/demo — mesmo ajuste do botão)
+- `src/formulario/locais/index.ts` (exports)
+- Testes em `testes/unitarios/formulario/fluxos-local.test.ts`, `testes/unitarios/formulario/etapa-itinerarios.test.tsx`, `testes/e2e/*` que usam `excluir-sentido-*`
+
+## Dependências
+
+- **DEC-075/DEC-076** (registradas) e a edição da Spec 04 §7.2/§16 item 6 (aplicada pelo responsável 2026-07-23).
+- Reutiliza `removerParadasDeLocal` (motor existente, TASK-077/DEC-045). Independente da TASK-095.
+
+## Riscos
+
+- Regressão em suítes que dependem de `excluir-sentido-*` (doc 18 §6 — testids intocáveis): exceção consciente autorizada pela DEC-076 (o gesto sai do produto, não é renomeado); mapear todos os usos antes de remover.
+- Local legado com dois pontos: garantir que o "X" remova as Paradas de **ambos** os sentidos, não só a do sentido corrente.
+- Não confundir remoção de entidade Local com a cascata de Seção órfã (TASK-084) — são caminhos distintos.
+
+## Perguntas em aberto
+
+- Nenhuma (DEC-075/DEC-076 decididas).
+
+---
+
+## TASK-095 — Formulário de nome de Seção/Local inline na tabela lateral, na posição de inserção (DEC-077)
+
+## Objetivo
+
+Ao final, ao escolher "Seção" ou "Local" no menu de criação do mapa, o campo de nome aparece como uma **linha-formulário inserida na tabela lateral, na posição exata onde a nova parada entrará** — janela de fundo branco no padrão da janela flutuante do mapa —, em vez do painel abaixo do mapa.
+
+## Contexto
+
+Pedido do responsável com mockup (2026-07-23, DEC-077): o campo de nome deve aparecer no contexto em que o item vai entrar na lista (ex.: entre `cityB` e `cityC`), não num `Painel` desconectado abaixo do mapa (`form-criar-secao`/`form-criar-local` em `src/formulario/itinerarios/editor-mapa-itinerario.tsx`). A âncora de inserção já é resolvida por `prepararInsercaoDeParada`. É escolha de UX dentro do espaço da Spec 04 §7.1/§7.2 (que só exige o nome digitado) — **sem mudança de spec**. Compõe com a tabela redesenhada da TASK-091 (DEC-073).
+
+## Fora de escopo
+
+- Mudança no fluxo de criação em si (tipos, validações, espelhamento) — é a **TASK-094**.
+- Qualquer regra de OSRM / 350 m / montagem / ancoragem.
+- Contrato JSON/schema — o formulário é estado de UI efêmero (RN-096).
+- Redesenho geral da tabela (colunas, densidade, zebra) — é a **TASK-091**; esta task apenas **injeta** a linha-formulário na estrutura existente.
+- Vocabulário de "Tipo" e marcadores do mapa (TASK-091/TASK-068) — inalterados.
+
+## Specs fonte
+
+- Spec 04 §7.1 (inserção de Seção; nome digitado pelo usuário)
+- Spec 04 §7.2 (inserção de Local; nome digitado)
+- Spec 04 §7/§7.3 (mapa + tabela lateral sincronizada durante a montagem)
+- doc 18 §2/§3/§4 (tokens; componentes de `shared/ui`; variação por prop, não por `className`) — vinculante (DEC-050)
+
+## Regras envolvidas
+
+- RN-025 (Seção = município + nome; base do rótulo exibido)
+- RN-031 (Local pertence ao Serviço)
+- RN-034/035 (ordem 1-based; extremos sempre Seção — a posição de inserção respeita isso)
+- RN-096 (nada persistido; formulário é estado de UI)
+
+## Entidades afetadas
+
+- Seção, Local (só a superfície de criação; sem mudança de modelo)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Escolher "Seção"/"Local" no menu de criação insere uma linha-formulário na tabela lateral, na posição exata onde a parada entrará (âncora de `prepararInsercaoDeParada`).
+- [ ] Criação **sem** âncora de linha (clique-direito fora da rota) → linha-formulário ao fim da tabela.
+- [ ] A linha-formulário tem fundo branco no padrão da janela flutuante do mapa (`MenuFlutuante`/`Painel` de `shared/ui`), rótulo pequeno em cinza sem destaque ("Nome da Seção"/"Nome do Local"), campo de texto e botões `[Criar Seção]`/`[Criar Local]` e `[Cancelar]`.
+- [ ] A tabela rola até a linha-formulário quando ela abre (scroll-into-view).
+- [ ] O painel de criação **abaixo do mapa** deixa de existir.
+- [ ] Os `data-testid` existentes são preservados: `form-criar-secao`, `form-criar-local`, `nome-secao-input`, `nome-local-input`, `confirmar-criar-secao`, `confirmar-criar-local`.
+- [ ] Confirmar cria a parada na posição mostrada; cancelar remove a linha-formulário sem efeito colateral; nenhum recálculo/OSRM disparado só por abrir/cancelar.
+- [ ] Sem `style=` inline; estilo por tokens/variante (doc 18 §4).
+
+## Casos válidos
+
+- Tabela `cityA - n1` · `cityB - n2` · `cityC - n3`; criar Local entre B e C → linha-formulário aparece entre as linhas de B e C, com rótulo "Nome do Local" e botões; ao confirmar "Padaria", entra como parada nessa posição.
+- Criar Seção sem clicar sobre a linha da rota → linha-formulário no fim da tabela.
+
+## Casos inválidos
+
+- Linha-formulário que perca um dos `data-testid` obrigatórios → recusado (teste-guarda de seletor).
+- Confirmar com nome vazio → botão desabilitado (comportamento atual preservado).
+- Abrir a linha-formulário disparando recálculo/OSRM → recusado (teste de integração).
+
+## Testes esperados
+
+- Unitários: eventual helper puro de cálculo da posição da linha-formulário na lista, se criado.
+- Integração (jsdom, dublê de `@/shared/mapa`): abrir criação de Seção/Local injeta a linha na posição correta; painel abaixo do mapa ausente; testids preservados; cancelar limpa; sem recálculo ao abrir/cancelar.
+- E2E (`etapa-itinerarios.spec.ts`, tiles/OSRM mockados): criar Seção e Local pela linha-formulário inline; verificar posição relativa às demais linhas.
+- Snapshot/contrato JSON: N/A (nada persistido pelo formulário).
+- PDF: N/A.
+
+## Arquivos prováveis
+
+- `src/formulario/itinerarios/editor-mapa-itinerario.tsx` (remover os `Painel` de criação abaixo do mapa; injetar a linha-formulário na tabela na posição de inserção; scroll-into-view)
+- `src/shared/ui/tabela.tsx` (se a linha-formulário exigir um slot/variante de linha na tabela — via prop, não `className`)
+- Testes em `testes/unitarios/formulario/etapa-itinerarios.test.tsx` e `testes/e2e/etapa-itinerarios.spec.ts`
+
+## Dependências
+
+- **DEC-077** (registrada).
+- **TASK-091** (redesenho da tabela lateral — DEC-073): recomendada **antes**, para a linha-formulário compor com a estrutura de colunas final. Se a 095 rodar antes, herda a obrigação de não quebrar as colunas que a 091 introduzirá.
+- Independente da **TASK-094** (podem rodar em qualquer ordem; ambas tocam `editor-mapa-itinerario.tsx` — coordenar para evitar conflito de merge).
+
+## Riscos
+
+- Conflito de merge com a TASK-094 em `editor-mapa-itinerario.tsx` — sequenciar as duas.
+- Scroll-into-view em tabela com muitas linhas: garantir que a linha-formulário fique visível sem "pular" a seleção da TASK-064.
+- Preservar exatamente os `data-testid` ao mover o formulário de container (doc 18 §6).
+
+## Perguntas em aberto
+
+- Nenhuma (DEC-077 decidida).
+
+---
+
 ## Ordem recomendada de execução
 
 ```text

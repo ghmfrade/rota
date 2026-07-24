@@ -137,7 +137,7 @@ Regras de estrutura e algoritmos: Spec 02 §5 e Spec 03 §7 — não redefinidos
 UX de inserção (estrutura na Spec 02 §7; regra dos 350 m pareada na Spec 03 §7.4):
 
 - Locais pertencem **ao Serviço**; são pontos **sem tarifa**; podem aparecer no itinerário; **não aparecem** na matriz de seccionamento; **não poluem** a tabela horária principal (nem na UX, nem no PDF); podem aparecer em **modo avançado** ou no anexo técnico do PDF (§13).
-- Cada Local pode ter um ou dois pontos georreferenciados (Ida e Volta). Se o Serviço é bidirecional, **a criação sempre gera os dois pontos** (no mesmo lugar). Na montagem do itinerário de Volta, o ponto já aparece marcado como parada por onde o itinerário passa; o usuário pode **arrastá-lo** (bloqueio da regra dos 350 m pareada — Spec 03 §7.4) ou **excluir o ponto só naquele sentido** (ex.: manter só a Ida) — o Local passa a ser unidirecional, e a parada correspondente sai do itinerário daquele sentido.
+- Cada Local nasce unidirecional: a criação gera apenas a geolocalização do sentido em edição, mesmo em Serviço bidirecional — não há espelhamento nem vínculo entre um Local da Ida e um Local da Volta; cada sentido lança seus próprios Locais. Remover um Local (o "X" da sua linha na tabela lateral) exclui a entidade e toda parada que a referencie. O contrato (Spec 02 §7.1) segue admitindo Local com os dois pontos — caso de documentos importados de versões anteriores; para esses, vale a regra dos 350 m pareada (Spec 03 §7.4) no arrasto, e o "X" remove a entidade e as paradas de ambos os sentidos.
 - O `municipio` do Local também é derivado da geolocalização (Spec 03 §2.3), somente-leitura.
 
 ### 7.3 Itinerário e mapa
@@ -460,7 +460,7 @@ Categorias e comportamento esperado (validações e textos de roteamento: Spec 0
 3. **Usuário digita horários de relógio, nunca offsets** — conversão para `offset_horario` é interna; Locais recebem horários internamente e não aparecem na grade principal (§8.2).
 4. **"Copiar dias comuns"** clona as viagens comuns como viagens de feriado com UUIDs novas; **"copiar viagem para outro dia"** idem (§8.3–§8.4).
 5. **Município é somente-leitura**, derivado por ponto-em-polígono (Spec 03 §2.3); padrão visual `Cidade - Nome da Seção` em telas, tabelas, matrizes e PDF (§7.1).
-6. **Criação bidirecional espelhada por padrão:** Seções e Locais de Serviço bidirecional nascem com Ida e Volta no mesmo ponto; a Volta é ajustada (ou, para Local, excluída) na montagem do itinerário de Volta (§7.1–§7.2).
+6. **Criação bidirecional espelhada só para Seções**: Seções de Serviço bidirecional nascem com Ida e Volta no mesmo ponto, e a Volta é ajustada na montagem do itinerário de Volta (§7.1). Locais nascem **unidirecionais** — só o ponto do sentido em edição; a Volta usa seus próprios Locais, independentes dos da Ida (§7.2).
 7. **Sem R$ nesta versão** — matrizes e PDF só em km; a exibição de tarifa via portaria (Spec 03 §11) fica para versão futura (§9.2).
 8. **Faixas de horário fixadas** (madrugada, pico manhã, entre-pico manhã, entre-pico almoço, entre-pico tarde, pico tarde, noite) com os intervalos de §10; classificação pelo `horario_saida`.
 9. **Contagens sempre rotuladas "semana padrão (sem feriados)"** na tela e no PDF (§10, §13.3).
