@@ -19,7 +19,9 @@ const nextConfig: NextConfig = {
   // server trata como origem distinta de `localhost` — sem esta liberação, a
   // página não hidrata e a suíte inteira falha. Efeito só em `next dev`:
   // ignorado no export estático e no `next start` do executor canônico.
-  allowedDevOrigins: ["127.0.0.1"],
+  // `10.23.36.9` libera o acesso via IP de rede local (`next dev -H 0.0.0.0`)
+  // para colegas na mesma rede.
+  allowedDevOrigins: ["127.0.0.1", "10.23.36.9"],
 };
 
 export default nextConfig;

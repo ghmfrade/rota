@@ -78,7 +78,9 @@ export function EtapaIdentificacao({
       })
       .catch((erro: unknown) => {
         if (ativo) {
-          definirErroListas(erro instanceof Error ? erro.message : String(erro));
+          definirErroListas(
+            erro instanceof Error ? erro.message : String(erro),
+          );
         }
       });
     return () => {
@@ -195,7 +197,11 @@ function SeletorDeAutos({
   if (erroListas) {
     return (
       <Painel>
-        <p role="alert" data-testid="erro-listas-identificacao" className="text-sm text-erro">
+        <p
+          role="alert"
+          data-testid="erro-listas-identificacao"
+          className="text-sm text-erro"
+        >
           Não foi possível carregar as listas estáticas de Autos/empresas:{" "}
           {erroListas}
         </p>
@@ -289,9 +295,9 @@ function PreVisualizacaoDoCandidato({
           className="mt-4"
         >
           <p className="text-sm">
-            Este Autos já opera. Considere carregar o JSON vigente em vez de
-            criar um documento do zero — sem o arquivo anterior, o Comparador
-            tratará tudo como novo.
+            A funcionalidade de criação de arquivo ROTA do zero deve ser
+            utilizada exclusivamente na primeira implantação da tabela
+            operacional do Autos de linha.
           </p>
         </Painel>
       )}

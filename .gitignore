@@ -24,3 +24,5 @@ playwright-report/
 # Sistema operacional
 .DS_Store
 Thumbs.db
+
+certificates
