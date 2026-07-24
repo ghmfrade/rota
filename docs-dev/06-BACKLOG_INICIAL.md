@@ -1772,6 +1772,7 @@ A Spec 04 §7.3 item 5 já prevê que "ponto de rota criado/movido/**removido**"
 - **Distinguir clique de arraste é o risco principal:** limiar muito baixo transforma tremor de mão em remoção acidental; muito alto, o clique não pega. Escolher limiar em pixels, documentá-lo e testar os dois lados da borda.
 - O marcador é elemento DOM acima do canvas: garantir que o clique nele **não** vaze para o `click` do mapa e crie um ponto novo no lugar do removido (a precedência "vértice ganha da linha" é a DEC-057).
 - Remoção sem desfazer: aceitável porque o ponto é refazível com um clique (RN-042) — **não** inventar confirmação (nenhuma spec a prevê).
+- **Depende da TASK-097** (acrescentado em 2026-07-24): enquanto o arrasto perto da linha for revertido pelo re-render do hover, um arrasto legítimo termina sem deslocamento efetivo e fica a um passo de ser lido como clique — ou seja, como **remoção**. Rodar a 070 antes da 097 troca um bug inócuo (gesto que não faz nada) por um destrutivo (gesto que apaga o ponto). Acrescentar critério de aceite: arrasto **sobre a linha** move e nunca remove, com o hover ativo durante o gesto.
 
 ## Perguntas em aberto
 
@@ -2186,10 +2187,11 @@ Pedido do responsável (2026-07-17), **decidido pela DEC-062**. Hoje `etapa-itin
 - O modelo atual de estado é fortemente indexado por `(servicoUuid, sentido)` — favorece a mudança, mas os handlers assumem "sentido selecionado" único em vários pontos.
 - Tabela lateral: definir na análise se mostra o sentido ativo (recomendado, com a Q-043 tornando a Volta derivada) ou as duas listas.
 - Composição visual por sentido: numeração, segundo plano e erro RN-035 precisam coexistir sem fazer um Local válido parecer inválido.
+- **Re-render durante gesto de arrasto** (acrescentado em 2026-07-24): abas de sentido e dois painéis de descrição multiplicam os re-renders desta superfície, e cada render sincroniza os marcadores do mapa. A **TASK-097** estabelece o invariante que impede isso de reverter um arrasto em curso (`sincronizarMarcadores` não reposiciona o marcador em arrasto); rodar a 076 antes da 097 reintroduz o defeito por um caminho novo. Não é dependência dura, mas a ordem 097 → 076 é fortemente recomendada, e a análise da 076 deve reafirmar o invariante.
 
 ## Dependências
 
-- **DEC-062** (decidida — task liberada). Recomendado: após TASK-064..071 e a TASK-079 (lista unificada que a aba rege); depende também da TASK-068/DEC-070 para preservar o estado contextual por sentido.
+- **DEC-062** (decidida — task liberada). Recomendado: após TASK-064..071 e a TASK-079 (lista unificada que a aba rege); depende também da TASK-068/DEC-070 para preservar o estado contextual por sentido. Recomendado também **após a TASK-097** (invariante de arrasto — ver Riscos).
 
 ## Perguntas em aberto
 
@@ -2366,10 +2368,11 @@ Relato do responsável (2026-07-17): mover uma Seção hoje exige arrastar ponto
 - **Cascata de recálculo multi-Serviço** é caminho novo (hoje o recálculo é do itinerário corrente): definir na análise se recalcula na hora (várias chamadas OSRM) ou marca os itinerários como desatualizados com pendência — decisão de UX a alinhar na `/analisar-task` (sem inventar regra: RN-052 manda recalcular ao editar coordenada).
 - Conflito de gesto com DEC-055 (clique direito = menu) e TASK-070 (clique no vértice remove): o gesto de entrada/cancelamento não pode colidir — por isso a Q-041 deixa o desenho para o design sob DEC-050.
 - Serviço em construção (modo novo): pontos vivem em `secoesEmConstrucao` — cobrir os dois modos.
+- **Arrasto sobre a linha da rota** (acrescentado em 2026-07-24): o gesto desta task é, por definição, um arrasto no mapa — e a translação de uma Seção acontece justamente em cima do traçado, onde a **TASK-097** documenta que o arrasto é hoje revertido pelo re-render do hover. Sem a 097, o modo de realocação nasce quebrado exatamente no caso central. **Dependência dura: 097 antes da 078.**
 
 ## Dependências
 
-- **DEC-061** (decidida — task liberada). Recomendado: após o ramo pendente do mapa (TASK-064..071).
+- **DEC-061** (decidida — task liberada). Recomendado: após o ramo pendente do mapa (TASK-064..071). **Requer a TASK-097** (arrasto sobre a linha deixa de ser revertido — ver Riscos).
 
 ## Perguntas em aberto
 
@@ -4404,5 +4407,365 @@ ramo do mapa: 064 → 065 → 071 → 066 → 067
   de rota. Defeito anterior às **TASK-094/095** (vem da TASK-019), não é
   regressão delas; roda **depois** das duas. Prioridade alta: inutiliza a
   inserção de Local no fluxo criar-do-zero.
+
+**Bugs de gesto do mapa relatados pelo responsável em 2026-07-24:**
+
+```text
+097 (prioridade máxima) → 070
+                        → 076 → 078
+098 (independente da 097; após DEC-078)
+```
+
+- **TASK-097** (bug) corrige a reversão silenciosa do arrasto de marcador quando
+  o cursor passa dentro da tolerância de 6 px da linha da rota: o hover
+  (TASK-069/DEC-072) provoca um re-render por `mousemove` e
+  `sincronizarMarcadores` devolve o marcador em arrasto à posição da prop, de
+  modo que o `dragend` lê a coordenada antiga e o gesto vira no-op (viola
+  **Spec 04 §7.3 itens 4/5/6** e **RN-052**). Atinge ponto de rota, Seção e
+  Local. Defeito de implementação, sem lacuna de domínio. **Roda antes da
+  TASK-070** (com a 070 no ar, um arrasto frustrado passa a ser candidato a
+  remoção destrutiva) e antes da **TASK-076** (abas/dois painéis multiplicam os
+  renders da mesma superfície).
+- **TASK-098** implementa a **DEC-078** (Q-056): o `contextmenu` sobre a linha
+  passa a entregar a **coordenada projetada** no traçado, como o clique esquerdo
+  já faz desde a DEC-072 — a Seção/Local intermediária deixa de nascer deslocada
+  da linha azul. Independente da 097; toca o mesmo arquivo (`shared/mapa/mapa.tsx`),
+  então convém não rodar as duas em paralelo.
+
+## TASK-097 — Arrastar marcador perto da linha da rota deixa de ser revertido pelo re-render do hover
+
+## Objetivo
+
+Ao final, arrastar um ponto de rota (ou um marcador de Seção/Local) e soltá-lo **sobre ou perto da linha da rota** aplica a nova coordenada e dispara o recálculo, como já acontece longe da linha. Hoje o gesto é silenciosamente revertido: o marcador volta à posição anterior e nada é recalculado.
+
+## Contexto
+
+Bug relatado pelo responsável (2026-07-24), reproduzível nos dois caminhos (Autos do zero e JSON carregado): o usuário arrasta um ponto de rota para cima da pista já pintada de azul pelo itinerário — exatamente o ajuste fino que a Spec 04 §7.3 item 6 prevê — e o sistema "não aceita e cancela o arrastar".
+
+**Causa-raiz confirmada em diagnóstico** (teste descartável, reproduzido e depois removido), em quatro elos:
+
+1. `src/shared/mapa/mapa.tsx` — a cada `mousemove` **dentro da tolerância de 6 px da camada de linhas**, o mapa chama `aoMoverSobreLinha(projeção)` (TASK-069/DEC-072).
+2. `src/formulario/itinerarios/editor-mapa-itinerario.tsx` — o callback grava `preVisualizacao` com um **objeto novo a cada evento**, provocando um re-render por `mousemove`.
+3. `src/shared/mapa/mapa.tsx` — todo render recria o array `marcadores`, disparando o `useEffect([marcadores])` → `sincronizarMarcadores`.
+4. `sincronizarMarcadores` chama `existente.setLngLat(spec.posicao)` **incondicionalmente**, inclusive no marcador em arrasto. O `Marker.setLngLat` do MapLibre reposiciona sem checar estado de arrasto (verificado em `node_modules/maplibre-gl/dist/maplibre-gl-dev.js`). No `dragend`, o handler lê `marcador.getLngLat()` — já revertido para a posição da prop — e chama `aoArrastar` com a coordenada **antiga**: o gesto vira no-op.
+
+Saída do diagnóstico (posições recebidas pelo marcador durante o arrasto sobre a linha): `[-46.45,-23.88]` (inicial) → `[-46.4,-23.9]` (arrasto) → **`[-46.45,-23.88]` (revertido)**. Com o cursor fora da linha, o controle passou sem reversão — o hover devolve `null` sobre um estado que já é `null`, o React descarta o update e não há re-render. É exatamente a assimetria relatada ("perto ou sobre a rota").
+
+**Alcance maior que o relatado:** o mesmo mecanismo derruba o arrasto de **Seção e de Local** sempre que o marcador transita perto do traçado — o caso normal, já que a linha corre sobre as vias (argumento da própria DEC-055). O defeito atinge a Spec 04 §7.3 **item 4** ("move coordenadas arrastando marcadores; soltar o marcador dispara revalidação (350 m) e recálculo") tanto quanto o item 6.
+
+Não exige decisão nova: a spec e a **RN-052** já mandam recalcular "no soltar de cada gesto". É defeito de implementação, não lacuna de domínio.
+
+## Fora de escopo
+
+- **Projetar/grudar a coordenada solta sobre a linha** — arrastar continua entregando a coordenada exata onde o usuário soltou (a projeção do clique direito é a **DEC-078/TASK-098**; a do clique esquerdo já é a DEC-072). Grudar o arrasto foi a opção **C descartada** na Q-056.
+- **Clicar no vértice para remover o ponto de rota** — é a **TASK-070**, que roda depois desta.
+- Qualquer mudança na regra dos 350 m, na derivação de município, no ancorador (`ancorarPontoNaRota`/`projetarNaLinha`), no motor de montagem ou no cliente OSRM.
+- Mudar a affordance de hover em si (cor, forma ou existência do vértice fantasma — DEC-057/069/072): esta task só decide **quando** ele não deve aparecer.
+- Otimizar o número de renders do `EditorMapaItinerario` (memoização do array de marcadores) — mitigação frágil que não é o invariante correto; se merecer, vira task própria.
+- Contrato JSON, schema, `versao_schema`, PDF, Comparador — nada muda.
+
+## Specs fonte
+
+- Spec 04 §7.3 item 4 ("**Move coordenadas** arrastando marcadores; soltar o marcador dispara revalidação (350 m) e recálculo da rota")
+- Spec 04 §7.3 item 5 ("recalcula a rota sempre que o itinerário muda … coordenada movida, ponto de rota criado/**movido**/removido")
+- Spec 04 §7.3 item 6 (ponto de rota: "clicar sobre a linha da rota calculada cria um vértice **arrastável**; soltar recalcula")
+- Spec 04 §7.3, regra explícita de UX ("Alterar itinerário, paradas, **coordenadas** ou pontos de rota chama OSRM — no momento do 'soltar'/confirmar de cada gesto")
+- Spec 03 §3.6 (ponto de rota ancorado ao trecho que molda)
+
+## Regras envolvidas
+
+- **RN-052** — Abrir JSON não chama OSRM; **editar recalcula** ("alterar itinerário/paradas/**coordenadas**/pontos de rota recalcula, no 'soltar' de cada gesto"). É a regra hoje violada.
+- **RN-042** — Ponto de rota sem identidade; a posição no array é a identidade dentro do gesto (o índice usado por `aoMoverPontoDeRota` precisa continuar correto).
+- **RN-027** — 350 m por centroide cumulativo (Seção): a revalidação do arrasto de Seção passa a receber a coordenada realmente solta, e não a antiga.
+- **RN-032** — 350 m pareado de Local: idem para o arrasto de Local.
+- **RN-048** — Falha do OSRM no recálculo pós-arrasto não apaga a última rota válida.
+- **RN-097** — `shared/mapa` é primitiva desacoplada: a correção precisa ser aditiva e não alterar o comportamento de consumidores que não usam `aoMoverSobreLinha` (Comparador futuro, demo pages).
+- **RN-096** — nada de persistência nova; o estado de arrasto é efêmero e nunca exportado.
+
+## Entidades afetadas
+
+- **ponto de rota** (gesto principal relatado)
+- **Seção** e **Local** (mesmo defeito no arrasto de suas geolocalizações — Spec 04 §7.3 item 4)
+- Nenhuma entidade muda de forma no contrato JSON.
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] `sincronizarMarcadores` **não** chama `setLngLat` (nem remove/recria) o marcador que está em arrasto; os demais marcadores continuam sendo sincronizados normalmente no mesmo render.
+- [ ] O estado "em arrasto" é derivado dos eventos `dragstart`/`dragend` do próprio `Marker`, guardado em `ref` (não em estado de React — não pode provocar render).
+- [ ] Ao soltar um ponto de rota **sobre a linha da rota**, `aoArrastar` recebe a coordenada **onde o usuário soltou** (não a anterior) e o recálculo é disparado (RN-052).
+- [ ] Ao soltar um marcador de **Seção** sobre/perto da linha, `revalidarArrasto` recebe a coordenada solta e a revalidação de 350 m roda sobre ela (RN-027); recusa continua devolvendo o marcador à posição antiga, como hoje (DEC-044).
+- [ ] Ao soltar um marcador de **Local** sobre/perto da linha, idem com `revalidarArrastoLocal` (RN-032).
+- [ ] Enquanto houver arrasto em curso, o mapa **não** emite `aoMoverSobreLinha` e o **vértice fantasma não aparece**; ao terminar o arrasto, o hover volta a funcionar normalmente (fantasma reaparece ao passar sobre a linha).
+- [ ] Terminado o arrasto, a sincronização volta ao normal: um render subsequente reposiciona o marcador para a posição da prop (ex.: recálculo que reancora o ponto).
+- [ ] Consumidor de `Mapa` **sem** `aoMoverSobreLinha` e sem marcador arrastável fica inalterado (RN-097) — demo pages e E2E de 350 m continuam verdes.
+- [ ] Nenhum `data-testid`/`aria-*` alterado (doc 18 §6.5); nenhuma mudança em `src/shared/contrato/`.
+
+## Casos válidos
+
+- Itinerário com rota desenhada e 1 ponto de rota fora da via. Arrastar o vértice até ficar **em cima** da linha azul e soltar → o vértice permanece onde foi solto, `aoMoverPontoDeRota` recebe o índice correto e a coordenada nova, OSRM é chamado uma vez (mock).
+- Mesmo cenário, arrastando o vértice para **longe** da linha (comportamento que já funciona hoje) → continua funcionando, sem regressão.
+- Arrastar um marcador de **Seção** por cima da linha até um ponto a ≤ 350 m do centroide resultante → aceito, geolocalização atualizada, rota recalculada.
+- Arrasto que atravessa a linha e termina fora dela → coordenada final é a de fora; o fantasma não apareceu em nenhum momento do trajeto.
+
+## Casos inválidos
+
+- Arrastar um marcador de **Seção** para além dos 350 m, passando por cima da linha → **recusado** com a mensagem de 350 m já existente, e o marcador volta à posição antiga (DEC-044/Q-025) — a recusa é de domínio e **não** pode ser confundida com a reversão que esta task elimina; teste explícito separando as duas.
+- Arrastar um **Local** para além dos 350 m do par (Local legado com dois pontos) → recusado com a mensagem de Local, mesma separação.
+- Arrasto seguido de falha do OSRM (mock `NoRoute`) → pendência bloqueante, última rota válida preservada (RN-048), e a coordenada solta **não** é revertida por causa da falha.
+- `mousemove` sobre a linha **sem** nenhum arrasto em curso → o fantasma aparece normalmente (a supressão não pode vazar para o caso comum).
+
+## Testes esperados
+
+- **Unitários** (`testes/unitarios/mapa/mapa.test.tsx`): o dublê de `Marker` passa a registrar `on("dragstart"/"dragend")` e a gravar as chamadas de `setLngLat`. Casos: (a) re-render com o marcador em arrasto **não** produz nova chamada de `setLngLat` naquele marcador; (b) o mesmo re-render **sincroniza** os demais marcadores; (c) depois do `dragend`, um novo render volta a sincronizar o marcador; (d) `mousemove` sobre a linha durante o arrasto **não** chama `aoMoverSobreLinha`; (e) sem arrasto, chama (guarda de não-regressão da TASK-069).
+- **Unitários** (`testes/unitarios/formulario/editor-mapa-itinerario.test.tsx`): o marcador de ponto de rota continua expondo `aoArrastar` com o índice correto; o fantasma não é montado enquanto há arrasto.
+- **Integração:** arrasto de ponto de rota com hover sobre a linha entre `dragstart` e `dragend` → `aplicarNovasParadas` recebe a lista com a coordenada **nova** e o OSRM mockado é chamado uma vez; asserção explícita de **RN-004** (as UUIDs de Seções/Locais do documento não mudam no gesto).
+- **E2E** (`testes/e2e/etapa-itinerarios.spec.ts`, OSRM e tiles mockados): criar um ponto de rota, arrastá-lo até sobre a linha, soltar e aferir que a coordenada listada na tabela lateral mudou e que não há pendência bloqueante.
+- **Snapshot/contrato JSON:** `pontos_de_rota` resultante bem-formado (`apos_parada_ordem ∈ [1, paradas−1]`, sem `uuid`) — RN-042.
+- **PDF:** não se aplica.
+
+## Arquivos prováveis
+
+- **Alterar:** `src/shared/mapa/mapa.tsx` (ref de marcador em arrasto; guarda em `sincronizarMarcadores`; supressão de `aoMoverSobreLinha` durante o arrasto).
+- **Alterar:** `src/formulario/itinerarios/editor-mapa-itinerario.tsx` — **somente se** a supressão do fantasma exigir sinal do lado do consumidor; a preferência é resolver inteiramente na primitiva.
+- **Alterar:** `testes/unitarios/mapa/mapa.test.tsx`, `testes/unitarios/formulario/editor-mapa-itinerario.test.tsx`, `testes/e2e/etapa-itinerarios.spec.ts`.
+- **Não tocar:** `src/shared/mapa/ancoragem.ts`, `src/formulario/roteamento/**`, `src/formulario/secoes/**`, `src/formulario/locais/**`, `src/shared/contrato/**`.
+
+## Riscos
+
+- **Marcador "preso"** se o `dragend` não disparar (desmontagem do marcador no meio do arrasto, remoção da lista): a limpeza do `ref` precisa cobrir a remoção do marcador em `sincronizarMarcadores` e o `unmount` do mapa, senão um marcador deixa de ser sincronizado para sempre. Caso inválido a testar.
+- **Interação com a TASK-070** (clique no vértice remove): hoje o MapLibre suprime o `click` do elemento durante o arrasto (`pointerEvents = "none"` em `_onMove`), mas a 070 vai introduzir limiar de clique × arraste sobre este mesmo caminho. Esta task deve rodar **antes** da 070 — com a reversão viva, um arrasto frustrado é inofensivo; com a 070 no ar, passa a ser candidato a remoção destrutiva.
+- **Interação com a TASK-076** (Ida e Volta no mesmo mapa): abas e dois painéis multiplicam os re-renders desta superfície. O guarda desta task é o invariante que impede a 076 de reintroduzir o defeito por outro caminho.
+- Regressão da affordance de hover (TASK-069/DEC-072) se a supressão vazar para fora do arrasto — coberta por teste de não-regressão explícito.
+
+## Perguntas em aberto
+
+Nenhuma. O comportamento correto está fixado pela Spec 04 §7.3 itens 4/5/6 e pela RN-052; não há lacuna de domínio a decidir.
+
+---
+
+## TASK-098 — Clique direito sobre a linha entrega a coordenada projetada no traçado (DEC-078)
+
+## Objetivo
+
+Ao final, a Seção ou o Local criado pelo menu do **clique direito sobre a linha da rota** nasce na coordenada **projetada sobre o traçado** (ponto do itinerário mais próximo do clique), e não no pixel bruto do cursor. Clique direito fora da linha continua na coordenada bruta.
+
+## Contexto
+
+Bug relatado pelo responsável (2026-07-24): ao criar uma Seção/Local intermediária clicando com o botão direito **em cima do itinerário calculado**, a entidade não nasce sobre a linha (como acontece com o ponto de rota), mas no ponto exato onde o usuário clicou — deslocada do traçado, o que é inconveniente.
+
+A causa é uma assimetria entre os dois botões em `src/shared/mapa/mapa.tsx`: o handler de `click` projeta a coordenada com `projetarSobreLinhas` antes de entregá-la (**DEC-072**, TASK-069), mas o handler de `contextmenu` repassa `evento.lngLat` cru. Essa coordenada segue intacta por `editor-mapa-itinerario.tsx` (`menuCriacao.posicao` → `aoIniciarCriacaoParada`) até `confirmarCriacaoInline` em `etapa-itinerarios.tsx`, onde vira a `geolocalizacao_*` persistida da entidade.
+
+O **índice de inserção** na lista de paradas **já está correto** e não é objeto desta task: `indiceInsercaoParaPosicao` chama `ancorarPontoNaRota`, que projeta internamente. O único defeito é a coordenada da entidade.
+
+Como a coordenada persistida é entrada da **RN-027** (350 m) e da **RN-029** (município), a mudança não podia ser decidida pelo implementador. Foi levantada como **Q-056** e decidida pelo responsável nesta mesma conversa: **DEC-078**, opção A — estender a DEC-072 ao botão direito.
+
+## Fora de escopo
+
+- **Grudar o arrasto de Seção/Local no traçado** — opção C explicitamente **descartada** na Q-056/DEC-078: arrastar continua entregando a coordenada solta, preservando o posicionamento deliberado fora da linha.
+- **Alterar o índice de inserção** na lista de paradas (já correto, via `ancorarPontoNaRota`) ou o comportamento do clique direito **fora** da linha (continua acrescentando ao fim — DEC-055).
+- Corrigir a reversão do arrasto perto da linha — é a **TASK-097**, independente desta.
+- Mudar a tolerância do hit-test (6 px), a forma do menu flutuante, a linha-formulário inline (TASK-095/DEC-077) ou qualquer motor de Seção/Local/350 m/município.
+- Contrato JSON, schema, `versao_schema`, PDF, Comparador — nada muda.
+
+## Specs fonte
+
+- Spec 04 §7.3 item 2 ("insere **Seções e Locais em ordem**, clicando no mapa")
+- Spec 04 §7.3 item 6 (clicar sobre a linha da rota calculada) — origem da simetria com a DEC-072
+- Spec 02 §5.1 (`secao.servicos[].geolocalizacao_ida`/`_volta`)
+- Spec 02 §7.1 (geolocalizações do Local)
+- Spec 03 §2.1/§2.2 (regra dos 350 m sobre a geolocalização) e §2.3 (município derivado)
+
+## Regras envolvidas
+
+- **RN-027** — 350 m por centroide cumulativo (Seção): passa a ser avaliada sobre a coordenada projetada; a regra **não muda de texto**, só a entrada.
+- **RN-029** — Município derivado por ponto-em-polígono: idem; a derivação continua rodando sobre a coordenada efetivamente persistida.
+- **RN-026** — Cada Serviço contribui suas geolocalizações à Seção (é este valor que passa a ser o projetado).
+- **RN-032** — 350 m pareado de Local (inalterada; Local nasce unidirecional — DEC-075).
+- **RN-042** — Ponto de rota (inalterado): esta task não toca o gesto do botão esquerdo.
+- **RN-097** — extensão **aditiva** da primitiva `shared/mapa`: consumidor sem `aoClicarDireitoNaLinha` fica inalterado.
+- **RN-004** — UUIDs preservadas: a projeção altera coordenada, nunca identidade.
+
+## Entidades afetadas
+
+- **Seção** (`geolocalizacao_ida`/`geolocalizacao_volta` da entrada do Serviço)
+- **Local** (geolocalização do sentido em edição)
+- **Parada** (posição na lista **inalterada** — só a coordenada da entidade muda)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] `contextmenu` que **acerta** a camada de linhas entrega a `aoClicarDireitoNaLinha` a **mesma coordenada projetada** que um `click` no mesmo ponto entregaria a `aoClicarNaLinha` (paridade provada por teste).
+- [ ] `contextmenu` **fora** da camada continua entregando a coordenada **bruta** a `aoClicarDireito`, sem projeção.
+- [ ] A Seção criada pelo menu do clique direito sobre a linha persiste a coordenada **projetada** em `secao.servicos[].geolocalizacao_<sentido>` (RN-026).
+- [ ] O Local criado pelo mesmo caminho persiste a coordenada projetada na geolocalização do sentido em edição (DEC-075 preservada — nasce unidirecional).
+- [ ] A validação dos **350 m** (RN-027) e a derivação de **município** (RN-029) rodam sobre a coordenada projetada — recusa por 350 m e por "fora de SP" continuam funcionando, com as mensagens atuais.
+- [ ] O **índice de inserção** na lista de paradas permanece o mesmo de hoje (nenhuma mudança em `indiceInsercaoParaPosicao`/`ancorarPontoNaRota`).
+- [ ] A âncora de tela do menu flutuante (`ancoraTela`) continua na posição do **cursor**, não na projeção — o menu não pode saltar.
+- [ ] Nenhum `data-testid`/`aria-*` alterado; consumidores sem `aoClicarDireitoNaLinha` inalterados (RN-097).
+
+## Casos válidos
+
+- Rota desenhada; clique direito a 3 px da linha, escolhendo "Seção" e confirmando o nome → o marcador quadrado da Seção nasce **sobre** a linha azul, e a `geolocalizacao_<sentido>` gravada é a projeção.
+- Mesmo gesto escolhendo "Local" → marcador circular sobre a linha, Local unidirecional (DEC-075).
+- Clique direito a 50 px da linha (fora da tolerância) → coordenada bruta, parada acrescentada ao fim (DEC-055), sem projeção.
+- Itinerário **sem** rota calculada (nenhuma linha desenhada) → clique direito cai no caminho "fora da linha", como hoje.
+
+## Casos inválidos
+
+- Clique direito sobre a linha num ponto cuja **projeção** fica a > 350 m do centroide resultante da Seção → recusa de 350 m com a mensagem atual (RN-027); nenhuma Seção criada.
+- Clique direito sobre a linha num ponto cuja projeção cai **fora de SP** (> 2 km de qualquer polígono) → erro "fora de SP" (RN-029), nenhuma entidade criada.
+- Linha degenerada (`< 2` pontos, `projetarNaLinha` devolve `undefined`) → degrada para a coordenada **bruta**, sem quebrar o gesto nem descartar o clique em silêncio.
+
+## Testes esperados
+
+- **Unitários** (`testes/unitarios/mapa/mapa.test.tsx`): `contextmenu` com acerto na camada entrega a projeção (mesma coordenada do teste de `click` já existente da TASK-069); sem acerto, entrega a bruta; `ancoraTela` continua vindo de `originalEvent.clientX/clientY`.
+- **Unitários** (`testes/unitarios/formulario/editor-mapa-itinerario.test.tsx`): `aoIniciarCriacaoParada` recebe a coordenada projetada como `posicao` **e** como `posicaoNaLinha` quando o gesto foi sobre a linha.
+- **Integração:** criar Seção e Local pelo clique direito sobre a linha → documento resultante com a geolocalização projetada; 350 m e município avaliados sobre ela; ordem das paradas idêntica à de hoje.
+- **E2E** (`testes/e2e/etapa-itinerarios.spec.ts`, OSRM e tiles mockados): criar Seção pelo menu do clique direito sobre a linha e aferir a coordenada exibida na tabela lateral.
+- **Snapshot/contrato JSON:** documento exportado continua válido no schema strict (RN-010); nenhum campo novo (RN-008..015).
+- **PDF:** não se aplica.
+
+## Arquivos prováveis
+
+- **Alterar:** `src/shared/mapa/mapa.tsx` (handler de `contextmenu` reusa `projetarSobreLinhas`).
+- **Alterar (provavelmente nada):** `src/formulario/itinerarios/editor-mapa-itinerario.tsx` e `etapa-itinerarios.tsx` — a coordenada já flui até `criarSecaoNoPonto`/`criarLocalNoPonto`; confirmar sem alterar lógica.
+- **Alterar:** `testes/unitarios/mapa/mapa.test.tsx`, `testes/unitarios/formulario/editor-mapa-itinerario.test.tsx`, `testes/e2e/etapa-itinerarios.spec.ts`.
+- **Não tocar:** `src/shared/mapa/ancoragem.ts` (reusado sem alteração), `src/formulario/secoes/fluxos-secao.ts`, `src/formulario/locais/fluxos-local.ts`, `src/shared/contrato/**`.
+
+## Riscos
+
+- **Baixo acoplamento, efeito amplo:** a projeção passa a valer para **todo** consumidor de `aoClicarDireitoNaLinha`. Hoje só o mapa único de itinerários usa a prop — confirmar por varredura antes de fechar.
+- Documentos **já exportados** com Seções fora do traçado permanecem válidos e não são migrados (nada reprocessa coordenada existente) — comportamento correto: nenhuma migração de dado é criada.
+- Deslocamento de poucos metros pode, em caso de fronteira municipal, mudar a derivação da RN-029. Aceito na DEC-078; caso inválido de "fora de SP" coberto por teste.
+
+## Perguntas em aberto
+
+Nenhuma. **Q-056 decidida (DEC-078, 2026-07-24)**.
+
+## TASK-099 — Renomear `aoAtualizarSessao` para `aoDefinirSessao` (par homófono `Sessao`/`Secao` no Formulário)
+
+## Objetivo
+
+Ao final, a prop/callback que troca **a sessão inteira de edição** não se chama mais `aoAtualizarSessao`, e por isso deixa de ser confundível com `aoAtualizarSecao`, que entrega **uma Seção**. Refactor puro de nomenclatura de código: nenhum comportamento, contrato, regra ou teste de asserção muda.
+
+## Contexto
+
+`aoAtualizarSessao` (7 arquivos de `src/`, 4 de testes, **59 ocorrências em 54 linhas** — conferido em 2026-07-24) e `aoAtualizarSecao` (`editor-secoes.tsx`, `editor-mapa-itinerario.tsx`, `painel-reuso-secao.tsx`, `app/editor-secoes-demo/page.tsx`) são coisas sem relação: a primeira troca o `SessaoFormulario` inteiro (`aplicacao-formulario.tsx:30` a liga ao `definirSessao` do React state); a segunda entrega uma `Secao` ao host, que a converte em gesto de sessão. O fluxo é sempre `aoAtualizarSecao` → host → `aoAtualizarSessao`, **nunca** o contrário.
+
+Os dois nomes diferem por **uma letra**, são **homófonos em português** e ambos são props de callback do mesmo módulo (`formulario/itinerarios/etapa-itinerarios.tsx` usa as duas no mesmo arquivo, incluindo lado a lado nas linhas 1095/1116). Trocar um pelo outro por engano é plausível, e nos pontos em que as assinaturas casam o erro **compila em silêncio**.
+
+Levantado durante a `/analisar-task` da TASK-097 e deixado **fora do escopo** dela (o "Fora de escopo" é vinculante). **Não é bug** — nada está quebrado hoje; é risco de leitura e de digitação.
+
+**Escolha do nome.** "Seção" é nomenclatura oficial das specs (Spec 02 §5) e **intocável** (`docs-dev/04` princípio 12; `docs-dev/18` §6 item 7), então quem renomeia é o lado da sessão de trabalho. **Nome proposto: `aoDefinirSessao`.** Justificativa: (a) desfaz a colisão no **verbo**, não só no substantivo — `definir` vs. `atualizar` não são homófonos nem prefixo um do outro, e o par deixa de diferir por uma letra; (b) espelha o nome real da origem, `definirSessao` em `aplicacao-formulario.tsx:30`; (c) **preserva o vocabulário "sessão"**, já estabelecido em ~569 ocorrências (`SessaoFormulario`, `servicosDaSessao`, `secoesDaSessao`, `identidadeDaSessao`, `comServicosDaSessao`…), o que é exatamente o que permite deixar o tipo fora do escopo sem criar vocabulário dividido.
+
+**`aoAtualizarDocumento` é a alternativa a recusar**, e a recusa é factual, não estética: a sessão **não é** o documento. `SessaoFormulario` tem dois modos e só o modo `"carregado"` carrega um `DocumentoOperacao` (`src/formulario/sessao.ts:112-149`); no modo `"novo"` não há documento nenhum. Pior, `documento` já é o nome de um **campo interno** da sessão — `aoAtualizarDocumento(sessao)` passaria a mentir sobre o que recebe. `aoAtualizarTrabalho` introduz um substantivo ("Trabalho") que não existe em lugar nenhum do código nem das specs, trocando uma confusão por um termo órfão. **A escolha final é do responsável** — é decisão de código, não de domínio, e por isso não abre Q-xxx nem DEC-xxx; se ele preferir outro nome, o resto da task vale sem alteração.
+
+**Prioridade baixa**, com restrição de sequenciamento dura (ver Riscos).
+
+## Fora de escopo
+
+- **Renomear o tipo `SessaoFormulario`** (165 ocorrências) e os demais identificadores com "sessão" (`servicosDaSessao`, `obterSessao`, `montarSessaoNaEtapa`, `sessaoAtual`, `sessaoFinal`, `SESSAO_CARREGADA`…). Justificativa: o tipo **não colide com nada** — não existe `SecaoFormulario`, e `Secao` (o tipo do contrato) nunca aparece em posição intercambiável com ele. Arrastá-lo triplicaria o diff sem reduzir risco algum, e a proposta `aoDefinirSessao` mantém o vocabulário coerente justamente para tornar esse recorte defensável. Se um dia o vocabulário inteiro mudar, é outra task, com outra justificativa.
+- **Renomear `aoAtualizarSecao`, `Secao`, `secoesDaSessao`** ou qualquer identificador do lado da entidade — proibido por `docs-dev/04` princípio 12 e `docs-dev/18` §6 item 7.
+- **Renomear a prop `sessao`** (o dado) passada lado a lado com o callback, e os locais `secao`/`sessao` dentro dos corpos de função. Superfície muito maior, risco diferente, ganho marginal.
+- **Qualquer mudança de comportamento**, de fluxo, de mensagem, de ordem de chamada, de assinatura ou de tipo. Se um `git diff` mostrar algo além de identificador renomeado (e o comentário que o cita), o refactor vazou.
+- **Contrato JSON, `versao_schema`, schema zod, RN, spec, `docs-dev/` derivados** — nada muda. `src/shared/contrato/**` e todos os motores (roteamento, 350 m, município, montagem, matrizes) **não são tocados**.
+- **Alterar `data-testid` ou `aria-*`** (`docs-dev/18` §6 item 5).
+- **Reorganizar arquivos, extrair funções, "aproveitar para" simplificar** o fluxo da sessão.
+
+## Specs fonte
+
+- **Spec 02 §5** — Seção é entidade do Autos, compartilhada: fixa "Seção" como termo do domínio, logo o lado **não renomeável** do par.
+- **Spec 04 §7.1** — Inserção de Seções: o gesto que `aoAtualizarSecao` serve.
+- **Spec 04 §12** — Exportação JSON: exportar **é** salvar, portanto "sessão" é estado efêmero de edição e **não** é conceito de spec — é o lado renomeável do par.
+
+## Regras envolvidas
+
+- **RN-025** — Seção é entidade do Autos, compartilhada. Nomenclatura de Seção preservada integralmente.
+- **RN-096** — o Formulário não persiste no servidor; a sessão é estado efêmero de memória, sem correspondente no contrato. Fundamenta renomear o lado da sessão.
+- **RN-004** — UUIDs preservadas na importação: invariante que o refactor não pode roçar; o round-trip existente continua verde **sem alteração de asserção**.
+- **RN-010** — schema strict, JSON só com dados de operação: nenhum campo, nenhum nome de campo do contrato muda.
+- **RN-008..015** — contrato fechado: intocado.
+
+## Entidades afetadas
+
+**Nenhuma.** Não há mudança em Autos, Serviço, Seção, Local, Parada, ponto de rota ou Viagem — nem em estrutura, nem em nome, nem em comportamento. A mudança é de **identificador de código** de um callback de UI.
+
+## Ferramentas afetadas
+
+- [x] Formulário (apenas nomenclatura interna)
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] `grep -rn "aoAtualizarSessao" src testes` devolve **zero** ocorrências.
+- [ ] O novo nome aparece exatamente nos **mesmos 11 arquivos** e nas mesmas posições (7 de `src/`, 4 de testes) — nenhum arquivo novo tocado, nenhum deixado para trás.
+- [ ] `aoAtualizarSecao` permanece **byte a byte igual** nos 4 arquivos onde existe (`src/formulario/secoes/editor-secoes.tsx`, `src/formulario/itinerarios/editor-mapa-itinerario.tsx`, `src/formulario/itinerarios/painel-reuso-secao.tsx`, `src/app/editor-secoes-demo/page.tsx`) e em seus testes.
+- [ ] O tipo `SessaoFormulario` e todo o restante do vocabulário "sessão" permanecem inalterados (fora de escopo declarado).
+- [ ] `npm run typecheck` e `npm run lint` verdes.
+- [ ] Suíte canônica completa verde (`npm run test:all:log`), **sem nenhuma asserção de comportamento alterada** — nos 4 arquivos de teste o diff é só o identificador.
+- [ ] Nenhum `data-testid` e nenhum `aria-*` alterado (`docs-dev/18` §6 item 5) — verificável por `git diff`.
+- [ ] `git diff -- src/shared/contrato src/shared/geo src/formulario/roteamento src/formulario/exportacao src/formulario/importacao` é **vazio**.
+- [ ] Comentários que citam o nome antigo foram atualizados junto; nenhum comentário passou a descrever comportamento diferente.
+
+## Casos válidos
+
+- `src/formulario/aplicacao-formulario.tsx:30` — `<LayoutFormulario sessao={sessao} aoDefinirSessao={definirSessao} />`: o callback continua sendo o `definirSessao` do estado React, mesma referência, mesma assinatura `(sessao: SessaoFormulario) => void`.
+- `src/formulario/layout/layout-formulario.tsx` — a prop é declarada, desestruturada e repassada às cinco etapas (Identificação, Serviços, Itinerários, Viagens, Matrizes) com o nome novo; nenhuma etapa fica com o nome antigo.
+- `src/formulario/itinerarios/etapa-itinerarios.tsx:1095/1116` — `aoAtualizarSecao={aoCriarOuAtualizarSecao}` **permanece intacto** no mesmo componente em que `aoDefinirSessao` passa a ser consumido; é o ponto que dava origem à confusão e o que prova que ela acabou.
+- Os 4 testes (`etapa-itinerarios.test.tsx`, `layout-formulario-shell.test.tsx`, `servicos-contadores.test.tsx`, `servicos-etapa.test.tsx`) passam com o nome novo, com o mesmo número de casos, os mesmos títulos e as mesmas asserções.
+
+## Casos inválidos
+
+Aqui "inválido" é o que **reprova a entrega**, não entrada de usuário — a task não introduz validação:
+
+- Sobrou qualquer `aoAtualizarSessao` em `src/` ou `testes/` → reprova (rename parcial deixa dois nomes para a mesma coisa, pior que o estado atual).
+- Um `data-testid`, um `aria-*` ou um texto de UI apareceu no diff → reprova (`docs-dev/18` §6 item 5).
+- Um arquivo de `src/shared/contrato/**` ou de qualquer motor foi tocado → reprova.
+- Alguma **asserção** de teste mudou (valor esperado, contagem, título de caso, mock) → reprova: é sinal de que o refactor vazou para comportamento.
+- `SessaoFormulario` foi renomeado junto → reprova por ampliação de escopo.
+- O rename foi feito por substituição cega de texto e alcançou `aoAtualizarSecao`, `secoesDaSessao` ou similares → reprova.
+
+## Testes esperados
+
+- **Unitários:** **nenhum teste novo e nenhum removido.** Os 4 arquivos que citam o nome sofrem substituição mecânica do identificador. A evidência é a suíte inteira verde com diff de asserções vazio.
+- **Integração:** nenhuma alteração; `etapa-itinerarios.test.tsx` cobre o fluxo `aoAtualizarSecao` → host → callback de sessão e continua passando sem edição de asserção — é o teste que prova que a fiação sobreviveu ao rename.
+- **E2E:** nenhuma alteração esperada (nenhum seletor depende de nome de prop). Se algum `.spec.ts` precisar mudar, **pare**: significa que um `data-testid` foi tocado.
+- **Snapshot/contrato JSON:** inalterado; round-trip de RN-004 continua verde sem edição.
+- **PDF:** não se aplica.
+
+## Arquivos prováveis
+
+- **Alterar (`src/`, 7):** `formulario/aplicacao-formulario.tsx`, `formulario/layout/layout-formulario.tsx`, `formulario/identificacao/identificacao.tsx`, `formulario/itinerarios/etapa-itinerarios.tsx`, `formulario/matrizes/etapa-matrizes.tsx`, `formulario/servicos/servicos.tsx`, `formulario/viagens/etapa-viagens.tsx`.
+- **Alterar (testes, 4):** `testes/unitarios/formulario/etapa-itinerarios.test.tsx`, `layout-formulario-shell.test.tsx`, `servicos-contadores.test.tsx`, `servicos-etapa.test.tsx`.
+- **Não tocar:** `src/formulario/sessao.ts` (o tipo e os seletores ficam fora do escopo — não há ocorrência do callback ali), `src/formulario/secoes/**`, `src/formulario/itinerarios/painel-reuso-secao.tsx`, `src/formulario/itinerarios/editor-mapa-itinerario.tsx`, `src/app/**`, `src/shared/**`, `docs/specs/**`, `docs-dev/**` (exceto o registro de conclusão em `19-STATUS_EXECUCAO.md`).
+
+## Riscos
+
+- **Conflito de merge — o risco principal.** `etapa-itinerarios.tsx` é editado por **TASK-097, 070, 076, 078** e (indiretamente) **098**; um rename de 59 pontos atravessado no meio dessa fila cria conflito em arquivo grande, num diff que ninguém quer reler. **Restrição dura de sequenciamento: esta task roda DEPOIS de 097, 098, 070, 076 e 078.** Registrado na ordem recomendada do `19-STATUS_EXECUCAO.md` §5.
+- **Rename cego.** Substituição por texto sem limite de palavra pode alcançar identificadores vizinhos. Usar rename simbólico da IDE/TS ou `\baoAtualizarSessao\b`, e conferir com `git diff --stat` que só os 11 arquivos previstos aparecem.
+- **Vazamento silencioso de escopo.** Renomear código convida a "melhorar de passagem". O diff só pode conter identificador + comentários que o citam.
+- **Ganho é preventivo, não corretivo.** Nenhum bug é fechado aqui; se a fila de prioridades apertar, esta task cede lugar sempre.
+
+## Perguntas em aberto
+
+Nenhuma Q-xxx. Pendência **operacional**, não de domínio: o responsável confirma `aoDefinirSessao` (ou indica outro nome) antes da implementação — decisão de código, que por `docs-dev/04` não gera Q-xxx nem DEC-xxx.
 
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.
