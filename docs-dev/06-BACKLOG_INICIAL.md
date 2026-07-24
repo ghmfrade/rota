@@ -4180,6 +4180,134 @@ Pedido do responsável com mockup (2026-07-23, DEC-077): o campo de nome deve ap
 
 ---
 
+## TASK-096 — Gravar `servico.locais[]` pelo caminho unificado da DEC-053 (Local some no modo "novo" após a promoção)
+
+## Objetivo
+
+Ao final, criar ou arrastar um Local num Serviço **já promovido** no fluxo "novo" grava a entidade em `servico.locais[]` de fato — hoje ela é descartada silenciosamente e a Parada fica com `local_uuid` pendurado, violando RN-036.
+
+## Contexto
+
+Bug relatado pelo responsável (2026-07-23), no fluxo **criar do zero**: o Local recém-criado aparece na tabela lateral com o **UUID cru** na coluna "Cidade - Nome", o painel de montagem acusa *"Uma Parada do itinerário de Ida do Serviço 1-1SU está com a referência de Seção/Local incompleta ou com a localização do sentido faltando"*, e a partir daí o mapa **não aceita mais pontos de rota**.
+
+Causa localizada em `comLocaisAtualizados` (`src/formulario/itinerarios/etapa-itinerarios.tsx:400-415`), que bifurca por `base.modo` em vez de por `linhaAtual.completo`:
+
+```ts
+if (linhaAtual.completo && base.modo === "carregado") { /* documento.autos.servicos */ }
+if (base.modo === "novo") { /* servicosEmConstrucao */ }
+return base;   // ← perde o Local
+```
+
+No modo `"novo"`, assim que o Serviço ganha rota válida ele é promovido (**DEC-053**): `promoverServicoNaSessao` o retira de `servicosEmConstrucao` e o põe em `sessao.servicos`. A partir daí `linhaAtual.completo === true` **e** `base.modo === "novo"`, então o primeiro ramo não entra e o segundo mapeia uma lista que não contém mais o Serviço — devolvendo-a intacta. A Parada, essa sim, é comitada em `paradasEmEdicao`, produzindo a referência pendurada.
+
+Os três sintomas são a mesma raiz: (1) a linha da tabela cai no fallback `parada.localUuid`; (2) `resolverParadasRota` falha por RN-036; (3) `aoCriarPontoDeRota` (`etapa-itinerarios.tsx:946`) faz `if (!resolucao.ok) return;` e engole o clique.
+
+Seção não é afetada: `comSecoesAtualizadas` grava em `secoesEmConstrucao`, que é exatamente de onde `secoesDaSessao` lê no modo "novo" — os dois lados casam. O par correto para Serviços já existe e já está importado no arquivo: `servicosDaSessao`/`comServicosDaSessao` (`src/formulario/sessao.ts:162-182`).
+
+Defeito **anterior** às TASK-094/095 (introduzido na TASK-019, commit `b1c83ff`); as duas apenas tornaram o caminho de criação de Local mais frequente. Não é regressão delas.
+
+## Fora de escopo
+
+- Qualquer mudança no fluxo de criação de Local (unidirecionalidade, "X" que remove a entidade) — é a **TASK-094**, entregue e aprovada.
+- Qualquer mudança na linha-formulário inline — é a **TASK-095**, entregue e aprovada.
+- Refatorar `comSecoesAtualizadas` (está correta) ou generalizar as duas numa só.
+- Mudar o gatilho, a forma ou o momento da promoção (DEC-053) — esta task **consome** a promoção, não a altera.
+- Tornar a falha de `aoCriarPontoDeRota` visível ao usuário (o `return` mudo da linha 946) — é sintoma, não causa; se merecer tratamento próprio, vira task separada (ver "Perguntas em aberto").
+- Contrato JSON/schema — nada muda: `servico.locais[]` já existe (Spec 02 §7) e nada é gravado antes da exportação (RN-096).
+- Correção do `transform: none !important` em `globals.css` (marcadores do mapa empilhados no canto superior esquerdo sob `prefers-reduced-motion`) — **já aplicada** como hotfix fora de task, junto da correção de redação do doc 18 §2. Bug independente.
+
+## Specs fonte
+
+- Spec 02 §7 (Local vive em `servico.locais[]`, entidade do Serviço)
+- Spec 02 §7.1 (geolocalizações do Local)
+- Spec 02 §10.1 (integridade referencial da Parada)
+- Spec 04 §7.2 (criar/arrastar Local no mapa da etapa de itinerários)
+- Spec 04 §6/§7/§8 via **DEC-053** (promoção `ServicoEmConstrucao` → `Servico`)
+
+## Regras envolvidas
+
+- **RN-036** — Referências de Parada íntegras e com geolocalização do sentido (é a regra hoje violada).
+- **RN-031** — Local é entidade do Serviço, não compartilhado (é `servico.locais[]` que precisa receber a entidade).
+- **RN-033** — Parada: XOR `secao_uuid`/`local_uuid` (a Parada gravada é bem formada; o que falta é o alvo).
+- **RN-032** — geolocalização do sentido do Local (preservada pelo motor `criarLocalNoPonto`/`revalidarArrastoLocal`, intocado).
+- **RN-004** — UUIDs preservadas (a gravação não pode recriar nem renumerar o Local).
+- **RN-096** — exportar é o salvar: a sessão continua efêmera; nada de persistência nova.
+
+## Entidades afetadas
+
+- **Local** (`servico.locais[]`)
+- **Serviço** (destino da gravação)
+- **Parada** (deixa de ficar com referência pendurada — efeito, não alvo da edição)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] `comLocaisAtualizados` decide por `linhaAtual.completo`, não por `base.modo`: Serviço completo grava via `comServicosDaSessao(base, servicosDaSessao(base).map(...))`; Serviço em construção grava em `servicosEmConstrucao`.
+- [ ] No modo `"novo"`, com o Serviço **já promovido**, criar um Local faz o Local aparecer em `servicosDaSessao(sessao)[i].locais` com a mesma UUID devolvida por `criarLocalNoPonto`.
+- [ ] Nesse mesmo cenário, a linha da tabela lateral mostra `"Cidade - Nome"` (`nomeExibicaoLocal`), nunca o UUID cru.
+- [ ] Nesse mesmo cenário, `resolverParadasRota` resolve a Parada do Local sem violação de RN-036 (nenhum aviso de "referência de Seção/Local incompleta").
+- [ ] Nesse mesmo cenário, criar um ponto de rota clicando na linha da rota continua funcionando após a inserção do Local.
+- [ ] No modo `"carregado"` (Serviço completo do documento) e no modo `"novo"` **antes** da promoção, o comportamento atual é preservado byte a byte.
+- [ ] `aoAtualizarLocal` (arrastar o marcador do Local) grava pelo mesmo caminho corrigido — a coordenada nova sobrevive num Serviço promovido do modo "novo".
+- [ ] Nenhuma UUID é recriada em nenhum dos caminhos (RN-004).
+- [ ] `data-testid`/`aria-*` existentes intocados; nenhuma alteração de contrato, schema, OSRM ou PDF.
+
+## Casos válidos
+
+1. **Modo "novo", Serviço promovido** — documento criado do zero; Serviço `1-1SU` com itinerário de Ida já com rota válida (portanto promovido para `sessao.servicos`). Clique direito no mapa → "Local" → nome `"Rodoviária"` → confirmar. Esperado: `sessao.servicos[0].locais` contém `{ uuid, municipio: <derivado>, nome: "Rodoviária", geolocalizacao_ida: {…} }`; a tabela mostra `"<Município> - Rodoviária"`; nenhuma violação de montagem.
+2. **Modo "novo", Serviço em construção** (ainda sem rota, não promovido) — mesmo gesto. Esperado: o Local vai para `servicosEmConstrucao[i].locais` (comportamento atual, preservado).
+3. **Modo "carregado"** — JSON aberto, Serviço completo. Esperado: o Local vai para `documento.autos.servicos[i].locais` (comportamento atual, preservado).
+4. **Arrasto no modo "novo" promovido** — Local existente arrastado 100 m. Esperado: `geolocalizacao_<sentido>` atualizada em `sessao.servicos[i].locais[j]`, mesma UUID, `municipio` rederivado (RN-029).
+5. **Dois Locais em sequência no mesmo Serviço promovido** — o segundo não apaga o primeiro (a lista comitada parte da lista corrente, não de uma cópia obsoleta).
+
+## Casos inválidos
+
+1. **Serviço não encontrado na lista de destino** — `linhaAtual.servicoUuid` ausente tanto em `servicosDaSessao` quanto em `servicosEmConstrucao`: a função não pode devolver `base` calada (é exatamente o bug). Reação esperada: nenhuma Parada é comitada para uma entidade que não pôde ser gravada — o gesto é abortado antes do commit, ou a condição é impossível por construção e um teste prova a impossibilidade.
+2. **Local fora do Estado de São Paulo** — `criarLocalNoPonto` devolve `{ ok: false, motivo: "fora_de_sp" }`: a mensagem literal da Spec 04 §14 continua aparecendo na linha-formulário inline e **nada** é gravado (comportamento da TASK-095, preservado).
+3. **Arrasto que viola os 350 m pareados** (Local legado com dois pontos) — `revalidarArrastoLocal` recusa: o ponto não se move e nada é gravado (RN-032, comportamento preservado).
+4. **`linhaAtual` nulo** — nenhum Serviço selecionado: a função devolve `base` inalterada, como hoje.
+
+## Testes esperados
+
+- **Unitários:** `comLocaisAtualizados` (ou a etapa via harness) nos quatro estados — carregado/completo, novo/completo-promovido, novo/em-construção, `linhaAtual` nulo —, assertando **em qual lista** o Local aterrissa e que a UUID é a mesma (RN-004). O caso novo/promovido é o teste de regressão desta task e deve falhar contra o código atual.
+- **Integração:** em `testes/unitarios/formulario/etapa-itinerarios.test.tsx`, sessão no modo "novo" com Serviço promovido → criar Local pela linha-formulário inline (TASK-095) → asserir que a linha da tabela exibe `"Cidade - Nome"` e **não** o UUID, e que nenhum `aviso-montagem-invalida` de RN-036 é renderizado. Segundo teste: após inserir o Local, um clique na linha da rota ainda cria ponto de rota. OSRM mockado (DEC-029).
+- **E2E:** em `testes/e2e/etapa-itinerarios.spec.ts` (ou no `fluxo-novo.spec.ts`, se existir): fluxo criar-do-zero → itinerário com rota → criar Local → a tabela mostra o nome e a etapa segue navegável. OSRM e tiles mockados.
+- **Snapshot/contrato JSON:** nenhum novo; o round-trip de UUID existente já cobre a exportação e deve continuar verde.
+- **PDF:** nenhum.
+
+## Arquivos prováveis
+
+- `src/formulario/itinerarios/etapa-itinerarios.tsx` (alterar `comLocaisAtualizados`; verificar se `aoCriarLocal`/`aoAtualizarLocal` precisam de guarda para o caso inválido 1)
+- `testes/unitarios/formulario/etapa-itinerarios.test.tsx` (alterar — testes de regressão)
+- `testes/e2e/etapa-itinerarios.spec.ts` (alterar, se o E2E entrar aqui)
+
+## Dependências
+
+- **DEC-053** (promoção `ServicoEmConstrucao` → `Servico`) — é o estado que expõe o bug; nenhuma mudança nela.
+- **TASK-061/TASK-080** (promoção implementada, entregues) — pré-requisito factual.
+- **TASK-094** e **TASK-095** (entregues e aprovadas) — esta task roda **depois** das duas e não desfaz nada delas.
+- Nenhuma Q-xxx pendente: a task **não** nasce bloqueada.
+
+## Riscos
+
+- **Regressão nos modos preservados:** o ramo do modo "carregado" e o de Serviço em construção precisam de teste-guarda antes da mudança, senão a correção de um caminho pode calar outro.
+- **`sessao` × `sessaoRef`:** `aplicarNovasParadas` monta a base a partir de `sessao` (valor do render) enquanto `recalcularERegistrar` lê `sessaoRef.current`. A correção deve manter essa fronteira como está — mexer nela é outra task.
+- **Ordem de commit:** `aoComitarBase` roda antes do commit síncrono; `locaisParaResolver` precisa continuar recebendo a lista **com** o Local novo, senão a resolução (RN-036) falha por outro motivo.
+- **Espelho Ida↔Volta:** Local é livre por sentido (Spec 02 §14; Spec 04 §7.2) e **não** espelha — a correção não pode introduzir espelhamento por efeito colateral (contraria DEC-075/TASK-094).
+
+## Perguntas em aberto
+
+- Nenhuma bloqueante. Fica registrado como observação para a `/analisar-task`: o `if (!resolucao.ok) return;` de `aoCriarPontoDeRota` (`etapa-itinerarios.tsx:946`) descarta o clique **sem qualquer feedback** ao usuário. Corrigida a causa desta task, o sintoma desaparece — mas o silêncio permanece como comportamento defensivo geral. Se o responsável julgar que merece feedback próprio, isso é task separada (parente da TASK-085, "tornar visível o motivo de qualquer bloqueio"), nunca escopo desta.
+
+---
+
 ## Ordem recomendada de execução
 
 ```text
@@ -4269,5 +4397,12 @@ ramo do mapa: 064 → 065 → 071 → 066 → 067
   **antes da próxima implementação ou revisão pesada**, para que
   `implementar-task` produza uma única evidência final e `revisar-aderencia` a
   reutilize quando válida.
+- **TASK-096** (bug, 2026-07-23) corrige `comLocaisAtualizados`, que bifurca por
+  `base.modo` em vez de `linhaAtual.completo` e por isso **descarta o Local** num
+  Serviço já promovido no modo "novo" (**DEC-053**), deixando a Parada com
+  `local_uuid` pendurado (violação de **RN-036**) e travando a criação de pontos
+  de rota. Defeito anterior às **TASK-094/095** (vem da TASK-019), não é
+  regressão delas; roda **depois** das duas. Prioridade alta: inutiliza a
+  inserção de Local no fluxo criar-do-zero.
 
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.
