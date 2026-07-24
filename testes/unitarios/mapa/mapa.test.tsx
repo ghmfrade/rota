@@ -35,9 +35,19 @@ vi.mock("maplibre-gl", () => ({
     acertos: unknown[] = [];
     queryRenderedFeatures = vi.fn(() => this.acertos);
     canvas = document.createElement("canvas");
+    // Container real (o `containerRef` do componente) — os marcadores são
+    // anexados aqui, exatamente como o MapLibre real anexa ao
+    // `getCanvasContainer()`, para que o `mousedown` possa borbulhar do
+    // marcador até este elemento (base da correção da TASK-078).
+    container: HTMLElement;
 
-    constructor() {
+    constructor(opcoes: { container?: HTMLElement } = {}) {
+      this.container = opcoes.container ?? document.createElement("div");
       dublê.instancia = this;
+    }
+
+    getCanvasContainer() {
+      return this.container;
     }
 
     on(nome: string, handler: (evento: EventoMapa) => void) {
@@ -100,7 +110,34 @@ vi.mock("maplibre-gl", () => ({
       return { lng: this.posicao?.[0] ?? 0, lat: this.posicao?.[1] ?? 0 };
     }
 
-    addTo() {
+    addTo(mapa?: { getCanvasContainer?: () => HTMLElement }) {
+      const container = mapa?.getCanvasContainer?.();
+      if (container) {
+        container.appendChild(this.elemento);
+        if (this.arrastavel) {
+          // Modela o `_addDragHandler` real do MapLibre (confirmado em
+          // `node_modules/maplibre-gl/dist/maplibre-gl-dev.js:74549`): o
+          // arrasto nativo é ligado ao `mousedown` que ALCANÇA o
+          // container do mapa, sem filtrar `button`. Antes da correção da
+          // TASK-078, o botão direito também engatava este caminho — só
+          // `stopPropagation()` no handler custom do botão direito evita o
+          // disparo duplo (`dragstart`/`dragend` abaixo).
+          container.addEventListener("mousedown", (evento) => {
+            if (!this.elemento.contains(evento.target as Node)) return;
+            this.handlers.get("dragstart")?.();
+            const aoMover = (eventoMove: MouseEvent) => {
+              this.setLngLat([eventoMove.clientX, eventoMove.clientY]);
+            };
+            const aoSoltar = () => {
+              document.removeEventListener("mousemove", aoMover);
+              document.removeEventListener("mouseup", aoSoltar);
+              this.handlers.get("dragend")?.();
+            };
+            document.addEventListener("mousemove", aoMover);
+            document.addEventListener("mouseup", aoSoltar);
+          });
+        }
+      }
       return this;
     }
 
@@ -684,6 +721,15 @@ describe("Mapa — arrasto não é revertido pelo re-render (TASK-097; RN-052)",
 // direito é um segundo arrasto, implementado aqui do zero (o MapLibre só
 // arrasta nativamente no botão esquerdo), com supressão do `contextmenu`
 // nativo e cancelamento por `Esc` — igual ao gesto nativo.
+//
+// Reprovação anterior (docs-dev/14-REVISOES/TASK-078-20260724.md): o
+// `Marker` mockado registrava `dragstart`/`dragend` mas nunca ligava o
+// `mousedown` DOM ao arrasto nativo, dando falso verde a um botão direito
+// que, no MapLibre real, também transladava a Seção inteira. O mock de
+// `addTo` agora modela o `_addDragHandler` real (mousedown que ALCANÇA o
+// container do mapa dispara o arrasto, sem filtrar botão) — a asserção
+// "botão direito não chama `aoArrastar`" só passa com o `stopPropagation`
+// do handler custom em `mapa.tsx` de fato implementado.
 describe("Mapa — arrasto por botão direito (TASK-078; DEC-079)", () => {
   const M: MarcadorMapa = {
     id: "secao-1",
@@ -743,6 +789,34 @@ describe("Mapa — arrasto por botão direito (TASK-078; DEC-079)", () => {
     act(() => arrastado.handlers.get("dragend")?.());
 
     expect(aoArrastar).toHaveBeenCalledWith({ lng: 99, lat: 99 });
+    expect(aoArrastarComBotaoDireito).not.toHaveBeenCalled();
+    resultado.desmontar();
+  });
+
+  test("botão esquerdo real (mousedown DOM que borbulha até o container) engata o arrasto nativo e chama `aoArrastar`, não `aoArrastarComBotaoDireito`", async () => {
+    // Sentinela da fidelidade do mock: como o handler de botão direito só
+    // chama `stopPropagation()` quando `button === 2`, o botão esquerdo
+    // deve seguir alcançando o container e disparando o arrasto nativo
+    // simulado — provando que a supressão é seletiva por botão, não um
+    // bloqueio geral do `mousedown`.
+    const aoArrastar = vi.fn();
+    const aoArrastarComBotaoDireito = vi.fn();
+    const resultado = await montarComMarcador({ ...M, aoArrastar, aoArrastarComBotaoDireito });
+    const elemento = dublê.marcadores[0].elemento;
+
+    act(() => {
+      elemento.dispatchEvent(
+        new MouseEvent("mousedown", { button: 0, clientX: 10, clientY: 20, bubbles: true }),
+      );
+    });
+    act(() => {
+      document.dispatchEvent(new MouseEvent("mousemove", { clientX: 40, clientY: 60 }));
+    });
+    act(() => {
+      document.dispatchEvent(new MouseEvent("mouseup", { clientX: 40, clientY: 60 }));
+    });
+
+    expect(aoArrastar).toHaveBeenCalledWith({ lng: 40, lat: 60 });
     expect(aoArrastarComBotaoDireito).not.toHaveBeenCalled();
     resultado.desmontar();
   });

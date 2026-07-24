@@ -1474,3 +1474,94 @@ test.describe("TASK-096 — criar Local num Serviço do fluxo criar-do-zero JÁ 
     ).toHaveCount(4);
   });
 });
+
+// TASK-078 (DEC-061/079) — reprovação anterior (docs-dev/14-REVISOES/
+// TASK-078-20260724.md): sem `stopPropagation()` no `mousedown` do botão
+// direito, o `mousedown` borbulhava do marcador até o container do MapLibre
+// e engatava o arrasto NATIVO (o mesmo do botão esquerdo) — o botão direito
+// também translada a Seção inteira, tornando os dois gestos indistinguíveis
+// no navegador real (o mock do `Marker` no unitário não modelava esse
+// acoplamento). Estes testes rodam num browser de verdade (Playwright), sem
+// nenhum dublê do MapLibre, e usam o cluster em cor neutra (aceite da task) —
+// os marcadores `secao-cluster-*` (forma QUADRADO, distinta do fantasma
+// CIRCULAR de pré-visualização de ponto de rota) — como sinal visível: ele só
+// aparece quando o arrasto NATIVO (botão esquerdo) engata `aoIniciarArrasto`
+// — o botão direito nunca deve revelá-lo.
+const SELETOR_CLUSTER_SECAO = ".marcador-mapa--fantasma.marcador-mapa-quadrado";
+
+test.describe("Mapa — distinção de gesto por botão numa Seção real (TASK-078; DEC-079)", () => {
+  test("botão ESQUERDO revela o cluster em cor neutra durante o arrasto (translação real, RN-052)", async ({
+    page,
+  }) => {
+    await page.route("https://router.project-osrm.org/**", (rota) =>
+      rota.fulfill(respostaOsrmGenericaOk(rota.request().url())),
+    );
+
+    await abrirEtapaVolta(page);
+
+    const mapa = page.getByTestId("mapa-base");
+    await expect(mapa).toBeVisible();
+    // Sem isto, o mapa pode ficar fora da área visível da viewport de teste
+    // (o container é mais alto que o viewport padrão) e os gestos de mouse
+    // abaixo alcançam coordenadas fora da janela, sem efeito algum.
+    await mapa.scrollIntoViewIfNeeded();
+    const marcadores = mapa.locator(".maplibregl-marker");
+    await expect(marcadores).toHaveCount(3);
+
+    // Volta: Praia Grande, São Vicente, Santos (ordem já usada nos demais
+    // testes deste arquivo). Santos (índice 2) é a Seção COMPARTILHADA com o
+    // Serviço 0001-2SU do fixture — o cluster desta Seção tem outras
+    // contribuições além da corrente (0001-1SU/volta).
+    const caixa = await marcadores.nth(2).boundingBox();
+    if (!caixa) throw new Error("marcador de Santos sem bounding box");
+    const centro = { x: caixa.x + caixa.width / 2, y: caixa.y + caixa.height / 2 };
+
+    // Deslocamento pequeno: a translação não tem limite de 350 m (só fora de
+    // SP recusa — RN-029), então nenhum zoom é necessário para manter o
+    // gesto dentro do Estado.
+    await page.mouse.move(centro.x, centro.y);
+    await page.mouse.down();
+    await page.mouse.move(centro.x + 8, centro.y + 8, { steps: 5 });
+
+    // Durante o arrasto: os demais pontos da Seção aparecem em cor neutra —
+    // prova, num browser real, de que o botão ESQUERDO engatou a translação
+    // (não só a função pura já coberta pelo unitário de `fluxos-secao.ts`).
+    await expect(page.locator(SELETOR_CLUSTER_SECAO).first()).toBeVisible();
+
+    await page.mouse.up();
+  });
+
+  test("botão DIREITO NÃO revela o cluster (regressão-guarda da correção)", async ({ page }) => {
+    await page.route("https://router.project-osrm.org/**", (rota) =>
+      rota.fulfill(respostaOsrmGenericaOk(rota.request().url())),
+    );
+
+    await abrirEtapaVolta(page);
+
+    const mapa = page.getByTestId("mapa-base");
+    await expect(mapa).toBeVisible();
+    await mapa.scrollIntoViewIfNeeded();
+    const marcadores = mapa.locator(".maplibregl-marker");
+    await expect(marcadores).toHaveCount(3);
+
+    const caixa = await marcadores.nth(2).boundingBox();
+    if (!caixa) throw new Error("marcador de Santos sem bounding box");
+    const centro = { x: caixa.x + caixa.width / 2, y: caixa.y + caixa.height / 2 };
+
+    await page.mouse.move(centro.x, centro.y);
+    await page.mouse.down({ button: "right" });
+    await page.mouse.move(centro.x + 8, centro.y + 8, { steps: 5 });
+
+    // Causa-raiz da reprovação original: sem `stopPropagation`, este
+    // `mousedown` do botão direito alcançava o MapLibre e engatava o arrasto
+    // nativo, revelando o cluster também aqui. Com a correção, nunca aparece.
+    await expect(page.locator(SELETOR_CLUSTER_SECAO)).toHaveCount(0);
+
+    await page.mouse.up({ button: "right" });
+
+    await expect(page.locator(SELETOR_CLUSTER_SECAO)).toHaveCount(0);
+    // O `contextmenu` nativo do navegador segue suprimido (DEC-079) e o menu
+    // Seção/Local da DEC-055 (superfície distinta) não abre neste gesto.
+    await expect(page.getByRole("menuitem")).toHaveCount(0);
+  });
+});

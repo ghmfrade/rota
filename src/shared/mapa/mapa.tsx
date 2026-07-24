@@ -598,6 +598,12 @@ export const Mapa = forwardRef<MapaHandle, MapaProps>(function Mapa(
         const atual = marcadoresRefProp.current.find((m) => m.id === spec.id);
         if (!atual?.aoArrastarComBotaoDireito) return;
         evento.preventDefault();
+        // Sem isto, o `mousedown` borbulha do marcador (descendente do
+        // canvas container) até o container do mapa, onde o MapLibre liga o
+        // arrasto nativo (`_addDragHandler`) a QUALQUER botão — o gesto
+        // nativo (translação, botão esquerdo) dispararia também aqui,
+        // tornando os dois gestos indistinguíveis (reprovação da TASK-078).
+        evento.stopPropagation();
         arrastandoRef.current = spec.id;
         canceladoRef.current = false;
         if (aoMoverSobreLinhaRef.current) {
