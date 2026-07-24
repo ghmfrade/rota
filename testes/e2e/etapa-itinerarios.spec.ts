@@ -1120,3 +1120,127 @@ test.describe('TASK-094 — Local nasce unidirecional; o "X" remove a entidade (
     await expect(page.getByText("Local TASK-094 E2E")).toHaveCount(0);
   });
 });
+
+test.describe("TASK-096 — criar Local num Serviço do fluxo criar-do-zero JÁ PROMOVIDO (DEC-053)", () => {
+  test("criar-do-zero → Serviço → itinerário com rota → Local: a entidade é gravada, aparece com o nome e a etapa segue navegável", async ({
+    page,
+  }) => {
+    // Nenhuma resposta fixa: `respostaOsrmGenericaOk` deriva legs/geometria do
+    // número de coordenadas de CADA requisição — a rota cresce de 2 (as duas
+    // Seções) para 3 paradas (Local intermediário inserido depois).
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      const url = rota.request().url();
+      return rota.fulfill(respostaOsrmGenericaOk(url));
+    });
+    await page.route("https://tile.openstreetmap.org/**", (rota) =>
+      rota.fulfill({ contentType: "image/png", body: PNG_1x1 }),
+    );
+
+    // Criar do zero (Identificação) — Spec 04 §5; DEC-064.
+    await page.goto("/");
+    await page.getByTestId("acao-criar-zero").getByRole("button").click();
+    await page.getByTestId("confirmar-criar-zero").click();
+    await expect(page.getByTestId("layout-formulario")).toBeVisible();
+    await page.getByTestId("seletor-autos").selectOption("1");
+    await page.getByTestId("select-tipo").selectOption("Rodoviário");
+
+    // Serviço unidirecional "Ida" (DEC-035) — só precisa do necessário para o
+    // itinerário: numero_n/carater já vêm com sugestão/padrão.
+    await page.getByTestId("etapa-botao").filter({ hasText: "Serviços" }).click();
+    await expect(page.getByTestId("etapa-servicos")).toBeVisible();
+    await page.getByTestId("servico-criar").click();
+    await page.getByTestId("form-direcionalidade").selectOption("ida");
+    await page.getByTestId("form-salvar").click();
+    await expect(page.getByTestId("servico-item")).toHaveCount(1);
+    const numeroN = (await page.getByTestId("servico-numero-n").textContent())!.trim();
+
+    // Etapa de mapa: o Serviço ainda está em `servicosEmConstrucao` (DEC-035) —
+    // nenhum itinerário até as duas Seções extremas serem lançadas (RN-035).
+    await page
+      .locator('[data-testid="etapa-botao"][data-etapa="secoes-locais-itinerarios"]')
+      .click();
+    await expect(page.getByTestId("etapa-itinerarios")).toBeVisible();
+    await page.getByTestId("select-servico-itinerario").selectOption({ label: numeroN });
+    await page.locator('[data-testid="botao-sentido"][data-sentido="ida"]').click();
+
+    const mapa = page.getByTestId("mapa-base");
+    await expect(mapa).toBeVisible();
+    await mapa.scrollIntoViewIfNeeded();
+    const caixa = await mapa.boundingBox();
+    if (!caixa) throw new Error("mapa sem bounding box");
+
+    // Duas Seções em pontos distintos (extremos — RN-035). A primeira não
+    // dispara OSRM (RN-034: mínimo 2 paradas); a segunda fecha o itinerário e
+    // recalcula — com rota válida, o Serviço é PROMOVIDO (DEC-053; TASK-061),
+    // saindo de `servicosEmConstrucao` para a lista de Serviços completos. É
+    // exatamente esse estado (Serviço promovido no modo "novo") em que o bug
+    // relatado descartava o Local.
+    await mapa.click({
+      button: "right",
+      position: { x: caixa.width / 2 - 40, y: caixa.height / 2 },
+    });
+    await page.getByRole("menuitem", { name: "Seção" }).click();
+    await page.getByTestId("nome-secao-input").fill("Seção A E2E");
+    await page.getByTestId("confirmar-criar-secao").click();
+    await expect(
+      page.getByTestId("tabela-paradas").getByTestId("parada-item"),
+    ).toHaveCount(1);
+
+    await mapa.click({
+      button: "right",
+      position: { x: caixa.width / 2 + 40, y: caixa.height / 2 },
+    });
+    await page.getByRole("menuitem", { name: "Seção" }).click();
+    await page.getByTestId("nome-secao-input").fill("Seção B E2E");
+    await page.getByTestId("confirmar-criar-secao").click();
+    await expect(
+      page.getByTestId("tabela-paradas").getByTestId("parada-item"),
+    ).toHaveCount(2);
+    await expect(page.getByTestId("recalculando-rota")).toHaveCount(0);
+
+    // Local INTERMEDIÁRIO: clique exatamente sobre a linha da rota, entre os
+    // dois marcadores de Seção, ancora a inserção no meio (TASK-067/DEC-055)
+    // — não no fim, que violaria RN-035 e mascararia o cenário do bug.
+    const marcadores = mapa.locator(".maplibregl-marker");
+    await expect(marcadores).toHaveCount(2);
+    const caixaA = await marcadores.nth(0).boundingBox();
+    const caixaB = await marcadores.nth(1).boundingBox();
+    if (!caixaA || !caixaB) throw new Error("marcador de Seção sem bounding box");
+    const meio = {
+      x: (caixaA.x + caixaA.width / 2 + caixaB.x + caixaB.width / 2) / 2,
+      y: (caixaA.y + caixaA.height / 2 + caixaB.y + caixaB.height / 2) / 2,
+    };
+    await mapa.click({ button: "right", position: { x: meio.x - caixa.x, y: meio.y - caixa.y } });
+    await page.getByRole("menuitem", { name: "Local" }).click();
+    await page.getByTestId("nome-local-input").fill("Local E2E");
+    await page.getByTestId("confirmar-criar-local").click();
+
+    // Critérios de aceite da TASK-096: a tabela mostra "Cidade - Nome" (nunca
+    // o UUID cru), nenhum aviso de montagem por RN-036, e a etapa continua
+    // navegável — a Parada do Local resolveu contra a entidade de verdade.
+    const linhaLocal = page
+      .locator('[data-testid="parada-item"]')
+      .filter({ hasText: "Local E2E" });
+    await expect(linhaLocal).toHaveCount(1);
+    await expect(linhaLocal.getByTestId("parada-rotulo")).not.toHaveText(
+      /^[0-9a-f-]{36}$/i,
+    );
+    await expect(page.getByTestId("avisos-montagem-invalida")).toHaveCount(0);
+    await expect(
+      page.getByTestId("tabela-paradas").getByTestId("parada-item"),
+    ).toHaveCount(3);
+
+    // Um clique adicional sobre a linha da rota ainda cria ponto de rota —
+    // terceiro sintoma relatado (o gesto silenciosamente descartado).
+    await mapa.click({
+      button: "right",
+      position: { x: caixa.width / 2, y: caixa.height / 2 + 60 },
+    });
+    await page.getByRole("menuitem", { name: "Seção" }).click();
+    await page.getByTestId("nome-secao-input").fill("Confirma navegação E2E");
+    await page.getByTestId("confirmar-criar-secao").click();
+    await expect(
+      page.getByTestId("tabela-paradas").getByTestId("parada-item"),
+    ).toHaveCount(4);
+  });
+});

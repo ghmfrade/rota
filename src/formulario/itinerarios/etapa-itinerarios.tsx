@@ -397,21 +397,26 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
       : { ...base, secoesEmConstrucao: secoesAtualizadas };
   }
 
+  // A chave é `linhaAtual.completo` (se o Serviço já tem itinerário/rota),
+  // NUNCA `base.modo` (TASK-096): desde a DEC-053/TASK-080 um Serviço
+  // completo vive em `servicosDaSessao` (documento no carregado, `sessao.
+  // servicos` no novo) e um em construção vive em `servicosEmConstrucao` —
+  // nos DOIS modos. Cruzar com `base.modo` deixava dois estados sem ramo
+  // (novo/promovido; carregado/em-construção): a função devolvia `base`
+  // calada e o Local era descartado enquanto a Parada já tinha sido
+  // comitada, violando RN-036.
   function comLocaisAtualizados(base: SessaoFormulario, locaisAtualizados: Local[]): SessaoFormulario {
     if (!linhaAtual) return base;
-    if (linhaAtual.completo && base.modo === "carregado") {
-      const servicos = base.documento.autos.servicos.map((s) =>
+    if (linhaAtual.completo) {
+      const servicos = servicosDaSessao(base).map((s) =>
         s.uuid === linhaAtual.servicoUuid ? { ...s, locais: locaisAtualizados } : s,
       );
-      return { ...base, documento: { ...base.documento, autos: { ...base.documento.autos, servicos } } };
+      return comServicosDaSessao(base, servicos);
     }
-    if (base.modo === "novo") {
-      const lista = (base.servicosEmConstrucao ?? []).map((s) =>
-        s.uuid === linhaAtual.servicoUuid ? { ...s, locais: locaisAtualizados } : s,
-      );
-      return { ...base, servicosEmConstrucao: lista };
-    }
-    return base;
+    const servicosEmConstrucao = servicosEmConstrucaoDaSessao(base).map((s) =>
+      s.uuid === linhaAtual.servicoUuid ? { ...s, locais: locaisAtualizados } : s,
+    );
+    return { ...base, servicosEmConstrucao };
   }
 
   /**

@@ -1697,6 +1697,344 @@ describe("EtapaItinerarios — remoção da entidade Local pelo \"X\" (TASK-094;
   });
 });
 
+describe("EtapaItinerarios — gravar servico.locais[] pelo caminho unificado da DEC-053 (TASK-096)", () => {
+  const SERVICO_EM_CONSTRUCAO_UUID = "7c6b5a49-3d2e-4f1a-8b9c-0d1e2f3a4b5c";
+
+  /** Serviço já PROMOVIDO (DEC-053) no modo "novo": vive em `sessao.servicos`,
+   * não em `servicosEmConstrucao` — o estado em que o bug relatado ocorre. */
+  function sessaoNovoServicoPromovido(): Extract<SessaoFormulario, { modo: "novo" }> {
+    const documento = documentoExemploMinimo();
+    const servico = documento.autos.servicos[0];
+    const secoes = documento.autos.secoes;
+    const ida = servico.itinerarios.find((i) => i.sentido === "ida")!;
+    servico.locais = [];
+    servico.itinerarios = [ida];
+    ida.paradas = secoes.map((secao, indice) => ({ ordem: indice + 1, secao_uuid: secao.uuid }));
+    ida.rota = {
+      ...ida.rota,
+      distancia_km: 14,
+      duracao_s: 1800,
+      trechos: [
+        { parada_origem_ordem: 1, parada_destino_ordem: 2, distancia_km: 8, duracao_s: 1080 },
+        { parada_origem_ordem: 2, parada_destino_ordem: 3, distancia_km: 6, duracao_s: 720 },
+      ],
+      pontos_de_rota: [],
+    };
+    ida.viagens = ida.viagens.map((viagem) => ({
+      ...viagem,
+      horarios_paradas: viagem.horarios_paradas.slice(0, 3),
+    }));
+    return {
+      modo: "novo",
+      identidade: {
+        codigo: documento.autos.codigo,
+        empresa: documento.autos.empresa,
+        tipo: documento.autos.tipo,
+        status: "proposta",
+      },
+      secoesEmConstrucao: secoes,
+      servicos: [servico],
+    };
+  }
+
+  /** Serviço ainda EM CONSTRUÇÃO no modo "novo" (guarda: comportamento hoje
+   * correto, não pode regredir). */
+  function sessaoNovoServicoEmConstrucao(): Extract<SessaoFormulario, { modo: "novo" }> {
+    const documento = documentoExemploMinimo();
+    const secoes = documento.autos.secoes;
+    const servicoEmConstrucao: ServicoEmConstrucao = {
+      uuid: SERVICO_UUID,
+      numero_n: "0000-1CR",
+      caracteristica_veiculo: "CR",
+      carater: "principal",
+      direcionalidade: "ida",
+      locais: [],
+    };
+    return {
+      modo: "novo",
+      identidade: {
+        codigo: documento.autos.codigo,
+        empresa: documento.autos.empresa,
+        tipo: documento.autos.tipo,
+        status: "proposta",
+      },
+      secoesEmConstrucao: secoes,
+      servicosEmConstrucao: [servicoEmConstrucao],
+    };
+  }
+
+  /** Serviço em construção sobre um documento CARREGADO (ambiguidade 2 da
+   * análise): `linhaAtual.completo === false` e `base.modo === "carregado"` —
+   * nenhum dos dois `if` do bug original entra. */
+  function sessaoCarregadaServicoEmConstrucao(): Extract<SessaoFormulario, { modo: "carregado" }> {
+    const documento = documentoExemploMinimo();
+    const servicoEmConstrucao: ServicoEmConstrucao = {
+      uuid: SERVICO_EM_CONSTRUCAO_UUID,
+      numero_n: "0000-2CR",
+      caracteristica_veiculo: "CR",
+      carater: "principal",
+      direcionalidade: "ida",
+      locais: [],
+    };
+    return {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+      servicosEmConstrucao: [servicoEmConstrucao],
+    };
+  }
+
+  test('[regressão] modo "novo", Serviço já PROMOVIDO: criar Local grava em sessao.servicos[i].locais, não é descartado', async () => {
+    vi.stubGlobal("fetch", respostaOsrmGenericaMock());
+    const { obterSessao, resultado } = await montarSessaoNaEtapa(
+      sessaoNovoServicoPromovido(),
+      SERVICO_UUID,
+      "ida",
+    );
+
+    criarLocalPelaLinhaFormularioInline(resultado, "Rodoviária", { lng: -46.38, lat: -23.98 });
+    await act(async () => {
+      await flush();
+    });
+
+    const sessaoFinal = obterSessao();
+    if (sessaoFinal.modo !== "novo") throw new Error("esperava modo novo");
+    const servico = sessaoFinal.servicos!.find((s) => s.uuid === SERVICO_UUID)!;
+    expect(servico).toBeDefined();
+    const localCriado = servico.locais.find((l) => l.nome === "Rodoviária");
+    expect(localCriado).toBeDefined();
+    expect(localCriado!.geolocalizacao_ida).toBeDefined();
+
+    // A Parada criada referencia a MESMA UUID do Local gravado (RN-004/036) —
+    // é exatamente essa igualdade que o bug quebrava (Parada comitada, Local
+    // descartado).
+    const chave = chaveItinerario(SERVICO_UUID, "ida");
+    const paradaLocal = sessaoFinal.paradasEmEdicao?.[chave]?.find((p) => p.tipo === "local");
+    expect(paradaLocal?.tipo === "local" ? paradaLocal.localUuid : undefined).toBe(
+      localCriado!.uuid,
+    );
+
+    resultado.desmontar();
+  });
+
+  test('[integração] modo "novo" promovido: a tabela mostra "Cidade - Nome", nenhum aviso de RN-036, e o clique na rota continua criando ponto de rota', async () => {
+    vi.stubGlobal("fetch", respostaOsrmGenericaMock());
+    const { obterSessao, resultado } = await montarSessaoNaEtapa(
+      sessaoNovoServicoPromovido(),
+      SERVICO_UUID,
+      "ida",
+    );
+
+    criarLocalPelaLinhaFormularioInline(
+      resultado,
+      "Rodoviária",
+      { lng: -46.38, lat: -23.98 },
+      { lng: -46.38, lat: -23.98 },
+    );
+    await act(async () => {
+      await flush();
+    });
+
+    // Nunca o UUID cru na linha (era o primeiro sintoma relatado).
+    const rotulos = [
+      ...resultado.container.querySelectorAll('[data-testid="parada-rotulo"]'),
+    ].map((el) => el.textContent);
+    expect(rotulos.some((texto) => texto?.includes("Santos - Rodoviária"))).toBe(true);
+    expect(rotulos.some((texto) => /^[0-9a-f-]{36}$/i.test(texto ?? ""))).toBe(false);
+
+    // Nenhum aviso de montagem (RN-036) — a referência está íntegra.
+    expect(
+      resultado.container.querySelector('[data-testid="avisos-montagem-invalida"]'),
+    ).toBeNull();
+
+    // Clique sobre a linha da rota ainda cria ponto de rota (terceiro sintoma
+    // relatado — o `if (!resolucao.ok) return;` deixava de disparar quando
+    // `resolverParadasRota` não encontrava o Local descartado).
+    const chave = chaveItinerario(SERVICO_UUID, "ida");
+    const pontosAntes = obterSessao().pontosDeRotaEmEdicao?.[chave]?.length ?? 0;
+    act(() => {
+      (
+        editorCapturado.props as unknown as {
+          aoCriarPontoDeRota?: (posicao: Coordenada) => void;
+        }
+      ).aoCriarPontoDeRota?.({ lng: -46.4, lat: -24.0 });
+    });
+    await act(async () => {
+      await flush();
+    });
+    const pontosDepois = obterSessao().pontosDeRotaEmEdicao?.[chave]?.length ?? 0;
+    expect(pontosDepois).toBe(pontosAntes + 1);
+
+    resultado.desmontar();
+  });
+
+  test('[guarda] modo "novo", Serviço EM CONSTRUÇÃO: criar Local continua gravando em servicosEmConstrucao[i].locais (comportamento preservado)', async () => {
+    const { obterSessao, resultado } = await montarSessaoNaEtapa(
+      sessaoNovoServicoEmConstrucao(),
+      SERVICO_UUID,
+      "ida",
+    );
+
+    criarLocalPelaLinhaFormularioInline(resultado, "Padaria", { lng: -46.38, lat: -23.98 });
+    await act(async () => {
+      await flush();
+    });
+
+    const sessaoFinal = obterSessao();
+    if (sessaoFinal.modo !== "novo") throw new Error("esperava modo novo");
+    expect(sessaoFinal.servicos ?? []).toHaveLength(0);
+    const servicoEmConstrucao = sessaoFinal.servicosEmConstrucao!.find(
+      (s) => s.uuid === SERVICO_UUID,
+    )!;
+    expect(servicoEmConstrucao.locais?.some((l) => l.nome === "Padaria")).toBe(true);
+
+    resultado.desmontar();
+  });
+
+  test('[guarda] modo "carregado", Serviço EM CONSTRUÇÃO: criar Local grava em servicosEmConstrucao[i].locais, não em documento.autos (ambiguidade 2 da análise)', async () => {
+    const { obterSessao, resultado } = await montarSessaoNaEtapa(
+      sessaoCarregadaServicoEmConstrucao(),
+      SERVICO_EM_CONSTRUCAO_UUID,
+      "ida",
+    );
+
+    criarLocalPelaLinhaFormularioInline(resultado, "Padaria", { lng: -46.38, lat: -23.98 });
+    await act(async () => {
+      await flush();
+    });
+
+    const sessaoFinal = obterSessao();
+    if (sessaoFinal.modo !== "carregado") throw new Error("esperava modo carregado");
+    const servicoEmConstrucao = sessaoFinal.servicosEmConstrucao!.find(
+      (s) => s.uuid === SERVICO_EM_CONSTRUCAO_UUID,
+    )!;
+    expect(servicoEmConstrucao.locais?.some((l) => l.nome === "Padaria")).toBe(true);
+    // O documento carregado original não é tocado por este Serviço, que nem
+    // existe nele.
+    expect(
+      sessaoFinal.documento.autos.servicos.some((s) => s.uuid === SERVICO_EM_CONSTRUCAO_UUID),
+    ).toBe(false);
+
+    resultado.desmontar();
+  });
+
+  test('dois Locais em sequência no mesmo Serviço promovido: o segundo não apaga o primeiro', async () => {
+    vi.stubGlobal("fetch", respostaOsrmGenericaMock());
+    const { obterSessao, resultado } = await montarSessaoNaEtapa(
+      sessaoNovoServicoPromovido(),
+      SERVICO_UUID,
+      "ida",
+    );
+
+    criarLocalPelaLinhaFormularioInline(resultado, "Padaria", { lng: -46.38, lat: -23.98 });
+    await act(async () => {
+      await flush();
+    });
+    criarLocalPelaLinhaFormularioInline(resultado, "Farmácia", { lng: -46.39, lat: -23.99 });
+    await act(async () => {
+      await flush();
+    });
+
+    const sessaoFinal = obterSessao();
+    if (sessaoFinal.modo !== "novo") throw new Error("esperava modo novo");
+    const servico = sessaoFinal.servicos!.find((s) => s.uuid === SERVICO_UUID)!;
+    const nomes = servico.locais.map((l) => l.nome);
+    expect(nomes).toContain("Padaria");
+    expect(nomes).toContain("Farmácia");
+
+    resultado.desmontar();
+  });
+
+  test('[arrasto] mover o marcador de um Local num Serviço promovido do modo "novo" atualiza geolocalizacao_ida preservando a UUID (RN-004) e rederiva o município (RN-029)', async () => {
+    vi.stubGlobal("fetch", respostaOsrmGenericaMock());
+    const sessaoInicial = sessaoNovoServicoPromovido();
+    const servicoInicial = sessaoInicial.servicos![0];
+    servicoInicial.locais = [
+      {
+        uuid: "c2afe932-bf0f-4338-8ff4-63cd908b9033",
+        nome: "Ponto de Embarque Praia",
+        municipio: "Praia Grande",
+        geolocalizacao_ida: { latitude: -24.005, longitude: -46.398 },
+      },
+    ];
+
+    const { obterSessao, resultado } = await montarSessaoNaEtapa(
+      sessaoInicial,
+      SERVICO_UUID,
+      "ida",
+    );
+
+    const localAtualizado = {
+      ...servicoInicial.locais[0],
+      geolocalizacao_ida: { latitude: -23.5, longitude: -46.6 },
+    };
+    act(() => {
+      (
+        editorCapturado.props as unknown as {
+          aoAtualizarLocal?: (local: typeof localAtualizado) => void;
+        }
+      ).aoAtualizarLocal?.(localAtualizado);
+    });
+    await act(async () => {
+      await flush();
+    });
+
+    const sessaoFinal = obterSessao();
+    if (sessaoFinal.modo !== "novo") throw new Error("esperava modo novo");
+    const servicoFinal = sessaoFinal.servicos!.find((s) => s.uuid === SERVICO_UUID)!;
+    const localFinal = servicoFinal.locais.find(
+      (l) => l.uuid === "c2afe932-bf0f-4338-8ff4-63cd908b9033",
+    )!;
+    expect(localFinal).toBeDefined();
+    expect(localFinal.geolocalizacao_ida).toEqual({ latitude: -23.5, longitude: -46.6 });
+
+    resultado.desmontar();
+  });
+
+  test("[inválido] sem Serviço selecionado não existe caminho de criação de Local (linhaAtual nulo é impossível por construção)", async () => {
+    // `editorCapturado` é module-level (compartilhado entre testes) — limpo
+    // aqui para que a asserção de ausência não capture o valor de um teste
+    // anterior que MONTOU o editor de verdade.
+    editorCapturado.props = null;
+    let sessaoAtual: SessaoFormulario = sessaoNovoServicoPromovido();
+    const montagem: { resultado?: ResultadoRenderizacao } = {};
+    const renderizarEtapa = () => (
+      <EtapaItinerarios
+        sessao={sessaoAtual}
+        aoAtualizarSessao={(novaSessao) => {
+          sessaoAtual = novaSessao;
+          montagem.resultado!.rerenderizar(renderizarEtapa());
+        }}
+      />
+    );
+    const resultado = renderizar(renderizarEtapa());
+    montagem.resultado = resultado;
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Seleciona um Serviço que NÃO existe em `linhas` — `select` não tem essa
+    // opção, então o valor não muda e `linhaAtual` permanece nulo. Nenhum
+    // gesto do usuário chega a chamar `comLocaisAtualizados`.
+    const select = resultado.container.querySelector(
+      '[data-testid="select-servico-itinerario"]',
+    ) as HTMLSelectElement;
+    expect(
+      [...select.options].some((opcao) => opcao.value === "uuid-inexistente-nao-selecionado"),
+    ).toBe(false);
+
+    // Sem Serviço selecionado: nem o seletor de sentido, nem o mapa, nem a
+    // tabela de paradas — não há gesto capaz de chamar `comLocaisAtualizados`
+    // com `linhaAtual` nulo.
+    expect(resultado.container.querySelector('[data-testid="seletor-sentido"]')).toBeNull();
+    expect(resultado.container.querySelector('[data-testid="tabela-paradas"]')).toBeNull();
+    expect(editorCapturado.props).toBeNull();
+
+    resultado.desmontar();
+  });
+});
+
 describe("EtapaItinerarios — linha-formulário de criação inline na tabela (TASK-095; DEC-077)", () => {
   function linhaDaTabela(resultado: ResultadoRenderizacao, indice: number): Element | undefined {
     const linhas = [
