@@ -613,3 +613,46 @@ Consolidação do que **exige decisão humana**. Nada aqui foi decidido — quan
 **Impacto se não decidir:** ao copiar entre grades com invariantes diferentes é preciso definir a **normalização** dos discriminadores (ex.: feriado→excepcional zera `viagem_feriado` e seta `tabela_excepcional_uuid`; excepcional→feriado seta `viagem_feriado=true` e limpa a referência). Sem decisão, essa transformação seria inventada e poderia violar RN-099.
 **Opções/sub-decisões:** (a) origens permitidas: comum, feriados, qualquer excepcional; (b) normalização automática dos discriminadores no destino (obrigatória p/ preservar RN-099); (c) confirmação sobrescrever/mesclar se o destino já tiver conteúdo (como §8.4). **Recomendo** as três origens com normalização automática + confirmação, UUIDs novas (RN-007). Habilita a **TASK-112** (estende a TASK-105).
 **Decisão:** **Decidida (DEC-087, 2026-07-27).** Origens comum/feriados/excepcional com normalização automática (RN-099); **"mesclar" = sincronização preservando UUID** (apaga ausentes, atualiza offsets, preserva UUID das casadas por `horario_saida`, acrescenta faltantes com UUID nova) — **exceção à RN-007**, valendo para TASK-105 **e** TASK-112; "sobrescrever" segue com UUIDs novas. **Exige alteração da Spec 04 §8.4/§8.5 e carve-out na RN-007 antes do código.** Edge do casamento sob RN-062 (duplicatas) a resolver na `/analisar-task`. Ver DEC-087.
+
+## Q-066 — Retirar a ação "Apagar bloco inteiro" da grade de horários
+
+**Contexto:** Na revisão de aderência da TASK-106 (2026-07-27), o responsável
+pelo domínio determinou que o botão **"Apagar bloco" não existirá mais**. A
+implementação atual segue a Spec 04 §8.3: apaga, em todos os dias, a Viagem que
+ocupa a mesma posição ordinal. O problema operacional apontado é que o bloco é
+apenas um alinhamento visual por posição — não uma entidade nem uma unidade de
+operação — e pode juntar Viagens com horários diferentes em cada dia. Portanto,
+o gesto destrutivo agrupa partidas sem vínculo operacional real. Permanecem
+distintos e úteis: o "X" que apaga **uma Viagem** e a operação de apagar **um dia
+inteiro** da TASK-110/DEC-085.
+
+**Spec relacionada:** Spec 04 §8.1 (bloco = posição ordinal) e §8.3 (manda
+disponibilizar apagar o bloco inteiro); RN-061 (cada célula preenchida é uma
+Viagem independente por dia). Não há entidade `Bloco` no contrato da Spec 02.
+
+**Conflito:** **real entre a spec vigente e a nova orientação do responsável**.
+A implementação não pode remover o botão enquanto a Spec 04 §8.3 continuar
+exigindo-o, pois `docs/specs/**` prevalece sobre derivados, task e código.
+
+**Impacto se não decidir:** a TASK-106 permanece sem reavaliação final: manter o
+botão contraria a UX determinada nesta revisão; removê-lo antes de alinhar a spec
+viola a hierarquia de verdade. As TASK-107..111, dependentes da fundação da
+TASK-106, não devem avançar sobre uma superfície reprovada.
+
+**Opções possíveis:**
+
+- **A — retirar "Apagar bloco inteiro" (proposta do responsável):** alinhar a
+  Spec 04 §8.3, remover botão/handler/motor/testes exclusivos de `apagarBloco` e
+  manter "Apagar viagem inteira"; a operação de coluna da TASK-110 permanece.
+- **B — manter a ação da spec vigente:** conservar o botão e a remoção ordinal,
+  aceitando que o bloco seja uma unidade visual destrutível.
+- **C — redefinir o bloco como unidade operacional:** exigiria nova modelagem e
+  não foi solicitada; não recomendada, pois hoje o contrato não possui essa
+  entidade.
+
+**Recomendação técnica:** opção **A**, fiel à orientação e ao racional operacional
+dados pelo responsável. Não altera o JSON, o Comparador, o PDF nem as contagens;
+altera a Spec 04 §8.3, a superfície da TASK-106 e seus testes.
+
+**Decisão:** Pendente. Para registrar a DEC correspondente, o responsável deve
+confirmar explicitamente: **"Q-066, opção A"** (ou outra opção).

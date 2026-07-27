@@ -1,7 +1,20 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-07-27 (branch `redesign`) — **TASK-103
-concluída e aprovada**. A implementação `99a64c5` restringe a semana padrão às
+**Atualização mais recente:** 2026-07-27 (branch `redesign`) — **TASK-106
+implementada e reprovada na revisão de aderência**. A implementação `c2db60a`
+entregou a grade compacta, ordenação, campo textual, seleção, hover e navegação,
+mas a revisão `14-REVISOES/TASK-106-20260727.md` confirmou três divergências da
+interação requerida: o realce desenha um contorno por célula em vez de uma única
+seleção contínua da Viagem; o Enter para na última Seção em vez de continuar na
+Viagem de baixo até a célula criável; e o Tab iniciado num campo vazio é bloqueado
+antes da navegação. Os testes atuais codificam os dois primeiros comportamentos
+incorretos e não cobrem `vazio → Tab → vazio`. A suíte canônica segue verde
+(1.279 unitários + 75 E2E; fingerprint `dd7eb28d…`; identidade
+`498d7fa6…`), mas não prova esses critérios. A remoção solicitada de **"Apagar
+bloco"** conflita com a Spec 04 §8.3 e virou a **Q-066 pendente**; nenhuma spec
+foi alterada. A TASK-106 permanece no Grupo H e as TASK-107..111 continuam sem
+avanço até a correção e nova revisão; o total segue em 17 pendentes. Antes nesta
+data — **TASK-103 concluída e aprovada**. A implementação `99a64c5` restringe a semana padrão às
 Viagens comuns (`viagem_feriado = false` e `tabela_excepcional_uuid = null`) e
 centraliza o rótulo “sem feriados nem operação excepcional”; fórmula, invariância
 total/por faixa e exibição têm testes. Parecer aprovado em
@@ -227,7 +240,10 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 ## 5. Tasks a executar — ordem recomendada
 
-**Estado atual: 17 tasks pendentes.** Em 2026-07-27, a TASK-103 saiu da lista:
+**Estado atual: 17 tasks pendentes.** Em 2026-07-27, a TASK-106 foi implementada
+em `c2db60a`, mas a revisão de aderência a **reprovou**; por isso continua nesta
+lista e não altera a contagem. A correção pertence à própria 106, com Q-066
+pendente para a remoção de "Apagar bloco". Antes disso, a TASK-103 saiu da lista:
 implementada em `99a64c5` e aprovada em
 `14-REVISOES/TASK-103-20260727.md`; o Grupo G passa de 3 para 2 pendentes, sem
 alterar a ordem `104 → 105`. Antes disso, a TASK-102 saiu da lista:
@@ -321,16 +337,16 @@ Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Servi
 
 ### Grupo H — Redesign da grade de horários (proposta 2026-07-27)
 
-Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). A **TASK-106** é a fundação (spec-backed: Spec 04 §8.1/§8.2/§8.3 + design system DEC-050). As Q-060..065 foram **decididas no mesmo dia** (DEC-082..087) e a Spec 04 §8.4/§8.5 exigida pela DEC-087 foi aplicada + carve-out da RN-007 registrada: **106..112 desbloqueadas**. Botões de ação da Viagem surgem **no hover** (não na seleção — dobrado na TASK-106). Ordem: **106 primeiro** (idealmente **antes de TASK-104/105**, para a grade excepcional herdar o novo layout), depois 107..111; a 112 reusa o motor de sincronização da 105.
+Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). A **TASK-106** é a fundação (spec-backed: Spec 04 §8.1/§8.2/§8.3 + design system DEC-050). As Q-060..065 foram **decididas no mesmo dia** (DEC-082..087) e a Spec 04 §8.4/§8.5 exigida pela DEC-087 foi aplicada + carve-out da RN-007 registrada. A entrega `c2db60a` da 106 foi **reprovada** em `14-REVISOES/TASK-106-20260727.md`: seleção, Enter e Tab precisam de correção na própria task; a retirada de "Apagar bloco" depende da **Q-066** e do alinhamento da Spec 04 §8.3. As TASK-107..111 permanecem bloqueadas pela fundação ainda não aprovada. A TASK-112 não depende da 106; continua condicionada ao motor da TASK-105. Botões de ação da Viagem surgem **no hover** (não na seleção — dobrado na TASK-106).
 
 | # | Task | Complex. | Estado | Observação |
 |:---:|---|:---:|---|---|
-| 1 | **106** — Redesign da grade: layout tabular compacto, ordenação temporal, seleção + hover + navegação por teclado (Tab/Enter), sem ícone de relógio | **4** | Desbloqueada | Spec 04 §8.1/§8.2/§8.3 + DEC-050. Recomendada **antes** de 104/105. Pré-requisito visual de 107..111. |
-| 2 | **107** — Inserção de Viagem por offset relativo (±X min) | **2** | Desbloqueada (DEC-082) | Depois de 106. Herda offsets; só o dia; default 10 min. |
-| 3 | **108** — Cópia por headway até horário-limite (lote) | **3** | Desbloqueada (DEC-083) | Depois de 106. Limite inclusivo; para antes das 24h. |
-| 4 | **109** — Cópia p/ dia adjacente (setas ←/→) + guarda de duplicidade | **2** | Desbloqueada (DEC-084) | Depois de 106. Guarda só no gesto (RN-062 intacta). |
-| 5 | **110** — Operações de dia inteiro: copiar dia→dias e apagar Viagens do dia | **3** | Desbloqueada (DEC-085) | Depois de 106. Reusa a guarda da 109. |
-| 6 | **111** — Modo compacto: ocultar Seções intermediárias e final | **2** | Desbloqueada (DEC-086) | Depois de 106. Versão simples do PDF é da TASK-034 (§13.2). |
+| 1 | **106** — Redesign da grade: layout tabular compacto, ordenação temporal, seleção + hover + navegação por teclado (Tab/Enter), sem ícone de relógio | **4** | **Implementada; revisão reprovada** | Corrigir seleção contínua, Enter entre Viagens e Tab vazio→vazio. Q-066 pendente para retirar "Apagar bloco"; reavaliar antes de avançar. |
+| 2 | **107** — Inserção de Viagem por offset relativo (±X min) | **2** | **Bloqueada pela TASK-106** (DEC-082 decidida) | Depois da correção/revisão da 106. Herda offsets; só o dia; default 10 min. |
+| 3 | **108** — Cópia por headway até horário-limite (lote) | **3** | **Bloqueada pela TASK-106** (DEC-083 decidida) | Depois da correção/revisão da 106. Limite inclusivo; para antes das 24h. |
+| 4 | **109** — Cópia p/ dia adjacente (setas ←/→) + guarda de duplicidade | **2** | **Bloqueada pela TASK-106** (DEC-084 decidida) | Depois da correção/revisão da 106. Guarda só no gesto (RN-062 intacta). |
+| 5 | **110** — Operações de dia inteiro: copiar dia→dias e apagar Viagens do dia | **3** | **Bloqueada pela TASK-106** (DEC-085 decidida) | Depois da correção/revisão da 106. Reusa a guarda da 109. |
+| 6 | **111** — Modo compacto: ocultar Seções intermediárias e final | **2** | **Bloqueada pela TASK-106** (DEC-086 decidida) | Depois da correção/revisão da 106. Versão simples do PDF é da TASK-034 (§13.2). |
 | 7 | **112** — "Copiar dias comuns" origem estendida + mescla = sincronização preservando UUID | **4** | Desbloqueada (DEC-087) | Spec 04 §8.4/§8.5 aplicada + carve-out RN-007 registrada. Reusa o motor de sincronização da 105. |
 
 **Ação de spec (DEC-087) — concluída:** a **Spec 04 §8.4/§8.5** foi atualizada (origem selecionável; "mesclar" = sincronização preservando UUID; "sobrescrever" = UUIDs novas) e a **carve-out da RN-007** foi registrada no `01-RULE_INDEX.md` e `03-TRACEABILITY_MATRIX.md`. O casamento sob duplicatas (RN-062) ficou resolvido na spec (§8.5, "por contagem").

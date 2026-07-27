@@ -5285,6 +5285,17 @@ Reconstruir a apresentação e a interação da grade de horários (etapa Viagen
 
 O responsável considera a UX atual (TASK-028/029/030, redesenho TASK-056) visualmente ruim e pouco eficiente para digitação. Esta task entrega a **fundação** sobre a qual as tasks de novos gestos (TASK-107..111) se apoiam. Tudo aqui é backed por spec já existente (§8.1 layout/ordenação, §8.2 preenchimento, §8.3 apagar/copiar) + design system (DEC-050) + §2.4/§2.5; **não depende de nenhuma Q nova**.
 
+**Nota da revisão de 2026-07-27:** a entrega `c2db60a` foi reprovada e deve ser
+corrigida dentro desta própria task, sem criar task paralela. A seleção de uma
+Viagem deve formar **uma única superfície visual contínua** envolvendo todas as
+células da Viagem, e não um realce independente por célula. O Enter percorre as
+Seções de cima para baixo e, depois da última Seção, segue para a primeira Seção
+da Viagem de baixo, inclusive até a célula vazia que cria a próxima Viagem. O Tab
+avança para o mesmo nível no dia seguinte mesmo quando o campo de origem ou de
+destino está vazio (`vazio → Tab → vazio`). Esses três pontos apenas esclarecem
+critérios já pertencentes à TASK-106. A remoção de **"Apagar bloco"** depende da
+Q-066, pois contraria a ação ainda exigida literalmente pela Spec 04 §8.3.
+
 ## Fora de escopo
 
 - Inserção por offset relativo (TASK-107/Q-060); cópia por headway (TASK-108/Q-061); cópia p/ dia adjacente + dedup (TASK-109/Q-062); operações de dia inteiro copiar/apagar-coluna (TASK-110/Q-063); modo compacto ocultando Seções (TASK-111/Q-064); origem estendida da cópia (TASK-112/Q-065).
@@ -5318,10 +5329,10 @@ O responsável considera a UX atual (TASK-028/029/030, redesenho TASK-056) visua
 - [ ] Dentro de cada dia, as Viagens aparecem em **ordem temporal** (mais cedo em cima); blocos ordenados pelo menor horário de início entre os dias (§8.1).
 - [ ] Células **sem ícone de relógio**; densidade tabular compacta conforme design system.
 - [ ] Digitar horário na 1ª Seção de um bloco/dia **cria a Viagem** (comportamento §8.2 preservado).
-- [ ] Selecionar uma Viagem (clique) evidencia-a e mantém a seleção persistente.
+- [ ] Selecionar uma Viagem (clique) evidencia **uma única superfície visual contínua** envolvendo todas as suas células e mantém a seleção persistente; não desenhar um contorno completo independente em cada célula.
 - [ ] Os **botões de ação flutuantes** da Viagem (apagar; e, nas TASK-107..110, inserir ±X / headway / copiar p/ dia adjacente) aparecem **no hover** (mouse sobre a Viagem) e **somem ao tirar o mouse**, ficando só a seleção — para poluir menos e deixar os demais horários visíveis durante a digitação (DEC-082..085 assumem este modelo de superfície).
 - [ ] "X" apaga **aquela Viagem** (a coluna do bloco naquele dia); a variante "apagar as Viagens do dia inteiro" fica na TASK-110 (Q-063).
-- [ ] **Tab** move o foco de digitação para a **mesma Seção no dia seguinte**; **Enter** move para a **Seção de baixo** (próxima linha visível do bloco).
+- [ ] **Tab** move o foco de digitação para a **mesma Seção no dia seguinte**, inclusive no percurso `vazio → vazio`; **Enter** percorre as Seções de cima para baixo e, após a última Seção, continua na primeira Seção da Viagem de baixo, até alcançar a célula vazia que cria a próxima Viagem.
 - [ ] Nenhuma chamada ao OSRM pela grade; nenhum `data-testid`/`aria-*` existente quebrado sem substituto.
 
 ## Casos válidos
@@ -5351,11 +5362,12 @@ O responsável considera a UX atual (TASK-028/029/030, redesenho TASK-056) visua
 
 ## Dependências
 
-- Nenhuma dura de Q. Reusa TASK-028/029/030 (concluídas). Recomendada **antes** de TASK-104/105. Pré-requisito visual das TASK-107..111.
+- Reusa TASK-028/029/030 (concluídas). Recomendada **antes** de TASK-104/105. Pré-requisito visual das TASK-107..111.
+- A correção de seleção/Enter/Tab não depende de Q. A retirada de "Apagar bloco" e a reavaliação final dependem da Q-066 e do alinhamento da Spec 04 §8.3 pelo responsável pelas specs.
 
 ## Perguntas em aberto
 
-- Nenhuma. As variantes novas de gesto ficam nas TASK-107..112 (Q-060..Q-065).
+- **Q-066 pendente:** retirar a ação "Apagar bloco inteiro", hoje exigida pela Spec 04 §8.3. As variantes novas de gesto continuam nas TASK-107..112 (Q-060..Q-065).
 
 ---
 
