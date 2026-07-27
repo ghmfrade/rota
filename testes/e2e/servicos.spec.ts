@@ -194,6 +194,11 @@ test.describe("Serviços — modo carregado (Serviços completos do JSON)", () =
   test("duplicar Serviço completo mantém os marcadores das Seções no mapa (TASK-101)", async ({
     page,
   }) => {
+    let chamadasOsrm = 0;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamadasOsrm += 1;
+      return rota.abort();
+    });
     await page.route("https://tile.openstreetmap.org/**", (rota) =>
       rota.fulfill({ contentType: "image/png", body: PNG_1x1 }),
     );
@@ -214,5 +219,6 @@ test.describe("Serviços — modo carregado (Serviços completos do JSON)", () =
     await expect(
       page.getByTestId("mapa-base").locator(".marcador-mapa-quadrado"),
     ).toHaveCount(3);
+    expect(chamadasOsrm).toBe(0);
   });
 });

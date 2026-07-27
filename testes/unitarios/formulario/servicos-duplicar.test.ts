@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
+import { exportarComoProposta } from "@/formulario/exportacao";
+import { importarDocumento } from "@/formulario/importacao";
 import { REGEX_UUID_V4, esquemaDocumentoOperacao } from "@/shared/contrato";
+import type { DocumentoOperacao } from "@/shared/contrato";
+import type { ListasAutosEmpresas } from "@/shared/dados-estaticos";
 import {
   duplicarServico,
   reconciliarSecoesDaDuplicacao,
@@ -25,6 +29,55 @@ function uuidsDeServico(servico: {
     ...servico.locais.map((l) => l.uuid),
     ...servico.itinerarios.flatMap((i) => i.viagens.map((v) => v.uuid)),
   ];
+}
+
+function todasAsUuids(documento: DocumentoOperacao): string[] {
+  return [
+    ...documento.autos.secoes.map((secao) => secao.uuid),
+    ...documento.autos.servicos.flatMap(uuidsDeServico),
+  ].sort();
+}
+
+function referenciasDeSecao(documento: DocumentoOperacao): string[] {
+  return documento.autos.servicos
+    .flatMap((servico) =>
+      servico.itinerarios.flatMap((itinerario) =>
+        itinerario.paradas.flatMap((parada) =>
+          parada.secao_uuid === undefined ? [] : [parada.secao_uuid],
+        ),
+      ),
+    )
+    .sort();
+}
+
+function contribuicoesDeSecao(documento: DocumentoOperacao): string[] {
+  return documento.autos.secoes
+    .flatMap((secao) =>
+      secao.servicos.map(
+        (contribuicao) => `${secao.uuid}:${contribuicao.servico_uuid}`,
+      ),
+    )
+    .sort();
+}
+
+function listasReconhecendo(
+  documento: DocumentoOperacao,
+): ListasAutosEmpresas {
+  return {
+    versao_schema: "1.0",
+    tipos: [{ codigo: documento.autos.tipo, descricao: "Tipo macro." }],
+    empresas: [{ id: "empresa-do-doc", nome: documento.autos.empresa }],
+    autos: [
+      {
+        codigo: documento.autos.codigo,
+        tc: "01",
+        denominacao_linha: "Linha de teste",
+        empresa_id: "empresa-do-doc",
+        tipo: documento.autos.tipo,
+        operante: true,
+      },
+    ],
+  };
 }
 
 describe("duplicarServico — UUIDs novas, referências de Seção mantidas (RN-007)", () => {
@@ -204,6 +257,50 @@ describe("reconciliarSecoesDaDuplicacao — contribuições da cópia (TASK-101)
     ).toBe(true);
   });
 
+  test("round-trip após duplicar preserva UUIDs, referências e contribuições (RN-004/RN-005/RN-007)", () => {
+    const doc = documentoBidirecionalMultiServico();
+    const original = doc.autos.servicos[0];
+    const copia = duplicarServico(original);
+    const documentoDuplicado: DocumentoOperacao = {
+      ...doc,
+      autos: {
+        ...doc.autos,
+        secoes: reconciliarSecoesDaDuplicacao(
+          doc.autos.secoes,
+          original,
+          copia,
+        ),
+        servicos: [...doc.autos.servicos, copia],
+      },
+    };
+    const uuidsAntes = todasAsUuids(documentoDuplicado);
+    const referenciasAntes = referenciasDeSecao(documentoDuplicado);
+    const contribuicoesAntes = contribuicoesDeSecao(documentoDuplicado);
+
+    const exportado = exportarComoProposta(documentoDuplicado, "2026-07-27");
+    expect(exportado.ok).toBe(true);
+    if (!exportado.ok) return;
+
+    const importado = importarDocumento(
+      exportado.json,
+      listasReconhecendo(documentoDuplicado),
+    );
+    expect(importado.ok).toBe(true);
+    if (!importado.ok) return;
+
+    expect(todasAsUuids(importado.documento)).toEqual(uuidsAntes);
+    expect(referenciasDeSecao(importado.documento)).toEqual(referenciasAntes);
+    expect(contribuicoesDeSecao(importado.documento)).toEqual(
+      contribuicoesAntes,
+    );
+    expect(
+      importado.documento.autos.servicos.some(
+        (servico) => servico.uuid === copia.uuid,
+      ),
+    ).toBe(true);
+    expect(new Set(uuidsAntes).size).toBe(uuidsAntes.length);
+  });
+
   test("Serviço unidirecional copia somente a geolocalização do seu sentido", () => {
     const doc = documentoExemploMinimo();
     const original = doc.autos.servicos[0];
@@ -273,6 +370,46 @@ describe("reconciliarSecoesDaDuplicacao — contribuições da cópia (TASK-101)
       resultado.some((secao) =>
         secao.servicos.some((entrada) => entrada.servico_uuid === copia.uuid),
       ),
+    ).toBe(false);
+  });
+
+  test("caso inválido: contribuição sem geolocalização exigida não inventa o sentido ausente (RN-026/RN-036)", () => {
+    const doc = documentoBidirecionalMultiServico();
+    const original = doc.autos.servicos[0];
+    const secaoUsada = doc.autos.secoes.find((secao) =>
+      original.itinerarios.some((itinerario) =>
+        itinerario.paradas.some(
+          (parada) => parada.secao_uuid === secao.uuid,
+        ),
+      ),
+    )!;
+    const contribuicaoOriginal = secaoUsada.servicos.find(
+      (entrada) => entrada.servico_uuid === original.uuid,
+    )!;
+    delete contribuicaoOriginal.geolocalizacao_volta;
+    const copia = duplicarServico(original);
+    const secoes = reconciliarSecoesDaDuplicacao(
+      doc.autos.secoes,
+      original,
+      copia,
+    );
+    const contribuicaoCopia = secoes
+      .find((secao) => secao.uuid === secaoUsada.uuid)!
+      .servicos.find((entrada) => entrada.servico_uuid === copia.uuid);
+
+    expect(contribuicaoCopia?.geolocalizacao_ida).toEqual(
+      contribuicaoOriginal.geolocalizacao_ida,
+    );
+    expect(contribuicaoCopia?.geolocalizacao_volta).toBeUndefined();
+    expect(
+      esquemaDocumentoOperacao.safeParse({
+        ...doc,
+        autos: {
+          ...doc.autos,
+          secoes,
+          servicos: [...doc.autos.servicos, copia],
+        },
+      }).success,
     ).toBe(false);
   });
 });
