@@ -229,7 +229,7 @@ Municipio D - Seção 4    10:00  10:00  11:00  10:00  10:00    —     —
 ### 8.4 Tabela de feriados
 
 - Mesma estrutura da tabela de dias comuns; alimenta as Viagens com `viagem_feriado = true` (semântica: opera quando um feriado cai naquele dia da semana — Spec 03 §9.1).
-- Botão **"Copiar dias comuns"**: preenche a tabela de feriados com horários iguais à operação de dias comuns — clona todas as Viagens comuns do sentido como Viagens de feriado (**UUIDs novas**). Confirmação se a tabela de feriados já tiver conteúdo (sobrescrever/mesclar).
+- Botão **"Copiar dias comuns"**: caso particular da **semeadura de grade** definida em §8.5 (item "Semear grade a partir de outra"), com a **origem** fixada na grade **comum** e o **destino** na tabela de feriados. Valem integralmente as regras de §8.5: normalização automática dos discriminadores de grade e, quando o destino já tiver conteúdo, a escolha entre **sobrescrever** e **mesclar** (sincronização preservando identidade). A origem também pode ser trocada pelo seletor de §8.5 (ex.: semear a tabela de feriados a partir de uma tabela excepcional).
 - Feriados **não entram** nas contagens (semana padrão — Spec 03 §9.2); a grade exibe essa nota como legenda.
 
 ### 8.5 Tabelas de operação excepcional
@@ -240,7 +240,13 @@ Municipio D - Seção 4    10:00  10:00  11:00  10:00  10:00    —     —
 - **Filtro/busca:** as tabelas de férias de verão/inverno são **filtráveis** por serem valores de tipo fechados; as personalizadas, por texto de `descricao`.
 - **Precedência (Spec 03 §9.1):** em feriado, a grade de feriado prevalece sobre a excepcional. A tabela excepcional **não** tem tabela de feriado própria.
 - **Contagens:** Viagens excepcionais **não entram** nas contagens da semana padrão (Spec 03 §9.2/§9.4); a grade exibe essa nota como legenda, como já faz a de feriados.
-- **"Copiar dias comuns"** (análogo à §8.4): opcionalmente disponível para semear uma tabela excepcional a partir da operação comum, clonando as Viagens comuns como excepcionais (**UUIDs novas**, `tabela_excepcional_uuid` da tabela destino, `viagem_feriado = false`).
+- **Semear grade a partir de outra ("Copiar dias comuns" e além):** qualquer grade (feriado ou excepcional) pode ser **semeada a partir de outra grade do mesmo Serviço/sentido** — a **origem** é selecionável entre a grade **comum**, a de **feriados** ou **qualquer tabela excepcional** existente. Ao semear:
+  - **Normalização automática dos discriminadores:** `viagem_feriado` e `tabela_excepcional_uuid` das Viagens copiadas são ajustados para os da grade **destino**, preservando o invariante `tabela_excepcional_uuid ≠ null ⇒ viagem_feriado = false` (Spec 02 §11). Ex.: semear uma tabela excepcional a partir da grade de feriados zera `viagem_feriado` e aplica o `tabela_excepcional_uuid` da tabela destino; semear a grade de feriados a partir de uma excepcional seta `viagem_feriado = true` e limpa `tabela_excepcional_uuid`.
+  - **Destino vazio:** as Viagens da origem são **clonadas** no destino com **UUIDs novas** (Spec 02 §12).
+  - **Destino com conteúdo — confirmação entre duas operações:**
+    - **Sobrescrever:** limpa o destino e reclona a origem com **UUIDs novas** (equivale a semear num destino vazio).
+    - **Mesclar (sincronização preservando identidade):** o destino é reconciliado para ficar **igual** à origem, **preservando a identidade das Viagens que permanecem**. As Viagens do destino **ausentes** na origem são **removidas**; as que **casam** com a origem (mesmo `horario_saida` na grade) **mantêm o seu `uuid`** e têm apenas os horários de passagem **atualizados** para os da origem (mesmo quando só os offsets mudaram); as Viagens da origem **ausentes** no destino são **acrescentadas** com **UUIDs novas**. O objetivo é a **estabilidade de identidade para o Comparador** — reexecutar a semeadura aparece como "horário de passagem alterado", não como "Viagem removida + Viagem criada". Como duas Viagens podem ter o mesmo `horario_saida` (§11; não há unicidade — Spec 02 §14), o casamento naquele horário é resolvido **por contagem** (quantas Viagens casam), preservando a identidade de tantas quantas coincidirem e removendo/acrescentando o excedente.
+  - A tabela excepcional continua **sem** sub-grade de feriado própria (precedência **feriado > excepcional > comum** — Spec 03 §9.1).
 
 ---
 

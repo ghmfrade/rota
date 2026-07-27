@@ -57,10 +57,10 @@
 
 ## RN-007 — Cópias criam entidades novas com UUIDs novas
 
-**Descrição:** Operações de cópia — duplicar Serviço, copiar viagem para outro dia, copiar dias comuns para feriado — criam entidades novas, com UUIDs novas. Só a entidade original mantém identidade. No duplicar Serviço, as referências a Seções (`secao_uuid`) são mantidas (Seção é compartilhada), mas o novo Serviço contribui suas próprias geolocalizações.
-**Origem:** Spec 02 §11 (campo `uuid`), §12; Spec 04 §6, §8.3–§8.4.
+**Descrição:** Operações de cópia — duplicar Serviço, copiar viagem para outro dia, semear grade em **destino vazio** ou no modo **"sobrescrever"** — criam entidades novas, com UUIDs novas. Só a entidade original mantém identidade. No duplicar Serviço, as referências a Seções (`secao_uuid`) são mantidas (Seção é compartilhada), mas o novo Serviço contribui suas próprias geolocalizações. **Exceção — mescla/sincronização de grade (Spec 04 §8.5; DEC-087):** ao **mesclar** uma grade a partir de outra (semeadura com o destino já preenchido), as Viagens do destino que **casam por `horario_saida`** com a origem **preservam o seu `uuid`** (só os offsets são atualizados); UUID nova aplica-se apenas às Viagens **acrescentadas** e ao caminho **"sobrescrever"**. Serve à estabilidade de identidade no Comparador (RN-004) — o diff mostra "offset alterado", não "removida + criada".
+**Origem:** Spec 02 §11 (campo `uuid`), §12; Spec 04 §6, §8.3–§8.5; DEC-087.
 **Tipo:** Domínio | UI. **Criticidade:** Alta. **Afeta:** F, C, J, T.
-**Exemplos inválidos:** "copiar dias comuns" reutilizando as UUIDs das viagens comuns nas viagens de feriado.
+**Exemplos inválidos:** "copiar dias comuns" em modo **sobrescrever** (ou destino vazio) reutilizando as UUIDs das viagens de origem. **Não** é violação o modo **mesclar** preservar o `uuid` das viagens do destino que casam por `horario_saida` (exceção DEC-087).
 
 ---
 

@@ -1,6 +1,24 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-07-27 (branch `redesign`) — **operação
+**Atualização mais recente:** 2026-07-27 (branch `redesign`) — **redesign da
+grade de horários (proposta do responsável)**: criadas **TASK-106..112** (Grupo H
+da §5) e **Q-060..Q-065** (`docs-dev/16`). A TASK-106 (fundação visual/interativa
+da grade) é **spec-backed** (Spec 04 §8.1/§8.2/§8.3 + design system DEC-050) e roda
+**desbloqueada**; as TASK-107..112 introduzem gestos **não descritos nas specs**
+(inserção por offset, cópia por headway, cópia p/ dia adjacente + dedup, operações
+de dia inteiro, modo compacto, origem estendida da cópia). Na **mesma data o
+responsável decidiu** as Q-060..065 (via `/registrar-decisao`): **DEC-082..087**.
+Com isso, **TASK-107..111 ficaram desbloqueadas** (DEC-082..086). A DEC-087 (mescla =
+sincronização preservando UUID, **exceção à RN-007**) exigia alteração de spec: a
+**Spec 04 §8.4/§8.5 foi atualizada** pelo responsável (semeadura com origem
+selecionável; "mesclar" = sincronização preservando UUID; "sobrescrever" = UUIDs
+novas) e a **carve-out da RN-007 foi registrada** no `01-RULE_INDEX.md` e
+`03-TRACEABILITY_MATRIX.md` — com isso a **TASK-112 também ficou desbloqueada** e a
+parte "mesclar" da **TASK-105** deixou de estar condicionada. O casamento sob
+duplicatas (RN-062) ficou resolvido na própria spec (§8.5, "por contagem"), sem Q
+nova. Também foi fixado que os botões de ação da Viagem surgem **no hover** (não na
+seleção) — dobrado na TASK-106. **Todo o Grupo H (106..112) está desbloqueado.**
+Pendentes: 12 → 19. Antes nesta data — **operação
 excepcional (DEC-081/Q-059)**: criadas **TASK-102..105** (Grupo G da §5),
 Specs 02/03/04/05 atualizadas para o contrato v1.1, RN-098/099 criadas e
 RN-061/062/068/069 ajustadas; as pendentes de PDF/Comparador (033/034/036/037/039)
@@ -192,11 +210,15 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 ## 5. Tasks a executar — ordem recomendada
 
-**Estado atual: 12 tasks pendentes.** Em 2026-07-27, após a TASK-101 sair da
+**Estado atual: 19 tasks pendentes.** Em 2026-07-27, após a TASK-101 sair da
 lista (reavaliação aprovada em `14-REVISOES/TASK-101-20260727-reavaliacao.md`,
 8 pendentes), foram **criadas 4 tasks** da operação excepcional (DEC-081/Q-059):
-**TASK-102..105** (Grupo G abaixo), levando o total a **12**. O texto
-cronológico abaixo preserva os totais históricos de cada revisão anterior.
+**TASK-102..105** (Grupo G abaixo), levando o total a **12**; em seguida, o
+**redesign da grade de horários** adicionou **TASK-106..112** (Grupo H,
+Q-060..065), levando a **19**. As Q-060..065 foram **decididas no mesmo dia**
+(DEC-082..087) e a Spec 04 §8.4/§8.5 exigida pela DEC-087 foi aplicada: as **7 tasks
+do Grupo H (106..112) estão desbloqueadas**. O texto cronológico abaixo preserva os
+totais históricos de cada revisão anterior.
 
 > **Atualização desta revisão:** a **TASK-091 foi concluída** — a Q-052 foi decidida (**DEC-073**), implementação `f1eca46`, parecer **aprovado com ressalvas** em `14-REVISOES/TASK-091-20260722.md` (condição: commitar o registro da DEC-073; follow-ups: teste-guarda das quatro colunas/vocabulário e teste de desseleção sobre Local extremo herdado da 064 — este último **segue aberto**, não foi absorvido pela 091). Antes: a **TASK-064 foi concluída** — implementação `d6a5fcf` + fixes `50f840b`/`7a3084f`, parecer **aprovado com ressalvas** em `14-REVISOES/TASK-064-20260722.md`. Nenhuma das duas faz parte da lista abaixo.
 
@@ -275,6 +297,22 @@ Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Servi
 | 4 | **105** — Formulário: grade excepcional + "copiar dias comuns" | **3** | Depois de 102 e 104; reusa as grades da TASK-028/030 (concluídas). |
 
 **Superfícies pendentes alteradas pela DEC-081 (não viram task nova — anotadas no backlog):** **TASK-034** (PDF: tabelas excepcionais + rótulo), **TASK-033** (rótulo/`versao_schema`), **TASK-036** (diff: casar tabela por `uuid` + mudança de grade), **TASK-037** (telas: grades excepcionais separadas + rótulo), **TASK-039** (PDF comparativo). Cobertas ao construí-las, lendo as specs já atualizadas — evita task paralela sobre superfície não construída (lição §6.2). Nenhuma task pendente foi **anulada**.
+
+### Grupo H — Redesign da grade de horários (proposta 2026-07-27)
+
+Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). A **TASK-106** é a fundação (spec-backed: Spec 04 §8.1/§8.2/§8.3 + design system DEC-050). As Q-060..065 foram **decididas no mesmo dia** (DEC-082..087) e a Spec 04 §8.4/§8.5 exigida pela DEC-087 foi aplicada + carve-out da RN-007 registrada: **106..112 desbloqueadas**. Botões de ação da Viagem surgem **no hover** (não na seleção — dobrado na TASK-106). Ordem: **106 primeiro** (idealmente **antes de TASK-104/105**, para a grade excepcional herdar o novo layout), depois 107..111; a 112 reusa o motor de sincronização da 105.
+
+| # | Task | Complex. | Estado | Observação |
+|:---:|---|:---:|---|---|
+| 1 | **106** — Redesign da grade: layout tabular compacto, ordenação temporal, seleção + hover + navegação por teclado (Tab/Enter), sem ícone de relógio | **4** | Desbloqueada | Spec 04 §8.1/§8.2/§8.3 + DEC-050. Recomendada **antes** de 104/105. Pré-requisito visual de 107..111. |
+| 2 | **107** — Inserção de Viagem por offset relativo (±X min) | **2** | Desbloqueada (DEC-082) | Depois de 106. Herda offsets; só o dia; default 10 min. |
+| 3 | **108** — Cópia por headway até horário-limite (lote) | **3** | Desbloqueada (DEC-083) | Depois de 106. Limite inclusivo; para antes das 24h. |
+| 4 | **109** — Cópia p/ dia adjacente (setas ←/→) + guarda de duplicidade | **2** | Desbloqueada (DEC-084) | Depois de 106. Guarda só no gesto (RN-062 intacta). |
+| 5 | **110** — Operações de dia inteiro: copiar dia→dias e apagar Viagens do dia | **3** | Desbloqueada (DEC-085) | Depois de 106. Reusa a guarda da 109. |
+| 6 | **111** — Modo compacto: ocultar Seções intermediárias e final | **2** | Desbloqueada (DEC-086) | Depois de 106. Versão simples do PDF é da TASK-034 (§13.2). |
+| 7 | **112** — "Copiar dias comuns" origem estendida + mescla = sincronização preservando UUID | **4** | Desbloqueada (DEC-087) | Spec 04 §8.4/§8.5 aplicada + carve-out RN-007 registrada. Reusa o motor de sincronização da 105. |
+
+**Ação de spec (DEC-087) — concluída:** a **Spec 04 §8.4/§8.5** foi atualizada (origem selecionável; "mesclar" = sincronização preservando UUID; "sobrescrever" = UUIDs novas) e a **carve-out da RN-007** foi registrada no `01-RULE_INDEX.md` e `03-TRACEABILITY_MATRIX.md`. O casamento sob duplicatas (RN-062) ficou resolvido na spec (§8.5, "por contagem").
 
 ### Grupo F — Bloqueada
 

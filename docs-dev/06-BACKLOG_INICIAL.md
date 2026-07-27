@@ -5209,6 +5209,8 @@ Cada tabela excepcional passa a ter uma grade própria (mesma estrutura da grade
 
 Spec 04 §8.5. Reusa a grade de dias comuns (TASK-028, concluída) e o motor de cópia da tabela de feriados (TASK-030, concluída). A tabela precisa existir (TASK-104).
 
+**Nota (DEC-087, 2026-07-27):** a semântica de **"mesclar"** do "copiar dias comuns" passa a ser **sincronização preservando UUID** (torna o destino igual à origem: apaga ausentes, atualiza offsets, preserva o `uuid` das casadas por `horario_saida`, acrescenta faltantes com UUID nova) — **exceção à RN-007**, a mesma da TASK-112; "sobrescrever" segue com UUIDs novas. A **Spec 04 §8.4/§8.5 já foi atualizada** e a **carve-out da RN-007 já está registrada** — a task está implementável na íntegra (destino vazio = UUIDs novas; mesclar = sincronização). O motor de sincronização é compartilhado com a TASK-112.
+
 ## Fora de escopo
 
 - CRUD/filtro das tabelas (TASK-104); contagens (TASK-103); PDF; Comparador.
@@ -5266,6 +5268,508 @@ Spec 04 §8.5. Reusa a grade de dias comuns (TASK-028, concluída) e o motor de 
 ## Perguntas em aberto
 
 - Nenhuma.
+
+---
+
+## Grupo H — Redesign da grade de horários (proposta 2026-07-27)
+
+Recurso proposto pelo responsável em 2026-07-27 (redesign da UX de inserção de horários, com Excel de layout e 4 imagens em `docs-dev/`). A **fundação visual/interativa** (TASK-106) é spec-backed (Spec 04 §8.1/§8.2/§8.3 + design system DEC-050) e roda **desbloqueada**. Os **novos gestos** (TASK-107..112) introduzem comportamento não descrito nas specs e nascem **bloqueados** nas respectivas Q-060..Q-065 (`docs-dev/16`); só podem ser implementados após decisão do responsável (via `/registrar-decisao`). Ordem recomendada: **106 primeiro** (idealmente antes de TASK-104/105, para a grade excepcional herdar o novo layout), depois as demais conforme as Q forem decididas.
+
+## TASK-106 — Redesign da grade de horários: layout tabular compacto, ordenação temporal, seleção de Viagem e navegação por teclado
+
+## Objetivo
+
+Reconstruir a apresentação e a interação da grade de horários (etapa Viagens) no layout tabular da Spec 04 §8.1 — linhas `Cidade - Seção`, colunas SEG…DOM, blocos empilhados por posição ordinal —, mais denso/tabular (**sem o ícone de relógio** nas células), com **ordenação temporal** garantida por dia, **seleção** de uma Viagem e **navegação por teclado** (Tab = próximo dia, Enter = Seção de baixo), preservando o fluxo de digitar horário para criar Viagem e o "X" para apagar a Viagem do dia.
+
+## Contexto
+
+O responsável considera a UX atual (TASK-028/029/030, redesenho TASK-056) visualmente ruim e pouco eficiente para digitação. Esta task entrega a **fundação** sobre a qual as tasks de novos gestos (TASK-107..111) se apoiam. Tudo aqui é backed por spec já existente (§8.1 layout/ordenação, §8.2 preenchimento, §8.3 apagar/copiar) + design system (DEC-050) + §2.4/§2.5; **não depende de nenhuma Q nova**.
+
+## Fora de escopo
+
+- Inserção por offset relativo (TASK-107/Q-060); cópia por headway (TASK-108/Q-061); cópia p/ dia adjacente + dedup (TASK-109/Q-062); operações de dia inteiro copiar/apagar-coluna (TASK-110/Q-063); modo compacto ocultando Seções (TASK-111/Q-064); origem estendida da cópia (TASK-112/Q-065).
+- Contrato JSON / schema (nenhuma mudança); contagens; PDF; Comparador.
+- UI de tabelas excepcionais (TASK-104/105) — mas o layout resultante deve ser reusável por elas (ver Riscos).
+
+## Specs fonte
+
+- Spec 04 §8.1 (estrutura: linhas/colunas/blocos, ordenação temporal por `horario_saida`, exibição HH:MM), §8.2 (preencher 1ª Seção cria Viagem; alterar passante redistribui), §8.3 (apagar viagem inteira), §2.4–§2.5 (usuário digita horários; offsets ocultos)
+- `docs-dev/18-DESIGN_SYSTEM.md` (DEC-050 — vinculante para UI)
+
+## Regras envolvidas
+
+- RN-061 (Viagem por dia), RN-063 (`horarios_paradas` monotônico), RN-064/RN-065 (sugestão/redistribuição — preservar), RN-066 (reset), RN-067 (digita relógio, não offset)
+
+## Entidades afetadas
+
+- Viagem (apresentação/edição), Seção (linhas)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Grade renderiza no layout §8.1 (linhas `Cidade - Seção`, colunas SEG…DOM, blocos por posição ordinal; dia sem viagem na posição = "—").
+- [ ] Dentro de cada dia, as Viagens aparecem em **ordem temporal** (mais cedo em cima); blocos ordenados pelo menor horário de início entre os dias (§8.1).
+- [ ] Células **sem ícone de relógio**; densidade tabular compacta conforme design system.
+- [ ] Digitar horário na 1ª Seção de um bloco/dia **cria a Viagem** (comportamento §8.2 preservado).
+- [ ] Selecionar uma Viagem (clique) evidencia-a e mantém a seleção persistente.
+- [ ] Os **botões de ação flutuantes** da Viagem (apagar; e, nas TASK-107..110, inserir ±X / headway / copiar p/ dia adjacente) aparecem **no hover** (mouse sobre a Viagem) e **somem ao tirar o mouse**, ficando só a seleção — para poluir menos e deixar os demais horários visíveis durante a digitação (DEC-082..085 assumem este modelo de superfície).
+- [ ] "X" apaga **aquela Viagem** (a coluna do bloco naquele dia); a variante "apagar as Viagens do dia inteiro" fica na TASK-110 (Q-063).
+- [ ] **Tab** move o foco de digitação para a **mesma Seção no dia seguinte**; **Enter** move para a **Seção de baixo** (próxima linha visível do bloco).
+- [ ] Nenhuma chamada ao OSRM pela grade; nenhum `data-testid`/`aria-*` existente quebrado sem substituto.
+
+## Casos válidos
+
+- Preencher 08:00 em SEG cria a Viagem; Tab leva a TER na mesma Seção; Enter desce para a Seção 2; uma Viagem 07:00 inserida depois aparece **acima** da de 08:00 (ordenação temporal).
+
+## Casos inválidos
+
+- Horário passante fora de ordem (menor que a âncora anterior) → célula em erro, não confirma (§8.2/RN-065) — comportamento preservado, não regredido.
+
+## Testes esperados
+
+- Unitários: ordenação temporal do dia; montagem de blocos por posição ordinal; mapeamento Tab/Enter → célula alvo.
+- Integração: digitar cria Viagem; "X" apaga a Viagem do dia; redistribuição (RN-065) preservada.
+- E2E: navegação por teclado (Tab/Enter) e criação/apagar numa grade real (OSRM mockado).
+- Snapshot/contrato JSON: exportação inalterada (sem mudança de contrato).
+- PDF: n/a.
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/etapa-viagens.tsx`, `montagem-grade.ts`, `acoes-grade.ts`; `shared/ui` (célula/tabela densa).
+
+## Riscos
+
+- Superfície muito ativa; regressão nos gestos §8.2/§8.3 e na redistribuição (RN-065).
+- **Sequenciamento com TASK-104/105:** ambas tocam a etapa Viagens/grade. Recomenda-se **106 antes de 104/105** para a grade excepcional herdar o novo layout; se 104/105 forem entregues antes, a 106 deve redesenhar também a superfície excepcional.
+
+## Dependências
+
+- Nenhuma dura de Q. Reusa TASK-028/029/030 (concluídas). Recomendada **antes** de TASK-104/105. Pré-requisito visual das TASK-107..111.
+
+## Perguntas em aberto
+
+- Nenhuma. As variantes novas de gesto ficam nas TASK-107..112 (Q-060..Q-065).
+
+---
+
+## TASK-107 — Inserção de Viagem por offset relativo (±X min a partir da Viagem selecionada) — **desbloqueada (DEC-082)**
+
+## Objetivo
+
+Com uma Viagem selecionada, botões acima/abaixo da célula criam **outra Viagem** cujo `horario_saida` é o da selecionada deslocado de ±X min (imagem "selecao de horario e botoes 1"), herdando os offsets da origem.
+
+## Contexto
+
+Gesto de conveniência sobre a criação já prevista (§8.2/§8.3). Depende da fundação da TASK-106. **Q-060 decidida (DEC-082):** herda offsets da origem; escopo só o dia selecionado; X editável, default 10 min.
+
+## Fora de escopo
+
+- Geração em lote por headway (TASK-108); demais gestos (TASK-109..112). Contrato/PDF/Comparador/contagens.
+
+## Specs fonte
+
+- Spec 04 §8.3 (inserir viagem), §8.2 (derivadas por acúmulo); Spec 02 §12 (UUID nova)
+
+## Regras envolvidas
+
+- RN-004 (UUID nova na criação), RN-061, RN-063, RN-067
+
+## Entidades afetadas
+
+- Viagem
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] JSON
+
+## Critérios de aceite
+
+- [ ] Botão acima/abaixo cria Viagem com `horario_saida` = origem ± X (default X = 10 min, editável); UUID nova; entra na ordenação temporal (§8.1).
+- [ ] A nova Viagem **herda os offsets** da origem (translação rígida).
+- [ ] Escopo: **só o dia da célula selecionada**.
+- [ ] Os botões ±X aparecem **no hover** da Viagem (modelo da TASK-106), não na seleção.
+
+## Casos válidos
+
+- Origem 08:00 + botão "+1:10" → nova Viagem 09:10 no mesmo dia, offsets herdados.
+
+## Casos inválidos
+
+- X que leve a horário < 00:00 ou > 23:59 → recusa com aviso.
+
+## Testes esperados
+
+- Unitários: translação de `horario_saida` e herança de offsets; UUID nova.
+- E2E: gesto na grade (OSRM mockado).
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/acoes-grade.ts`, `etapa-viagens.tsx`.
+
+## Riscos
+
+- Interação com a redistribuição (RN-065) ao herdar offsets manuais da origem.
+
+## Dependências
+
+- TASK-106 (fundação/seleção/hover). Q-060 decidida (DEC-082).
+
+## Perguntas em aberto
+
+- Nenhuma — Q-060 decidida (DEC-082).
+
+---
+
+## TASK-108 — Cópia de Viagem por headway até um horário-limite (geração em lote) — **desbloqueada (DEC-083)**
+
+## Objetivo
+
+Botão de "seta curva" que gera **várias Viagens** a partir da selecionada, com headway fixo, até um horário-limite (imagem "selecao de horario e botoes 2").
+
+## Contexto
+
+Geração em lote não existe em spec. Depende da TASK-106. **Q-061 decidida (DEC-083):** limite inclusivo; para antes das 24h; herda offsets; escopo só o dia selecionado; recusa entrada inválida.
+
+## Fora de escopo
+
+- Inserção unitária por offset (TASK-107); demais gestos. Contrato/PDF/Comparador/contagens.
+
+## Specs fonte
+
+- Spec 04 §8.3, §8.2; Spec 02 §12
+
+## Regras envolvidas
+
+- RN-004, RN-061, RN-063, RN-067
+
+## Entidades afetadas
+
+- Viagem
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] JSON
+
+## Critérios de aceite
+
+- [ ] Origem + headway + limite gera N Viagens (última partida **≤ limite** — inclusivo), UUIDs novas, offsets herdados, escopo no dia selecionado.
+- [ ] Headway ≤ 0 ou limite < origem → recusa com aviso; a sequência **para antes das 24h** (não vira o dia).
+
+## Casos válidos
+
+- 08:00, headway 01:10, limite 17:00 → 08:00, 09:10, …, ≤ 17:00.
+
+## Casos inválidos
+
+- Headway 00:00 → recusa; limite 07:00 com origem 08:00 → recusa.
+
+## Testes esperados
+
+- Unitários: geração da sequência (limite inclusivo, corte às 23:59); UUIDs novas.
+- E2E: gesto na grade (OSRM mockado).
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/acoes-grade.ts`, `copias-grade.ts`, `etapa-viagens.tsx`.
+
+## Riscos
+
+- Pode criar muitas Viagens — validar performance de render (reusa TASK-106).
+
+## Dependências
+
+- TASK-106. Q-061 decidida (DEC-083).
+
+## Perguntas em aberto
+
+- Nenhuma — Q-061 decidida (DEC-083).
+
+---
+
+## TASK-109 — Cópia de Viagem para o dia adjacente (setas ←/→) com guarda de duplicidade — **desbloqueada (DEC-084)**
+
+## Objetivo
+
+Setas ←/→ na Viagem selecionada copiam-na para o dia anterior/seguinte; se já houver Viagem "igual" no destino, não copia e avisa.
+
+## Contexto
+
+Copiar-para-dia já existe (§8.3); o novo é o gesto de um clique para o dia adjacente **e** a guarda de duplicidade. **Q-062 decidida (DEC-084):** guarda que não copia e avisa; critério = mesmo `horario_saida` na mesma grade; a guarda vale **só no gesto**, sem reintroduzir validação de unicidade no contrato (**RN-062 preservada**).
+
+## Fora de escopo
+
+- Operações de dia inteiro (TASK-110); demais gestos. Qualquer validação estrutural de unicidade no contrato (proibida — RN-062).
+
+## Specs fonte
+
+- Spec 04 §8.3 (copiar viagem para outro dia); Spec 02 §12
+
+## Regras envolvidas
+
+- RN-004, RN-061, RN-062 (não reintroduzir unicidade no contrato)
+
+## Entidades afetadas
+
+- Viagem
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] JSON
+
+## Critérios de aceite
+
+- [ ] Seta → copia a Viagem para o dia seguinte (UUID nova); seta ← para o anterior. Botões surgem **no hover** (TASK-106).
+- [ ] Se o destino já tem Viagem com o mesmo `horario_saida` na mesma grade, **não copia** e avisa ("já tem horário").
+- [ ] Nenhuma validação de unicidade é adicionada a outros caminhos (RN-062 preservada — a guarda é só de UI).
+
+## Casos válidos
+
+- Viagem 08:00 em SEG, seta → cria 08:00 em TER (destino sem 08:00).
+
+## Casos inválidos
+
+- Destino já tem 08:00 (mesma grade) → aviso "já tem horário", nada criado.
+
+## Testes esperados
+
+- Unitários: cópia p/ dia adjacente com UUID nova; detecção de duplicidade pelo critério da Q-062.
+- E2E: gesto e aviso (OSRM mockado).
+- Contrato: round-trip mantém RN-062 (duplicatas ainda aceitas em import).
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/acoes-grade.ts`, `copias-grade.ts`, `etapa-viagens.tsx`.
+
+## Riscos
+
+- Risco de a guarda escorregar para validação de contrato/import — vedado por RN-062 (guarda só no gesto — DEC-084).
+
+## Dependências
+
+- TASK-106. Q-062 decidida (DEC-084).
+
+## Perguntas em aberto
+
+- Nenhuma — Q-062 decidida (DEC-084).
+
+---
+
+## TASK-110 — Operações de dia inteiro: copiar um dia para outros dias e apagar as Viagens de um dia — **desbloqueada (DEC-085)**
+
+## Objetivo
+
+Diálogo "Copiar para [vários dias]" que replica todas as Viagens de um dia para os dias escolhidos (imagem 3), e a variante do "X" que apaga todas as Viagens do dia (coluna inteira).
+
+## Contexto
+
+§8.3 cobre copiar/apagar uma Viagem e apagar o bloco inteiro (linha); operações de **coluna** (dia inteiro) são novas. Depende da TASK-106. **Q-063 decidida (DEC-085):** copiar-dia com destino cheio = mesclar com a guarda da DEC-084; apagar-dia sob confirmação OK/Cancelar.
+
+## Fora de escopo
+
+- Cópia para dia adjacente unitária (TASK-109); demais gestos. Contrato/PDF/Comparador/contagens.
+
+## Specs fonte
+
+- Spec 04 §8.3; Spec 02 §12
+
+## Regras envolvidas
+
+- RN-004, RN-061, RN-062 (ver interação com Q-062)
+
+## Entidades afetadas
+
+- Viagem
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] JSON
+
+## Critérios de aceite
+
+- [ ] "Copiar dia para [dias]" replica todas as Viagens do dia origem nos destinos (UUIDs novas).
+- [ ] Destino com Viagens: **mesclar com a guarda da DEC-084** (pula as iguais por `horario_saida`/grade, com aviso).
+- [ ] "X" → apagar as Viagens do dia inteiro sob **confirmação OK/Cancelar** (destrutivo).
+
+## Casos válidos
+
+- SEG com 3 Viagens, copiar para SÁB e DOM → SÁB/DOM recebem as 3 (UUIDs novas).
+
+## Casos inválidos
+
+- Apagar-dia sem confirmação → não executa; cancelar mantém as Viagens.
+
+## Testes esperados
+
+- Unitários: cópia de coluna (UUIDs novas); política substituir/mesclar; apagar-dia.
+- E2E: diálogo de cópia e confirmação de apagar (OSRM mockado).
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/copias-grade.ts`, `acoes-grade.ts`, `etapa-viagens.tsx`; `shared/ui` (diálogo multiseleção de dias).
+
+## Riscos
+
+- Reuso da guarda de duplicidade da TASK-109/DEC-084 sem duplicar lógica.
+
+## Dependências
+
+- TASK-106; reusa a guarda da TASK-109 (DEC-084). Q-063 decidida (DEC-085).
+
+## Perguntas em aberto
+
+- Nenhuma — Q-063 decidida (DEC-085).
+
+---
+
+## TASK-111 — Modo compacto: ocultar Seções intermediárias e final (só linhas de partida) — **desbloqueada (DEC-086)**
+
+## Objetivo
+
+Toggle que colapsa a grade do sentido para exibir só a Seção de partida de cada Viagem (imagem 4), mantendo cópia/inserção e ajustando o Enter para a próxima Seção de partida visível.
+
+## Contexto
+
+Modo de visualização não descrito na §8.1 (que só prevê "modo avançado" para Locais). Puramente de tela, sem tocar dados/contrato. Depende da TASK-106. **Q-064 decidida (DEC-086):** toggle na tela adotado; **no PDF, o recorte compacto já é a "versão simples" do §13.2** (entregue pela TASK-034, sem escopo novo de PDF nesta task).
+
+## Fora de escopo
+
+- Ocultar Locais (já vedados na grade principal, §8.1); PDF (o modo é só de tela). Alterar `horarios_paradas`.
+
+## Specs fonte
+
+- Spec 04 §8.1 (linhas = Seções), §2.4
+
+## Regras envolvidas
+
+- RN-063 (dados das Seções ocultas permanecem íntegros), RN-067
+
+## Entidades afetadas
+
+- Viagem (apresentação)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] JSON
+
+## Critérios de aceite
+
+- [ ] Toggle oculta Seções intermediárias e final; só a Seção de partida de cada Viagem fica visível.
+- [ ] Cópia/inserção seguem operando; nenhum dado é alterado ao ocultar/mostrar.
+- [ ] Enter passa para a próxima **Seção de partida visível** (integra a nav. da TASK-106).
+
+## Casos válidos
+
+- Grade de 4 Seções colapsada para 1 linha de partida por Viagem; alternar mostra tudo de novo.
+
+## Casos inválidos
+
+- Nenhum de dado (modo de visualização); export inalterado.
+
+## Testes esperados
+
+- Unitários: filtro de linhas visíveis; alvo do Enter no modo compacto.
+- E2E: alternar o modo e digitar (OSRM mockado).
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/etapa-viagens.tsx`, `montagem-grade.ts`.
+
+## Riscos
+
+- Baixo risco técnico (modo de visualização). A versão simples do PDF é da TASK-034 (§13.2), não desta task.
+
+## Dependências
+
+- TASK-106. Q-064 decidida (DEC-086). (A versão simples do PDF: TASK-034/§13.2.)
+
+## Perguntas em aberto
+
+- Nenhuma — Q-064 decidida (DEC-086).
+
+---
+
+## TASK-112 — "Copiar dias comuns" com origem estendida + mescla como sincronização preservando UUID — **desbloqueada (DEC-087; Spec 04 §8.4/§8.5 aplicada)**
+
+## Objetivo
+
+Estender a semente de grades para copiar Viagens da grade comum, **de feriados** ou de **outra tabela excepcional**, normalizando os discriminadores no destino; e implementar a **mescla como sincronização preservando UUID** (torna o destino igual à origem, preservando o `uuid` das Viagens que casam por `horario_saida`).
+
+## Contexto
+
+§8.4/§8.5 e a **TASK-105** antes só copiavam da grade **comum** com "UUIDs novas". A **Q-065 foi decidida (DEC-087)**: origem estendida + mescla como sincronização preservando UUID — **exceção à RN-007**. **A Spec 04 §8.4/§8.5 já foi atualizada** (semeadura com origem selecionável; "mesclar" = sincronização preservando UUID; "sobrescrever" = UUIDs novas) e a **carve-out da RN-007** já está no `01-RULE_INDEX.md`/`03-TRACEABILITY_MATRIX.md` — a task está **implementável**. Depende da TASK-105 revisada (mesma semântica de mescla) e do contrato (TASK-102/104).
+
+## Fora de escopo
+
+- CRUD de tabelas (TASK-104); grade excepcional base (TASK-105); PDF/Comparador/contagens.
+
+## Specs fonte
+
+- Spec 04 §8.4 (copiar dias comuns → feriados), §8.5 (→ excepcional); Spec 02 §11 (invariante); Spec 03 §9.1 (precedência)
+
+## Regras envolvidas
+
+- RN-007 (cópia → UUIDs novas), RN-099 (invariante da grade excepcional), RN-061
+
+## Entidades afetadas
+
+- Viagem, Tabela excepcional
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] JSON
+
+## Critérios de aceite
+
+- [ ] Selecionar a **origem** da cópia (comum / feriados / uma excepcional) ao semear a grade destino.
+- [ ] Normalização automática dos discriminadores no destino preserva RN-099 (ex.: feriado→excepcional zera `viagem_feriado` e seta `tabela_excepcional_uuid`).
+- [ ] **Mesclar = sincronização preservando UUID:** apaga do destino as ausentes na origem; nas casadas por `horario_saida` mantém o `uuid` e atualiza offsets; acrescenta as faltantes com UUID nova.
+- [ ] **Sobrescrever** = limpar tudo e reclonar com UUIDs novas (RN-007 original).
+- [ ] Casamento por `horario_saida` sob duplicatas (RN-062) resolvido conforme a `/analisar-task` (multiconjunto) — abrir Q-xxx se a decisão/spec não bastar.
+
+## Casos válidos
+
+- Copiar da grade de feriados para uma "Férias de verão" (destino vazio) → Viagens com `viagem_feriado=false` e `tabela_excepcional_uuid` da tabela destino.
+- Reexecutar a mescla num destino que só teve offsets alterados → os `uuid` são **preservados** (diff mostra "offset alterado", não "apagou+criou").
+
+## Casos inválidos
+
+- Cópia que resultasse em `tabela_excepcional_uuid ≠ null` **e** `viagem_feriado=true` → impedida (RN-099).
+
+## Testes esperados
+
+- Unitários: normalização por par (origem→destino); sincronização (apaga/atualiza/acrescenta) preservando UUID das casadas; invariante RN-099.
+- E2E: escolher origem, mesclar e sobrescrever numa grade (OSRM mockado).
+- Contrato/round-trip: preserva o invariante e a identidade das Viagens casadas.
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/copias-grade.ts`, componentes da grade excepcional (TASK-105).
+
+## Riscos
+
+- Normalização incorreta violaria RN-099; sincronização incorreta violaria a identidade (RN-004) ou reintroduziria o problema que a carve-out da RN-007 resolve.
+- Casamento por `horario_saida` é **ambíguo sob duplicatas** (RN-062) — ver critério de aceite.
+
+## Dependências
+
+- Spec 04 §8.4/§8.5 aplicada + carve-out da RN-007 registrada (DEC-087). Precede: TASK-105 revisada (mesma semântica de mescla); TASK-104, TASK-102 (contrato/entidade). Reusa o motor de sincronização com a TASK-105.
+
+## Perguntas em aberto
+
+- Nenhuma — Q-065 decidida (DEC-087). O casamento sob duplicatas (RN-062) ficou resolvido **na própria spec** (§8.5: casamento "por contagem"); não requer Q nova.
 
 ---
 
