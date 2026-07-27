@@ -74,6 +74,12 @@ export const DIAS_SEMANA = [
 
 export const STATUS_DE_AUTOS = ["proposta", "vigente"] as const; // Spec 02 §4.1 (RN-011)
 
+export const TIPOS_DE_TABELA_EXCEPCIONAL = [
+  "ferias_verao",
+  "ferias_inverno",
+  "personalizado",
+] as const; // Spec 02 §6.1 (RN-098)
+
 // Coordenadas em faixas geográficas padrão (inferência controlada — faixas
 // não fixadas na spec; GeoJSON/WGS84).
 const latitude = z.number().min(-90).max(90);
@@ -225,14 +231,61 @@ export const esquemaHorarioParada = z.strictObject({
   offset_horario: offsetHorario,
 });
 
+// Spec 02 §6.1 — grade de operação excepcional do Serviço (RN-098).
+// `null` nos tipos canônicos é equivalente à ausência conforme o exemplo
+// normativo da Spec 02 §15; `personalizado` exige uma string.
+export const esquemaTabelaExcepcional = z
+  .strictObject({
+    uuid: uuidV4,
+    tipo: z.enum(TIPOS_DE_TABELA_EXCEPCIONAL),
+    descricao: z.string().nullable().optional(),
+  })
+  .superRefine((tabela, ctx) => {
+    if (tabela.tipo === "personalizado" && typeof tabela.descricao !== "string") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["descricao"],
+        message:
+          '[RN-098] descricao é obrigatória quando tipo é "personalizado" (Spec 02 §6.1, §14)',
+      });
+    }
+    if (
+      tabela.tipo !== "personalizado" &&
+      tabela.descricao !== undefined &&
+      tabela.descricao !== null
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["descricao"],
+        message:
+          '[RN-098] descricao deve ser ausente ou null quando tipo é "ferias_verao" ou "ferias_inverno" (Spec 02 §6.1, §14)',
+      });
+    }
+  });
+
 // Spec 02 §11 — Viagem estratificada por dia (RN-061)
-export const esquemaViagem = z.strictObject({
-  uuid: uuidV4,
-  horario_saida: horarioRelogio,
-  dia_semana: z.enum(DIAS_SEMANA),
-  viagem_feriado: z.boolean(),
-  horarios_paradas: z.array(esquemaHorarioParada).min(1),
-});
+export const esquemaViagem = z
+  .strictObject({
+    uuid: uuidV4,
+    horario_saida: horarioRelogio,
+    dia_semana: z.enum(DIAS_SEMANA),
+    viagem_feriado: z.boolean(),
+    tabela_excepcional_uuid: uuidV4.nullable().default(null),
+    horarios_paradas: z.array(esquemaHorarioParada).min(1),
+  })
+  .superRefine((viagem, ctx) => {
+    if (
+      viagem.tabela_excepcional_uuid !== null &&
+      viagem.viagem_feriado
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["tabela_excepcional_uuid"],
+        message:
+          "[RN-099] Viagem de tabela excepcional não pode ser de feriado (Spec 02 §11, §14)",
+      });
+    }
+  });
 
 // Spec 02 §10 — Itinerário
 export const esquemaItinerario = z.strictObject({
@@ -253,6 +306,7 @@ export const esquemaServico = z.strictObject({
   caracteristica_veiculo: z.enum(CARACTERISTICAS_DE_VEICULO),
   carater: z.enum(CARATERES),
   locais: z.array(esquemaLocal).default([]),
+  tabelas_excepcionais: z.array(esquemaTabelaExcepcional).default([]),
   matriz_distancias: z.array(esquemaParDistancia),
   matriz_seccionamento: z.array(esquemaParSecao).default([]),
   itinerarios: z
@@ -277,10 +331,9 @@ export const esquemaAutos = z.strictObject({
 
 // Valor de `versao_schema` (Spec 02 §3) gravado num documento criado do zero
 // no Formulário (TASK-032; DEC-066/Q-046) — não há JSON de origem para
-// herdar a versão. "1.0" é a mesma versão usada nas fixtures canônicas e no
-// exemplo mínimo da Spec 02 §15; ponto único de atualização se a versão do
-// contrato mudar.
-export const VERSAO_SCHEMA_ATUAL = "1.0";
+// herdar a versão. A operação excepcional elevou o contrato de "1.0" para
+// "1.1"; documentos antigos continuam válidos pelos defaults `[]`/`null`.
+export const VERSAO_SCHEMA_ATUAL = "1.1";
 
 // Spec 02 §3 — Objeto raiz (sem as validações cruzadas; ver index.ts)
 export const esquemaDocumentoOperacaoBase = z.strictObject({
@@ -302,6 +355,7 @@ export type PontoDeRota = z.infer<typeof esquemaPontoDeRota>;
 export type ItemDescricao = z.infer<typeof esquemaItemDescricao>;
 export type DescricaoItinerario = z.infer<typeof esquemaDescricaoItinerario>;
 export type HorarioParada = z.infer<typeof esquemaHorarioParada>;
+export type TabelaExcepcional = z.infer<typeof esquemaTabelaExcepcional>;
 export type Viagem = z.infer<typeof esquemaViagem>;
 export type Itinerario = z.infer<typeof esquemaItinerario>;
 export type Servico = z.infer<typeof esquemaServico>;

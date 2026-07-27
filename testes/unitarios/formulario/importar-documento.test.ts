@@ -9,6 +9,7 @@ import {
   FIXTURES_VALIDAS,
   documentoExemploMinimo,
   documentoBidirecionalMultiServico,
+  documentoOperacaoExcepcional,
 } from "../../fixtures";
 
 // TASK-006 — importação de JSON com preservação de UUID (Spec 04 §3.1).
@@ -38,13 +39,16 @@ function listasReconhecendo(doc: DocumentoOperacao): ListasAutosEmpresas {
 }
 
 // Coleta o conjunto de TODAS as UUIDs de um documento cru (Seção, Serviço,
-// Local, Viagem) — oráculo do round-trip (RN-004).
+// Local, TabelaExcepcional e Viagem) — oráculo do round-trip (RN-004).
 function coletarUuids(doc: DocumentoOperacao): Set<string> {
   const uuids = new Set<string>();
   for (const secao of doc.autos.secoes) uuids.add(secao.uuid);
   for (const servico of doc.autos.servicos) {
     uuids.add(servico.uuid);
     for (const local of servico.locais) uuids.add(local.uuid);
+    for (const tabela of servico.tabelas_excepcionais ?? []) {
+      uuids.add(tabela.uuid);
+    }
     for (const itinerario of servico.itinerarios) {
       for (const viagem of itinerario.viagens) uuids.add(viagem.uuid);
     }
@@ -84,6 +88,59 @@ describe("importarDocumento — round-trip de UUID (RN-004)", () => {
     expect(resultado.ok).toBe(true);
     if (!resultado.ok) return;
     expect(resultado.documento).toEqual(baseline);
+  });
+
+  test("migra documento 1.0 aplicando []/null sem reescrever versao_schema", () => {
+    const original = documentoExemploMinimo();
+    original.versao_schema = "1.0";
+    for (const servico of original.autos.servicos) {
+      delete (servico as Partial<typeof servico>).tabelas_excepcionais;
+      for (const itinerario of servico.itinerarios) {
+        for (const viagem of itinerario.viagens) {
+          delete (viagem as Partial<typeof viagem>).tabela_excepcional_uuid;
+        }
+      }
+    }
+
+    const resultado = importarDocumento(
+      JSON.stringify(original),
+      listasReconhecendo(original),
+    );
+
+    expect(resultado.ok).toBe(true);
+    if (!resultado.ok) return;
+    expect(resultado.documento.versao_schema).toBe("1.0");
+    for (const servico of resultado.documento.autos.servicos) {
+      expect(servico.tabelas_excepcionais).toEqual([]);
+      for (const itinerario of servico.itinerarios) {
+        for (const viagem of itinerario.viagens) {
+          expect(viagem.tabela_excepcional_uuid).toBeNull();
+        }
+      }
+    }
+  });
+
+  test("preserva UUIDs e referências da operação excepcional", () => {
+    const original = documentoOperacaoExcepcional();
+    const resultado = importarDocumento(
+      JSON.stringify(original),
+      listasReconhecendo(original),
+    );
+
+    expect(resultado.ok).toBe(true);
+    if (!resultado.ok) return;
+    const servico = resultado.documento.autos.servicos[0];
+    expect(servico.tabelas_excepcionais.map((tabela) => tabela.uuid)).toEqual(
+      original.autos.servicos[0].tabelas_excepcionais.map(
+        (tabela) => tabela.uuid,
+      ),
+    );
+    expect(
+      servico.itinerarios[0].viagens[0].tabela_excepcional_uuid,
+    ).toBe(
+      original.autos.servicos[0].itinerarios[0].viagens[0]
+        .tabela_excepcional_uuid,
+    );
   });
 
   test("preserva a ORDEM das entidades — não reindexa (NEG-014)", () => {

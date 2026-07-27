@@ -24,6 +24,7 @@ function viagem(
     horario_saida: horarioSaida,
     dia_semana: diaSemana,
     viagem_feriado: viagemFeriado,
+    tabela_excepcional_uuid: null,
     horarios_paradas: [
       { parada_ordem: 1, offset_horario: "00:00:00" },
       { parada_ordem: 2, offset_horario: "00:07:00" }, // âncora manual (não é baseline)

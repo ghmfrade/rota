@@ -1,5 +1,10 @@
 import type { Local, Secao, Servico, Viagem } from "./esquema";
 
+type DadosServicoNovo = Omit<Servico, "uuid" | "tabelas_excepcionais"> &
+  Partial<Pick<Servico, "tabelas_excepcionais">>;
+type DadosViagemNova = Omit<Viagem, "uuid" | "tabela_excepcional_uuid"> &
+  Partial<Pick<Viagem, "tabela_excepcional_uuid">>;
+
 // Fábricas de entidade com identidade (Spec 01 §6; Spec 02 §12).
 //
 // Único caminho de NASCIMENTO de Seção, Serviço, Local e Viagem no Formulário:
@@ -30,8 +35,12 @@ export function criarSecao(dados: Omit<Secao, "uuid">): Secao {
 }
 
 /** Cria um Serviço novo com `uuid` UUIDv4 gerada (RN-001/RN-002). */
-export function criarServico(dados: Omit<Servico, "uuid">): Servico {
-  return { ...dados, uuid: crypto.randomUUID() };
+export function criarServico(dados: DadosServicoNovo): Servico {
+  return {
+    ...dados,
+    tabelas_excepcionais: dados.tabelas_excepcionais ?? [],
+    uuid: crypto.randomUUID(),
+  };
 }
 
 /** Cria um Local novo com `uuid` UUIDv4 gerada (RN-001/RN-002). */
@@ -40,8 +49,12 @@ export function criarLocal(dados: Omit<Local, "uuid">): Local {
 }
 
 /** Cria uma Viagem nova com `uuid` UUIDv4 gerada (RN-001/RN-002). */
-export function criarViagem(dados: Omit<Viagem, "uuid">): Viagem {
-  return { ...dados, uuid: crypto.randomUUID() };
+export function criarViagem(dados: DadosViagemNova): Viagem {
+  return {
+    ...dados,
+    tabela_excepcional_uuid: dados.tabela_excepcional_uuid ?? null,
+    uuid: crypto.randomUUID(),
+  };
 }
 
 /**

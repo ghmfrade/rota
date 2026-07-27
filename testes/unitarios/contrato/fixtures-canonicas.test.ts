@@ -30,7 +30,11 @@ describe("fixtures canônicas válidas", () => {
       [
         [
           "spec02-15-exemplo-minimo",
-          "1.0",
+          "1.1",
+        ],
+        [
+          "spec02-15-operacao-excepcional",
+          "1.1",
         ],
         [
           "bidirecional-multi-servico",

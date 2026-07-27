@@ -112,6 +112,7 @@ describe("calcularMatrizDistancias — casos sintéticos e de borda", () => {
           horario_saida: "08:00:00",
           dia_semana: "segunda",
           viagem_feriado: false,
+          tabela_excepcional_uuid: null,
           horarios_paradas: paradas.map((p) => ({ parada_ordem: p.ordem, offset_horario: "00:00:00" })),
         },
       ],

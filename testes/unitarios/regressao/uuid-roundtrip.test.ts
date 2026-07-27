@@ -5,7 +5,10 @@ import {
   exportarComoProposta,
   exportarComoVigente,
 } from "@/formulario/exportacao";
-import { FIXTURES_VALIDAS } from "../../fixtures";
+import {
+  FIXTURES_VALIDAS,
+  documentoOperacaoExcepcional,
+} from "../../fixtures";
 import { coletarUuids, listasReconhecendo } from "./apoio";
 
 // Regressão permanente (categoria 10 da docs-dev/08 §10) — RN-004, a regra
@@ -64,6 +67,30 @@ describe("RN-004 — round-trip import→export→import preserva UUIDs", () => 
       );
     },
   );
+
+  test("preserva tabela_excepcional_uuid no round-trip completo", () => {
+    const original = documentoOperacaoExcepcional();
+    const listas = listasReconhecendo(original);
+    const importado = importarDocumento(JSON.stringify(original), listas);
+    expect(importado.ok).toBe(true);
+    if (!importado.ok) return;
+
+    const exportado = exportarComoProposta(importado.documento, HOJE);
+    expect(exportado.ok).toBe(true);
+    if (!exportado.ok) return;
+
+    const reimportado = importarDocumento(exportado.json, listas);
+    expect(reimportado.ok).toBe(true);
+    if (!reimportado.ok) return;
+
+    const referenciaOriginal =
+      original.autos.servicos[0].itinerarios[0].viagens[0]
+        .tabela_excepcional_uuid;
+    expect(
+      reimportado.documento.autos.servicos[0].itinerarios[0].viagens[0]
+        .tabela_excepcional_uuid,
+    ).toBe(referenciaOriginal);
+  });
 
   test.each(FIXTURES_VALIDAS)(
     "definir como vigente preserva o conjunto de UUIDs de $nome (RN-079)",

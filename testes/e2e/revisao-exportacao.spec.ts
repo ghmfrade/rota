@@ -62,6 +62,8 @@ test.describe("Exportação (Spec 04 §12; RN-078)", () => {
     expect(caminho).not.toBeNull();
     const conteudo = JSON.parse(readFileSync(caminho!, "utf-8"));
 
+    // Documento carregado mantém a versão estrutural de origem; a migração
+    // 1.0 aplica defaults sem reescrever versao_schema.
     expect(conteudo.versao_schema).toBe("1.0");
     expect(conteudo.autos.status).toBe("proposta");
     expect(conteudo.autos.data_criacao).toMatch(/^\d{4}-\d{2}-\d{2}$/);

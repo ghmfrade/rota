@@ -398,6 +398,18 @@ exports[`RN-008/RN-010 — snapshot do contrato por versao_schema > a forma estr
                               "minItems": 1,
                               "type": "array",
                             },
+                            "tabela_excepcional_uuid": {
+                              "anyOf": [
+                                {
+                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                  "type": "string",
+                                },
+                                {
+                                  "type": "null",
+                                },
+                              ],
+                              "default": null,
+                            },
                             "uuid": {
                               "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                               "type": "string",
@@ -411,6 +423,7 @@ exports[`RN-008/RN-010 — snapshot do contrato por versao_schema > a forma estr
                             "horario_saida",
                             "dia_semana",
                             "viagem_feriado",
+                            "tabela_excepcional_uuid",
                             "horarios_paradas",
                           ],
                           "type": "object",
@@ -563,6 +576,42 @@ exports[`RN-008/RN-010 — snapshot do contrato por versao_schema > a forma estr
                   "minLength": 1,
                   "type": "string",
                 },
+                "tabelas_excepcionais": {
+                  "default": [],
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "descricao": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "tipo": {
+                        "enum": [
+                          "ferias_verao",
+                          "ferias_inverno",
+                          "personalizado",
+                        ],
+                        "type": "string",
+                      },
+                      "uuid": {
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "uuid",
+                      "tipo",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
                 "uuid": {
                   "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                   "type": "string",
@@ -574,6 +623,7 @@ exports[`RN-008/RN-010 — snapshot do contrato por versao_schema > a forma estr
                 "caracteristica_veiculo",
                 "carater",
                 "locais",
+                "tabelas_excepcionais",
                 "matriz_distancias",
                 "matriz_seccionamento",
                 "itinerarios",
@@ -621,6 +671,6 @@ exports[`RN-008/RN-010 — snapshot do contrato por versao_schema > a forma estr
     ],
     "type": "object",
   },
-  "versao_schema": "1.0",
+  "versao_schema": "1.1",
 }
 `;

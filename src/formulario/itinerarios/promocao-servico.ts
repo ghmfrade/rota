@@ -74,6 +74,7 @@ export function promoverServico(
     caracteristica_veiculo: servico.caracteristica_veiculo,
     carater: servico.carater,
     locais: servico.locais ?? [],
+    tabelas_excepcionais: [],
     matriz_seccionamento: [],
     itinerarios,
     matriz_distancias: [],

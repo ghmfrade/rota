@@ -6,9 +6,10 @@ import parVigente from "./par-vigente.json";
 import parProposta from "./par-proposta.json";
 
 // Índice das fixtures canônicas versionadas (TASK-041). As fixtures válidas
-// são JSON em disco, aceitos por `esquemaDocumentoOperacao` (TASK-003, Spec 02);
-// as variantes INVÁLIDAS ficam em `variantes-invalidas.ts` como mutações
-// dirigidas (uma por RN estrutural), não como arquivos.
+// vêm dos JSONs em disco ou de uma composição explícita do exemplo da Spec 02,
+// sempre aceitas por `esquemaDocumentoOperacao` (TASK-003, Spec 02). As
+// variantes INVÁLIDAS ficam em `variantes-invalidas.ts` como mutações dirigidas
+// (uma por RN estrutural), não como arquivos.
 //
 // Cada loader devolve uma cópia profunda, isolando cada consumidor das mutações
 // de outra suíte. O cast é seguro: são JSON canônico já provado válido pela
@@ -21,6 +22,27 @@ function carregar(fixtura: unknown): DocumentoOperacao {
 /** Exemplo mínimo da Spec 02 §15 — Serviço único, três Seções, um Local. */
 export function documentoExemploMinimo(): DocumentoOperacao {
   return carregar(exemploMinimo);
+}
+
+/** Ilustração da operação excepcional da Spec 02 §15 sobre o exemplo mínimo. */
+export function documentoOperacaoExcepcional(): DocumentoOperacao {
+  const documento = documentoExemploMinimo();
+  const servico = documento.autos.servicos[0];
+  servico.tabelas_excepcionais = [
+    {
+      uuid: "9c1e0000-0000-4000-8000-000000000001",
+      tipo: "ferias_verao",
+      descricao: null,
+    },
+    {
+      uuid: "2a7f0000-0000-4000-8000-000000000002",
+      tipo: "personalizado",
+      descricao: "Excursão Aparecida",
+    },
+  ];
+  servico.itinerarios[0].viagens[0].tabela_excepcional_uuid =
+    servico.tabelas_excepcionais[0].uuid;
+  return documento;
 }
 
 /** Autos bidirecional com dois Serviços compartilhando Seções (Ida + Volta). */
@@ -49,6 +71,7 @@ export const FIXTURES_VALIDAS: {
   carregar: () => DocumentoOperacao;
 }[] = [
   { nome: "spec02-15-exemplo-minimo", carregar: documentoExemploMinimo },
+  { nome: "spec02-15-operacao-excepcional", carregar: documentoOperacaoExcepcional },
   { nome: "bidirecional-multi-servico", carregar: documentoBidirecionalMultiServico },
   { nome: "unidirecional", carregar: documentoUnidirecional },
   { nome: "par-vigente", carregar: documentoParVigente },

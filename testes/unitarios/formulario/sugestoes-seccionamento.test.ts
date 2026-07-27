@@ -28,6 +28,7 @@ function servico(overrides: Partial<Servico> & { uuid: string }): Servico {
     caracteristica_veiculo: "CR",
     carater: "principal",
     locais: [],
+    tabelas_excepcionais: [],
     itinerarios: [],
     matriz_distancias: [],
     matriz_seccionamento: [],

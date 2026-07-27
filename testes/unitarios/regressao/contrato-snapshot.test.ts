@@ -15,7 +15,7 @@ import { documentoExemploMinimo } from "../../fixtures";
 // NÃO captura as validações cruzadas do §14 (integridade referencial, somas),
 // que vivem em validacoes-estruturais.ts e já são cobertas pelas variantes
 // inválidas da TASK-041. `versao_schema` é `z.string()` no contrato (não um
-// literal), então o valor vigente ("1.0") vem da fixture canônica e ancora o
+// literal), então o valor vigente ("1.1") vem da fixture canônica e ancora o
 // snapshot.
 
 describe("RN-008/RN-010 — snapshot do contrato por versao_schema", () => {
@@ -28,6 +28,6 @@ describe("RN-008/RN-010 — snapshot do contrato por versao_schema", () => {
   });
 
   it("a versao_schema alvo do contrato é a esperada", () => {
-    expect(documentoExemploMinimo().versao_schema).toBe("1.0");
+    expect(documentoExemploMinimo().versao_schema).toBe("1.1");
   });
 });

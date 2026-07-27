@@ -80,6 +80,7 @@ const AUTOS_DEMO: Autos = {
       caracteristica_veiculo: "CR",
       carater: "principal",
       locais: [],
+      tabelas_excepcionais: [],
       matriz_distancias: [
         {
           secao_a_uuid: "11111111-1111-4111-8111-111111111111",
@@ -142,6 +143,7 @@ const AUTOS_DEMO: Autos = {
               horario_saida: "07:00:00",
               dia_semana: "segunda",
               viagem_feriado: false,
+              tabela_excepcional_uuid: null,
               horarios_paradas: [
                 { parada_ordem: 1, offset_horario: "00:00:00" },
                 { parada_ordem: 2, offset_horario: "00:15:00" },
@@ -153,6 +155,7 @@ const AUTOS_DEMO: Autos = {
               horario_saida: "15:00:00",
               dia_semana: "segunda",
               viagem_feriado: false,
+              tabela_excepcional_uuid: null,
               horarios_paradas: [
                 { parada_ordem: 1, offset_horario: "00:00:00" },
                 { parada_ordem: 2, offset_horario: "00:15:00" },
@@ -164,6 +167,7 @@ const AUTOS_DEMO: Autos = {
               horario_saida: "21:00:00",
               dia_semana: "segunda",
               viagem_feriado: false,
+              tabela_excepcional_uuid: null,
               horarios_paradas: [
                 { parada_ordem: 1, offset_horario: "00:00:00" },
                 { parada_ordem: 2, offset_horario: "00:15:00" },
@@ -177,6 +181,7 @@ const AUTOS_DEMO: Autos = {
               horario_saida: "07:30:00",
               dia_semana: "segunda",
               viagem_feriado: true,
+              tabela_excepcional_uuid: null,
               horarios_paradas: [
                 { parada_ordem: 1, offset_horario: "00:00:00" },
                 { parada_ordem: 2, offset_horario: "00:15:00" },
@@ -209,6 +214,7 @@ const AUTOS_DEMO: Autos = {
               horario_saida: "18:00:00",
               dia_semana: "segunda",
               viagem_feriado: false,
+              tabela_excepcional_uuid: null,
               horarios_paradas: [
                 { parada_ordem: 1, offset_horario: "00:00:00" },
                 { parada_ordem: 2, offset_horario: "00:15:00" },
@@ -225,6 +231,7 @@ const AUTOS_DEMO: Autos = {
       caracteristica_veiculo: "CR",
       carater: "semidireta",
       locais: [],
+      tabelas_excepcionais: [],
       matriz_distancias: [
         {
           secao_a_uuid: "11111111-1111-4111-8111-111111111111",
@@ -257,6 +264,7 @@ const AUTOS_DEMO: Autos = {
               horario_saida: "09:30:00",
               dia_semana: "sabado",
               viagem_feriado: false,
+              tabela_excepcional_uuid: null,
               horarios_paradas: [
                 { parada_ordem: 1, offset_horario: "00:00:00" },
                 { parada_ordem: 2, offset_horario: "00:15:00" },

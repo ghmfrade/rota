@@ -26,6 +26,7 @@ function viagem(parcial: Partial<Viagem> & Pick<Viagem, "horario_saida">): Viage
     viagem_feriado: false,
     horarios_paradas: [{ parada_ordem: 1, offset_horario: "00:00:00" }],
     ...parcial,
+    tabela_excepcional_uuid: parcial.tabela_excepcional_uuid ?? null,
   };
 }
 
@@ -58,6 +59,7 @@ function servicoSintetico(
     caracteristica_veiculo: "CR",
     carater: "principal",
     locais: [],
+    tabelas_excepcionais: [],
     matriz_distancias: [],
     matriz_seccionamento: matrizSeccionamento,
     itinerarios: [itinerarioComViagens(viagensIda)],

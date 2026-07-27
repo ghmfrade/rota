@@ -48,6 +48,19 @@ describe("schema fechado (RN-010/RN-013)", () => {
     esperarInvalido(doc);
   });
 
+  it("rn010: recusa campo extra em TabelaExcepcional", () => {
+    const doc = documentoDaFixture();
+    doc.autos.servicos[0].tabelas_excepcionais = [
+      {
+        uuid: "9c1e0000-0000-4000-8000-000000000001",
+        tipo: "ferias_verao",
+        descricao: null,
+        periodo: "janeiro",
+      },
+    ];
+    esperarInvalido(doc);
+  });
+
   it("rn010: recusa campo extra em Parada (nome)", () => {
     const doc = documentoDaFixture();
     doc.autos.servicos[0].itinerarios[0].paradas[0].nome = "Terminal";

@@ -447,6 +447,25 @@ function validarServico(
   secoesPorUuid: Map<string, Secao>,
   caminhoServico: Caminho,
 ): void {
+  // RN-098 — tipos canônicos são únicos por Serviço; personalizado repete.
+  const tiposCanonicosVistos = new Set<"ferias_verao" | "ferias_inverno">();
+  const tabelasExcepcionais = servico.tabelas_excepcionais ?? [];
+  tabelasExcepcionais.forEach((tabela, indiceTabela) => {
+    if (tabela.tipo === "personalizado") return;
+    if (tiposCanonicosVistos.has(tabela.tipo)) {
+      violacoes.push({
+        caminho: [
+          ...caminhoServico,
+          "tabelas_excepcionais",
+          indiceTabela,
+          "tipo",
+        ],
+        mensagem: `[RN-098] no máximo uma tabela ${tabela.tipo} por Serviço (Spec 02 §6.1, §14)`,
+      });
+    }
+    tiposCanonicosVistos.add(tabela.tipo);
+  });
+
   // RN-038 — sentidos distintos
   if (
     servico.itinerarios.length === 2 &&
@@ -635,6 +654,31 @@ function validarServico(
     locaisPorUuid: new Map(servico.locais.map((local) => [local.uuid, local])),
   };
   servico.itinerarios.forEach((itinerario, indiceItinerario) => {
+    // RN-099 — a referência excepcional pertence ao mesmo Serviço-pai.
+    const tabelasPorUuid = new Set(
+      tabelasExcepcionais.map((tabela) => tabela.uuid),
+    );
+    itinerario.viagens.forEach((viagem, indiceViagem) => {
+      if (
+        viagem.tabela_excepcional_uuid !== undefined &&
+        viagem.tabela_excepcional_uuid !== null &&
+        !tabelasPorUuid.has(viagem.tabela_excepcional_uuid)
+      ) {
+        violacoes.push({
+          caminho: [
+            ...caminhoServico,
+            "itinerarios",
+            indiceItinerario,
+            "viagens",
+            indiceViagem,
+            "tabela_excepcional_uuid",
+          ],
+          mensagem:
+            "[RN-099] tabela_excepcional_uuid deve referenciar uma tabela excepcional existente no mesmo Serviço (Spec 02 §11, §14)",
+        });
+      }
+    });
+
     validarItinerario(violacoes, itinerario, contexto, [
       ...caminhoServico,
       "itinerarios",
@@ -696,6 +740,23 @@ export function coletarViolacoesEstruturais(
           ],
         })),
       ),
+    ),
+  );
+  verificarUnicidadeDeUuid(
+    violacoes,
+    "TabelaExcepcional",
+    doc.autos.servicos.flatMap((servico, i) =>
+      (servico.tabelas_excepcionais ?? []).map((tabela, j) => ({
+        uuid: tabela.uuid,
+        caminho: [
+          "autos",
+          "servicos",
+          i,
+          "tabelas_excepcionais",
+          j,
+          "uuid",
+        ],
+      })),
     ),
   );
 

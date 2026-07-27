@@ -8,9 +8,10 @@ import type { ListasAutosEmpresas } from "@/shared/dados-estaticos";
 // move junto.
 
 /**
- * Conjunto de TODAS as UUIDs de um documento (Seção, Serviço, Local, Viagem) —
- * oráculo da preservação de identidade no round-trip (RN-004). A unicidade
- * global (RN-005) garante que o conjunto é comparável byte a byte.
+ * Conjunto de TODAS as UUIDs de um documento (Seção, Serviço, Local,
+ * TabelaExcepcional e Viagem) — oráculo da preservação de identidade no
+ * round-trip (RN-004). A unicidade global (RN-005/RN-098) garante que o
+ * conjunto é comparável byte a byte.
  */
 export function coletarUuids(doc: DocumentoOperacao): Set<string> {
   const uuids = new Set<string>();
@@ -18,6 +19,9 @@ export function coletarUuids(doc: DocumentoOperacao): Set<string> {
   for (const servico of doc.autos.servicos) {
     uuids.add(servico.uuid);
     for (const local of servico.locais) uuids.add(local.uuid);
+    for (const tabela of servico.tabelas_excepcionais ?? []) {
+      uuids.add(tabela.uuid);
+    }
     for (const itinerario of servico.itinerarios) {
       for (const viagem of itinerario.viagens) uuids.add(viagem.uuid);
     }

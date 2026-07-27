@@ -134,6 +134,7 @@ describe("editarHorarioPassante (Spec 04 §8.2; RN-065/067)", () => {
       horario_saida: "08:00:00",
       dia_semana: "segunda" as const,
       viagem_feriado: false,
+      tabela_excepcional_uuid: null,
       horarios_paradas: [
         { parada_ordem: 1, offset_horario: "00:00:00" },
         { parada_ordem: 2, offset_horario: "00:30:00" },
