@@ -1,12 +1,19 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-07-27 (branch `redesign`) — **TASK-102
-concluída e aprovada**. A implementação `8057b2f` elevou o contrato executável
-para `"1.1"` com `servico.tabelas_excepcionais[]`,
+**Atualização mais recente:** 2026-07-27 (branch `redesign`) — **TASK-103
+concluída e aprovada**. A implementação `99a64c5` restringe a semana padrão às
+Viagens comuns (`viagem_feriado = false` e `tabela_excepcional_uuid = null`) e
+centraliza o rótulo “sem feriados nem operação excepcional”; fórmula, invariância
+total/por faixa e exibição têm testes. Parecer aprovado em
+`14-REVISOES/TASK-103-20260727.md`; suíte canônica verde (1.255 unitários + 73
+E2E; fingerprint `23722e05…`; identidade `498d7fa6…`). O Grupo G passa de 3
+para 2 pendentes, sem alterar a ordem `104 → 105`. Pendentes: 18 → 17. Antes
+nesta data — **TASK-102 concluída e aprovada**. A implementação `8057b2f` elevou
+o contrato executável para `"1.1"` com `servico.tabelas_excepcionais[]`,
 `viagem.tabela_excepcional_uuid`, defaults compatíveis com documentos `"1.0"`,
 validações de RN-098/RN-099 e round-trip de UUID. Parecer aprovado em
 `14-REVISOES/TASK-102-20260727.md`; suíte canônica verde (1.251 unitários + 73
-E2E; fingerprint `a71219d2…`; identidade `498d7fa6…`). A fundação desbloqueia
+E2E; fingerprint `a71219d2…`; identidade `498d7fa6…`). A fundação desbloqueou
 TASK-103/104; TASK-105 continua dependendo também da TASK-104. Pendentes:
 19 → 18. Antes nesta data — **redesign da
 grade de horários (proposta do responsável)**: criadas **TASK-106..112** (Grupo H
@@ -80,7 +87,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 
 ## 3. Tasks executadas
 
-82 tasks concluídas. Agrupadas pela fase do backlog.
+83 tasks concluídas. Agrupadas pela fase do backlog.
 
 ### Fases 1–3 — Fundação, contrato JSON e validações de domínio
 
@@ -135,6 +142,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 029 | Edição de horário passante (âncoras + redistribuição) |
 | 030 | Tabela de feriados e cópias |
 | 031 | Contagens e resumo operacional |
+| 103 | Contagens excluem operação excepcional da semana padrão (RN-069/RN-099) |
 | 032 | Revisão e validação final |
 
 ### Fase 12 — Qualidade e follow-ups
@@ -219,7 +227,10 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 ## 5. Tasks a executar — ordem recomendada
 
-**Estado atual: 18 tasks pendentes.** Em 2026-07-27, a TASK-102 saiu da lista:
+**Estado atual: 17 tasks pendentes.** Em 2026-07-27, a TASK-103 saiu da lista:
+implementada em `99a64c5` e aprovada em
+`14-REVISOES/TASK-103-20260727.md`; o Grupo G passa de 3 para 2 pendentes, sem
+alterar a ordem `104 → 105`. Antes disso, a TASK-102 saiu da lista:
 implementada em `8057b2f` e aprovada em
 `14-REVISOES/TASK-102-20260727.md`; o Grupo G passa de 4 para 3 pendentes e a
 fundação de contrato de 103/104 fica cumprida. Antes disso, após a TASK-101 sair da
@@ -299,13 +310,12 @@ Independentes do ramo do mapa: nada aqui bloqueia ou é bloqueado por ele.
 
 ### Grupo G — Operação excepcional (DEC-081 / Q-059)
 
-Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Serviço — férias de verão/inverno/personalizado, categoria **textual**, sem datas). Specs 02/03/04/05 já atualizadas (contrato v1.1); RN-098/RN-099 criadas, RN-061/062/068/069 ajustadas. A **TASK-102 foi concluída e aprovada** em 2026-07-27; ordem pendente recomendada: **104 → 105**, com **103** já desbloqueada e executável em paralelo antes da 105.
+Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Serviço — férias de verão/inverno/personalizado, categoria **textual**, sem datas). Specs 02/03/04/05 já atualizadas (contrato v1.1); RN-098/RN-099 criadas, RN-061/062/068/069 ajustadas. As **TASK-102 e TASK-103 foram concluídas e aprovadas** em 2026-07-27; ordem pendente recomendada: **104 → 105**.
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 1 | **103** — Contagens excluem a operação excepcional da semana padrão | **2** | Modifica o módulo da TASK-031 (concluída); fórmula + rótulo. Dependência 102 cumprida. |
-| 2 | **104** — Formulário: CRUD + filtro das tabelas excepcionais por Serviço | **3** | Dependência 102 cumprida. **Atenção:** remoção de tabela com Viagens associadas pode virar Q-xxx na `/analisar-task` (Spec 04 §8.5 não fixa). |
-| 3 | **105** — Formulário: grade excepcional + "copiar dias comuns" | **3** | Depois de 104; dependência 102 cumprida; reusa as grades da TASK-028/030 (concluídas). |
+| 1 | **104** — Formulário: CRUD + filtro das tabelas excepcionais por Serviço | **3** | Dependência 102 cumprida. **Atenção:** remoção de tabela com Viagens associadas pode virar Q-xxx na `/analisar-task` (Spec 04 §8.5 não fixa). |
+| 2 | **105** — Formulário: grade excepcional + "copiar dias comuns" | **3** | Depois de 104; dependência 102 cumprida; reusa as grades da TASK-028/030 (concluídas). |
 
 **Superfícies pendentes alteradas pela DEC-081 (não viram task nova — anotadas no backlog):** **TASK-034** (PDF: tabelas excepcionais + rótulo), **TASK-033** (rótulo/`versao_schema`), **TASK-036** (diff: casar tabela por `uuid` + mudança de grade), **TASK-037** (telas: grades excepcionais separadas + rótulo), **TASK-039** (PDF comparativo). Cobertas ao construí-las, lendo as specs já atualizadas — evita task paralela sobre superfície não construída (lição §6.2). Nenhuma task pendente foi **anulada**.
 
@@ -380,6 +390,6 @@ A TASK-096 foi criada em `a3cfa86` tocando **apenas** o `06-BACKLOG_INICIAL.md`;
 
 Ao criar as TASK-102..105, a verificação de sobreposição (item 2 do §1) mostrou que a operação excepcional **altera** cinco tasks **pendentes** cujas superfícies ainda não existem: **TASK-033/034** (PDF operacional) e **TASK-036/037/039** (Comparador). As Specs 04 §8.5/§13 e 05 §10.4/§12.3 já foram atualizadas, então quem implementar essas tasks lerá o escopo excepcional direto da spec.
 
-**Decisão:** **não** criar tasks paralelas de PDF/diff excepcional. Criar uma "TASK-106 PDF excepcional" sobre a TASK-034 ainda não construída reproduziria exatamente o padrão do §6.2 (TASK-087 absorvida pela 046): duas tasks disputando a mesma superfície, uma absorvendo a outra. Em vez disso, cada pendente recebeu uma **"Nota (DEC-081)"** no `06-BACKLOG_INICIAL.md` fixando o acréscimo de escopo. As tasks **concluídas** afetadas foram tratadas: TASK-031 (contagens) é atualizada pela nova **TASK-103**; TASK-028/030/032 são estendidas por 104/105 sem alteração.
+**Decisão:** **não** criar tasks paralelas de PDF/diff excepcional. Criar uma "TASK-106 PDF excepcional" sobre a TASK-034 ainda não construída reproduziria exatamente o padrão do §6.2 (TASK-087 absorvida pela 046): duas tasks disputando a mesma superfície, uma absorvendo a outra. Em vez disso, cada pendente recebeu uma **"Nota (DEC-081)"** no `06-BACKLOG_INICIAL.md` fixando o acréscimo de escopo. As tasks **concluídas** afetadas foram tratadas: TASK-031 (contagens) foi atualizada e aprovada pela **TASK-103**; TASK-028/030/032 são estendidas por 104/105 sem alteração.
 
 **Nenhuma task pendente foi anulada** pela DEC-081 — só ampliadas (034/036/037/039) ou pontualmente rotuladas (033).
