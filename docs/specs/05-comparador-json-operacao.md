@@ -282,7 +282,7 @@ Ao expandir um Serviço "Alterado", mostra os campos que mudaram no padrão `ant
 
 ## 10. Comparação de Viagens Ofertadas por Faixa de Horário
 
-Compara a **quantidade de viagens ofertadas**, seguindo a fórmula de contagem da Spec 03 §9.4 e a **semana padrão, sem feriados** (Spec 03 §9.2) — Viagens com `viagem_feriado = false`. Viagens de feriado vão em tabela separada (§10.4), **sem misturar**.
+Compara a **quantidade de viagens ofertadas**, seguindo a fórmula de contagem da Spec 03 §9.4 e a **semana padrão, sem feriados nem operação excepcional** (Spec 03 §9.2) — Viagens com `viagem_feriado = false` **e** `tabela_excepcional_uuid = null`. Viagens de feriado e de tabelas excepcionais vão em tabelas separadas (§10.4), **sem misturar**.
 
 ### 10.1 Dimensões da comparação
 
@@ -321,11 +321,11 @@ Mínimo de colunas (uma linha por faixa + linha de total):
 - Cada `Δ` = `Arq. 2 − Arq. 1` (positivo = aumentou; §6).
 - Abaixo dos Serviços, um bloco **"Total do Autos"** com a mesma estrutura (faixas × Ida/Volta/Combinado, com Δ), somando todos os Serviços.
 
-### 10.4 Viagens de feriado (tabela separada)
+### 10.4 Viagens de feriado e de tabelas excepcionais (tabelas separadas)
 
-- As Viagens com `viagem_feriado = true` **não** entram na contagem principal (Spec 03 §9.2) — aparecem numa **tabela de feriados própria**, com a mesma estrutura de faixas, comparando Arq. 1 × Arq. 2.
-- Rótulo obrigatório: a tabela principal é **"semana padrão (sem feriados)"** (Spec 04 §10/§13.3); a de feriados é claramente marcada como operação de feriado.
-- Dois JSONs que difiram **apenas** na grade de feriados têm as **mesmas** contagens principais (Spec 03 §9.2) — a diferença aparece só na tabela de feriados.
+- As Viagens com `viagem_feriado = true` **e** as com `tabela_excepcional_uuid ≠ null` **não** entram na contagem principal (Spec 03 §9.2) — aparecem em **tabelas próprias separadas**: uma de feriados e uma por **grade excepcional** casada por `uuid` da tabela (Spec 02 §6.1), comparando Arq. 1 × Arq. 2.
+- Rótulo obrigatório: a tabela principal é **"semana padrão (sem feriados nem operação excepcional)"** (Spec 04 §10/§13.3); a de feriados é claramente marcada como operação de feriado, e as excepcionais como suas respectivas grades.
+- Dois JSONs que difiram **apenas** nas grades de feriado **ou nas tabelas excepcionais** têm as **mesmas** contagens principais (Spec 03 §9.2) — a diferença aparece só nas tabelas separadas correspondentes.
 
 ---
 
@@ -371,7 +371,7 @@ Além dos totais por faixa (§10), uma visão **detalhada** por horário, casand
 
 ### 12.1 Escopo e seleção
 
-Por **Serviço** e **sentido** (Ida/Volta), o usuário vê o diff das Viagens. Seleção de Serviço e sentido no topo; separação entre **semana padrão** (Viagens `viagem_feriado = false`) e **feriados** (`= true`), sem misturar (§10.4; Spec 03 §9.2).
+Por **Serviço** e **sentido** (Ida/Volta), o usuário vê o diff das Viagens. Seleção de Serviço e sentido no topo; separação entre **semana padrão** (grade comum: `viagem_feriado = false` **e** `tabela_excepcional_uuid = null`), **feriados** e **cada tabela excepcional** (casada por `uuid`), sem misturar (§10.4; Spec 03 §9.2).
 
 ### 12.2 Situações de Viagem que a tela mostra
 
@@ -383,6 +383,7 @@ Casando por `uuid` de Viagem (§5.2):
 - **viagens mantidas sem alteração** (mesma UUID, tudo igual);
 - **mudança de dia da semana** (`dia_semana` diferente na mesma Viagem);
 - **mudança entre viagem comum e viagem de feriado** (`viagem_feriado` diferente na mesma Viagem);
+- **mudança de grade** de uma Viagem (comum ↔ feriado ↔ excepcional): `viagem_feriado` diferente e/ou `tabela_excepcional_uuid` diferente na mesma Viagem (casada por `uuid`);
 - **mudança nos horários passantes pelas Seções** (offsets diferentes → horários absolutos de passagem diferentes por Seção).
 
 ### 12.3 Formato do diff de horário
@@ -395,7 +396,7 @@ segunda, Ida, 08:00 → 08:15 (+15 min)
 
 - O `Δ` é a diferença em minutos (positivo = atrasou/mais tarde; negativo = adiantou).
 - Para os **horários passantes por Seção**, cada Seção alterada mostra seu próprio `antigo → novo (Δ)`, com o nome no padrão `Cidade - Nome da Seção` (§1). Horários são **absolutos** (`horario_saida + offset` — Spec 02 §11.1), nunca offsets crus (§1).
-- Mudança de `dia_semana` mostra `segunda → terça`; mudança de `viagem_feriado` mostra `comum → feriado` (ou vice-versa).
+- Mudança de `dia_semana` mostra `segunda → terça`; mudança de grade mostra `comum → feriado`, `comum → Férias de verão`, etc. (por `viagem_feriado`/`tabela_excepcional_uuid`).
 
 ### 12.4 Tabela principal — Seções, não Locais
 
@@ -679,7 +680,7 @@ Mensagens **operacionais** e compreensíveis para usuário técnico, sem expor n
 3. **Bloqueio por Autos diferentes** na comparação principal, justificado por UUIDs não coincidirem entre documentos distintos; modo "justapor mesmo assim" é opcional e não gera o PDF padrão (§4.4).
 4. **`status`/`data_criacao`/`data_publicacao` são cabeçalho, não diff** (Spec 02 §4.1) — exibidos, nunca contados como diferença operacional (§4.3).
 5. **Taxonomia fixa:** Adicionado, Removido, Alterado, Inalterado, Alerta técnico — aplicada a Serviços, Seções, Locais, Itinerários, Viagens, Matrizes e Rotas (§6).
-6. **Semana padrão × feriado sempre separados** (Spec 03 §9.2): contagens de viagens e opções usam só `viagem_feriado = false`; feriados em tabela própria (§10.4, §12).
+6. **Semana padrão × feriado sempre separados** (Spec 03 §9.2): contagens usam só a grade comum (`viagem_feriado = false` **e** `tabela_excepcional_uuid = null`); feriados **e tabelas excepcionais** em tabelas próprias (§10.4, §12).
 7. **Faixas de horário herdadas da Spec 04 §10**, classificadas por `horario_saida` (§10.2).
 8. **Diff de horário em `antigo → novo (Δ minutos)`**, sempre em horário absoluto, casado por UUID de Viagem (§12.3).
 9. **Matrizes triangulares inferiores, em km, sem R$** (Spec 04 §9); célula comparativa com os quatro estados (igual/alterado/adicionado/removido) para distâncias e seccionamento (§13.2, §14.3).

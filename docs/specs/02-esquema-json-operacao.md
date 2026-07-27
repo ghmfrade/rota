@@ -2,8 +2,8 @@
 
 **Projeto:** ROTA — Registro de Operação e Tabelas de Autos
 **Depende de:** [Spec 01 — Visão Geral do Sistema](01-visao-geral.md)
-**Status:** Em definição — v0.9 (enum de `caracteristica_veiculo` definitivo: `CR`/`CL`, `EX`, `LE`, `ME`/`MEL`, `ML`/`MLL`, `MX`, `MM`/`MML`; sem `SL`; supera os códigos `RO`/`ROL`/mistos "M\*" da v0.8; exemplo do §15 adequado)
-**Escopo:** O contrato de dados — entidades, campos, tipos, regras de UUID e validações estruturais do JSON de operação. **Não é escopo desta spec:** fórmulas de tarifa (valor em R$), algoritmo de roteamento, algoritmo de sugestão/redistribuição dos horários de passagem, semântica de `viagem_feriado` e contagens derivadas, derivação do município por geolocalização, regras de tipificação, algoritmo exato de sugestão de menor distância (isso é a [Spec 03](03-regras-de-negocio-calculo.md)).
+**Status:** Em definição — v0.9 (enum de `caracteristica_veiculo` definitivo: `CR`/`CL`, `EX`, `LE`, `ME`/`MEL`, `ML`/`MLL`, `MX`, `MM`/`MML`; sem `SL`; supera os códigos `RO`/`ROL`/mistos "M\*" da v0.8; exemplo do §15 adequado; v0.10: Serviço ganha `tabelas_excepcionais[]` e Viagem ganha `tabela_excepcional_uuid` (grade de operação excepcional — DEC-081; semântica e contagens na Spec 03 §9))
+**Escopo:** O contrato de dados — entidades, campos, tipos, regras de UUID e validações estruturais do JSON de operação. **Não é escopo desta spec:** fórmulas de tarifa (valor em R$), algoritmo de roteamento, algoritmo de sugestão/redistribuição dos horários de passagem, semântica de `viagem_feriado`, das tabelas excepcionais e contagens derivadas, derivação do município por geolocalização, regras de tipificação, algoritmo exato de sugestão de menor distância (isso é a [Spec 03](03-regras-de-negocio-calculo.md)).
 
 ---
 
@@ -33,6 +33,7 @@ Documento (raiz)
    │     └─ servico_uuid, geolocalizacao_ida?, geolocalizacao_volta?
    └─ servicos[]
       ├─ uuid, numero_n, caracteristica_veiculo, carater
+      ├─ tabelas_excepcionais[]     ({ uuid, tipo, descricao? }) — grades de operação excepcional deste Serviço (§6.1)
       ├─ locais[]                   (pontos comuns — sem tarifa — só deste Serviço)
       │  └─ uuid, nome, municipio, geolocalizacao_ida?, geolocalizacao_volta?
       ├─ matriz_distancias[]        ({ secao_a_uuid, secao_b_uuid, valor_adotado_de_distancia, distancia_trecho_ida?, distancia_trecho_volta? }) — todos os pares, computada
@@ -47,7 +48,7 @@ Documento (raiz)
          │  ├─ trechos[]: parada_origem_ordem, parada_destino_ordem, distancia_km, duracao_s
          │  └─ pontos_de_rota[]: apos_parada_ordem, latitude, longitude   (só forçam o traçado; não geram parada/trecho)
          └─ viagens[]
-            └─ uuid, horario_saida, dia_semana, viagem_feriado, horarios_paradas[]
+            └─ uuid, horario_saida, dia_semana, viagem_feriado, tabela_excepcional_uuid?, horarios_paradas[]
                └─ horarios_paradas[]: parada_ordem, offset_horario
 ```
 
@@ -72,7 +73,7 @@ Decisões de nesting fixadas nesta spec (histórico completo em §13):
 
 | Campo           | Tipo   | Obrigatório | Descrição                                                                                                                                                                                     |
 | --------------- | ------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `versao_schema` | string | Sim         | Versão deste contrato (ex.: `"1.0"`). Permite ao Comparador/Ingestor evoluir o schema sem quebrar leitura de JSONs antigos. Não é metadado de fluxo — é versionamento estrutural do contrato. |
+| `versao_schema` | string | Sim         | Versão deste contrato (ex.: `"1.1"`). Permite ao Comparador/Ingestor evoluir o schema sem quebrar leitura de JSONs antigos. Não é metadado de fluxo — é versionamento estrutural do contrato. A operação excepcional (DEC-081) elevou a versão de `"1.0"` para `"1.1"`; como os campos novos são opcionais com default, documentos `"1.0"` seguem válidos. |
 | `autos`         | object | Sim         | Identificação do Autos, suas Seções e seus Serviços. Ver §4.                                                                                                                                  |
 
 ---
@@ -153,7 +154,22 @@ _Validação de um JSON de origem desconhecida (Comparador/Ingestor):_ como esse
 | `locais`                 | array\<Local\>        | Não (default `[]`) | Pontos comuns (sem tarifa) usados pelos itinerários deste Serviço. Não compartilhados com outros Serviços. Ver §7.                                                                                                                                                                                                                                                                                                                                                              |
 | `matriz_distancias`      | array\<ParDistância\> | Sim                | Distância entre cada par de Seções atendidas por este Serviço, computada e congelada a partir da rota. Ver §8.                                                                                                                                                                                                                                                                                                                                                                  |
 | `matriz_seccionamento`   | array\<ParSeção\>     | Não (default `[]`) | Pares de Seções entre os quais é permitida venda de passagem parcial, com a distância de referência (km) confirmada pelo usuário. Ver §9.                                                                                                                                                                                                                                                                                                                                       |
+| `tabelas_excepcionais`   | array\<TabelaExcepcional\> | Não (default `[]`) | Grades de operação **excepcional** deste Serviço (ex.: férias de verão), além das grades comum e de feriado. Categoria semântica de texto, **nunca** um período de meses/datas. Ver §6.1 e a semântica na Spec 03 §9.                                                                                                                                                                                                                                                        |
 | `itinerarios`            | array\<Itinerário\>   | Sim                | 1 ou 2 elementos. Ver §10.                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+
+### 6.1 TabelaExcepcional (elemento de `servico.tabelas_excepcionais`)
+
+Uma tabela excepcional é uma **grade de horários nomeada**, alternativa à operação comum, que o usuário aplica a Viagens quando a operação daquele período difere da rotina (ex.: férias de verão com frequência reduzida). Não descreve **quando** o período ocorre — o ROTA não guarda datas nem meses (o calendário é externo, Spec 01 §3); descreve apenas **qual** operação vale sob aquela categoria. A vigência real (quando a tabela substitui a comum) é interpretação humana/operacional, fora do sistema.
+
+| Campo       | Tipo            | Obrigatório                        | Descrição                                                                                                                                                                                                 |
+| ----------- | --------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `uuid`      | string (UUIDv4) | Sim                                | Identidade estável da tabela. Gerada client-side na criação, preservada em reimportações (§12). É a chave que cada Viagem excepcional referencia.                                                          |
+| `tipo`      | enum            | Sim                                | `"ferias_verao"` \| `"ferias_inverno"` \| `"personalizado"`. Os dois primeiros são rótulos fixos (filtráveis por serem valores fechados); `personalizado` é uma categoria livre nomeada por `descricao`. |
+| `descricao` | string          | **Só se `tipo == "personalizado"`** | Texto livre que nomeia a tabela personalizada (ex.: `"Excursão Aparecida"`). Ausente/irrelevante quando `tipo` é `ferias_verao`/`ferias_inverno` (o rótulo deriva do tipo).                                |
+
+- **Cardinalidade por Serviço:** no máximo **uma** tabela `ferias_verao` e **uma** `ferias_inverno` (tipos canônicos são únicos); `personalizado` pode repetir.
+- **Sem verificação de sobreposição** entre tabelas excepcionais — categorias textuais são de responsabilidade do usuário.
+- Uma tabela excepcional **não** tem sub-grade de feriado própria: em feriado, a operação de feriado prevalece (Spec 03 §9.1).
 
 ---
 
@@ -346,14 +362,15 @@ Validações estruturais:
 
 ## 11. Viagem
 
-**Viagem é estratificada por dia** (decisão da v0.6, induzida pela Spec 04 §8): cada Viagem é **uma partida num único dia da semana**, comum ou de feriado — objetos simples, um por célula da grade de horários da Spec 04. Um serviço que sai às 08:00 de segunda a sexta tem **cinco** Viagens (uma por dia), cada uma com `uuid` e offsets próprios (o que também permite, naturalmente, offsets diferentes por dia). Substitui o desenho anterior (`dias_semana[]` + `regra_feriado`), que agrupava vários dias numa mesma Viagem e tratava feriado como etiqueta aditiva.
+**Viagem é estratificada por dia** (decisão da v0.6, induzida pela Spec 04 §8): cada Viagem é **uma partida num único dia da semana**, comum ou de feriado — objetos simples, um por célula da grade de horários da Spec 04. Um serviço que sai às 08:00 de segunda a sexta tem **cinco** Viagens (uma por dia), cada uma com `uuid` e offsets próprios (o que também permite, naturalmente, offsets diferentes por dia). Substitui o desenho anterior (`dias_semana[]` + `regra_feriado`), que agrupava vários dias numa mesma Viagem e tratava feriado como etiqueta aditiva. Cada Viagem pertence a **exatamente uma** grade: comum, feriado ou uma **tabela excepcional** (`tabela_excepcional_uuid`, abaixo) — mutuamente exclusivas.
 
 | Campo              | Tipo                   | Obrigatório | Descrição                                                                                                                                                                                                                                                                                                                                                                                                |
 | ------------------ | ---------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `uuid`             | string (UUIDv4)        | Sim         | Identidade estável da viagem. Mesma regra de Seção/Serviço/Local: gerada client-side na criação, preservada em reimportações. Permite ao Comparador reportar "viagem das 08:00 de segunda adiantada para 08:15" em vez de "removeu uma, criou outra". Operações de cópia (copiar viagem para outro dia, copiar dias comuns para feriado — Spec 04 §8.3–§8.4) criam **entidades novas, com UUIDs novas**. |
 | `horario_saida`    | string (`HH:MM:SS`)    | Sim         | Horário absoluto de saída desta viagem, a partir da primeira parada do itinerário.                                                                                                                                                                                                                                                                                                                       |
 | `dia_semana`       | enum                   | Sim         | **Um único** dia: `"segunda"` \| `"terca"` \| `"quarta"` \| `"quinta"` \| `"sexta"` \| `"sabado"` \| `"domingo"`.                                                                                                                                                                                                                                                                                        |
-| `viagem_feriado`   | boolean                | Sim         | `false` = **viagem comum**: opera normalmente quando `dia_semana` cai (tabela de dias comuns da grade). `true` = **viagem de feriado**: opera **apenas** quando um feriado cai no `dia_semana` indicado (tabela de feriados da grade). Semântica detalhada e efeito (nulo) sobre contagens na Spec 03 §9. O calendário de feriados permanece externo ao ROTA.                                            |
+| `viagem_feriado`   | boolean                | Sim         | `false` = **viagem comum**: opera normalmente quando `dia_semana` cai (tabela de dias comuns da grade). `true` = **viagem de feriado**: opera **apenas** quando um feriado cai no `dia_semana` indicado (tabela de feriados da grade). Semântica detalhada e efeito (nulo) sobre contagens na Spec 03 §9. O calendário de feriados permanece externo ao ROTA. Só se aplica quando `tabela_excepcional_uuid` é `null`.                                            |
+| `tabela_excepcional_uuid` | string (UUIDv4) \| `null` | Não (default `null`) | Quando **não** `null`, esta Viagem pertence à **tabela excepcional** de `servico.tabelas_excepcionais` com este `uuid` (do mesmo Serviço) — não à grade comum nem à de feriado. Quando `null`/ausente, a grade é dada por `viagem_feriado`. **Invariante:** se `tabela_excepcional_uuid ≠ null`, então `viagem_feriado = false` (uma Viagem excepcional nunca é de feriado — Spec 03 §9.1).                                            |
 | `horarios_paradas` | array\<HorárioParada\> | Sim         | Offset de passagem, a partir de `horario_saida`, para cada Parada do itinerário — específico desta Viagem. Ver §11.1.                                                                                                                                                                                                                                                                                    |
 
 Duas Viagens do mesmo itinerário podem ter o mesmo `dia_semana` e o mesmo `horario_saida` (reforço de horário) — não há validação de unicidade dessa combinação.
@@ -420,6 +437,7 @@ Histórico completo — v0.1 → v0.5 desta spec:
 21. **Viagem estratificada por dia** (v0.6, induzida pela Spec 04 §8): cada Viagem tem `dia_semana` **único** (enum de um dia) e `viagem_feriado` **booleano** — substitui `dias_semana[]` + `regra_feriado`. `viagem_feriado = false` → viagem comum; `true` → opera apenas quando um feriado cai naquele dia da semana (a "tabela de feriados" da grade — Spec 04 §8.4). Mantém intactos os conceitos de `horario_saida`, `horarios_paradas[]`/`offset_horario` e a UUID por Viagem. Motivação: eliminar a complexidade do agrupamento por dias (uma célula da grade = uma Viagem = um objeto simples) e permitir offsets diferentes por dia da semana. Viagens de feriado **não entram** nas contagens (semana padrão — Spec 03 §9). O calendário de feriados permanece externo.
 22. **`municipio` de Seção e Local é derivado, não digitado** (v0.6): preenchido automaticamente por ponto-em-polígono sobre a base estática de municípios de SP (`municipios_sp.geojson` + `pop_municipios.csv` — algoritmo na Spec 03 §2.3). O campo continua persistido no JSON (documento autossuficiente — leitores não precisam da base para exibir o nome).
 23. **`rota` ganha `descricao_itinerario`** (v0.7, §10.5): descrição textual do itinerário por nomes de vias, por sentido, com `texto` (string pronta para UX/PDF) e `itens[]` (lista estruturada). Intercala **apenas as Seções** do itinerário com os **nomes das vias** percorridas entre elas — **Locais comuns não entram**, pontos de rota não viram item. Derivada da rota roteirizada, congelada no JSON junto de `geometria`/`trechos`/`distancia_km`/`duracao_s`; leitores só leem, não recalculam. Algoritmo (extração via OSRM `steps=true`, limpeza de nomes, associação a intervalos entre Seções) na Spec 03 §3.7.
+24. **Operação excepcional como grade nomeada** (v0.10, DEC-081): `servico.tabelas_excepcionais[]` (`{ uuid, tipo, descricao? }`, tipos `ferias_verao`/`ferias_inverno`/`personalizado`) + `viagem.tabela_excepcional_uuid` (nulável). Categoria **textual**, nunca meses/datas. Precedência **feriado > excepcional > padrão**; a excepcional não tem sub-grade de feriado; invariante `tabela_excepcional_uuid ≠ null ⇒ viagem_feriado = false`. Não entra em contagem (Spec 03 §9.2/§9.4). Campos opcionais com default (`[]` / `null`) — documentos anteriores permanecem válidos; `versao_schema` passa de `"1.0"` para `"1.1"` (§3, §15).
 
 ---
 
@@ -441,7 +459,8 @@ Validações de forma do documento — não incluem regras de negócio (tarifa, 
 - Ao menos 2 Seções distintas referenciadas por paradas de um Serviço, para existir ao menos um par possível em `matriz_distancias`.
 - `matriz_distancias`: exatamente uma entrada por combinação não-ordenada de duas Seções distintas atendidas pelo Serviço; sem duplicatas; `distancia_trecho_ida`, `distancia_trecho_volta` e `valor_adotado_de_distancia` em **km** (§8) — nunca em metros.
 - `matriz_seccionamento`: cada par referencia Seções presentes em `matriz_distancias` deste mesmo Serviço; `secao_a_uuid ≠ secao_b_uuid`; `distancia_km` presente; sem pares duplicados; mesma unidade (km) de `matriz_distancias` (§8, §9).
-- `viagens` de um itinerário: mínimo 1 elemento; `dia_semana` presente, um dos sete valores do enum (§11); `viagem_feriado` booleano presente; `horarios_paradas` com exatamente um elemento por Parada do itinerário (mesmo conjunto de `ordem`), offsets não decrescentes por `parada_ordem`, primeiro elemento com `offset_horario = "00:00:00"`. Não há unicidade de `(dia_semana, horario_saida, viagem_feriado)` — reforços de horário são válidos (§11).
+- `tabelas_excepcionais` de um Serviço (se presente): cada `uuid` é UUIDv4 único no documento (§12); `tipo` é um dos três valores do enum; `descricao` **presente sse `tipo == "personalizado"`**; no máximo uma tabela com `tipo == "ferias_verao"` e uma com `tipo == "ferias_inverno"` por Serviço; `personalizado` pode repetir (§6.1).
+- `viagens` de um itinerário: mínimo 1 elemento; `dia_semana` presente, um dos sete valores do enum (§11); `viagem_feriado` booleano presente; `tabela_excepcional_uuid`, se presente e não `null`, referencia uma tabela existente em `tabelas_excepcionais` do Serviço-pai deste itinerário e implica `viagem_feriado = false` (invariante do §11); `horarios_paradas` com exatamente um elemento por Parada do itinerário (mesmo conjunto de `ordem`), offsets não decrescentes por `parada_ordem`, primeiro elemento com `offset_horario = "00:00:00"`. Não há unicidade de `(dia_semana, horario_saida, viagem_feriado, tabela_excepcional_uuid)` — reforços de horário são válidos (§11).
 
 ---
 
@@ -451,7 +470,7 @@ Serviço único (`0000-1CR`) atendendo três Seções (Santos, São Vicente, Pra
 
 ```json
 {
-  "versao_schema": "1.0",
+  "versao_schema": "1.1",
   "autos": {
     "codigo": "0000",
     "tipo": "Rodoviário",
@@ -812,6 +831,24 @@ Se um segundo Serviço do mesmo Autos (ex.: `0000-2CR`) também atendesse o Term
 ```
 
 Ambos os pontos do segundo Serviço entram no mesmo cálculo de centroide da Seção (§5.2), junto aos do primeiro.
+
+Ilustração de **operação excepcional** num Serviço (campos opcionais — §6.1, §11):
+
+```jsonc
+// em servico.tabelas_excepcionais:
+"tabelas_excepcionais": [
+  { "uuid": "9c1e0000-0000-4000-8000-000000000001", "tipo": "ferias_verao", "descricao": null },
+  { "uuid": "2a7f0000-0000-4000-8000-000000000002", "tipo": "personalizado", "descricao": "Excursão Aparecida" }
+]
+
+// … e uma Viagem que pertence à tabela de férias de verão:
+{
+  "uuid": "…", "horario_saida": "10:00:00", "dia_semana": "sabado",
+  "viagem_feriado": false,
+  "tabela_excepcional_uuid": "9c1e0000-0000-4000-8000-000000000001",
+  "horarios_paradas": [ { "parada_ordem": 1, "offset_horario": "00:00:00" } /* … */ ]
+}
+```
 
 ---
 

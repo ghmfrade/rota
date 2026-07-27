@@ -188,11 +188,11 @@ Regras de UX (decisões desta spec):
 
 ## 8. Viagens e Grade de Horários
 
-Após criar/alterar o itinerário de um Serviço, a etapa seguinte é a **grade de horários**, por Serviço × sentido. Com a estratificação de Viagem (Spec 02 §11, v0.6), **cada célula preenchida da grade é uma Viagem** — um único `dia_semana`, comum ou de feriado.
+Após criar/alterar o itinerário de um Serviço, a etapa seguinte é a **grade de horários**, por Serviço × sentido. Com a estratificação de Viagem (Spec 02 §11, v0.6), **cada célula preenchida da grade é uma Viagem** — um único `dia_semana`, na grade **comum**, de **feriado** ou de uma **tabela excepcional** (Spec 02 §6.1).
 
 ### 8.1 Estrutura da grade
 
-Duas tabelas por Serviço × sentido — **Dias comuns** (viagens com `viagem_feriado = false`) e, abaixo, **Feriados** (`viagem_feriado = true`):
+Uma ou mais tabelas por Serviço × sentido: **Dias comuns** (`viagem_feriado = false` e sem tabela excepcional), **Feriados** (`viagem_feriado = true`) e **uma tabela por grade excepcional** existente no Serviço (ex.: "Férias de verão"). Todas têm a mesma estrutura de linhas/colunas; diferem só pela grade a que alimentam:
 
 ```
                           SEG    TER    QUA    QUI    SEX    SAB    DOM
@@ -232,6 +232,16 @@ Municipio D - Seção 4    10:00  10:00  11:00  10:00  10:00    —     —
 - Botão **"Copiar dias comuns"**: preenche a tabela de feriados com horários iguais à operação de dias comuns — clona todas as Viagens comuns do sentido como Viagens de feriado (**UUIDs novas**). Confirmação se a tabela de feriados já tiver conteúdo (sobrescrever/mesclar).
 - Feriados **não entram** nas contagens (semana padrão — Spec 03 §9.2); a grade exibe essa nota como legenda.
 
+### 8.5 Tabelas de operação excepcional
+
+- Além das grades comum e de feriado, o usuário pode criar **tabelas excepcionais** por Serviço (Spec 02 §6.1). Ao criar, escolhe o **tipo**: **Férias de verão**, **Férias de inverno** (rótulos fixos, filtráveis) ou **Personalizado** (informa um nome livre em `descricao`).
+- Cada tabela excepcional é uma grade própria (mesma estrutura de §8.1), cujas células preenchidas são Viagens com `tabela_excepcional_uuid` apontando para ela e `viagem_feriado = false` (invariante — Spec 02 §11).
+- **Cardinalidade (Spec 02 §6.1):** no máximo uma "Férias de verão" e uma "Férias de inverno" por Serviço; "Personalizado" pode repetir. **Não** há verificação de sobreposição entre tabelas excepcionais.
+- **Filtro/busca:** as tabelas de férias de verão/inverno são **filtráveis** por serem valores de tipo fechados; as personalizadas, por texto de `descricao`.
+- **Precedência (Spec 03 §9.1):** em feriado, a grade de feriado prevalece sobre a excepcional. A tabela excepcional **não** tem tabela de feriado própria.
+- **Contagens:** Viagens excepcionais **não entram** nas contagens da semana padrão (Spec 03 §9.2/§9.4); a grade exibe essa nota como legenda, como já faz a de feriados.
+- **"Copiar dias comuns"** (análogo à §8.4): opcionalmente disponível para semear uma tabela excepcional a partir da operação comum, clonando as Viagens comuns como excepcionais (**UUIDs novas**, `tabela_excepcional_uuid` da tabela destino, `viagem_feriado = false`).
+
 ---
 
 ## 9. Matrizes
@@ -268,7 +278,7 @@ Apresentação (dados: Spec 02 §9; sugestões: Spec 03 §6; tarifa externa: Spe
 
 ## 10. Resumo Operacional
 
-Painel na tela de **Revisão** (e seção correspondente no PDF), com as contagens definidas na Spec 03 §9.4 (fórmulas lá — não repetidas aqui). Todas as contagens usam a **semana padrão (sem feriado)** e devem ser **rotuladas** como tal ("viagens semanais — semana padrão, sem feriados").
+Painel na tela de **Revisão** (e seção correspondente no PDF), com as contagens definidas na Spec 03 §9.4 (fórmulas lá — não repetidas aqui). Todas as contagens usam a **semana padrão (sem feriados nem operação excepcional)** e devem ser **rotuladas** como tal ("viagens semanais — semana padrão, sem feriados nem operação excepcional").
 
 **Por Serviço:**
 
@@ -369,7 +379,7 @@ O PDF operacional **não é o PDF comparativo** (que é do Comparador — Spec 0
 ### 13.1 Estrutura
 
 1. **Capa/identificação** — código do Autos, empresa, tipo, status + data (criação ou publicação), logotipo/título "ROTA — Tabela Operacional".
-2. **Resumo do Autos** — os contadores de §10 (com o rótulo "semana padrão, sem feriados"), incluindo a estratificação por faixa de horário.
+2. **Resumo do Autos** — os contadores de §10 (com o rótulo "semana padrão, sem feriados nem operação excepcional"), incluindo a estratificação por faixa de horário.
 3. **Serviços** — um bloco por Serviço: `numero_n`, característica de veículo, caráter, direcionalidade, resumo próprio.
 4. **Itinerários por Serviço e sentido** — para cada Serviço e sentido, nesta ordem: (a) **título** `Serviço 0000-NXX — Ida` / `— Volta`; (b) **sequência resumida de Seções** no padrão `Cidade - Nome da Seção`, ligadas por seta (`Cidade A - Seção A → Cidade B - Seção B → Cidade C - Seção C`); (c) **descrição textual do itinerário** por nomes de vias (`rota.descricao_itinerario.texto` — Spec 02 §10.5), ex.: `Cidade A - Seção A, Rua Treta, Avenida Santo Antônio, Cidade B - Seção B, Rodovia X, Cidade C - Seção C.`; (d) **imagem do mapa** com a rota (captura do canvas — Spec 01 §8). Locais comuns **não** aparecem aqui — nem na sequência de Seções, nem na descrição textual (só no anexo técnico). Regras de renderização da descrição: §13.4.
 5. **Tabela horária por Serviço, sentido e Seção** — duas versões (ver §13.2).
@@ -391,7 +401,7 @@ Seguindo o esquema da grade de §8 (colunas SEG…DOM; blocos por partida; dias 
 - Nomes de Seções **sempre** no padrão `Cidade - Nome da Seção`.
 - Matrizes **sempre** em metade esquerda/inferior, distâncias em **km**, **sem R$**.
 - **Sem offsets** na tabela principal (nem no anexo — offsets não são exibidos em lugar nenhum do PDF).
-- Contagens rotuladas como **"semana padrão (sem feriados)"**; a operação de feriado aparece exclusivamente na tabela de feriados.
+- Contagens rotuladas como **"semana padrão (sem feriados nem operação excepcional)"**; a operação de feriado aparece exclusivamente na tabela de feriados, e a excepcional em suas próprias tabelas.
 
 ### 13.4 Descrição textual do itinerário no PDF
 
@@ -463,7 +473,7 @@ Categorias e comportamento esperado (validações e textos de roteamento: Spec 0
 6. **Criação bidirecional espelhada só para Seções**: Seções de Serviço bidirecional nascem com Ida e Volta no mesmo ponto, e a Volta é ajustada na montagem do itinerário de Volta (§7.1). Locais nascem **unidirecionais** — só o ponto do sentido em edição; a Volta usa seus próprios Locais, independentes dos da Ida (§7.2).
 7. **Sem R$ nesta versão** — matrizes e PDF só em km; a exibição de tarifa via portaria (Spec 03 §11) fica para versão futura (§9.2).
 8. **Faixas de horário fixadas** (madrugada, pico manhã, entre-pico manhã, entre-pico almoço, entre-pico tarde, pico tarde, noite) com os intervalos de §10; classificação pelo `horario_saida`.
-9. **Contagens sempre rotuladas "semana padrão (sem feriados)"** na tela e no PDF (§10, §13.3).
+9. **Contagens sempre rotuladas "semana padrão (sem feriados nem operação excepcional)"** na tela e no PDF (§10, §13.3).
 10. **"Definir como vigente" é do Formulário** — ação técnica pós-aprovação no SEI: pede `data_publicacao`, remove `data_criacao`, preserva UUIDs; não é aprovação nem workflow (§12.2).
 11. **PDF com duas versões da tabela horária** (simples no corpo; detalhada com passantes de Seção no anexo técnico), anexo com Locais **sem horários nem offsets**, e offsets ausentes de todo o PDF (§13).
 12. **OSRM auto-hospedado como requisito de produção** (demo só para desenvolvimento) — registro de arquitetura, sem mudança no contrato da Spec 03 (§7.3).

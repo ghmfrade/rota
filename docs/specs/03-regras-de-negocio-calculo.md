@@ -605,28 +605,30 @@ RESTAURAR(viagem):
 
 ---
 
-## 9. Viagens de feriado (`viagem_feriado`) e Contagens
+## 9. Grades de operação (feriado e tabelas excepcionais) e Contagens
 
-_(Reescrito na v0.2 — a Spec 02 §11 v0.6 estratificou Viagem por dia: `dia_semana` único + `viagem_feriado` booleano, substituindo `dias_semana[]` + o enum `regra_feriado` que esta seção definia.)_ **Não existe redistribuição de horários em feriado** — a operação de feriado é uma grade própria, montada viagem a viagem. (O que antes era chamado de "redistribuição proporcional em feriado" era, na verdade, o recálculo de horários de passagem ao editar um horário a jusante — isso é a §8.2, não tem relação com feriado.)
+_(Reescrito na v0.2 — a Spec 02 §11 v0.6 estratificou Viagem por dia: `dia_semana` único + `viagem_feriado` booleano, substituindo `dias_semana[]` + o enum `regra_feriado` que esta seção definia.)_ **Não existe redistribuição de horários em feriado** — a operação de feriado é uma grade própria, montada viagem a viagem. (O que antes era chamado de "redistribuição proporcional em feriado" era, na verdade, o recálculo de horários de passagem ao editar um horário a jusante — isso é a §8.2, não tem relação com feriado.) A partir da DEC-081, além das grades **comum** e de **feriado**, um itinerário pode ter Viagens em **tabelas excepcionais** nomeadas (Spec 02 §6.1) — grades alternativas de período (ex.: férias de verão), identificadas por `viagem.tabela_excepcional_uuid`.
 
 ### 9.1 Semântica (decisão fechada)
 
-A operação de um itinerário é o conjunto das suas Viagens, cada uma valendo para **um único** `dia_semana`, em uma de duas grades:
+A operação de um itinerário é o conjunto das suas Viagens, cada uma valendo para **um único** `dia_semana`, em **uma** das grades a seguir (mutuamente exclusivas por Viagem):
 
-| `viagem_feriado` | Significado                                                                                                                                                                                                                                                                             |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `false`          | **Viagem comum** — opera normalmente quando `dia_semana` cai (grade de dias comuns).                                                                                                                                                                                                    |
-| `true`           | **Viagem de feriado** — opera **apenas** quando um **feriado** cai no `dia_semana` indicado (grade de feriados). Num feriado, a grade de feriados **substitui integralmente** a grade comum daquele dia: as viagens comuns do dia não operam; operam as viagens de feriado daquele dia. |
+| Grade da Viagem | Significado |
+| --- | --- |
+| **Comum** (`viagem_feriado = false` e `tabela_excepcional_uuid = null`) | Opera normalmente quando `dia_semana` cai (grade de dias comuns). |
+| **Feriado** (`viagem_feriado = true`) | Opera **apenas** quando um feriado cai no `dia_semana`. Num feriado, a grade de feriados **substitui integralmente** a operação daquele dia (inclusive a excepcional): as viagens comuns e as excepcionais do dia não operam; operam as de feriado. |
+| **Excepcional** (`tabela_excepcional_uuid ≠ null`, `viagem_feriado = false`) | Opera no período (textual) daquela tabela excepcional, **exceto** quando cai feriado — aí prevalece a grade de feriado. Uma tabela excepcional **não** tem sub-grade de feriado própria. |
 
-- As duas grades são independentes: um dia de feriado pode ter mais, menos ou nenhuma viagem em relação ao dia comum correspondente. "Operação de feriado igual à comum" é obtida copiando a grade (ação de UX — Spec 04 §8.4 —, que cria Viagens novas, com UUIDs novas).
+- As grades são independentes: um dia de feriado pode ter mais, menos ou nenhuma viagem em relação ao dia comum correspondente. "Operação de feriado igual à comum" é obtida copiando a grade (ação de UX — Spec 04 §8.4 —, que cria Viagens novas, com UUIDs novas).
+- **Precedência:** **feriado > excepcional > comum**. As tabelas excepcionais são independentes entre si; não há verificação de sobreposição (Spec 02 §6.1) — a vigência é interpretação humana.
 - O **calendário de feriados** (quais datas) permanece **externo** ao ROTA e ao JSON (Spec 01 §3). O documento diz o que acontece num feriado que caia em cada dia da semana, não **quando** ele cai.
 - **Uso: informativo/operacional de exibição.** A grade de feriados serve às tabelas da UX e do PDF (Spec 04 §8.4, §13); ela **não** gera partidas contáveis (§9.2).
 
-### 9.2 Feriado não altera contagens
+### 9.2 Feriado e operação excepcional não alteram contagens
 
 Regra crucial para as estatísticas derivadas (§9.4) e para o Comparador (Spec 05):
 
-- Todas as contagens — nº de viagens semanais e de opções de deslocamento — usam a **semana padrão**, que **por definição não tem feriado**: consideram **exclusivamente** as Viagens com `viagem_feriado = false` (e o seccionamento). Viagens de feriado **nunca** entram nessas contagens.
+- Todas as contagens — nº de viagens semanais e de opções de deslocamento — usam a **semana padrão**, que **por definição não tem feriado nem operação excepcional**: consideram **exclusivamente** as Viagens da grade **comum** — `viagem_feriado = false` **e** `tabela_excepcional_uuid = null` (e o seccionamento). Viagens de feriado **e Viagens excepcionais nunca** entram nessas contagens.
 - **Por quê:** o ROTA não tem registro de quais datas são feriado (calendário externo, §9.1), então não há como — nem faria sentido — somar ocorrências de feriado a uma frequência semanal.
 - Dois JSONs que difiram **apenas** na grade de feriados têm exatamente as mesmas contagens; a diferença aparece na tabela de feriados (tratada pelo Comparador como mudança de operação de feriado, não de frequência semanal).
 - **Requisito de exibição (Spec 04 §10/§13):** as contagens devem ser sempre rotuladas como "semana padrão (sem feriados)".
@@ -639,12 +641,13 @@ Regra crucial para as estatísticas derivadas (§9.4) e para o Comparador (Spec 
 
 ### 9.4 Contagem de viagens e opções de deslocamento (fórmulas)
 
-Define o cálculo das estatísticas derivadas exibidas na revisão e no PDF (Spec 04 §10). Tudo sobre a **semana padrão** (§9.2): somente Viagens com `viagem_feriado = false`.
+Define o cálculo das estatísticas derivadas exibidas na revisão e no PDF (Spec 04 §10). Tudo sobre a **semana padrão** (§9.2): somente Viagens da grade comum (`viagem_feriado = false` **e** `tabela_excepcional_uuid = null`).
 
 **Viagens semanais, por Serviço e sentido:**
 
 ```
-viagens_semana(servico, sentido) = | { v ∈ itinerario(sentido).viagens : v.viagem_feriado == false } |
+viagens_semana(servico, sentido) =
+    | { v ∈ itinerario(sentido).viagens : v.viagem_feriado == false ∧ v.tabela_excepcional_uuid == null } |
 ```
 
 Cada Viagem é uma partida num único dia (Spec 02 §11), então a contagem é o próprio número de objetos — sem multiplicação por dias. Total do Serviço = Ida + Volta; total do Autos = Σ dos Serviços.
