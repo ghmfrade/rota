@@ -1,20 +1,15 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
 **Atualização mais recente:** 2026-07-27 (branch `redesign`) — **TASK-106
-corrigida e aprovada com ressalvas na reavaliação de aderência**. A correção
-`75f2afa` fechou as três divergências funcionais do parecer anterior
-(`14-REVISOES/TASK-106-20260727.md`): a seleção agora forma uma superfície
-contínua da Viagem; Enter atravessa as Viagens até a célula criável; e Tab
-percorre células criáveis vazias. “Apagar bloco” foi removido conforme a
-**Q-066/DEC-088** e a Spec 04 §8.3 vigente. A reavaliação
-`14-REVISOES/TASK-106-20260727-reavaliacao.md` confirmou código e testes verdes
-(1.279 unitários + 76 E2E; fingerprint `8016e953…`; identidade
-`498d7fa6…`), mas encontrou uma ressalva documental de baixa severidade: as
-novas variantes públicas `densidade="padrao"|"compacta"` de `Campo`/`Select`
-não foram registradas no contrato visual de `docs-dev/18-DESIGN_SYSTEM.md`,
-como exige o §6.4 do próprio documento. A TASK-106 permanece no Grupo H até
-essa condição de merge ser cumprida; as TASK-107..111 continuam aguardando o
-fechamento do ciclo. O total segue em 17 pendentes. Antes nesta
+concluída e aprovada**. A correção `75f2afa` fechou seleção contínua, Enter
+entre Viagens, Tab em células criáveis e retirou “Apagar bloco” conforme a
+**Q-066/DEC-088**. O commit `5e03efa` documentou as variantes públicas
+`densidade="padrao"|"compacta"` de `Campo`/`Select`, resolvendo a única
+ressalva da reavaliação anterior. O parecer final
+`14-REVISOES/TASK-106-20260727-final.md` aprovou a entrega sem pendências, com
+evidência canônica verde (fingerprint `8016e953…`; identidade `498d7fa6…`).
+A TASK-106 sai do Grupo H e libera formalmente as TASK-107..111. Pendentes:
+17 → 16. Antes nesta
 data — **TASK-103 concluída e aprovada**. A implementação `99a64c5` restringe a semana padrão às
 Viagens comuns (`viagem_feriado = false` e `tabela_excepcional_uuid = null`) e
 centraliza o rótulo “sem feriados nem operação excepcional”; fórmula, invariância
@@ -227,6 +222,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 078 | Realocação de Seção por botão: esquerdo move o cluster, direito move o ponto corrente (DEC-061/DEC-079) — reprovada em `b8d0301`, corrigida em `714028b` (`stopPropagation` no botão direito), aprovada na reavaliação |
 | 100 | Botão "redefinir Seção": colapsa todas as contribuições no ponto do Serviço/sentido em edição (DEC-080) — aprovada com ressalvas (`14-REVISOES/TASK-100-20260724.md`); ressalva única (commitar os docs de fundamentação) **resolvida em `668124b`** (adendo no parecer) |
 | 075 | Identificação (fluxo novo): pré-visualização do Autos trocável + confirmação explícita ("Confirmar Autos") antes de congelar `codigo`/`empresa` (DEC-064) — aprovada (`14-REVISOES/TASK-075-20260724.md`) |
+| 106 | Redesign da grade de horários: layout tabular compacto, ordenação temporal, seleção contínua, ações no hover e navegação Tab/Enter — aprovada no parecer final `14-REVISOES/TASK-106-20260727-final.md` |
 
 ---
 
@@ -241,13 +237,12 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 ## 5. Tasks a executar — ordem recomendada
 
-**Estado atual: 17 tasks pendentes.** Em 2026-07-27, a TASK-106 foi implementada
-em `c2db60a`, reprovada, corrigida em `75f2afa` e **aprovada com ressalvas** na
-reavaliação `14-REVISOES/TASK-106-20260727-reavaliacao.md`. As três falhas
+**Estado atual: 16 tasks pendentes.** Em 2026-07-27, a TASK-106 saiu da lista:
+implementada em `c2db60a`, corrigida em `75f2afa` e **aprovada** no parecer
+final `14-REVISOES/TASK-106-20260727-final.md`, após `5e03efa` documentar a
+prop pública `densidade` de `Campo`/`Select` no design system. As três falhas
 funcionais estão fechadas e “Apagar bloco” foi retirado conforme
-Q-066/**DEC-088**; a task continua nesta lista somente pela condição documental
-de registrar a prop pública `densidade` de `Campo`/`Select` no design system.
-Antes disso, a TASK-103 saiu da lista:
+Q-066/**DEC-088**; as TASK-107..111 estão liberadas. Antes disso, a TASK-103 saiu da lista:
 implementada em `99a64c5` e aprovada em
 `14-REVISOES/TASK-103-20260727.md`; o Grupo G passa de 3 para 2 pendentes, sem
 alterar a ordem `104 → 105`. Antes disso, a TASK-102 saiu da lista:
@@ -341,17 +336,16 @@ Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Servi
 
 ### Grupo H — Redesign da grade de horários (proposta 2026-07-27)
 
-Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). A **TASK-106** é a fundação (spec-backed: Spec 04 §8.1/§8.2/§8.3 + design system DEC-050). As Q-060..065 foram **decididas no mesmo dia** (DEC-082..087) e a Spec 04 §8.4/§8.5 exigida pela DEC-087 foi aplicada + carve-out da RN-007 registrada. A entrega `c2db60a` da 106 foi **reprovada** em `14-REVISOES/TASK-106-20260727.md`; a correção `75f2afa` fechou seleção, Enter, Tab e retirou “Apagar bloco” conforme **Q-066/DEC-088**. A reavaliação `14-REVISOES/TASK-106-20260727-reavaliacao.md` ficou **aprovada com ressalvas**: nenhuma falha funcional permanece, mas falta documentar a nova prop pública `densidade` de `Campo`/`Select` no design system. As TASK-107..111 aguardam essa condição de fechamento. A TASK-112 não depende da 106; continua condicionada ao motor da TASK-105. Botões de ação da Viagem surgem **no hover** (não na seleção — dobrado na TASK-106).
+Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). A **TASK-106 foi concluída e aprovada**: a entrega `c2db60a` foi reprovada, a correção `75f2afa` fechou seleção, Enter, Tab e retirou “Apagar bloco” conforme **Q-066/DEC-088**, e `5e03efa` documentou a densidade pública de `Campo`/`Select`, encerrando a ressalva da reavaliação. Parecer final em `14-REVISOES/TASK-106-20260727-final.md`. As TASK-107..111 estão liberadas pela fundação aprovada. A TASK-112 não depende da 106; continua condicionada ao motor da TASK-105. Botões de ação da Viagem surgem **no hover** (não na seleção — dobrado na TASK-106).
 
 | # | Task | Complex. | Estado | Observação |
 |:---:|---|:---:|---|---|
-| 1 | **106** — Redesign da grade: layout tabular compacto, ordenação temporal, seleção + hover + navegação por teclado (Tab/Enter), sem ícone de relógio | **4** | **Implementada; aprovada com ressalvas** | Funcionalidade corrigida em `75f2afa`; condição de merge: documentar `densidade` de `Campo`/`Select` no doc 18. |
-| 2 | **107** — Inserção de Viagem por offset relativo (±X min) | **2** | **Aguarda fechamento da TASK-106** (DEC-082 decidida) | Depois da condição documental da 106. Herda offsets; só o dia; default 10 min. |
-| 3 | **108** — Cópia por headway até horário-limite (lote) | **3** | **Aguarda fechamento da TASK-106** (DEC-083 decidida) | Depois da condição documental da 106. Limite inclusivo; para antes das 24h. |
-| 4 | **109** — Cópia p/ dia adjacente (setas ←/→) + guarda de duplicidade | **2** | **Aguarda fechamento da TASK-106** (DEC-084 decidida) | Depois da condição documental da 106. Guarda só no gesto (RN-062 intacta). |
-| 5 | **110** — Operações de dia inteiro: copiar dia→dias e apagar Viagens do dia | **3** | **Aguarda fechamento da TASK-106** (DEC-085 decidida) | Depois da condição documental da 106. Reusa a guarda da 109. |
-| 6 | **111** — Modo compacto: ocultar Seções intermediárias e final | **2** | **Aguarda fechamento da TASK-106** (DEC-086 decidida) | Depois da condição documental da 106. Versão simples do PDF é da TASK-034 (§13.2). |
-| 7 | **112** — "Copiar dias comuns" origem estendida + mescla = sincronização preservando UUID | **4** | Desbloqueada (DEC-087) | Spec 04 §8.4/§8.5 aplicada + carve-out RN-007 registrada. Reusa o motor de sincronização da 105. |
+| 1 | **107** — Inserção de Viagem por offset relativo (±X min) | **2** | Desbloqueada (DEC-082; TASK-106 aprovada) | Herda offsets; só o dia; default 10 min. |
+| 2 | **108** — Cópia por headway até horário-limite (lote) | **3** | Desbloqueada (DEC-083; TASK-106 aprovada) | Limite inclusivo; para antes das 24h. |
+| 3 | **109** — Cópia p/ dia adjacente (setas ←/→) + guarda de duplicidade | **2** | Desbloqueada (DEC-084; TASK-106 aprovada) | Guarda só no gesto (RN-062 intacta). |
+| 4 | **110** — Operações de dia inteiro: copiar dia→dias e apagar Viagens do dia | **3** | Desbloqueada (DEC-085; TASK-106 aprovada) | Reusa a guarda da 109. |
+| 5 | **111** — Modo compacto: ocultar Seções intermediárias e final | **2** | Desbloqueada (DEC-086; TASK-106 aprovada) | Versão simples do PDF é da TASK-034 (§13.2). |
+| 6 | **112** — "Copiar dias comuns" origem estendida + mescla = sincronização preservando UUID | **4** | Desbloqueada (DEC-087) | Spec 04 §8.4/§8.5 aplicada + carve-out RN-007 registrada. Reusa o motor de sincronização da 105. |
 
 **Ação de spec (DEC-087) — concluída:** a **Spec 04 §8.4/§8.5** foi atualizada (origem selecionável; "mesclar" = sincronização preservando UUID; "sobrescrever" = UUIDs novas) e a **carve-out da RN-007** foi registrada no `01-RULE_INDEX.md` e `03-TRACEABILITY_MATRIX.md`. O casamento sob duplicatas (RN-062) ficou resolvido na spec (§8.5, "por contagem").
 
