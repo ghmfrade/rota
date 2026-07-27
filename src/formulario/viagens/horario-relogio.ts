@@ -1,9 +1,11 @@
 // Conversões de horário de relógio (Spec 04 §8.1/§8.2; RN-067): a grade
-// recebe "HH:MM" digitado pelo usuário (input nativo type="time") e o
+// recebe horário digitado pelo usuário num campo textual (com ou sem ":") e o
 // Formulário converte para o "HH:MM:SS" do contrato (Spec 02 §11) — o offset
 // nunca é digitado diretamente, só o horário absoluto.
 
 const REGEX_HORA_MINUTO = /^([01]\d|2[0-3]):[0-5]\d$/;
+const REGEX_HORA_MINUTO_COM_SEPARADOR = /^(\d{1,2}):(\d{2})$/;
+const REGEX_HORA_MINUTO_SEM_SEPARADOR = /^(\d{1,2})(\d{2})$/;
 
 /** Converte "HH:MM:SS" (horário de relógio ou offset) em total de segundos. */
 export function horarioParaSegundos(horarioHms: string): number {
@@ -25,13 +27,31 @@ export function formatarHms(totalSegundos: number): string {
 }
 
 /**
- * Converte "HH:MM" (input `type="time"` da grade) em "HH:MM:SS" — segundos
- * sempre "00" quando digitados pela grade (Spec 04 §8.1). `null` se
- * malformado — a grade não inventa horário a partir de entrada inválida.
+ * Normaliza a digitação rápida da grade para `HH:MM`: o separador é opcional,
+ * portanto `830`, `0830`, `8:30` e `08:30` representam o mesmo horário. A
+ * validação continua restrita ao relógio 00:00–23:59 (RN-067).
+ */
+export function normalizarEntradaHoraMinuto(entrada: string): string | null {
+  const texto = entrada.trim();
+  const partes =
+    REGEX_HORA_MINUTO_COM_SEPARADOR.exec(texto) ??
+    REGEX_HORA_MINUTO_SEM_SEPARADOR.exec(texto);
+  if (!partes) return null;
+
+  const horas = Number(partes[1]);
+  const minutos = Number(partes[2]);
+  if (horas > 23 || minutos > 59) return null;
+  return `${pad(horas)}:${pad(minutos)}`;
+}
+
+/**
+ * Converte a entrada textual da grade em "HH:MM:SS" — segundos sempre "00"
+ * quando digitados pela grade (Spec 04 §8.1). `null` se malformado.
  */
 export function horaMinutoParaHorarioRelogio(horaMinuto: string): string | null {
-  if (!REGEX_HORA_MINUTO.test(horaMinuto)) return null;
-  return `${horaMinuto}:00`;
+  const normalizado = normalizarEntradaHoraMinuto(horaMinuto);
+  if (normalizado === null || !REGEX_HORA_MINUTO.test(normalizado)) return null;
+  return `${normalizado}:00`;
 }
 
 /** Converte "HH:MM:SS" gravado no contrato em "HH:MM" para exibição na grade (Spec 04 §8.1). */

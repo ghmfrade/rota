@@ -69,4 +69,15 @@ describe("Campo", () => {
     expect(container.querySelector('[data-testid="sem-rotulo"]')).not.toBeNull();
     desmontar();
   });
+
+  it('densidade="compacta" reduz o preenchimento sem alterar o contrato do campo', () => {
+    const { container, desmontar } = renderizar(
+      <Campo densidade="compacta" data-testid="campo-compacto" />,
+    );
+    const entrada = container.querySelector("input")!;
+    expect(entrada.className).toContain("px-2");
+    expect(entrada.className).toContain("py-1");
+    expect(entrada.className).not.toContain("px-3");
+    desmontar();
+  });
 });

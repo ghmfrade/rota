@@ -3,19 +3,39 @@ import {
   formatarHms,
   horaMinutoParaHorarioRelogio,
   horarioParaHoraMinuto,
+  normalizarEntradaHoraMinuto,
   somarHorarios,
 } from "@/formulario/viagens";
 
 // TASK-028 — conversões de horário de relógio da grade (Spec 04 §8.1/§8.2;
-// RN-067): usuário digita HH:MM, nunca offset.
+// RN-067): usuário digita horário de relógio, nunca offset. TASK-106 aceita
+// digitação rápida com ou sem ":" e sempre normaliza para HH:MM.
+
+describe("normalizarEntradaHoraMinuto (TASK-106; RN-067)", () => {
+  test.each([
+    ["0830", "08:30"],
+    ["830", "08:30"],
+    ["08:30", "08:30"],
+    ["8:30", "08:30"],
+  ])("normaliza %s para %s", (entrada, esperado) => {
+    expect(normalizarEntradaHoraMinuto(entrada)).toBe(esperado);
+  });
+
+  test.each(["", "8", "08:3", "2400", "24:00", "0860", "08:60", "texto"])(
+    "[inválido] rejeita %s",
+    (entrada) => {
+      expect(normalizarEntradaHoraMinuto(entrada)).toBeNull();
+    },
+  );
+});
 
 describe("horaMinutoParaHorarioRelogio (RN-067)", () => {
   test("converte HH:MM em HH:MM:SS com segundos 00", () => {
     expect(horaMinutoParaHorarioRelogio("08:15")).toBe("08:15:00");
   });
 
-  test("[inválido] string sem separador ':' é rejeitada", () => {
-    expect(horaMinutoParaHorarioRelogio("0815")).toBeNull();
+  test("converte entrada sem ':' em HH:MM:SS", () => {
+    expect(horaMinutoParaHorarioRelogio("0815")).toBe("08:15:00");
   });
 
   test("[inválido] hora fora de 00–23 é rejeitada", () => {

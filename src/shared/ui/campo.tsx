@@ -8,18 +8,25 @@
 
 import { useId } from "react";
 import type { ComponentPropsWithoutRef } from "react";
-import { classesDeControle, MolduraControle } from "./moldura-controle";
+import {
+  classesDeControle,
+  MolduraControle,
+  type DensidadeControle,
+} from "./moldura-controle";
 
 export interface CampoProps extends ComponentPropsWithoutRef<"input"> {
   /** Rótulo exibido acima do controle, associado via `htmlFor`/`id`. */
   rotulo?: string;
   /** Mensagem de erro; quando presente, colore rótulo/borda e é exibida. */
   erro?: string;
+  /** Densidade visual para campos em tabelas compactas. */
+  densidade?: DensidadeControle;
 }
 
 export function Campo({
   rotulo,
   erro,
+  densidade = "padrao",
   id,
   className,
   ...props
@@ -37,7 +44,7 @@ export function Campo({
     >
       <input
         id={idFinal}
-        className={classesDeControle(erro, className)}
+        className={classesDeControle(erro, className, densidade)}
         aria-invalid={erro ? true : undefined}
         aria-describedby={idMensagemErro}
         {...props}

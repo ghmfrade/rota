@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { DIAS_SEMANA, type Parada, type Viagem } from "@/shared/contrato";
 import {
+  destinoNavegacaoGrade,
   horarioAbsolutoNaParada,
   linhasSecoes,
   montarBlocosDiasComuns,
@@ -165,5 +166,34 @@ describe("horarioAbsolutoNaParada (RN-067)", () => {
   test("[inválido] parada_ordem inexistente na Viagem devolve undefined", () => {
     const v = viagem("a1", "segunda", "08:00:00");
     expect(horarioAbsolutoNaParada(v, 99)).toBeUndefined();
+  });
+});
+
+describe("destinoNavegacaoGrade (TASK-106)", () => {
+  const origem = { indiceBloco: 1, indiceSecao: 0, dia: "segunda" as const };
+
+  test("Tab avança para o próximo dia na mesma Seção e bloco", () => {
+    expect(destinoNavegacaoGrade(origem, "Tab", 3)).toEqual({
+      indiceBloco: 1,
+      indiceSecao: 0,
+      dia: "terca",
+    });
+  });
+
+  test("Enter desce para a próxima Seção no mesmo dia e bloco", () => {
+    expect(destinoNavegacaoGrade(origem, "Enter", 3)).toEqual({
+      indiceBloco: 1,
+      indiceSecao: 1,
+      dia: "segunda",
+    });
+  });
+
+  test("[borda] não inventa retorno após domingo ou última Seção", () => {
+    expect(
+      destinoNavegacaoGrade({ ...origem, dia: "domingo" }, "Tab", 3),
+    ).toBeNull();
+    expect(
+      destinoNavegacaoGrade({ ...origem, indiceSecao: 2 }, "Enter", 3),
+    ).toBeNull();
   });
 });

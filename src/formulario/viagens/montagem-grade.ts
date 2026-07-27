@@ -17,6 +17,33 @@ export type EstadoCelulaGrade =
 
 export type BlocoGrade = Record<DiaSemana, EstadoCelulaGrade>;
 
+export type TeclaNavegacaoGrade = "Tab" | "Enter";
+
+export interface CoordenadaCelulaGrade {
+  indiceBloco: number;
+  indiceSecao: number;
+  dia: DiaSemana;
+}
+
+/**
+ * Resolve a navegação explícita da TASK-106 sem criar retorno circular:
+ * Tab avança um dia na mesma Seção; Enter desce uma Seção no mesmo dia.
+ */
+export function destinoNavegacaoGrade(
+  origem: CoordenadaCelulaGrade,
+  tecla: TeclaNavegacaoGrade,
+  totalSecoes: number,
+): CoordenadaCelulaGrade | null {
+  if (tecla === "Tab") {
+    const indiceDia = DIAS_SEMANA.indexOf(origem.dia);
+    const proximoDia = DIAS_SEMANA[indiceDia + 1];
+    return proximoDia ? { ...origem, dia: proximoDia } : null;
+  }
+
+  if (origem.indiceSecao + 1 >= totalSecoes) return null;
+  return { ...origem, indiceSecao: origem.indiceSecao + 1 };
+}
+
 /**
  * Linhas da grade (Spec 04 §8.1): só as Paradas que são Seção, na ordem do
  * itinerário — Locais comuns não aparecem na grade principal (§2.5/§7.2).

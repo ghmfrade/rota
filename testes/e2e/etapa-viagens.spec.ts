@@ -35,6 +35,66 @@ async function abrirEtapaViagens(page: Page, documento: unknown) {
 }
 
 test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1/§8.2)", () => {
+  test("campo é somente digitação, aceita horário sem ':' e reordena temporalmente", async ({
+    page,
+  }) => {
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+
+    // TASK-106: nenhum input nativo `time` — clicar só dá foco, sem seletor.
+    await expect(grade.locator('input[type="time"]')).toHaveCount(0);
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toHaveAttribute(
+      "type",
+      "text",
+    );
+
+    // Digitação rápida sem ":" é normalizada. Uma partida posterior inserida
+    // com 0700 sobe acima da Viagem gravada das 08:00.
+    await grade.getByLabel("Criar viagem — segunda").fill("0700");
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toHaveValue("07:00");
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 2")).toHaveValue("08:00");
+
+    // Três algarismos também são aceitos e normalizados.
+    await grade.getByLabel("Horário de partida — segunda, viagem 1").fill("730");
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toHaveValue("07:30");
+  });
+
+  test("seleção persiste sem hover; ações aparecem só no hover; Tab/Enter navegam", async ({
+    page,
+  }) => {
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+    const partida = grade.getByLabel("Horário de partida — segunda, viagem 1");
+    const celulaPartida = partida.locator("xpath=ancestor::td");
+    const viagemUuid = await celulaPartida.getAttribute("data-viagem-uuid");
+    expect(viagemUuid).toBeTruthy();
+
+    await partida.click();
+    await grade.getByRole("columnheader", { name: "DOM" }).hover();
+    await expect(
+      grade.locator(`[data-viagem-uuid="${viagemUuid}"][data-selecionada="true"]`),
+    ).toHaveCount(3);
+
+    const acoes = celulaPartida.getByTestId("acoes-viagem");
+    await expect(acoes).toHaveCSS("opacity", "0");
+    await celulaPartida.hover();
+    await expect(acoes).toHaveCSS("opacity", "1");
+    await grade.getByRole("columnheader", { name: "DOM" }).hover();
+    await expect(acoes).toHaveCSS("opacity", "0");
+    await expect(
+      grade.locator(`[data-viagem-uuid="${viagemUuid}"][data-selecionada="true"]`),
+    ).toHaveCount(3);
+
+    await partida.press("Tab");
+    await expect(grade.getByLabel("Criar viagem — terca")).toBeFocused();
+
+    await partida.focus();
+    await partida.press("Enter");
+    await expect(
+      grade.getByLabel(/Horário de passagem — São Vicente - Terminal São Vicente, segunda, viagem 1/),
+    ).toBeFocused();
+  });
+
   test("Viagem gravada aparece com horários propagados por Seção; dias sem Viagem mostram célula criável", async ({
     page,
   }) => {
@@ -137,6 +197,7 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     await expect(passanteVicente).toHaveValue("08:30");
 
     // Restaurar sugestão (por Viagem): volta ao baseline 08:00/08:18/08:30.
+    await linhas.nth(0).getByTestId("celula-partida").hover();
     await linhas.nth(0).getByTestId("restaurar-viagem").click();
     await expect(passanteVicente).toHaveValue("08:18");
     await expect(passantePraia).toHaveValue("08:30");
@@ -189,6 +250,7 @@ test.describe("Etapa Viagens — grade de feriados e cópias (TASK-030; Spec 04 
     const grade = gradeComum(page);
 
     page.on("dialog", (d) => d.accept());
+    await grade.getByTestId("celula-partida").first().hover();
     await grade.getByLabel("Apagar viagem — segunda, viagem 1").click();
 
     // Sem Viagens: segunda volta a exibir a célula criável, sem partida existente.
@@ -200,6 +262,7 @@ test.describe("Etapa Viagens — grade de feriados e cópias (TASK-030; Spec 04 
     await abrirEtapaViagens(page, structuredClone(multiServico));
     const grade = gradeComum(page);
 
+    await grade.getByTestId("celula-partida").first().hover();
     await grade.getByLabel("Copiar para o dia — segunda, viagem 1").selectOption({ label: "QUA" });
     await grade.getByLabel("Copiar viagem para outro dia — segunda, viagem 1").click();
 

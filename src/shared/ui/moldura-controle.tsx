@@ -7,13 +7,20 @@
 
 import type { ReactNode } from "react";
 
+export type DensidadeControle = "padrao" | "compacta";
+
 export function classesDeRotulo(erro?: string): string {
   return ["text-xs", erro ? "text-erro" : "text-cinza-500"].join(" ");
 }
 
-export function classesDeControle(erro?: string, className?: string): string {
+export function classesDeControle(
+  erro?: string,
+  className?: string,
+  densidade: DensidadeControle = "padrao",
+): string {
   return [
-    "w-full rounded-controle border bg-white px-3 py-2 text-sm text-cinza-700",
+    "w-full rounded-controle border bg-white text-sm text-cinza-700",
+    densidade === "compacta" ? "px-2 py-1" : "px-3 py-2",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-azul-300",
     "disabled:opacity-50 disabled:cursor-not-allowed",
     "[transition:all_var(--transicao-rapida)]",

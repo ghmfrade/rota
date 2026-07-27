@@ -60,4 +60,17 @@ describe("Select", () => {
     expect(select.value).toBe("litoraneo");
     desmontar();
   });
+
+  it('densidade="compacta" reduz o preenchimento do select', () => {
+    const { container, desmontar } = renderizar(
+      <Select densidade="compacta">
+        <option>SEG</option>
+      </Select>,
+    );
+    const select = container.querySelector("select")!;
+    expect(select.className).toContain("px-2");
+    expect(select.className).toContain("py-1");
+    expect(select.className).not.toContain("px-3");
+    desmontar();
+  });
 });

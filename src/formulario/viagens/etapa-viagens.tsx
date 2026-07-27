@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ROTULO_SEMANA_PADRAO } from "@/shared/contagens";
 import { DIAS_SEMANA, type Itinerario, type Parada, type Secao, type Servico } from "@/shared/contrato";
-import { Botao, Campo, Painel, Select, Tabela } from "@/shared/ui";
+import { Botao, Painel, Select, Tabela } from "@/shared/ui";
 import { nomeExibicaoSecao } from "@/formulario/secoes";
 import {
   ancorasHorarioDaSessao,
@@ -28,13 +28,17 @@ import {
 } from "./copias-grade";
 import { horarioParaHoraMinuto } from "./horario-relogio";
 import {
+  destinoNavegacaoGrade,
   horarioAbsolutoNaParada,
   linhasSecoes,
   montarBlocosDiasComuns,
   montarBlocosFeriados,
   type BlocoGrade,
+  type CoordenadaCelulaGrade,
   type DiaSemana,
+  type TeclaNavegacaoGrade,
 } from "./montagem-grade";
+import { CampoHorarioGrade } from "./campo-horario-grade";
 
 // Etapa "Viagens e horários" (TASK-028/029/030; Spec 04 §8) — duas grades por
 // Serviço × sentido: dias comuns e feriados (RN-068, grades independentes).
@@ -44,7 +48,9 @@ import {
 // desfaz âncoras (RN-066). O conjunto de âncoras é estado efêmero da sessão
 // (DEC-049). TASK-030: grade de feriados, "Copiar dias comuns" (clona com UUIDs
 // novas — RN-007), "Copiar viagem para outro dia" e apagar viagem/bloco
-// (Spec 04 §8.3/§8.4).
+// (Spec 04 §8.3/§8.4). TASK-106: apresentação tabular compacta, campo textual
+// sem seletor nativo, ordenação temporal, seleção por UUID, ações no hover e
+// navegação Tab (dia seguinte) / Enter (Seção inferior).
 
 const ROTULO_DIA: Record<DiaSemana, string> = {
   segunda: "SEG",
@@ -71,6 +77,7 @@ interface PropsEtapaViagens {
 }
 
 export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
+  const raizEtapaRef = useRef<HTMLDivElement>(null);
   const [servicoSelecionadoUuid, definirServicoSelecionadoUuid] = useState<string | null>(null);
   const [sentidoSelecionado, definirSentidoSelecionado] = useState<Itinerario["sentido"] | null>(
     null,
@@ -80,6 +87,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   const [errosCelula, definirErrosCelula] = useState<Record<string, string>>({});
   // Dia-alvo escolhido em "Copiar viagem para outro dia", por Viagem (Spec 04 §8.3).
   const [diaCopiaPorViagem, definirDiaCopiaPorViagem] = useState<Record<string, DiaSemana>>({});
+  const [viagemSelecionadaUuid, definirViagemSelecionadaUuid] = useState<string | null>(null);
 
   const servicos: Servico[] = servicosDaSessao(sessao);
   const servicoAtual = servicos.find((s) => s.uuid === servicoSelecionadoUuid) ?? null;
@@ -128,29 +136,36 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
     return proximas;
   }
 
-  function aoConfirmarCriacao(dia: DiaSemana, horaMinuto: string, feriado: boolean) {
-    if (!itinerarioAtual || horaMinuto === "") return;
+  function aoConfirmarCriacao(dia: DiaSemana, horaMinuto: string, feriado: boolean): boolean {
+    if (!itinerarioAtual || horaMinuto === "") return false;
     const viagemNova = criarViagemNaCelula(itinerarioAtual, dia, horaMinuto, feriado);
-    if (!viagemNova) return;
+    if (!viagemNova) return false;
     aplicar({ ...itinerarioAtual, viagens: [...itinerarioAtual.viagens, viagemNova] });
+    definirViagemSelecionadaUuid(viagemNova.uuid);
+    return true;
   }
 
-  function aoConfirmarPartida(viagemUuid: string, horaMinuto: string) {
-    if (!itinerarioAtual || horaMinuto === "") return;
+  function aoConfirmarPartida(viagemUuid: string, horaMinuto: string): boolean {
+    if (!itinerarioAtual || horaMinuto === "") return false;
     const viagemOriginal = itinerarioAtual.viagens.find((v) => v.uuid === viagemUuid);
-    if (!viagemOriginal) return;
+    if (!viagemOriginal) return false;
     const viagemAtualizada = atualizarHorarioSaida(viagemOriginal, horaMinuto);
-    if (!viagemAtualizada) return;
+    if (!viagemAtualizada) return false;
     aplicar({
       ...itinerarioAtual,
       viagens: itinerarioAtual.viagens.map((v) => (v.uuid === viagemUuid ? viagemAtualizada : v)),
     });
+    return true;
   }
 
-  function aoEditarPassante(viagemUuid: string, paradaOrdem: number, horaMinuto: string) {
-    if (!itinerarioAtual || horaMinuto === "") return;
+  function aoEditarPassante(
+    viagemUuid: string,
+    paradaOrdem: number,
+    horaMinuto: string,
+  ): boolean {
+    if (!itinerarioAtual || horaMinuto === "") return false;
     const viagem = itinerarioAtual.viagens.find((v) => v.uuid === viagemUuid);
-    if (!viagem) return;
+    if (!viagem) return false;
 
     const resultado = editarHorarioPassante(
       viagem,
@@ -168,7 +183,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
           [chave]: "Horário fora de ordem: deve ficar entre a parada anterior e a próxima já fixadas.",
         }));
       }
-      return;
+      return false;
     }
 
     definirErrosCelula((atuais) => {
@@ -183,6 +198,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
       },
       { ...ancoras, [viagemUuid]: resultado.ancoras },
     );
+    return true;
   }
 
   function aoResetarViagem(viagemUuid: string) {
@@ -235,6 +251,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
       typeof window === "undefined" || window.confirm("Apagar esta viagem?");
     if (!confirmado) return;
     limparEstadoDeSessao([viagemUuid]);
+    if (viagemSelecionadaUuid === viagemUuid) definirViagemSelecionadaUuid(null);
     aplicar(apagarViagem(itinerarioAtual, viagemUuid), ancorasSem([viagemUuid]));
   }
 
@@ -249,6 +266,9 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
       .filter((v) => !itinerarioNovo.viagens.some((n) => n.uuid === v.uuid))
       .map((v) => v.uuid);
     limparEstadoDeSessao(removidos);
+    if (viagemSelecionadaUuid && removidos.includes(viagemSelecionadaUuid)) {
+      definirViagemSelecionadaUuid(null);
+    }
     aplicar(itinerarioNovo, ancorasSem(removidos));
   }
 
@@ -293,9 +313,29 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   const blocosFeriados = itinerarioAtual ? montarBlocosFeriados(itinerarioAtual.viagens) : [];
   const temFeriado = itinerarioAtual?.viagens.some((v) => v.viagem_feriado) ?? false;
 
+  function navegarNaGrade(
+    grade: "comuns" | "feriados",
+    origem: CoordenadaCelulaGrade,
+    tecla: TeclaNavegacaoGrade,
+  ): boolean {
+    const destino = destinoNavegacaoGrade(origem, tecla, secoesDaGrade.length);
+    if (!destino) return false;
+    const seletor =
+      `input[data-grade="${grade}"]` +
+      `[data-bloco="${destino.indiceBloco}"]` +
+      `[data-secao-index="${destino.indiceSecao}"]` +
+      `[data-dia="${destino.dia}"]`;
+    const alvo = raizEtapaRef.current?.querySelector<HTMLInputElement>(seletor);
+    if (!alvo) return false;
+    alvo.focus();
+    alvo.select();
+    return true;
+  }
+
   // Corpo de uma grade (dias comuns ou feriados). `feriado` propaga para a
   // criação de Viagem (grade correta) e para apagar bloco.
   function corpoGrade(blocos: BlocoGrade[], feriado: boolean) {
+    const grade = feriado ? "feriados" : "comuns";
     return blocos.map((bloco, indiceBloco) => {
       const blocoTemViagem = DIAS_SEMANA.some((dia) => bloco[dia].estado === "existente");
       return secoesDaGrade.map((parada, indiceSecao) => {
@@ -303,8 +343,12 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
         const nomeSecao = secao ? nomeExibicaoSecao(secao) : "";
         const ehPrimeiraSecao = indiceSecao === 0;
         return (
-          <tr key={`${indiceBloco}-${parada.ordem}`} data-testid="linha-grade">
-            <th scope="row">
+          <tr
+            key={`${indiceBloco}-${parada.ordem}`}
+            data-testid="linha-grade"
+            className={indiceSecao === 0 && indiceBloco > 0 ? "border-t-2 border-cinza-400" : ""}
+          >
+            <th scope="row" className="whitespace-nowrap font-semibold">
               {nomeSecao}
               {ehPrimeiraSecao && blocoTemViagem && (
                 <Botao
@@ -324,58 +368,97 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                 const horarioHms = horarioAbsolutoNaParada(celula.viagem, parada.ordem);
                 const horarioMostrar = horarioHms ? horarioParaHoraMinuto(horarioHms) : "";
 
+                const selecionada = viagemSelecionadaUuid === celula.viagem.uuid;
+                const classesCelula = [
+                  "relative",
+                  selecionada ? "bg-azul-100 ring-2 ring-inset ring-azul-600" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ");
+                const atributosNavegacao = {
+                  "data-grade": grade,
+                  "data-bloco": indiceBloco,
+                  "data-secao-index": indiceSecao,
+                  "data-dia": dia,
+                };
+                const navegar = (tecla: TeclaNavegacaoGrade) =>
+                  navegarNaGrade(
+                    grade,
+                    { indiceBloco, indiceSecao, dia },
+                    tecla,
+                  );
+
                 if (ehPrimeiraSecao) {
                   const viagemUuid = celula.viagem.uuid;
                   return (
-                    <td key={dia} data-testid="celula-partida">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Campo
-                          type="time"
-                          aria-label={`Horário de partida — ${dia}, viagem ${indiceBloco + 1}`}
-                          value={horarioMostrar}
-                          onChange={(evento) => aoConfirmarPartida(viagemUuid, evento.target.value)}
+                    <td
+                      key={dia}
+                      data-testid="celula-partida"
+                      data-viagem-uuid={viagemUuid}
+                      data-selecionada={selecionada ? "true" : undefined}
+                      className={`group ${classesCelula}`}
+                      onClick={() => definirViagemSelecionadaUuid(viagemUuid)}
+                    >
+                      <div className="relative">
+                        <CampoHorarioGrade
+                          key={`${viagemUuid}-${horarioMostrar}`}
+                          rotuloAcessivel={`Horário de partida — ${dia}, viagem ${indiceBloco + 1}`}
+                          valor={horarioMostrar}
+                          aoConfirmar={(valor) => aoConfirmarPartida(viagemUuid, valor)}
+                          aoNavegar={navegar}
+                          atributosNavegacao={atributosNavegacao}
+                          aoSelecionar={() => definirViagemSelecionadaUuid(viagemUuid)}
                         />
-                        <Botao
-                          variante="secundario"
-                          data-testid="restaurar-viagem"
-                          aria-label={`Restaurar sugestão — ${dia}, viagem ${indiceBloco + 1}`}
-                          onClick={() => aoResetarViagem(viagemUuid)}
+                        <div
+                          data-testid="acoes-viagem"
+                          className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 flex -translate-x-1/2 items-center gap-1 rounded-controle border border-cinza-200 bg-white p-1 opacity-0 shadow-sombra-3 [transition:opacity_var(--transicao-rapida)] group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100"
                         >
-                          Restaurar
-                        </Botao>
-                        <Botao
-                          variante="perigo"
-                          data-testid="apagar-viagem"
-                          aria-label={`Apagar viagem — ${dia}, viagem ${indiceBloco + 1}`}
-                          onClick={() => aoApagarViagem(viagemUuid)}
-                        >
-                          Apagar
-                        </Botao>
-                        <Select
-                          data-testid="select-copia-dia"
-                          aria-label={`Copiar para o dia — ${dia}, viagem ${indiceBloco + 1}`}
-                          value={diaCopiaPorViagem[viagemUuid] ?? celula.viagem.dia_semana}
-                          onChange={(evento) =>
-                            definirDiaCopiaPorViagem((atuais) => ({
-                              ...atuais,
-                              [viagemUuid]: evento.target.value as DiaSemana,
-                            }))
-                          }
-                        >
-                          {DIAS_SEMANA.map((d) => (
-                            <option key={d} value={d}>
-                              {ROTULO_DIA[d]}
-                            </option>
-                          ))}
-                        </Select>
-                        <Botao
-                          variante="secundario"
-                          data-testid="copiar-viagem"
-                          aria-label={`Copiar viagem para outro dia — ${dia}, viagem ${indiceBloco + 1}`}
-                          onClick={() => aoCopiarViagem(viagemUuid)}
-                        >
-                          Copiar
-                        </Botao>
+                          <Botao
+                            variante="fantasma"
+                            tamanho="compacto"
+                            data-testid="restaurar-viagem"
+                            aria-label={`Restaurar sugestão — ${dia}, viagem ${indiceBloco + 1}`}
+                            onClick={() => aoResetarViagem(viagemUuid)}
+                          >
+                            Restaurar
+                          </Botao>
+                          <Select
+                            densidade="compacta"
+                            data-testid="select-copia-dia"
+                            aria-label={`Copiar para o dia — ${dia}, viagem ${indiceBloco + 1}`}
+                            value={diaCopiaPorViagem[viagemUuid] ?? celula.viagem.dia_semana}
+                            onChange={(evento) =>
+                              definirDiaCopiaPorViagem((atuais) => ({
+                                ...atuais,
+                                [viagemUuid]: evento.target.value as DiaSemana,
+                              }))
+                            }
+                          >
+                            {DIAS_SEMANA.map((d) => (
+                              <option key={d} value={d}>
+                                {ROTULO_DIA[d]}
+                              </option>
+                            ))}
+                          </Select>
+                          <Botao
+                            variante="fantasma"
+                            tamanho="compacto"
+                            data-testid="copiar-viagem"
+                            aria-label={`Copiar viagem para outro dia — ${dia}, viagem ${indiceBloco + 1}`}
+                            onClick={() => aoCopiarViagem(viagemUuid)}
+                          >
+                            Copiar
+                          </Botao>
+                          <Botao
+                            variante="perigo"
+                            tamanho="compacto"
+                            data-testid="apagar-viagem"
+                            aria-label={`Apagar viagem — ${dia}, viagem ${indiceBloco + 1}`}
+                            onClick={() => aoApagarViagem(viagemUuid)}
+                          >
+                            X
+                          </Botao>
+                        </div>
                       </div>
                     </td>
                   );
@@ -383,15 +466,25 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                 const chave = chaveCelula(celula.viagem.uuid, parada.ordem);
                 const erro = errosCelula[chave];
                 return (
-                  <td key={dia} data-testid="celula-passante">
-                    <Campo
-                      type="time"
-                      aria-label={`Horário de passagem — ${nomeSecao}, ${dia}, viagem ${indiceBloco + 1}`}
-                      aria-invalid={erro ? true : undefined}
-                      value={horarioMostrar}
-                      onChange={(evento) =>
-                        aoEditarPassante(celula.viagem.uuid, parada.ordem, evento.target.value)
+                  <td
+                    key={dia}
+                    data-testid="celula-passante"
+                    data-viagem-uuid={celula.viagem.uuid}
+                    data-selecionada={selecionada ? "true" : undefined}
+                    className={classesCelula}
+                    onClick={() => definirViagemSelecionadaUuid(celula.viagem.uuid)}
+                  >
+                    <CampoHorarioGrade
+                      key={`${celula.viagem.uuid}-${parada.ordem}-${horarioMostrar}`}
+                      rotuloAcessivel={`Horário de passagem — ${nomeSecao}, ${dia}, viagem ${indiceBloco + 1}`}
+                      valor={horarioMostrar}
+                      erro={erro}
+                      aoConfirmar={(valor) =>
+                        aoEditarPassante(celula.viagem.uuid, parada.ordem, valor)
                       }
+                      aoNavegar={navegar}
+                      atributosNavegacao={atributosNavegacao}
+                      aoSelecionar={() => definirViagemSelecionadaUuid(celula.viagem.uuid)}
                     />
                     {erro && (
                       <span role="alert" data-testid="erro-passante" className="text-xs text-erro">
@@ -403,13 +496,26 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
               }
 
               if (celula.estado === "criavel" && ehPrimeiraSecao) {
+                const atributosNavegacao = {
+                  "data-grade": grade,
+                  "data-bloco": indiceBloco,
+                  "data-secao-index": indiceSecao,
+                  "data-dia": dia,
+                };
                 return (
                   <td key={dia} data-testid="celula-criavel">
-                    <Campo
-                      type="time"
-                      aria-label={`Criar viagem — ${dia}`}
-                      value=""
-                      onChange={(evento) => aoConfirmarCriacao(dia, evento.target.value, feriado)}
+                    <CampoHorarioGrade
+                      rotuloAcessivel={`Criar viagem — ${dia}`}
+                      valor=""
+                      aoConfirmar={(valor) => aoConfirmarCriacao(dia, valor, feriado)}
+                      aoNavegar={(tecla) =>
+                        navegarNaGrade(
+                          grade,
+                          { indiceBloco, indiceSecao, dia },
+                          tecla,
+                        )
+                      }
+                      atributosNavegacao={atributosNavegacao}
                     />
                   </td>
                 );
@@ -443,7 +549,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   }
 
   return (
-    <div data-testid="etapa-viagens">
+    <div ref={raizEtapaRef} data-testid="etapa-viagens">
       <div className="flex flex-wrap gap-4">
         <Select
           rotulo="Serviço"
@@ -452,6 +558,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
           onChange={(evento) => {
             definirServicoSelecionadoUuid(evento.target.value || null);
             definirSentidoSelecionado(null);
+            definirViagemSelecionadaUuid(null);
           }}
         >
           <option value="">— selecione —</option>
@@ -468,9 +575,12 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
             data-testid="select-sentido-viagens"
             value={sentidoSelecionado ?? ""}
             onChange={(evento) =>
-              definirSentidoSelecionado(
-                (evento.target.value || null) as Itinerario["sentido"] | null,
-              )
+              {
+                definirSentidoSelecionado(
+                  (evento.target.value || null) as Itinerario["sentido"] | null,
+                );
+                definirViagemSelecionadaUuid(null);
+              }
             }
           >
             <option value="">— selecione —</option>
@@ -495,7 +605,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
             >
               Restaurar sugestão (toda a grade)
             </Botao>
-            <Tabela className="mt-2">
+            <Tabela densidade="compacta" className="mt-2">
               {cabecalhoGrade()}
               <tbody>{corpoGrade(blocosComuns, false)}</tbody>
             </Tabela>
@@ -535,7 +645,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                 </Botao>
               )}
             </div>
-            <Tabela className="mt-2">
+            <Tabela densidade="compacta" className="mt-2">
               {cabecalhoGrade()}
               <tbody>{corpoGrade(blocosFeriados, true)}</tbody>
             </Tabela>

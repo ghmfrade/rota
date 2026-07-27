@@ -4,9 +4,11 @@ export {
   horaMinutoParaHorarioRelogio,
   horarioParaHoraMinuto,
   horarioParaSegundos,
+  normalizarEntradaHoraMinuto,
   somarHorarios,
 } from "./horario-relogio";
 export {
+  destinoNavegacaoGrade,
   linhasSecoes,
   montarBlocosDiasComuns,
   montarBlocosFeriados,
@@ -14,6 +16,8 @@ export {
   type DiaSemana,
   type EstadoCelulaGrade,
   type BlocoGrade,
+  type CoordenadaCelulaGrade,
+  type TeclaNavegacaoGrade,
 } from "./montagem-grade";
 export {
   copiarViagemParaDias,
@@ -36,3 +40,4 @@ export {
   offsetForaDeOrdem,
 } from "./redistribuicao-offsets";
 export { EtapaViagens } from "./etapa-viagens";
+export { CampoHorarioGrade } from "./campo-horario-grade";
