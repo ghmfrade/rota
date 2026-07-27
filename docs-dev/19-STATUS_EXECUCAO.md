@@ -1,6 +1,14 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-07-27 (branch `redesign`) — **redesign da
+**Atualização mais recente:** 2026-07-27 (branch `redesign`) — **TASK-102
+concluída e aprovada**. A implementação `8057b2f` elevou o contrato executável
+para `"1.1"` com `servico.tabelas_excepcionais[]`,
+`viagem.tabela_excepcional_uuid`, defaults compatíveis com documentos `"1.0"`,
+validações de RN-098/RN-099 e round-trip de UUID. Parecer aprovado em
+`14-REVISOES/TASK-102-20260727.md`; suíte canônica verde (1.251 unitários + 73
+E2E; fingerprint `a71219d2…`; identidade `498d7fa6…`). A fundação desbloqueia
+TASK-103/104; TASK-105 continua dependendo também da TASK-104. Pendentes:
+19 → 18. Antes nesta data — **redesign da
 grade de horários (proposta do responsável)**: criadas **TASK-106..112** (Grupo H
 da §5) e **Q-060..Q-065** (`docs-dev/16`). A TASK-106 (fundação visual/interativa
 da grade) é **spec-backed** (Spec 04 §8.1/§8.2/§8.3 + design system DEC-050) e roda
@@ -72,7 +80,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 
 ## 3. Tasks executadas
 
-81 tasks concluídas. Agrupadas pela fase do backlog.
+82 tasks concluídas. Agrupadas pela fase do backlog.
 
 ### Fases 1–3 — Fundação, contrato JSON e validações de domínio
 
@@ -81,6 +89,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 001 | Bootstrap do projeto Next.js |
 | 002 | Recursos estáticos: listas e base de municípios |
 | 003 | Schema base do JSON de operação |
+| 102 | Contrato v1.1: TabelasExcepcionais + referência excepcional na Viagem (RN-098/RN-099) |
 | 004 | Validador XOR de Parada e extremos-Seção — ⚠️ ver §4 |
 | 005 | Factory de entidades com UUID |
 | 006 | Importação de JSON com preservação de UUID |
@@ -210,7 +219,10 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 ## 5. Tasks a executar — ordem recomendada
 
-**Estado atual: 19 tasks pendentes.** Em 2026-07-27, após a TASK-101 sair da
+**Estado atual: 18 tasks pendentes.** Em 2026-07-27, a TASK-102 saiu da lista:
+implementada em `8057b2f` e aprovada em
+`14-REVISOES/TASK-102-20260727.md`; o Grupo G passa de 4 para 3 pendentes e a
+fundação de contrato de 103/104 fica cumprida. Antes disso, após a TASK-101 sair da
 lista (reavaliação aprovada em `14-REVISOES/TASK-101-20260727-reavaliacao.md`,
 8 pendentes), foram **criadas 4 tasks** da operação excepcional (DEC-081/Q-059):
 **TASK-102..105** (Grupo G abaixo), levando o total a **12**; em seguida, o
@@ -287,14 +299,13 @@ Independentes do ramo do mapa: nada aqui bloqueia ou é bloqueado por ele.
 
 ### Grupo G — Operação excepcional (DEC-081 / Q-059)
 
-Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Serviço — férias de verão/inverno/personalizado, categoria **textual**, sem datas). Specs 02/03/04/05 já atualizadas (contrato v1.1); RN-098/RN-099 criadas, RN-061/062/068/069 ajustadas. Ordem recomendada abaixo — caminho crítico **102 → 104 → 105**, com **103** logo após 102.
+Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Serviço — férias de verão/inverno/personalizado, categoria **textual**, sem datas). Specs 02/03/04/05 já atualizadas (contrato v1.1); RN-098/RN-099 criadas, RN-061/062/068/069 ajustadas. A **TASK-102 foi concluída e aprovada** em 2026-07-27; ordem pendente recomendada: **104 → 105**, com **103** já desbloqueada e executável em paralelo antes da 105.
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 1 | **102** — Contrato: `tabelas_excepcionais[]` + `tabela_excepcional_uuid` (schema v1.1 + validações + migração) | **3** | **Fundação — roda primeiro.** Nada toca a grade excepcional antes do schema. Cross-field invariant (feriado×excepcional) + back-compat `"1.0"`. Depende de TASK-003 (concluída). |
-| 2 | **103** — Contagens excluem a operação excepcional da semana padrão | **2** | Modifica o módulo da TASK-031 (concluída); fórmula + rótulo. Depois de 102. |
-| 3 | **104** — Formulário: CRUD + filtro das tabelas excepcionais por Serviço | **3** | Depois de 102. **Atenção:** remoção de tabela com Viagens associadas pode virar Q-xxx na `/analisar-task` (Spec 04 §8.5 não fixa). |
-| 4 | **105** — Formulário: grade excepcional + "copiar dias comuns" | **3** | Depois de 102 e 104; reusa as grades da TASK-028/030 (concluídas). |
+| 1 | **103** — Contagens excluem a operação excepcional da semana padrão | **2** | Modifica o módulo da TASK-031 (concluída); fórmula + rótulo. Dependência 102 cumprida. |
+| 2 | **104** — Formulário: CRUD + filtro das tabelas excepcionais por Serviço | **3** | Dependência 102 cumprida. **Atenção:** remoção de tabela com Viagens associadas pode virar Q-xxx na `/analisar-task` (Spec 04 §8.5 não fixa). |
+| 3 | **105** — Formulário: grade excepcional + "copiar dias comuns" | **3** | Depois de 104; dependência 102 cumprida; reusa as grades da TASK-028/030 (concluídas). |
 
 **Superfícies pendentes alteradas pela DEC-081 (não viram task nova — anotadas no backlog):** **TASK-034** (PDF: tabelas excepcionais + rótulo), **TASK-033** (rótulo/`versao_schema`), **TASK-036** (diff: casar tabela por `uuid` + mudança de grade), **TASK-037** (telas: grades excepcionais separadas + rótulo), **TASK-039** (PDF comparativo). Cobertas ao construí-las, lendo as specs já atualizadas — evita task paralela sobre superfície não construída (lição §6.2). Nenhuma task pendente foi **anulada**.
 
