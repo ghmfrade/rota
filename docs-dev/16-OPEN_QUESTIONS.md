@@ -626,13 +626,13 @@ o gesto destrutivo agrupa partidas sem vínculo operacional real. Permanecem
 distintos e úteis: o "X" que apaga **uma Viagem** e a operação de apagar **um dia
 inteiro** da TASK-110/DEC-085.
 
-**Spec relacionada:** Spec 04 §8.1 (bloco = posição ordinal) e §8.3 (manda
-disponibilizar apagar o bloco inteiro); RN-061 (cada célula preenchida é uma
-Viagem independente por dia). Não há entidade `Bloco` no contrato da Spec 02.
+**Spec relacionada:** Spec 04 §8.1 (bloco = posição ordinal) e §8.3 (na redação
+anterior, mandava disponibilizar apagar o bloco inteiro; o responsável já
+alinhou a seção à opção A); RN-061 (cada célula preenchida é uma Viagem
+independente por dia). Não há entidade `Bloco` no contrato da Spec 02.
 
-**Conflito:** **real entre a spec vigente e a nova orientação do responsável**.
-A implementação não pode remover o botão enquanto a Spec 04 §8.3 continuar
-exigindo-o, pois `docs/specs/**` prevalece sobre derivados, task e código.
+**Conflito:** era **real entre a redação anterior da spec e a nova orientação do
+responsável**. Foi resolvido pelo alinhamento da Spec 04 §8.3 e pela DEC-088.
 
 **Impacto se não decidir:** a TASK-106 permanece sem reavaliação final: manter o
 botão contraria a UX determinada nesta revisão; removê-lo antes de alinhar a spec
@@ -654,5 +654,8 @@ TASK-106, não devem avançar sobre uma superfície reprovada.
 dados pelo responsável. Não altera o JSON, o Comparador, o PDF nem as contagens;
 altera a Spec 04 §8.3, a superfície da TASK-106 e seus testes.
 
-**Decisão:** Pendente. Para registrar a DEC correspondente, o responsável deve
-confirmar explicitamente: **"Q-066, opção A"** (ou outra opção).
+**Decisão:** **Decidida (DEC-088, 2026-07-27).** Opção A, por decisão explícita
+do responsável pelo domínio: retirar "Apagar bloco inteiro"; manter o bloco
+apenas como alinhamento visual e preservar as ações de apagar uma Viagem e de
+apagar um dia inteiro. A Spec 04 §8.3 já foi alinhada pelo responsável. Ver
+DEC-088.

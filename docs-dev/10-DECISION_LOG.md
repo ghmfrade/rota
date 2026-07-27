@@ -725,7 +725,11 @@ Depois das specs aplicadas, a funcionalidade deve ser quebrada em tasks via `/no
 
 ## DEC-085 — Operações de dia inteiro na grade: copiar um dia para vários dias e apagar as Viagens de um dia
 
-**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, **Q-063** (dada nesta conversa, 2026-07-27); Spec 04 §8.3; Spec 02 §12 · **Data:** 2026-07-27
+**Status:** Aceita · **Superada em parte pela DEC-088:** permanecem as operações
+de dia inteiro; deixam de valer apenas as referências à disponibilidade de
+"apagar bloco inteiro" como ação da grade · **Origem:** decisão do responsável
+pelo domínio, **Q-063** (dada nesta conversa, 2026-07-27); Spec 04 §8.3; Spec 02
+§12 · **Data:** 2026-07-27
 **Decisão:** Duas operações de **coluna** (dia inteiro), além das de Viagem/bloco já previstas no §8.3:
 - **Copiar um dia para vários dias** (diálogo de multisseleção de dias): replica **todas as Viagens do dia-origem** nos dias destino (UUIDs novas). Quando o destino já tem Viagens, o comportamento é **mesclar com a guarda de duplicidade da DEC-084** — acrescenta as Viagens do origem e **pula, com aviso, as que já existirem iguais** (mesmo `horario_saida` na mesma grade).
 - **Apagar as Viagens do dia inteiro** (variante do "X"): limpa a coluna daquele dia **sob confirmação OK/Cancelar** (destrutivo, como o "apagar bloco inteiro" do §8.3).
@@ -761,3 +765,40 @@ Depois das specs aplicadas, a funcionalidade deve ser quebrada em tasks via `/no
 **Desbloqueia a TASK-112** (origem estendida) **após** a alteração de spec; **revisa a TASK-105** — a mescla base ganha a semântica de sincronização (a TASK-105 deixa de ser puramente "UUIDs novas"; ganha nota no `06-BACKLOG_INICIAL.md` e passa a depender da mesma alteração de spec).
 **Edge a resolver na `/analisar-task` (RN-062):** como a RN-062 permite **duas** Viagens com o mesmo `(dia_semana, horario_saida)`, o casamento "por `horario_saida`" **não é unívoco** quando há duplicatas. A conciliação por multiconjunto/contagem (quantas casam, quais preservam UUID) deve ser fixada na análise da TASK-105/112; se a spec/decisão não bastar, **abrir Q-xxx antes de implementar** (não decidir por conta própria — `docs-dev/04` princípio 2).
 **Impacto em implementação:** **RN:** **RN-007** (carve-out — ver acima), **RN-099** (normalização preserva o invariante), **RN-004** (identidade preservada no caminho de mescla), **RN-062** (edge do casamento — ver acima). **Módulos:** `src/formulario/viagens/copias-grade.ts` (motor de sincronização), componentes da grade (TASK-105/112). **Depende de:** alteração da Spec 04 §8.4/§8.5; TASK-102/104 (contrato/entidade), TASK-105 (base). **Sequenciamento:** aplicar a spec → revisar/implementar TASK-105 → TASK-112.
+
+## DEC-088 — Ação "Apagar bloco inteiro" é retirada da grade; bloco permanece apenas como alinhamento visual
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, opção A da
+**Q-066**; Spec 04 §8.1/§8.3 já alinhada pelo responsável · **Data:** 2026-07-27
+
+**Decisão:** A grade de horários **não oferece** ação para apagar o bloco inteiro
+(a n-ésima posição ordinal em todos os dias). O bloco continua existindo somente
+como **alinhamento visual por posição** e como suporte à inserção/ordenação da
+grade; não é entidade nem unidade de operação. Permanecem disponíveis e
+distintas:
+
+- apagar **uma Viagem** de um dia;
+- apagar **as Viagens de um dia inteiro**, operação de coluna da
+  TASK-110/DEC-085.
+
+**Motivo:** um mesmo bloco pode alinhar Viagens com horários diferentes em cada
+dia, sem vínculo operacional entre elas. Apagá-las em conjunto por ocuparem a
+mesma posição visual seria um gesto destrutivo sobre partidas independentes,
+contrário à semântica da RN-061.
+
+**Consequências:** resolve a **Q-066** pela opção A. A Spec 04 §8.3 já foi
+atualizada pelo responsável e agora declara expressamente que "Apagar bloco
+inteiro" não fica disponível. Supera apenas as referências à ação de bloco na
+DEC-085; copiar/apagar um dia inteiro permanece integralmente válido. Elimina a
+pendência documental dessa parte da correção da **TASK-106**, mas **não aprova**
+a entrega `c2db60a`: seleção contínua, Enter entre Viagens e Tab vazio→vazio
+continuam exigindo correção e nova revisão. As TASK-107..111 continuam
+dependentes de uma TASK-106 aprovada.
+
+**Impacto em implementação:** nenhuma mudança de contrato JSON, Comparador, PDF,
+contagens ou texto de RN. A **RN-061** fundamenta a independência das Viagens,
+sem precisar de alteração. Na correção da TASK-106, remover o botão, confirmação
+e handler de `apagarBloco` em `src/formulario/viagens/etapa-viagens.tsx`, o motor
+e export correspondente em `copias-grade.ts`/`index.ts` e seus testes exclusivos
+em `testes/unitarios/formulario/viagens-copias-grade.test.ts`; preservar
+`apagarViagem` e o escopo futuro da TASK-110.

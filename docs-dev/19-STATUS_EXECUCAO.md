@@ -10,10 +10,11 @@ Viagem de baixo até a célula criável; e o Tab iniciado num campo vazio é blo
 antes da navegação. Os testes atuais codificam os dois primeiros comportamentos
 incorretos e não cobrem `vazio → Tab → vazio`. A suíte canônica segue verde
 (1.279 unitários + 75 E2E; fingerprint `dd7eb28d…`; identidade
-`498d7fa6…`), mas não prova esses critérios. A remoção solicitada de **"Apagar
-bloco"** conflita com a Spec 04 §8.3 e virou a **Q-066 pendente**; nenhuma spec
-foi alterada. A TASK-106 permanece no Grupo H e as TASK-107..111 continuam sem
-avanço até a correção e nova revisão; o total segue em 17 pendentes. Antes nesta
+`498d7fa6…`), mas não prova esses critérios. A remoção de **"Apagar bloco"**
+foi decidida pela **Q-066/DEC-088** e a Spec 04 §8.3 já foi alinhada pelo
+responsável: o bloco permanece só como alinhamento visual. A TASK-106 permanece
+no Grupo H e as TASK-107..111 continuam sem avanço até a correção e nova revisão;
+o total segue em 17 pendentes. Antes nesta
 data — **TASK-103 concluída e aprovada**. A implementação `99a64c5` restringe a semana padrão às
 Viagens comuns (`viagem_feriado = false` e `tabela_excepcional_uuid = null`) e
 centraliza o rótulo “sem feriados nem operação excepcional”; fórmula, invariância
@@ -242,8 +243,9 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 **Estado atual: 17 tasks pendentes.** Em 2026-07-27, a TASK-106 foi implementada
 em `c2db60a`, mas a revisão de aderência a **reprovou**; por isso continua nesta
-lista e não altera a contagem. A correção pertence à própria 106, com Q-066
-pendente para a remoção de "Apagar bloco". Antes disso, a TASK-103 saiu da lista:
+lista e não altera a contagem. A correção pertence à própria 106; a
+Q-066/**DEC-088** já decidiu retirar "Apagar bloco" e a spec está alinhada.
+Antes disso, a TASK-103 saiu da lista:
 implementada em `99a64c5` e aprovada em
 `14-REVISOES/TASK-103-20260727.md`; o Grupo G passa de 3 para 2 pendentes, sem
 alterar a ordem `104 → 105`. Antes disso, a TASK-102 saiu da lista:
@@ -337,11 +339,11 @@ Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Servi
 
 ### Grupo H — Redesign da grade de horários (proposta 2026-07-27)
 
-Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). A **TASK-106** é a fundação (spec-backed: Spec 04 §8.1/§8.2/§8.3 + design system DEC-050). As Q-060..065 foram **decididas no mesmo dia** (DEC-082..087) e a Spec 04 §8.4/§8.5 exigida pela DEC-087 foi aplicada + carve-out da RN-007 registrada. A entrega `c2db60a` da 106 foi **reprovada** em `14-REVISOES/TASK-106-20260727.md`: seleção, Enter e Tab precisam de correção na própria task; a retirada de "Apagar bloco" depende da **Q-066** e do alinhamento da Spec 04 §8.3. As TASK-107..111 permanecem bloqueadas pela fundação ainda não aprovada. A TASK-112 não depende da 106; continua condicionada ao motor da TASK-105. Botões de ação da Viagem surgem **no hover** (não na seleção — dobrado na TASK-106).
+Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). A **TASK-106** é a fundação (spec-backed: Spec 04 §8.1/§8.2/§8.3 + design system DEC-050). As Q-060..065 foram **decididas no mesmo dia** (DEC-082..087) e a Spec 04 §8.4/§8.5 exigida pela DEC-087 foi aplicada + carve-out da RN-007 registrada. A entrega `c2db60a` da 106 foi **reprovada** em `14-REVISOES/TASK-106-20260727.md`: seleção, Enter e Tab precisam de correção na própria task. A **Q-066/DEC-088** decidiu retirar "Apagar bloco" e a Spec 04 §8.3 já foi alinhada; essa retirada integra a correção sem bloqueio documental. As TASK-107..111 permanecem bloqueadas pela fundação ainda não aprovada. A TASK-112 não depende da 106; continua condicionada ao motor da TASK-105. Botões de ação da Viagem surgem **no hover** (não na seleção — dobrado na TASK-106).
 
 | # | Task | Complex. | Estado | Observação |
 |:---:|---|:---:|---|---|
-| 1 | **106** — Redesign da grade: layout tabular compacto, ordenação temporal, seleção + hover + navegação por teclado (Tab/Enter), sem ícone de relógio | **4** | **Implementada; revisão reprovada** | Corrigir seleção contínua, Enter entre Viagens e Tab vazio→vazio. Q-066 pendente para retirar "Apagar bloco"; reavaliar antes de avançar. |
+| 1 | **106** — Redesign da grade: layout tabular compacto, ordenação temporal, seleção + hover + navegação por teclado (Tab/Enter), sem ícone de relógio | **4** | **Implementada; revisão reprovada** | Corrigir seleção contínua, Enter entre Viagens e Tab vazio→vazio; retirar "Apagar bloco" conforme DEC-088/Spec 04 §8.3. Reavaliar antes de avançar. |
 | 2 | **107** — Inserção de Viagem por offset relativo (±X min) | **2** | **Bloqueada pela TASK-106** (DEC-082 decidida) | Depois da correção/revisão da 106. Herda offsets; só o dia; default 10 min. |
 | 3 | **108** — Cópia por headway até horário-limite (lote) | **3** | **Bloqueada pela TASK-106** (DEC-083 decidida) | Depois da correção/revisão da 106. Limite inclusivo; para antes das 24h. |
 | 4 | **109** — Cópia p/ dia adjacente (setas ←/→) + guarda de duplicidade | **2** | **Bloqueada pela TASK-106** (DEC-084 decidida) | Depois da correção/revisão da 106. Guarda só no gesto (RN-062 intacta). |

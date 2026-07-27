@@ -5293,8 +5293,8 @@ Seções de cima para baixo e, depois da última Seção, segue para a primeira 
 da Viagem de baixo, inclusive até a célula vazia que cria a próxima Viagem. O Tab
 avança para o mesmo nível no dia seguinte mesmo quando o campo de origem ou de
 destino está vazio (`vazio → Tab → vazio`). Esses três pontos apenas esclarecem
-critérios já pertencentes à TASK-106. A remoção de **"Apagar bloco"** depende da
-Q-066, pois contraria a ação ainda exigida literalmente pela Spec 04 §8.3.
+critérios já pertencentes à TASK-106. A remoção de **"Apagar bloco"** foi
+decidida pela Q-066/**DEC-088**; a Spec 04 §8.3 já foi alinhada pelo responsável.
 
 ## Fora de escopo
 
@@ -5363,11 +5363,11 @@ Q-066, pois contraria a ação ainda exigida literalmente pela Spec 04 §8.3.
 ## Dependências
 
 - Reusa TASK-028/029/030 (concluídas). Recomendada **antes** de TASK-104/105. Pré-requisito visual das TASK-107..111.
-- A correção de seleção/Enter/Tab não depende de Q. A retirada de "Apagar bloco" e a reavaliação final dependem da Q-066 e do alinhamento da Spec 04 §8.3 pelo responsável pelas specs.
+- A correção de seleção/Enter/Tab não depende de Q. A retirada de "Apagar bloco" foi decidida pela **DEC-088** e a Spec 04 §8.3 já está alinhada; não resta bloqueio documental para incluí-la na correção.
 
 ## Perguntas em aberto
 
-- **Q-066 pendente:** retirar a ação "Apagar bloco inteiro", hoje exigida pela Spec 04 §8.3. As variantes novas de gesto continuam nas TASK-107..112 (Q-060..Q-065).
+- Nenhuma. A **Q-066 foi decidida pela DEC-088** (retirar "Apagar bloco inteiro") e a Spec 04 §8.3 já foi alinhada. As variantes novas de gesto continuam nas TASK-107..112 (Q-060..Q-065, já decididas).
 
 ---
 
