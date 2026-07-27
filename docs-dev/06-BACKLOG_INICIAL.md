@@ -4872,6 +4872,106 @@ Pedido novo do responsável (2026-07-24), decidido pela **DEC-080** (Q-058): dep
 
 - Nenhuma (Q-058 decidida pela DEC-080).
 
+## TASK-101 — Duplicar Serviço: o novo Serviço contribui suas próprias geolocalizações às Seções compartilhadas (marcadores no mapa + documento válido)
+
+## Objetivo
+
+Ao duplicar um Serviço, cada Seção compartilhada que o novo Serviço usa (via `parada.secao_uuid` preservada) passa a ter uma **entrada própria** em `secao.servicos[]` para o `uuid` do Serviço copiado, com `geolocalizacao_ida`/`geolocalizacao_volta` copiadas da entrada do Serviço original. Com isso as Seções do Serviço duplicado voltam a aparecer no mapa e o documento resultante volta a ser estruturalmente válido — sem exigir apagar e reinserir a Seção manualmente.
+
+## Contexto
+
+Bug relatado manualmente pelo responsável (2026-07-27): ao duplicar um Serviço, as Seções duplicadas **não aparecem no mapa**, embora apareçam na tabela lateral, nos horários e nas matrizes; a única forma de corrigir hoje é apagar as Seções do Serviço duplicado e reinseri-las.
+
+Causa-raiz confirmada em diagnóstico. O mapa desenha o marcador de uma Seção procurando, dentro da própria Seção, a entrada do Serviço corrente: `secao.servicos.find((s) => s.servico_uuid === servicoUuid)` (`src/formulario/itinerarios/editor-mapa-itinerario.tsx:152-156`) — sem entrada para aquele `servico_uuid`, não há ponto e nada é desenhado. A duplicação (`src/formulario/servicos/duplicar.ts`) cunha um `uuid` novo para o Serviço e **preserva** `parada.secao_uuid` (Seção é compartilhada — RN-025), mas **não** acrescenta às Seções compartilhadas a entrada `secao.servicos[]` correspondente ao novo `servico_uuid`; o handler `duplicar()` (`src/formulario/servicos/servicos.tsx:266-295`) grava só a lista de Serviços (`comServicosDaSessao`) e nunca reconcilia `autos.secoes`. Por isso a tabela/horários/matrizes funcionam (usam `secao_uuid`, preservada) mas o mapa não (usa a entrada por Serviço, ausente).
+
+Além do sintoma visual, o documento fica **inválido**: a validação estrutural exige que a Seção referenciada por cada Parada tenha entrada em `secao.servicos` para o Serviço daquela Parada (`src/shared/contrato/validacoes-estruturais.ts:172-180`, RN-036) e uma entrada por Serviço com as geolocalizações do sentido (RN-026). Reinserir a Seção "conserta" justamente porque recria essa entrada. Corrigir a duplicação fecha exatamente a cláusula final da RN-007 ("o novo Serviço contribui suas próprias geolocalizações").
+
+## Fora de escopo
+
+- **Renumeração de `numero_n`, escolha de característica/caráter e demais campos do Serviço copiado** — já resolvidos pela duplicação atual (TASK-016); esta task só acrescenta a reconciliação das Seções.
+- **Re-mapeamento de `local_uuid` e cópia profunda de rota/matrizes/viagens** — já corretos em `duplicar.ts`; não reescrever.
+- **Qualquer campo novo no contrato JSON** — `secao.servicos[]` (Spec 02 §5.1) já existe; nada de alterar a Spec 02.
+- **Alterar a lógica do arrasto/translação de Seção, do "redefinir Seção" (TASK-100) ou dos marcadores do mapa** — a leitura em `editor-mapa-itinerario.tsx` está correta; ela só precisa que a entrada exista.
+- **Recalcular rotas ou matrizes do Serviço copiado por causa da duplicação** — a rota e as matrizes já vêm clonadas e congeladas; a geolocalização copiada é idêntica à do original, então não há chamada OSRM nova nesta task.
+- **Deduplicar/mesclar Seções entre Serviços** — cada Serviço contribui sua entrada; não fundir entradas.
+
+## Specs fonte
+
+- Spec 02 §5.1 (entrada de Serviço em `secao.servicos[]` — `servico_uuid` + geolocalizações próprias)
+- Spec 02 §5 (Seção compartilhada), §11/§12 (`uuid`/identidade; só o original mantém identidade), §14 (integridade estrutural do Autos)
+- Spec 04 §6 (duplicar Serviço), §7/§7.3 (mapa da etapa de itinerários e marcadores de Seção)
+
+## Regras envolvidas
+
+- RN-007 (cópias criam entidades novas; **"no duplicar Serviço … o novo Serviço contribui suas próprias geolocalizações"** — cláusula hoje violada)
+- RN-026 (uma entrada em `secao.servicos[]` por Serviço que usa a Seção; obrigatoriedade segue a direcionalidade — bidirecional → ambas; unidirecional → só a do sentido)
+- RN-036 (a Seção referenciada por uma Parada deve ter entrada em `secao.servicos` para o Serviço daquela Parada — validação que hoje falha no documento duplicado)
+- RN-025 (Seção é entidade do Autos, compartilhada — `secao_uuid` preservada)
+- RN-018 (mínimos estruturais do Autos; entradas de `secao.servicos` consistentes)
+- RN-004/RN-005 (UUID da Seção e das entradas preservadas; `uuid` do Serviço copiado nova e única — round-trip)
+
+## Entidades afetadas
+
+- Seção (`secao.servicos[]` — ganha entrada para o Serviço copiado)
+- Serviço (cópia), Parada (`secao_uuid` preservada), Local, Viagem (inalterados quanto ao já correto)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato) — sem campo novo; `secao.servicos[]` já existe
+
+## Critérios de aceite
+
+- [ ] Ao duplicar um Serviço completo, para **cada** Seção referenciada por alguma Parada da cópia, existe em `secao.servicos[]` uma entrada com `servico_uuid` igual ao `uuid` do Serviço copiado.
+- [ ] A entrada nova copia `geolocalizacao_ida`/`geolocalizacao_volta` da entrada do Serviço **original** na mesma Seção; a obrigatoriedade segue a direcionalidade do Serviço copiado (bidirecional → ambas; unidirecional → só a do sentido — RN-026).
+- [ ] As Seções do Serviço duplicado aparecem no mapa da etapa de itinerários imediatamente após a duplicação, sem apagar/reinserir (o marcador de `editor-mapa-itinerario.tsx` encontra a entrada).
+- [ ] O documento resultante da duplicação passa na validação estrutural (RN-036/RN-026) — nenhuma violação de "Seção sem entrada para o Serviço da Parada".
+- [ ] As entradas do Serviço **original** em cada Seção permanecem intactas (a duplicação não muta o original nem as demais entradas das Seções).
+- [ ] `uuid` das Seções e das entradas originais preservados; `uuid` do Serviço copiado novo e único (round-trip export→import — RN-004/005).
+- [ ] Nenhuma chamada OSRM disparada pela duplicação (a geolocalização copiada é idêntica à do original).
+- [ ] Nenhum `data-testid`/`aria-*` existente alterado; suíte E2E atual verde.
+
+## Casos válidos
+
+- Serviço bidirecional que usa 3 Seções (cada uma com `geolocalizacao_ida` e `_volta` para o original): duplicar → cada uma das 3 Seções ganha uma entrada nova com o `uuid` do Serviço copiado e as duas geolocalizações copiadas do original; as 3 aparecem no mapa (Ida e Volta) da cópia.
+- Serviço unidirecional (só Ida) que usa 2 Seções: duplicar → cada Seção ganha entrada nova só com `geolocalizacao_ida` copiada; marcadores aparecem no mapa de Ida da cópia.
+- Duas Seções compartilhadas por outro Serviço além do original: após duplicar, cada Seção passa a ter entrada para o original, para o(s) outro(s) Serviço(s) e para a cópia — as entradas preexistentes ficam inalteradas.
+
+## Casos inválidos
+
+- (Guarda de regressão) Serviço original cuja entrada em uma Seção não tem a geolocalização do sentido exigido pela direcionalidade da cópia: a cópia não deve inventar coordenada — herda exatamente o que o original tem; se o original já fosse inválido, a cópia reflete a mesma invalidez (não mascarar), mas em documento válido isso não ocorre.
+- Duplicação **não** deve criar entrada em `secao.servicos[]` para Seções que a cópia não referencia por nenhuma Parada (nada de entradas órfãs — RN-018).
+
+## Testes esperados
+
+- Unitários: reconciliação pura da duplicação — cada Seção usada pela cópia ganha entrada com o `uuid` novo do Serviço e geolocalizações copiadas do original; direcionalidade respeitada (bi → ambas; uni → só o sentido); `uuid` das Seções/entradas preservados; original não mutado; nenhuma entrada órfã.
+- Integração/contrato: documento com Serviço duplicado passa na validação estrutural (`validacoes-estruturais`) sem violar RN-036/RN-026; round-trip export→import preserva `uuid` (RN-004).
+- E2E: duplicar um Serviço na etapa Serviços, abrir a etapa de itinerários do Serviço copiado e verificar que os marcadores de Seção aparecem no mapa (OSRM/tiles mockados), sem apagar/reinserir.
+
+## Arquivos prováveis
+
+- `src/formulario/servicos/duplicar.ts` — a duplicação passa a reconciliar as Seções compartilhadas (a assinatura/retorno precisa dar acesso às Seções do Autos, hoje ausente — ex.: receber/retornar também `secoes`, ou expor uma função pura de reconciliação; decidir na análise sem alterar o já correto).
+- `src/formulario/servicos/servicos.tsx` — o handler `duplicar()` grava as Seções reconciliadas na sessão junto com o Serviço copiado (`comServicosDaSessao` + o caminho equivalente para `secoes`).
+- `testes/unitarios/…` e `testes/e2e/…` (novos casos).
+
+## Riscos
+
+- **Modo "novo"/Serviço em construção** (`duplicar()` ramo `emConstrucao`, `servicos.tsx:283-294`): as Seções vivem em `secoesEmConstrucao`; verificar na análise se o mesmo gap existe ali e cobri-lo com a mesma reconciliação — se existir, entra nesta task; se a montagem em construção não referenciar Seções por esse caminho, registrar por que fica de fora.
+- **Assinatura de `duplicarServico`**: hoje recebe só o `Servico` e devolve só um `Servico`; as Seções vivem em `autos.secoes`. Mudar a fronteira sem quebrar os testes existentes da duplicação (RN-007/local re-mapeado) exige cuidado — não regredir a cópia profunda nem o re-mapeamento de `local_uuid`.
+- **Interação com TASK-100/TASK-078**: as entradas novas de `secao.servicos[]` precisam ser compatíveis com o "redefinir Seção" e a translação de cluster (que iteram todas as entradas) — garantir que a cópia não gere entradas malformadas.
+- Não recalcular rota/matriz por engano ao reconciliar (a geolocalização é idêntica à do original — sem OSRM).
+
+## Dependências
+
+- Nenhuma pendência de Q-xxx. Convive com a superfície já entregue (TASK-078/TASK-100); não depende delas para ser implementada.
+
+## Perguntas em aberto
+
+- Nenhuma (a correção decorre diretamente de RN-007/RN-026/RN-036; nenhuma regra nova é inventada).
+
 ---
 
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.
