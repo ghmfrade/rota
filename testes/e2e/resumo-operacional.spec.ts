@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 
 // E2E do painel "Resumo Operacional" (TASK-031; Spec 04 §10; RN-069/072):
 // contagens por Serviço e por Autos, estratificação pelas 7 faixas de
-// horário, rótulo obrigatório "semana padrão (sem feriados)". Harness próprio
+// horário, rótulo obrigatório da semana padrão sem feriados nem operação
+// excepcional. Harness próprio
 // e transitório (`/resumo-operacional-demo`) — a tela de Revisão completa é
 // da TASK-032. Sem OSRM: o Autos do harness já traz rota/viagens fixas.
 //
@@ -20,7 +21,7 @@ test("exibe contagens por Serviço, totais do Autos e estratificação por faixa
   await page.goto("/resumo-operacional-demo");
 
   await expect(page.getByTestId("rotulo-semana-padrao")).toContainText(
-    "semana padrão (sem feriados)",
+    "semana padrão (sem feriados nem operação excepcional)",
   );
 
   const linhas = page.getByTestId("linha-servico");

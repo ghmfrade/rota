@@ -23,6 +23,15 @@ function viagemFeriado(base: Viagem): Viagem {
   };
 }
 
+function viagemExcepcional(base: Viagem): Viagem {
+  return {
+    ...base,
+    uuid: "eeeeeeee-0000-4000-8000-eeeeeeeeeeee",
+    viagem_feriado: false,
+    tabela_excepcional_uuid: "ffffffff-0000-4000-8000-ffffffffffff",
+  };
+}
+
 describe("EtapaServicos — coluna de viagens semanais (Spec 04 §6)", () => {
   it("cada linha de Serviço completo exibe Ida/Volta/Total idênticos a contarServico()", () => {
     const documento = documentoBidirecionalMultiServico();
@@ -91,6 +100,41 @@ describe("EtapaServicos — coluna de viagens semanais (Spec 04 §6)", () => {
     expect(textoComFeriado).toBe(textoSemFeriado);
   });
 
+  it("RN-069/RN-099 — operação excepcional não altera a contagem exibida", () => {
+    const semExcepcional = documentoBidirecionalMultiServico();
+    const comExcepcional = documentoBidirecionalMultiServico();
+    const [servicoAlvo] = comExcepcional.autos.servicos;
+    servicoAlvo.tabelas_excepcionais = [
+      {
+        uuid: "ffffffff-0000-4000-8000-ffffffffffff",
+        tipo: "ferias_verao",
+      },
+    ];
+    const itinerarioIda = servicoAlvo.itinerarios.find((i) => i.sentido === "ida")!;
+    itinerarioIda.viagens = [
+      ...itinerarioIda.viagens,
+      viagemExcepcional(itinerarioIda.viagens[0]),
+    ];
+
+    const renderizarContagem = (documento: typeof semExcepcional) => {
+      const resultado = renderizar(
+        <EtapaServicos
+          sessao={{ modo: "carregado", documento, alertasImportacao: [] }}
+          aoAtualizarSessao={() => {}}
+        />,
+      );
+      const texto = resultado.container.querySelector(
+        `[data-testid="servico-item"][data-uuid="${servicoAlvo.uuid}"] [data-testid="servico-viagens-semana"]`,
+      )!.textContent;
+      resultado.desmontar();
+      return texto;
+    };
+
+    expect(renderizarContagem(comExcepcional)).toBe(
+      renderizarContagem(semExcepcional),
+    );
+  });
+
   it("Serviço em construção (DEC-035, sem itinerários) exibe 0 — sem NaN/undefined/crash", () => {
     const sessao: SessaoFormulario = {
       modo: "novo",
@@ -122,7 +166,7 @@ describe("EtapaServicos — coluna de viagens semanais (Spec 04 §6)", () => {
     desmontar();
   });
 
-  it("rótulo 'semana padrão (sem feriados)' aparece no cabeçalho da coluna nova", () => {
+  it("rótulo completo da semana padrão aparece no cabeçalho da coluna", () => {
     const documento = documentoBidirecionalMultiServico();
     const sessao: SessaoFormulario = {
       modo: "carregado",
@@ -136,7 +180,9 @@ describe("EtapaServicos — coluna de viagens semanais (Spec 04 §6)", () => {
     const rotulo = container.querySelector(
       '[data-testid="servicos-rotulo-semana-padrao"]',
     );
-    expect(rotulo?.textContent).toBe("semana padrão (sem feriados)");
+    expect(rotulo?.textContent).toBe(
+      "semana padrão (sem feriados nem operação excepcional)",
+    );
 
     const cabecalho = container.querySelector(
       'thead th[scope="col"]:has([data-testid="servicos-rotulo-semana-padrao"])',

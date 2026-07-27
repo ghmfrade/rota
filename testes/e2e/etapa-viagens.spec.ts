@@ -160,7 +160,9 @@ test.describe("Etapa Viagens — grade de feriados e cópias (TASK-030; Spec 04 
 
     // Grade de feriados nasce vazia (RN-071) — só célula criável, sem partida.
     await expect(feriados.getByTestId("celula-partida")).toHaveCount(0);
-    await expect(feriados.getByTestId("legenda-feriados")).toContainText("semana padrão");
+    await expect(feriados.getByTestId("legenda-feriados")).toContainText(
+      "semana padrão (sem feriados nem operação excepcional)",
+    );
 
     await feriados.getByTestId("copiar-dias-comuns").click();
 

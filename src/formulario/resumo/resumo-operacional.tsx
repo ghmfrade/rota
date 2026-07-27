@@ -17,9 +17,9 @@ import { Selo, Tabela } from "@/shared/ui";
 // controlado e presentacional (padrão DEC-043/045): só recebe `autos` e
 // exibe — todo o cálculo vive no módulo puro `shared/contagens` (RN-072).
 //
-// RN-069/NEG-018 — todas as contagens usam a semana padrão (sem feriado); o
-// rótulo abaixo é obrigatório em qualquer lugar que exiba estes números
-// (tela e PDF — Spec 04 §11 item 9/§13.3).
+// RN-069/NEG-018 — todas as contagens usam a semana padrão, sem feriado nem
+// operação excepcional; o rótulo abaixo é obrigatório em qualquer lugar que
+// exiba estes números (tela e PDF — Spec 04 §11 item 9/§13.3).
 
 export interface PropsPainelResumoOperacional {
   autos: Autos;

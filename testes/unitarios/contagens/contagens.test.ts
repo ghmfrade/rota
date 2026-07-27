@@ -5,6 +5,7 @@ import {
   contarAutosPorFaixa,
   contarServico,
   paresCompraveis,
+  ROTULO_SEMANA_PADRAO,
   viagensSemana,
 } from "@/shared/contagens";
 import type { Itinerario, Servico, Viagem } from "@/shared/contrato";
@@ -53,13 +54,23 @@ function servicoSintetico(
   viagensIda: Viagem[],
   matrizSeccionamento: Servico["matriz_seccionamento"] = [],
 ): Servico {
+  const temViagemExcepcional = viagensIda.some(
+    (item) => item.tabela_excepcional_uuid !== null,
+  );
   return {
     uuid: "s0000000-0000-4000-8000-000000000000",
     numero_n: "1000-1CR",
     caracteristica_veiculo: "CR",
     carater: "principal",
     locais: [],
-    tabelas_excepcionais: [],
+    tabelas_excepcionais: temViagemExcepcional
+      ? [
+          {
+            uuid: "e0000000-0000-4000-8000-000000000000",
+            tipo: "ferias_verao",
+          },
+        ]
+      : [],
     matriz_distancias: [],
     matriz_seccionamento: matrizSeccionamento,
     itinerarios: [itinerarioComViagens(viagensIda)],
@@ -87,7 +98,7 @@ describe("classificarFaixa (Spec 04 §10) — 7 faixas cobrindo 00:00–23:59", 
   });
 });
 
-describe("viagensSemana (RN-072/RN-069) — só Viagens comuns (viagem_feriado=false)", () => {
+describe("viagensSemana (RN-072/RN-069) — só Viagens da grade comum", () => {
   test("conta cada Viagem como uma partida — sem multiplicar por dias", () => {
     const itinerario = itinerarioComViagens([
       viagem({ horario_saida: "07:00:00" }),
@@ -103,6 +114,26 @@ describe("viagensSemana (RN-072/RN-069) — só Viagens comuns (viagem_feriado=f
       viagem({ horario_saida: "07:30:00", viagem_feriado: true }),
     ]);
     expect(viagensSemana(itinerario)).toBe(1);
+  });
+
+  test("[não-contável] 5 comuns + 2 excepcionais + 1 feriado → viagens_semana = 5", () => {
+    const comuns = Array.from({ length: 5 }, (_, indice) =>
+      viagem({ horario_saida: `0${indice + 6}:00:00` }),
+    );
+    const itinerario = itinerarioComViagens([
+      ...comuns,
+      viagem({
+        horario_saida: "12:00:00",
+        tabela_excepcional_uuid: "e0000000-0000-4000-8000-000000000000",
+      }),
+      viagem({
+        horario_saida: "13:00:00",
+        tabela_excepcional_uuid: "e0000000-0000-4000-8000-000000000000",
+      }),
+      viagem({ horario_saida: "14:00:00", viagem_feriado: true }),
+    ]);
+
+    expect(viagensSemana(itinerario)).toBe(5);
   });
 
   test("[inválido] itinerário ausente (Serviço unidirecional, sentido faltante) → 0", () => {
@@ -209,6 +240,43 @@ describe("RN-069/NEG-018 — feriado não altera contagens", () => {
     );
     expect(contarServico(autosComFeriado).totalViagensSemana).toBe(
       contarServico(autosSemFeriado).totalViagensSemana,
+    );
+  });
+});
+
+describe("RN-069/RN-099 — operação excepcional não altera contagens", () => {
+  test("dois Autos que diferem só na grade excepcional têm contagens idênticas", () => {
+    const viagemComum = viagem({ horario_saida: "07:00:00" });
+    const semExcepcional = servicoSintetico([viagemComum], []);
+    const comExcepcional = servicoSintetico(
+      [
+        viagemComum,
+        viagem({
+          horario_saida: "09:00:00",
+          tabela_excepcional_uuid: "e0000000-0000-4000-8000-000000000000",
+        }),
+        viagem({
+          horario_saida: "18:00:00",
+          tabela_excepcional_uuid: "e0000000-0000-4000-8000-000000000000",
+        }),
+      ],
+      [],
+    );
+    const autosBase = documentoUnidirecional().autos;
+    const autosSemExcepcional = { ...autosBase, servicos: [semExcepcional] };
+    const autosComExcepcional = { ...autosBase, servicos: [comExcepcional] };
+
+    expect(contarAutos(autosComExcepcional)).toEqual(
+      contarAutos(autosSemExcepcional),
+    );
+    expect(contarAutosPorFaixa(autosComExcepcional)).toEqual(
+      contarAutosPorFaixa(autosSemExcepcional),
+    );
+  });
+
+  test("rótulo tem fonte única com o texto literal da Spec 04 §10/§13.3", () => {
+    expect(ROTULO_SEMANA_PADRAO).toBe(
+      "semana padrão (sem feriados nem operação excepcional)",
     );
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ROTULO_SEMANA_PADRAO } from "@/shared/contagens";
 import { DIAS_SEMANA, type Itinerario, type Parada, type Secao, type Servico } from "@/shared/contrato";
 import { Botao, Campo, Painel, Select, Tabela } from "@/shared/ui";
 import { nomeExibicaoSecao } from "@/formulario/secoes";
@@ -503,7 +504,8 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
           <section data-testid="grade-feriados" className="mt-6">
             <h3 className="text-lg font-semibold text-cinza-900">Feriados</h3>
             <p data-testid="legenda-feriados" className="text-sm text-cinza-500">
-              Feriados não entram nas contagens — semana padrão (sem feriados).
+              Feriados e operação excepcional não entram nas contagens —{" "}
+              {ROTULO_SEMANA_PADRAO}.
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               {temFeriado ? (

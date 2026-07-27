@@ -5,11 +5,11 @@ import type { Autos, Itinerario, Servico, Viagem } from "../contrato/esquema";
 // Deslocamento é estatística DERIVADA, nunca campo do JSON (RN-073).
 // Compartilhado por Formulário e Comparador (ambos dependem só de `shared/`).
 //
-// Toda contagem usa a semana padrão: exclusivamente Viagens com
-// `viagem_feriado === false` (RN-069). O filtro vive numa única porta
-// (`viagensSemanaPadrao`) para garantir que feriado nunca vaza para nenhum
-// contador — dois Autos que difiram só na grade de feriados produzem
-// contagens idênticas.
+// Toda contagem usa a semana padrão: exclusivamente Viagens da grade comum,
+// com `viagem_feriado === false` e `tabela_excepcional_uuid === null`
+// (RN-069/RN-099). O filtro vive numa única porta (`viagensSemanaPadrao`) para
+// garantir que feriado e operação excepcional nunca vazem para nenhum
+// contador.
 
 // Spec 04 §10 — as 7 faixas de horário fixadas pela spec, cobrindo 00:00–23:59
 // sem lacuna nem sobreposição (classificação total e determinística).
@@ -28,7 +28,8 @@ export type IdFaixaHorario = (typeof FAIXAS_HORARIO)[number]["id"];
 // RN-069/NEG-018 — rótulo obrigatório em qualquer exibição de contagem
 // (tela e PDF — Spec 04 §11 item 9/§13.3). Fonte única: consumido por
 // servicos e resumo, nunca redeclarado.
-export const ROTULO_SEMANA_PADRAO = "semana padrão (sem feriados)";
+export const ROTULO_SEMANA_PADRAO =
+  "semana padrão (sem feriados nem operação excepcional)";
 
 // Classifica `horario_saida` (HH:MM:SS de relógio) numa das 7 faixas, pela
 // hora de relógio (Spec 04 §10). As faixas cobrem o dia inteiro, então esta
@@ -44,10 +45,13 @@ export function classificarFaixa(horarioSaida: string): IdFaixaHorario {
   return "noite";
 }
 
-// RN-069 — porta única do filtro "semana padrão": só Viagens comuns
-// (`viagem_feriado === false`). Todo contador passa por aqui.
+// RN-069/RN-099 — porta única do filtro "semana padrão": só Viagens comuns
+// (`viagem_feriado === false` e `tabela_excepcional_uuid === null`). Todo
+// contador passa por aqui.
 function viagensSemanaPadrao(itinerario: Itinerario): Viagem[] {
-  return itinerario.viagens.filter((v) => !v.viagem_feriado);
+  return itinerario.viagens.filter(
+    (v) => !v.viagem_feriado && v.tabela_excepcional_uuid === null,
+  );
 }
 
 // RN-072 — viagens_semana(servico, sentido): cardinalidade das Viagens
