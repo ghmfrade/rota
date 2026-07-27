@@ -27,7 +27,9 @@ export interface CoordenadaCelulaGrade {
 
 /**
  * Resolve a navegação explícita da TASK-106 sem criar retorno circular:
- * Tab avança um dia na mesma Seção; Enter desce uma Seção no mesmo dia.
+ * Tab avança um dia na mesma Seção; Enter desce uma Seção no mesmo dia. Ao
+ * alcançar a última Seção, Enter continua na primeira Seção do bloco abaixo
+ * (TASK-106), que pode ser a célula criável da próxima Viagem.
  */
 export function destinoNavegacaoGrade(
   origem: CoordenadaCelulaGrade,
@@ -40,8 +42,10 @@ export function destinoNavegacaoGrade(
     return proximoDia ? { ...origem, dia: proximoDia } : null;
   }
 
-  if (origem.indiceSecao + 1 >= totalSecoes) return null;
-  return { ...origem, indiceSecao: origem.indiceSecao + 1 };
+  if (origem.indiceSecao + 1 < totalSecoes) {
+    return { ...origem, indiceSecao: origem.indiceSecao + 1 };
+  }
+  return { ...origem, indiceBloco: origem.indiceBloco + 1, indiceSecao: 0 };
 }
 
 /**

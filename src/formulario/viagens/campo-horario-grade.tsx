@@ -50,7 +50,10 @@ export function CampoHorarioGrade({
   function aoPressionarTecla(evento: KeyboardEvent<HTMLInputElement>) {
     if (evento.key !== "Tab" && evento.key !== "Enter") return;
     const tecla = evento.key;
-    if (!confirmar()) {
+    // A célula criável vazia é um destino de navegação válido: Tab deve
+    // atravessá-la sem tentar criar uma Viagem sem horário (TASK-106).
+    const celulaCriavelVazia = valor === "" && rascunho === "";
+    if (!celulaCriavelVazia && !confirmar()) {
       evento.preventDefault();
       return;
     }

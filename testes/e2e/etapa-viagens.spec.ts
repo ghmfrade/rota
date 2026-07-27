@@ -59,7 +59,7 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toHaveValue("07:30");
   });
 
-  test("seleção persiste sem hover; ações aparecem só no hover; Tab/Enter navegam", async ({
+  test("seleção forma superfície contínua; ações aparecem só no hover; Tab navega", async ({
     page,
   }) => {
     await abrirEtapaViagens(page, structuredClone(multiServico));
@@ -72,27 +72,53 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     await partida.click();
     await grade.getByRole("columnheader", { name: "DOM" }).hover();
     await expect(
-      grade.locator(`[data-viagem-uuid="${viagemUuid}"][data-selecionada="true"]`),
-    ).toHaveCount(3);
+      grade.locator(
+        `[data-viagem-uuid="${viagemUuid}"][data-superficie-viagem="inicio"]`,
+      ),
+    ).toHaveCount(1);
+    await expect(
+      grade.locator(`[data-viagem-uuid="${viagemUuid}"][data-superficie-viagem="meio"]`),
+    ).toHaveCount(1);
+    await expect(
+      grade.locator(`[data-viagem-uuid="${viagemUuid}"][data-superficie-viagem="fim"]`),
+    ).toHaveCount(1);
+    await expect(
+      grade.locator(`[data-viagem-uuid="${viagemUuid}"][data-superficie-viagem]`).first(),
+    ).not.toHaveClass(/ring-2/);
 
     const acoes = celulaPartida.getByTestId("acoes-viagem");
     await expect(acoes).toHaveCSS("opacity", "0");
-    await celulaPartida.hover();
+    await grade.getByTestId("celula-passante").first().hover();
     await expect(acoes).toHaveCSS("opacity", "1");
     await grade.getByRole("columnheader", { name: "DOM" }).hover();
     await expect(acoes).toHaveCSS("opacity", "0");
     await expect(
-      grade.locator(`[data-viagem-uuid="${viagemUuid}"][data-selecionada="true"]`),
+      grade.locator(`[data-viagem-uuid="${viagemUuid}"][data-superficie-viagem]`),
     ).toHaveCount(3);
 
     await partida.press("Tab");
     await expect(grade.getByLabel("Criar viagem — terca")).toBeFocused();
+    await grade.getByLabel("Criar viagem — terca").press("Tab");
+    await expect(grade.getByLabel("Criar viagem — quarta")).toBeFocused();
+  });
 
-    await partida.focus();
-    await partida.press("Enter");
-    await expect(
-      grade.getByLabel(/Horário de passagem — São Vicente - Terminal São Vicente, segunda, viagem 1/),
-    ).toBeFocused();
+  test("Enter atravessa Viagens e alcança a célula criável", async ({ page }) => {
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+
+    await grade.getByLabel("Criar viagem — segunda").fill("09:00");
+    const ultimaSecaoPrimeiraViagem = grade.getByLabel(
+      /Horário de passagem — Praia Grande - Rodoviária Praia Grande, segunda, viagem 1/,
+    );
+    const partidaSegundaViagem = grade.getByLabel("Horário de partida — segunda, viagem 2");
+    const ultimaSecaoSegundaViagem = grade.getByLabel(
+      /Horário de passagem — Praia Grande - Rodoviária Praia Grande, segunda, viagem 2/,
+    );
+
+    await ultimaSecaoPrimeiraViagem.press("Enter");
+    await expect(partidaSegundaViagem).toBeFocused();
+    await ultimaSecaoSegundaViagem.press("Enter");
+    await expect(grade.getByLabel("Criar viagem — segunda")).toBeFocused();
   });
 
   test("Viagem gravada aparece com horários propagados por Seção; dias sem Viagem mostram célula criável", async ({
@@ -261,6 +287,8 @@ test.describe("Etapa Viagens — grade de feriados e cópias (TASK-030; Spec 04 
   test("copiar viagem para outro dia cria Viagem no dia-alvo (RN-007/061)", async ({ page }) => {
     await abrirEtapaViagens(page, structuredClone(multiServico));
     const grade = gradeComum(page);
+
+    await expect(grade.getByTestId("apagar-bloco")).toHaveCount(0);
 
     await grade.getByTestId("celula-partida").first().hover();
     await grade.getByLabel("Copiar para o dia — segunda, viagem 1").selectOption({ label: "QUA" });

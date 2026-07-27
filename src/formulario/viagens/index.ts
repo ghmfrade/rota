@@ -23,7 +23,6 @@ export {
   copiarViagemParaDias,
   clonarDiasComunsParaFeriado,
   apagarViagem,
-  apagarBloco,
   type ModoCopiaFeriado,
 } from "./copias-grade";
 export {

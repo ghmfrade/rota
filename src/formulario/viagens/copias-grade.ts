@@ -69,36 +69,3 @@ export function clonarDiasComunsParaFeriado(
 export function apagarViagem(itinerario: Itinerario, viagemUuid: string): Itinerario {
   return { ...itinerario, viagens: itinerario.viagens.filter((v) => v.uuid !== viagemUuid) };
 }
-
-/**
- * Apaga o bloco inteiro (Spec 04 §8.3): a `posicao`-ésima partida (0-based,
- * ordenação da grade — Spec 04 §8.1) de **cada dia** da grade indicada
- * (`feriado`). Remove, para cada `dia_semana`, a Viagem naquela posição
- * ordinal; a outra grade não é tocada. Posição sem Viagem naquele dia é
- * ignorada (nada a remover).
- */
-export function apagarBloco(
-  itinerario: Itinerario,
-  posicao: number,
-  feriado: boolean,
-): Itinerario {
-  const uuidsParaApagar = new Set<string>();
-  const porDia = new Map<DiaSemana, Viagem[]>();
-  for (const viagem of itinerario.viagens) {
-    if (viagem.viagem_feriado !== feriado) continue;
-    const lista = porDia.get(viagem.dia_semana) ?? [];
-    lista.push(viagem);
-    porDia.set(viagem.dia_semana, lista);
-  }
-  for (const lista of porDia.values()) {
-    lista.sort(
-      (a, b) => a.horario_saida.localeCompare(b.horario_saida) || a.uuid.localeCompare(b.uuid),
-    );
-    const alvo = lista[posicao];
-    if (alvo) uuidsParaApagar.add(alvo.uuid);
-  }
-  return {
-    ...itinerario,
-    viagens: itinerario.viagens.filter((v) => !uuidsParaApagar.has(v.uuid)),
-  };
-}

@@ -90,4 +90,49 @@ describe("CampoHorarioGrade (TASK-106; RN-067)", () => {
     expect(aoNavegar).toHaveBeenCalledWith("Tab");
     desmontar();
   });
+
+  it("Tab em célula criável vazia navega sem tentar criar Viagem", () => {
+    const aoConfirmar = vi.fn(() => true);
+    const aoNavegar = vi.fn(() => true);
+    const { container, desmontar } = renderizar(
+      <CampoHorarioGrade
+        valor=""
+        rotuloAcessivel="Criar viagem"
+        aoConfirmar={aoConfirmar}
+        aoNavegar={aoNavegar}
+      />,
+    );
+    const input = container.querySelector("input") as HTMLInputElement;
+    act(() => {
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }),
+      );
+    });
+    expect(aoConfirmar).not.toHaveBeenCalled();
+    expect(aoNavegar).toHaveBeenCalledWith("Tab");
+    desmontar();
+  });
+
+  it("[inválido] Tab com rascunho não vazio inválido não navega", () => {
+    const aoConfirmar = vi.fn(() => true);
+    const aoNavegar = vi.fn(() => true);
+    const { container, desmontar } = renderizar(
+      <CampoHorarioGrade
+        valor=""
+        rotuloAcessivel="Criar viagem"
+        aoConfirmar={aoConfirmar}
+        aoNavegar={aoNavegar}
+      />,
+    );
+    const input = container.querySelector("input") as HTMLInputElement;
+    preencher(input, "2460");
+    act(() => {
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }),
+      );
+    });
+    expect(aoConfirmar).not.toHaveBeenCalled();
+    expect(aoNavegar).not.toHaveBeenCalled();
+    desmontar();
+  });
 });

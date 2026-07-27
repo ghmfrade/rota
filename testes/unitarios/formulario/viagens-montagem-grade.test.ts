@@ -188,12 +188,19 @@ describe("destinoNavegacaoGrade (TASK-106)", () => {
     });
   });
 
-  test("[borda] não inventa retorno após domingo ou última Seção", () => {
+  test("[borda] não inventa retorno após domingo", () => {
     expect(
       destinoNavegacaoGrade({ ...origem, dia: "domingo" }, "Tab", 3),
     ).toBeNull();
+  });
+
+  test("Enter na última Seção continua na primeira Seção do bloco seguinte", () => {
     expect(
       destinoNavegacaoGrade({ ...origem, indiceSecao: 2 }, "Enter", 3),
-    ).toBeNull();
+    ).toEqual({
+      indiceBloco: 2,
+      indiceSecao: 0,
+      dia: "segunda",
+    });
   });
 });

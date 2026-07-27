@@ -1,7 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { REGEX_UUID_V4, type Itinerario, type Viagem } from "@/shared/contrato";
 import {
-  apagarBloco,
   apagarViagem,
   clonarDiasComunsParaFeriado,
   copiarViagemParaDias,
@@ -11,7 +10,7 @@ import {
 // outro dia e "copiar dias comuns" criam entidades novas com UUIDs novas
 // (RN-007/005), preservando offsets (RN-063) sem tocar as contagens; grades
 // comum e de feriado independentes (RN-068); grade de feriados vazia é válida
-// (RN-071); apagar viagem/bloco.
+// (RN-071); apagar uma Viagem.
 
 function viagem(
   uuid: string,
@@ -96,7 +95,6 @@ describe("copiarViagemParaDias (Spec 04 §8.3; RN-007/061)", () => {
     expect(copiarViagemParaDias(origem, [])).toEqual([]);
   });
 });
-
 describe("clonarDiasComunsParaFeriado (Spec 04 §8.4; RN-007/068)", () => {
   test("clona todas as comuns como feriado com UUIDs novas, sem tocar as comuns", () => {
     const c1 = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
@@ -151,7 +149,6 @@ describe("clonarDiasComunsParaFeriado (Spec 04 §8.4; RN-007/068)", () => {
     expect(clonarDiasComunsParaFeriado(it, "mesclar").viagens).toEqual([feriadoAntigo]);
   });
 });
-
 describe("apagarViagem (Spec 04 §8.3)", () => {
   test("remove só a Viagem de uuid dado", () => {
     const a = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
@@ -164,36 +161,5 @@ describe("apagarViagem (Spec 04 §8.3)", () => {
     const a = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
     const it = itinerario([a]);
     expect(apagarViagem(it, "zzzzzzzz-0000-4000-8000-000000000009").viagens).toEqual([a]);
-  });
-});
-
-describe("apagarBloco (Spec 04 §8.3)", () => {
-  test("remove a n-ésima partida (por posição ordinal) de cada dia da grade indicada", () => {
-    // segunda: 08:00 (pos0), 09:00 (pos1); terca: 08:30 (pos0)
-    const seg0 = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
-    const seg1 = viagem("bbbbbbbb-0000-4000-8000-000000000002", "segunda", "09:00:00");
-    const ter0 = viagem("cccccccc-0000-4000-8000-000000000003", "terca", "08:30:00");
-    const it = itinerario([seg0, seg1, ter0]);
-
-    const resultado = apagarBloco(it, 0, false); // apaga a 1ª partida de cada dia
-
-    const uuids = resultado.viagens.map((v) => v.uuid).sort();
-    expect(uuids).toEqual([seg1.uuid]); // seg0 e ter0 (pos0) removidas; seg1 (pos1) fica
-  });
-
-  test("não toca a outra grade (feriado × comum independentes — RN-068)", () => {
-    const comum = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00", false);
-    const feriado = viagem("bbbbbbbb-0000-4000-8000-000000000002", "segunda", "08:00:00", true);
-    const it = itinerario([comum, feriado]);
-
-    // apaga bloco0 da grade de feriados: só a de feriado sai
-    const resultado = apagarBloco(it, 0, true);
-    expect(resultado.viagens).toEqual([comum]);
-  });
-
-  test("[inválido] posição sem Viagem em nenhum dia → itinerário inalterado", () => {
-    const seg0 = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
-    const it = itinerario([seg0]);
-    expect(apagarBloco(it, 5, false).viagens).toEqual([seg0]);
   });
 });

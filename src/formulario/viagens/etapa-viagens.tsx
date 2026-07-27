@@ -21,7 +21,6 @@ import {
   resetarOffsetsViagem,
 } from "./acoes-grade";
 import {
-  apagarBloco,
   apagarViagem,
   clonarDiasComunsParaFeriado,
   copiarViagemParaDias,
@@ -47,7 +46,7 @@ import { CampoHorarioGrade } from "./campo-horario-grade";
 // com bloqueio de fora-de-ordem; "Restaurar sugestão" (por Viagem e em lote)
 // desfaz âncoras (RN-066). O conjunto de âncoras é estado efêmero da sessão
 // (DEC-049). TASK-030: grade de feriados, "Copiar dias comuns" (clona com UUIDs
-// novas — RN-007), "Copiar viagem para outro dia" e apagar viagem/bloco
+// novas — RN-007), "Copiar viagem para outro dia" e apagar uma Viagem
 // (Spec 04 §8.3/§8.4). TASK-106: apresentação tabular compacta, campo textual
 // sem seletor nativo, ordenação temporal, seleção por UUID, ações no hover e
 // navegação Tab (dia seguinte) / Enter (Seção inferior).
@@ -88,6 +87,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   // Dia-alvo escolhido em "Copiar viagem para outro dia", por Viagem (Spec 04 §8.3).
   const [diaCopiaPorViagem, definirDiaCopiaPorViagem] = useState<Record<string, DiaSemana>>({});
   const [viagemSelecionadaUuid, definirViagemSelecionadaUuid] = useState<string | null>(null);
+  const [viagemEmHoverUuid, definirViagemEmHoverUuid] = useState<string | null>(null);
 
   const servicos: Servico[] = servicosDaSessao(sessao);
   const servicoAtual = servicos.find((s) => s.uuid === servicoSelecionadoUuid) ?? null;
@@ -255,23 +255,6 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
     aplicar(apagarViagem(itinerarioAtual, viagemUuid), ancorasSem([viagemUuid]));
   }
 
-  function aoApagarBloco(posicao: number, feriado: boolean) {
-    if (!itinerarioAtual) return;
-    const confirmado =
-      typeof window === "undefined" ||
-      window.confirm("Apagar o bloco inteiro (a n-ésima partida em todos os dias)?");
-    if (!confirmado) return;
-    const itinerarioNovo = apagarBloco(itinerarioAtual, posicao, feriado);
-    const removidos = itinerarioAtual.viagens
-      .filter((v) => !itinerarioNovo.viagens.some((n) => n.uuid === v.uuid))
-      .map((v) => v.uuid);
-    limparEstadoDeSessao(removidos);
-    if (viagemSelecionadaUuid && removidos.includes(viagemSelecionadaUuid)) {
-      definirViagemSelecionadaUuid(null);
-    }
-    aplicar(itinerarioNovo, ancorasSem(removidos));
-  }
-
   // "Copiar dias comuns" para a grade de feriados (Spec 04 §8.4; RN-007/068).
   // Quando a grade de feriados já tem conteúdo, a confirmação é a escolha
   // explícita do modo (sobrescrever/mesclar) — dois botões distintos.
@@ -333,11 +316,10 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   }
 
   // Corpo de uma grade (dias comuns ou feriados). `feriado` propaga para a
-  // criação de Viagem (grade correta) e para apagar bloco.
+  // criação de Viagem na grade correta.
   function corpoGrade(blocos: BlocoGrade[], feriado: boolean) {
     const grade = feriado ? "feriados" : "comuns";
     return blocos.map((bloco, indiceBloco) => {
-      const blocoTemViagem = DIAS_SEMANA.some((dia) => bloco[dia].estado === "existente");
       return secoesDaGrade.map((parada, indiceSecao) => {
         const secao = secaoDaParada(parada, todasAsSecoes);
         const nomeSecao = secao ? nomeExibicaoSecao(secao) : "";
@@ -348,18 +330,12 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
             data-testid="linha-grade"
             className={indiceSecao === 0 && indiceBloco > 0 ? "border-t-2 border-cinza-400" : ""}
           >
-            <th scope="row" className="whitespace-nowrap font-semibold">
+            <th
+              scope="row"
+              className="whitespace-nowrap font-semibold"
+              onMouseEnter={() => definirViagemEmHoverUuid(null)}
+            >
               {nomeSecao}
-              {ehPrimeiraSecao && blocoTemViagem && (
-                <Botao
-                  variante="perigo"
-                  data-testid="apagar-bloco"
-                  aria-label={`Apagar bloco ${indiceBloco + 1}`}
-                  onClick={() => aoApagarBloco(indiceBloco, feriado)}
-                >
-                  Apagar bloco
-                </Botao>
-              )}
             </th>
             {DIAS_SEMANA.map((dia) => {
               const celula = bloco[dia];
@@ -369,9 +345,22 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                 const horarioMostrar = horarioHms ? horarioParaHoraMinuto(horarioHms) : "";
 
                 const selecionada = viagemSelecionadaUuid === celula.viagem.uuid;
+                const emHover = viagemEmHoverUuid === celula.viagem.uuid;
+                const posicaoNaSuperficie =
+                  indiceSecao === 0
+                    ? "inicio"
+                    : indiceSecao === secoesDaGrade.length - 1
+                      ? "fim"
+                      : "meio";
                 const classesCelula = [
                   "relative",
-                  selecionada ? "bg-azul-100 ring-2 ring-inset ring-azul-600" : "",
+                  selecionada
+                    ? [
+                        "bg-azul-100 border-x-2 border-azul-600",
+                        posicaoNaSuperficie === "inicio" ? "border-t-2" : "",
+                        posicaoNaSuperficie === "fim" ? "border-b-2" : "",
+                      ].join(" ")
+                    : "",
                 ]
                   .filter(Boolean)
                   .join(" ");
@@ -396,8 +385,14 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                       data-testid="celula-partida"
                       data-viagem-uuid={viagemUuid}
                       data-selecionada={selecionada ? "true" : undefined}
-                      className={`group ${classesCelula}`}
+                      data-superficie-viagem={selecionada ? posicaoNaSuperficie : undefined}
+                      className={classesCelula}
                       onClick={() => definirViagemSelecionadaUuid(viagemUuid)}
+                      onFocus={() => {
+                        definirViagemSelecionadaUuid(viagemUuid);
+                        definirViagemEmHoverUuid(viagemUuid);
+                      }}
+                      onMouseEnter={() => definirViagemEmHoverUuid(viagemUuid)}
                     >
                       <div className="relative">
                         <CampoHorarioGrade
@@ -411,7 +406,9 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                         />
                         <div
                           data-testid="acoes-viagem"
-                          className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 flex -translate-x-1/2 items-center gap-1 rounded-controle border border-cinza-200 bg-white p-1 opacity-0 shadow-sombra-3 [transition:opacity_var(--transicao-rapida)] group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100"
+                          className={`absolute left-1/2 top-full z-20 mt-1 flex -translate-x-1/2 items-center gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3 [transition:opacity_var(--transicao-rapida)] ${
+                            emHover ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+                          }`}
                         >
                           <Botao
                             variante="fantasma"
@@ -471,8 +468,14 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                     data-testid="celula-passante"
                     data-viagem-uuid={celula.viagem.uuid}
                     data-selecionada={selecionada ? "true" : undefined}
+                    data-superficie-viagem={selecionada ? posicaoNaSuperficie : undefined}
                     className={classesCelula}
                     onClick={() => definirViagemSelecionadaUuid(celula.viagem.uuid)}
+                    onFocus={() => {
+                      definirViagemSelecionadaUuid(celula.viagem.uuid);
+                      definirViagemEmHoverUuid(celula.viagem.uuid);
+                    }}
+                    onMouseEnter={() => definirViagemEmHoverUuid(celula.viagem.uuid)}
                   >
                     <CampoHorarioGrade
                       key={`${celula.viagem.uuid}-${parada.ordem}-${horarioMostrar}`}
@@ -503,7 +506,11 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                   "data-dia": dia,
                 };
                 return (
-                  <td key={dia} data-testid="celula-criavel">
+                  <td
+                    key={dia}
+                    data-testid="celula-criavel"
+                    onMouseEnter={() => definirViagemEmHoverUuid(null)}
+                  >
                     <CampoHorarioGrade
                       rotuloAcessivel={`Criar viagem — ${dia}`}
                       valor=""
@@ -522,7 +529,11 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
               }
 
               return (
-                <td key={dia} data-testid="celula-vazia">
+                <td
+                  key={dia}
+                  data-testid="celula-vazia"
+                  onMouseEnter={() => definirViagemEmHoverUuid(null)}
+                >
                   —
                 </td>
               );
@@ -607,7 +618,9 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
             </Botao>
             <Tabela densidade="compacta" className="mt-2">
               {cabecalhoGrade()}
-              <tbody>{corpoGrade(blocosComuns, false)}</tbody>
+              <tbody onMouseLeave={() => definirViagemEmHoverUuid(null)}>
+                {corpoGrade(blocosComuns, false)}
+              </tbody>
             </Tabela>
           </section>
 
@@ -647,7 +660,9 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
             </div>
             <Tabela densidade="compacta" className="mt-2">
               {cabecalhoGrade()}
-              <tbody>{corpoGrade(blocosFeriados, true)}</tbody>
+              <tbody onMouseLeave={() => definirViagemEmHoverUuid(null)}>
+                {corpoGrade(blocosFeriados, true)}
+              </tbody>
             </Tabela>
           </section>
         </>
