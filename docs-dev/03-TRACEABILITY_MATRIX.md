@@ -62,15 +62,15 @@
 | RN-058 | Spec 02 §9 | Seccionamento | F/C/I | schema + editor de matriz | U + CONTRATO | Alta |
 | RN-059 | Spec 02 §9/§14 | Par íntegro | F/C/I | validador | U (duplicata, par fora da matriz) | Alta |
 | RN-060 | Spec 03 §6; 04 §9.2 | Sugestões | F | funções de sugestão (2 modos) | U (menor entre serviços; próprio) | Média |
-| RN-061 | Spec 02 §11; 04 §8 | Viagem estratificada | F/C/I | schema + grade | U + CONTRATO | Alta |
-| RN-062 | Spec 02 §11 | Reforço de horário | F/C/I | validador (não-unicidade) | U | Baixa |
+| RN-061 | Spec 02 §11/§6.1; 04 §8; DEC-081 | Viagem estratificada (grade única; `tabela_excepcional_uuid` + invariante) | F/C/I | schema + grade | U + CONTRATO (invariante feriado×excepcional) | Alta |
+| RN-062 | Spec 02 §11 | Reforço de horário (tupla c/ `tabela_excepcional_uuid`) | F/C/I | validador (não-unicidade) | U | Baixa |
 | RN-063 | Spec 02 §11.1/§14 | horarios_paradas | F/C/I | validador | U (faltando parada, decrescente, 1º≠0) | Alta |
 | RN-064 | Spec 03 §8.1 | Sugestão de offsets | F | módulo de horários | U (acúmulo, formato HMS) | Média |
 | RN-065 | Spec 03 §8.2; 04 §8.2 | Redistribuição | F | módulo de horários (âncoras) | U (exemplo A/a/B literal; tail; degenerado) | Alta |
 | RN-066 | Spec 03 §8.3 | Reset | F | módulo de horários | U (idempotência; preserva saída) | Média |
 | RN-067 | Spec 04 §8.2; 05 §12.3 | Horários de relógio | F/C | conversão UI↔offset | U + E2E | Alta |
-| RN-068 | Spec 03 §9.1 | Grade de feriados | F/C | semântica (docs/UI) | U (contagens) | Alta |
-| RN-069 | Spec 03 §9.2; 04 §10 | Contagens sem feriado | F/C | módulo de contagens | U (JSONs que só diferem em feriado) | Alta |
+| RN-068 | Spec 03 §9.1; DEC-081 | Grade de feriados (substitui comum **e** excepcional; precedência) | F/C | semântica (docs/UI) | U (contagens; precedência) | Alta |
+| RN-069 | Spec 03 §9.2/§9.4; 04 §10; DEC-081 | Contagens sem feriado **nem excepcional** | F/C | módulo de contagens | U (JSONs que só diferem em feriado **ou** excepcional) | Alta |
 | RN-070 | Spec 03 §9.1 | Calendário externo | F/C/I | (ausência de código) | CONTRATO (sem campo de data de feriado) | Média |
 | RN-071 | Spec 03 §9.3; 04 §11 | Feriado vazio | F | painel de alertas | U | Baixa |
 | RN-072 | Spec 03 §9.4 | Fórmulas de contagem | F/C | módulo de contagens | U (ponta-a-ponta na união; estratificação) | Alta |
@@ -96,6 +96,8 @@
 | RN-095 | Spec 01 §1/§3 | Zero gestão | F/C/I | (ausência de código) | CONTRATO negativo + revisão | **Alta** |
 | RN-096 | Spec 01 §5; 04 §2.1 | Sem persistência | F | (ausência de backend) | revisão + E2E (sem chamadas de escrita) | Alta |
 | RN-097 | Spec 01 §2 | Desacoplamento | F/C/I | separação de módulos/rotas | revisão de arquitetura | Alta |
+| RN-098 | Spec 02 §6.1/§14; 04 §8.5; DEC-081 | TabelaExcepcional (`servico.tabelas_excepcionais[]`) | F/C/I | schema (zod strict) + validador (cardinalidade, `descricao` condicional, sem sobreposição) + migração 1.0→1.1 | U + CONTRATO (negativo: 2ª verão, descricao ausente em personalizado) | Alta |
+| RN-099 | Spec 02 §11/§6.1; 03 §9.1/§9.2; 04 §8.5; 05 §10.4/§12.3; DEC-081 | Grade excepcional da Viagem (referência, invariante, precedência, contagens, cópia, diff) | F/C/I | schema (referência + invariante) + grade no Formulário + contagens + diff por `uuid` da tabela | U + CONTRATO + INT (copiar dias comuns) | Alta |
 
 ---
 

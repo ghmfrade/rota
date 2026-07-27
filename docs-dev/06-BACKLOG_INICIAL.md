@@ -264,6 +264,7 @@
 **Resumo:** Módulo de contagens (viagens semanais, pares compráveis ∪ ponta-a-ponta, opções de deslocamento; estratificação pelas 7 faixas) + painel de revisão rotulado "semana padrão (sem feriados)".
 **Regras RN:** RN-069, RN-072, RN-073. **Depende de:** TASK-027, TASK-030.
 **Testes esperados:** unitários (fórmulas; feriado não altera; ponta-a-ponta sem dupla contagem).
+**Nota (DEC-081, 2026-07-27):** **concluída** com a fórmula/rótulo antigos; a **TASK-103** atualiza este módulo para excluir também a operação excepcional (`tabela_excepcional_uuid = null`) e o rótulo passa a "sem feriados nem operação excepcional" (RN-069 com texto novo).
 
 ## TASK-032 — Revisão e validação final
 
@@ -282,6 +283,7 @@
 **Resumo:** Geração client-side com a estrutura da Spec 04 §13.1 (capa, resumo rotulado, serviços, itinerários com sequência de Seções + descrição + mapa, rodapé com aviso SEI e `versao_schema`).
 **Regras RN:** RN-074, RN-076, RN-077. **Depende de:** TASK-020, TASK-025, TASK-031.
 **Testes esperados:** PDF (presença/ordem de seções; aviso; sem R$).
+**Nota (DEC-081, 2026-07-27):** o resumo rotulado usa "semana padrão (sem feriados nem operação excepcional)"; `versao_schema` agora pode ser `"1.1"` (documentos com operação excepcional). Ver TASK-034 para as tabelas excepcionais no corpo.
 
 ## TASK-034 — PDF operacional: tabelas horárias e matrizes
 
@@ -289,6 +291,7 @@
 **Resumo:** Versão simples (corpo) e detalhada (anexo, passantes por Seção), matrizes triangulares em km, anexo com Locais sem horários; offsets ausentes de todo o PDF.
 **Regras RN:** RN-075, RN-076. **Depende de:** TASK-033.
 **Testes esperados:** PDF (duas versões; Locais só no anexo; sem offsets).
+**Nota (DEC-081, 2026-07-27):** escopo **ampliado** pela operação excepcional — além das grades comum e de feriado, o PDF inclui **cada tabela excepcional como grade própria separada** (Spec 04 §8.5) e o rótulo das contagens passa a "semana padrão (sem feriados nem operação excepcional)" (Spec 04 §13.3; RN-069/RN-099). Cobrir ao implementar (não há task PDF separada para excepcional — evita task paralela sobre superfície ainda não construída, lição §6.2 do `19-STATUS_EXECUCAO`).
 
 ---
 
@@ -307,6 +310,7 @@
 **Resumo:** Casamento por UUID (4 entidades) e por contexto (itinerário, parada, pares, geoloc, horários); taxonomia Adicionado/Removido/Alterado/Inalterado/Alerta; propagação; exclusão de status/datas; detector de UUIDs não preservados; heurística "recriada" (sinaliza).
 **Regras RN:** RN-006, RN-012, RN-081..083, RN-085, RN-086. **Depende de:** TASK-035.
 **Testes esperados:** unitários extensivos (mesma UUID alterada; só-vigente; só-proposta; `numero_n` mudado sem mudar identidade; taxa de casamento baixa).
+**Nota (DEC-081, 2026-07-27):** escopo **ampliado** — casar as **tabelas excepcionais por `uuid`** da tabela (Spec 02 §6.1) e detectar **mudança de grade** de uma Viagem (`comum ↔ feriado ↔ excepcional`, por `viagem_feriado`/`tabela_excepcional_uuid`) — Spec 05 §12.3; RN-099. Cobrir ao implementar (sem task de diff separada para excepcional).
 
 ## TASK-037 — Telas de comparação (visão geral, serviços, horários, opções, matrizes)
 
@@ -314,6 +318,7 @@
 **Resumo:** Visão geral (placar, destaques, alertas), tabela de Serviços, viagens por faixa (semana padrão × feriados separados), opções de deslocamento com atribuição de causas, matrizes comparativas célula a célula, filtros e abas.
 **Regras RN:** RN-069, RN-072, RN-083, RN-088, RN-089. **Depende de:** TASK-031 (módulo de contagens compartilhado), TASK-036.
 **Testes esperados:** unitários dos formatos (`antigo → novo (Δ)`); integração por aba.
+**Nota (DEC-081, 2026-07-27):** escopo **ampliado** — a semana padrão exibida exclui feriado **e** operação excepcional (RN-069 com texto novo); **cada grade excepcional** aparece em tabela própria separada, casada por `uuid`, sem misturar com comum/feriado (Spec 05 §10.4). Cobrir ao implementar.
 
 ## TASK-038 — Mapa comparativo
 
@@ -332,6 +337,7 @@
 **Resumo:** Estrutura da Spec 05 §17.2 (capa com os dois arquivos + aviso SEI, resumo executivo, seções 3–9, anexo técnico), client-side, mesmas regras transversais.
 **Regras RN:** RN-076, RN-077, RN-092. **Depende de:** TASK-037, TASK-038.
 **Testes esperados:** PDF (estrutura; alertas presentes; semana padrão rotulada).
+**Nota (DEC-081, 2026-07-27):** o rótulo da semana padrão é "sem feriados nem operação excepcional" e as **grades excepcionais** entram em suas próprias tabelas comparativas (Spec 05 §10.4/§13.3; RN-069/RN-099). Cobrir ao implementar.
 
 ---
 
@@ -4971,6 +4977,295 @@ Além do sintoma visual, o documento fica **inválido**: a validação estrutura
 ## Perguntas em aberto
 
 - Nenhuma (a correção decorre diretamente de RN-007/RN-026/RN-036; nenhuma regra nova é inventada).
+
+---
+
+## TASK-102 — Contrato: entidade `tabelas_excepcionais` + `tabela_excepcional_uuid` na Viagem (schema v1.1 + validações + migração)
+
+## Objetivo
+
+Ampliar o schema executável e as validações estruturais para o contrato **v1.1**: `servico.tabelas_excepcionais[]` (`{ uuid, tipo, descricao? }`) e o campo `tabela_excepcional_uuid` na Viagem, com invariante, cardinalidade das canônicas e migração transparente de documentos `"1.0"`.
+
+## Contexto
+
+DEC-081 (Q-059) decidiu a operação excepcional; as Specs 02/03/04/05 já foram atualizadas (Spec 02 §6.1/§11/§14, `versao_schema` 1.0→1.1, campos opcionais com default). É a **fundação**: nenhuma UI, contagem, PDF ou diff pode tocar a grade excepcional antes do schema. Estende o schema base da TASK-003 (`src/shared/contrato/`).
+
+## Fora de escopo
+
+- UI de criar/editar/filtrar as tabelas (TASK-104) e a grade de horários excepcional (TASK-105).
+- Ajuste das contagens (TASK-103), do PDF (nota na TASK-034) e do Comparador (notas nas TASK-036/037/039).
+- Qualquer semântica de calendário/datas — a categoria é **textual** (`ferias_verao`/`ferias_inverno`/`personalizado`); não inventar vigência.
+
+## Specs fonte
+
+- Spec 02 §6.1 (TabelaExcepcional), §11 (Viagem: `tabela_excepcional_uuid` + invariante), §14 (validações estruturais), §13 (histórico/versão), §15 (exemplo)
+
+## Regras envolvidas
+
+- RN-098 (entidade, cardinalidade, `descricao` condicional, sem sobreposição), RN-099 (referência + invariante + precedência), RN-061 (grade única na Viagem), RN-062 (não-unicidade da tupla), RN-008..011 (schema fechado/strict), RN-004 (UUID preservada)
+
+## Entidades afetadas
+
+- Tabela excepcional (nova), Viagem, Serviço
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [x] Comparador (lê o novo schema)
+- [ ] Ingestor
+- [ ] PDF
+- [x] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] O exemplo mínimo (Spec 02 §15) e o novo exemplo de operação excepcional (§15) validam.
+- [ ] Cada validação estrutural nova (Spec 02 §14) tem caso negativo que falha isoladamente: `tipo` fora do enum; `descricao` ausente em `personalizado` ou presente em `ferias_verao`/`ferias_inverno`; 2ª tabela `ferias_verao` (ou `ferias_inverno`) no mesmo Serviço; `tabela_excepcional_uuid` que não existe no Serviço-pai; `tabela_excepcional_uuid ≠ null` com `viagem_feriado = true`.
+- [ ] Documento `versao_schema = "1.0"` sem os campos novos continua válido (default `null`/`[]`).
+- [ ] Round-trip export→import preserva o `uuid` de cada tabela excepcional e o `tabela_excepcional_uuid` das Viagens (RN-004).
+- [ ] Schema permanece **fechado** (campos extras rejeitados).
+
+## Casos válidos
+
+- Serviço com `tabelas_excepcionais: [{uuid, tipo:"ferias_verao", descricao:null}, {uuid, tipo:"personalizado", descricao:"Excursão Aparecida"}]` e Viagem `{viagem_feriado:false, tabela_excepcional_uuid:<uuid da verão>}`.
+- Serviço sem o campo (documento `"1.0"`).
+- Duas tabelas `personalizado` com `descricao` distintas.
+
+## Casos inválidos
+
+- Os cinco cenários dos critérios de aceite → recusa da validação estrutural (mensagem específica por caso).
+
+## Testes esperados
+
+- Unitários: validadores de cardinalidade canônica, `descricao` condicional, invariante feriado×excepcional (cross-field), referência a tabela existente.
+- Snapshot/contrato JSON: fixture §15 e a nova fixture excepcional passam; mutações dirigidas falham uma a uma; back-compat `"1.0"`.
+
+## Arquivos prováveis
+
+- `src/shared/contrato/esquema.ts` (schema zod: entidade + campo + `superRefine` do invariante), `src/shared/contrato/validacoes-estruturais.ts` (cardinalidade/referência/`descricao`), fixtures de teste, normalização de default na importação.
+
+## Riscos
+
+- Regressão no schema base; back-compat `"1.0"` (default silencioso). Invariante feriado×excepcional exige validação cross-field (não dá para expressar só no shape).
+
+## Dependências
+
+- TASK-003 (schema base). Sem pendência de Q-xxx (DEC-081).
+
+## Perguntas em aberto
+
+- Nenhuma.
+
+---
+
+## TASK-103 — Contagens: excluir a operação excepcional da semana padrão
+
+## Objetivo
+
+Ajustar o módulo de contagens para que a semana padrão seja **só a grade comum** (`viagem_feriado = false` **e** `tabela_excepcional_uuid = null`) e o rótulo passe a "semana padrão (sem feriados nem operação excepcional)".
+
+## Contexto
+
+A TASK-031 (**concluída**) implementou as contagens com a fórmula antiga "`viagem_feriado = false`". Como uma Viagem excepcional tem `viagem_feriado = false`, ela entraria indevidamente na conta. A Spec 03 §9.2/§9.4 já traz a fórmula corrigida e a Spec 04 §10/§13.3 o novo rótulo. É modificação de código já entregue, não superfície nova.
+
+## Fora de escopo
+
+- Criar/editar tabelas (TASK-104) e a grade excepcional (TASK-105).
+- PDF e Comparador (cobertos ao construir/rever TASK-034 e TASK-036/037).
+
+## Specs fonte
+
+- Spec 03 §9.2, §9.4 (fórmula da semana padrão); Spec 04 §10, §13.3 (rótulo)
+
+## Regras envolvidas
+
+- RN-069 (contagens sem feriado **nem** operação excepcional), RN-099
+
+## Entidades afetadas
+
+- Viagem (contagem)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [x] Comparador (consome o mesmo módulo de contagens)
+- [ ] PDF
+- [ ] JSON
+
+## Critérios de aceite
+
+- [ ] `viagens_semana` conta só Viagens com `viagem_feriado = false` **e** `tabela_excepcional_uuid = null`.
+- [ ] Dois documentos que diferem só nas tabelas excepcionais têm contagens idênticas.
+- [ ] Todo rótulo de contagem (tela; e o texto reutilizado por PDF/Comparador) diz "sem feriados nem operação excepcional".
+
+## Casos válidos
+
+- Itinerário com 5 comuns + 2 excepcionais + 1 feriado → `viagens_semana = 5`.
+
+## Casos inválidos
+
+- N/A (cálculo puro) — cobertos por casos de contagem dirigidos.
+
+## Testes esperados
+
+- Unitários: fórmula com mix de grades; invariância a mudanças só na grade excepcional; texto do rótulo (fonte única).
+
+## Arquivos prováveis
+
+- Módulo de contagens em `src/shared/` introduzido pela TASK-031; string de rótulo (garantir fonte única reusada por tela/PDF/comparador).
+
+## Riscos
+
+- Rótulo referenciado em múltiplos pontos — garantir uma única fonte para não divergir.
+
+## Dependências
+
+- TASK-102; TASK-031 (concluída). Sem Q-xxx.
+
+## Perguntas em aberto
+
+- Nenhuma.
+
+---
+
+## TASK-104 — Formulário: CRUD e filtro das tabelas de operação excepcional por Serviço
+
+## Objetivo
+
+Permitir ao usuário criar/editar/remover tabelas excepcionais de um Serviço (tipo Férias de verão / Férias de inverno / Personalizado com nome), respeitando a cardinalidade das canônicas e oferecendo filtro por tipo/descrição.
+
+## Contexto
+
+Spec 04 §8.5 define a UX; a entidade já existe no contrato após a TASK-102. É pré-requisito da grade excepcional (TASK-105). A etapa de Viagens já existe (TASK-028 / redesign TASK-056).
+
+## Fora de escopo
+
+- A grade de horários da tabela e o "copiar dias comuns" (TASK-105).
+- Contagens (TASK-103), PDF, Comparador.
+- **Qualquer** verificação de sobreposição entre tabelas (proibida pela Spec 02 §6.1).
+
+## Specs fonte
+
+- Spec 04 §8.5 (criar/tipos/filtro); Spec 02 §6.1 (cardinalidade, `descricao` condicional)
+
+## Regras envolvidas
+
+- RN-098 (cardinalidade canônica única, `descricao` só em `personalizado`, sem sobreposição), RN-004 (UUID nova na criação, preservada na edição)
+
+## Entidades afetadas
+
+- Tabela excepcional, Serviço
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] JSON
+
+## Critérios de aceite
+
+- [ ] Criar tabela escolhendo o tipo; `personalizado` exige `descricao` (nome), verão/inverno não.
+- [ ] Tentar criar 2ª "Férias de verão" (ou inverno) no mesmo Serviço é impedido com mensagem; `personalizado` pode repetir.
+- [ ] Remover uma tabela; filtro/busca por tipo (verão/inverno) e por texto (`descricao`).
+- [ ] Nova tabela recebe UUID nova; editar `descricao` preserva a UUID.
+
+## Casos válidos
+
+- Criar "Férias de verão"; criar duas "Personalizado" com nomes distintos; filtrar "verão".
+
+## Casos inválidos
+
+- 2ª "Férias de verão" → bloqueio; `personalizado` sem nome → erro de campo.
+
+## Testes esperados
+
+- Unitários: reducers de CRUD + cardinalidade + `descricao` condicional.
+- E2E: criar/filtrar/remover uma tabela.
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/` (etapa Viagens do redesign, TASK-056), `shared/ui` (diálogo/seletor de tipo, padrão do design system doc 18).
+
+## Riscos
+
+- **Remoção de uma tabela que já tem Viagens associadas** — a Spec 04 §8.5 não fixa o comportamento (bloquear × remover em cascata as Viagens). Resolver na `/analisar-task`; **se a spec não bastar, abrir Q-xxx antes de implementar** (não decidir por conta própria — `docs-dev/04` princípio 2).
+- Integração com a etapa Viagens/Serviços redesenhada.
+
+## Dependências
+
+- TASK-102; etapa Viagens (TASK-028 / TASK-056).
+
+## Perguntas em aberto
+
+- Possível Q-xxx sobre remoção de tabela com Viagens associadas (avaliar na análise).
+
+---
+
+## TASK-105 — Formulário: grade de horários da tabela excepcional + "copiar dias comuns"
+
+## Objetivo
+
+Cada tabela excepcional passa a ter uma grade própria (mesma estrutura da grade comum), cujas células viram Viagens com `tabela_excepcional_uuid` e `viagem_feriado = false`; mais o botão "copiar dias comuns" que semeia a grade clonando as Viagens comuns (UUIDs novas).
+
+## Contexto
+
+Spec 04 §8.5. Reusa a grade de dias comuns (TASK-028, concluída) e o motor de cópia da tabela de feriados (TASK-030, concluída). A tabela precisa existir (TASK-104).
+
+## Fora de escopo
+
+- CRUD/filtro das tabelas (TASK-104); contagens (TASK-103); PDF; Comparador.
+- Nenhuma sub-grade de feriado **dentro** da excepcional (Spec 03 §9.1 — em feriado a excepcional cai).
+
+## Specs fonte
+
+- Spec 04 §8.5 (grade própria, "copiar dias comuns"); Spec 02 §11 (invariante); Spec 03 §9.1 (precedência)
+
+## Regras envolvidas
+
+- RN-099 (grade excepcional, invariante), RN-061 (grade única), RN-007 (cópia → UUIDs novas), RN-063/RN-067 (offsets/digitação de horários)
+
+## Entidades afetadas
+
+- Viagem, Tabela excepcional
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] JSON
+
+## Critérios de aceite
+
+- [ ] Preencher célula na grade de uma tabela excepcional cria Viagem com o `tabela_excepcional_uuid` correto e `viagem_feriado = false`.
+- [ ] "Copiar dias comuns" clona as comuns como excepcionais (UUIDs novas, `viagem_feriado = false`, `tabela_excepcional_uuid` da tabela-destino), com confirmação se a grade já tiver conteúdo (sobrescrever/mesclar).
+- [ ] Legenda "não entra nas contagens da semana padrão" na grade excepcional.
+- [ ] Grades comum, de feriado e excepcional permanecem independentes.
+
+## Casos válidos
+
+- Grade "Férias de verão" com 3 sábados; "copiar dias comuns" numa tabela vazia.
+
+## Casos inválidos
+
+- Nenhum estrutural novo além dos herdados da grade (offsets fora de ordem etc. — RN-063).
+
+## Testes esperados
+
+- Unitários: criação de Viagem excepcional pela célula; cópia gera UUIDs novas com `viagem_feriado = false`; independência das grades.
+- E2E: preencher e copiar numa grade excepcional.
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/acoes-grade.ts` e componentes da grade; reuso do motor de cópia da TASK-030.
+
+## Riscos
+
+- Reaproveitar a grade comum sem duplicar lógica; garantir que a cópia respeita o invariante feriado×excepcional.
+
+## Dependências
+
+- TASK-102, TASK-104; TASK-028 e TASK-030 (concluídas).
+
+## Perguntas em aberto
+
+- Nenhuma.
 
 ---
 

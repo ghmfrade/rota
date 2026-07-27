@@ -449,13 +449,13 @@
 
 ## RN-061 — Viagem estratificada por dia
 
-**Descrição:** Cada Viagem é uma partida num **único** `dia_semana` (enum de 7 valores), com `viagem_feriado` booleano e `horario_saida` (`HH:MM:SS`). Um horário de seg–sex são 5 Viagens (UUIDs e offsets próprios). Substitui o desenho `dias_semana[]` + `regra_feriado`.
-**Origem:** Spec 02 §11, §13 item 21; Spec 01 §8; Spec 04 §8.
+**Descrição:** Cada Viagem é uma partida num **único** `dia_semana` (enum de 7 valores), com `viagem_feriado` booleano e `horario_saida` (`HH:MM:SS`). Um horário de seg–sex são 5 Viagens (UUIDs e offsets próprios). Substitui o desenho `dias_semana[]` + `regra_feriado`. Cada Viagem pertence a **exatamente uma** grade — comum, feriado ou uma **tabela excepcional** —, dadas por `viagem_feriado` + `tabela_excepcional_uuid` (`string | null`, default `null`); **invariante:** se `tabela_excepcional_uuid ≠ null` então `viagem_feriado = false` (DEC-081).
+**Origem:** Spec 02 §11, §13 item 21, §6.1; Spec 01 §8; Spec 04 §8; DEC-081.
 **Tipo:** Domínio | JSON. **Criticidade:** Alta. **Afeta:** F, C, I, J, P, T.
 
 ## RN-062 — Reforço de horário é válido
 
-**Descrição:** Duas Viagens do mesmo itinerário podem ter o mesmo `dia_semana` e `horario_saida` — não há validação de unicidade dessa combinação.
+**Descrição:** Duas Viagens do mesmo itinerário podem ter o mesmo `dia_semana` e `horario_saida` — não há validação de unicidade dessa combinação, nem da tupla `(dia_semana, horario_saida, viagem_feriado, tabela_excepcional_uuid)`.
 **Origem:** Spec 02 §11, §14.
 **Tipo:** Validação. **Criticidade:** Baixa. **Afeta:** F, C, J, T.
 
@@ -500,14 +500,14 @@
 
 ## RN-068 — Grade de feriados substitui integralmente a comum
 
-**Descrição:** Num feriado, operam **apenas** as Viagens `viagem_feriado = true` daquele `dia_semana`; as comuns do dia não operam. As duas grades são independentes (feriado pode ter mais, menos ou nenhuma viagem).
-**Origem:** Spec 02 §11; Spec 03 §9.1.
+**Descrição:** Num feriado, operam **apenas** as Viagens `viagem_feriado = true` daquele `dia_semana`; as comuns **e as excepcionais** do dia não operam. Precedência **feriado > excepcional > comum** (DEC-081). As grades são independentes (feriado pode ter mais, menos ou nenhuma viagem).
+**Origem:** Spec 02 §11; Spec 03 §9.1; DEC-081.
 **Tipo:** Domínio. **Criticidade:** Alta. **Afeta:** F, C, J, P, T.
 
 ## RN-069 — Feriado não altera contagens
 
-**Descrição:** Todas as contagens (viagens semanais, opções de deslocamento) usam a **semana padrão**: exclusivamente Viagens com `viagem_feriado = false`. Dois JSONs que difiram só na grade de feriados têm contagens idênticas. Contagens sempre rotuladas "semana padrão (sem feriados)".
-**Origem:** Spec 03 §9.2; Spec 04 §6, §10, §13.3; Spec 05 §10.4.
+**Descrição:** Todas as contagens (viagens semanais, opções de deslocamento) usam a **semana padrão** = grade comum: exclusivamente Viagens com `viagem_feriado = false` **e** `tabela_excepcional_uuid = null`. Viagens de feriado **e excepcionais nunca** entram nas contagens. Dois JSONs que difiram só na grade de feriados **ou nas tabelas excepcionais** têm contagens idênticas. Contagens sempre rotuladas "semana padrão (sem feriados nem operação excepcional)".
+**Origem:** Spec 03 §9.2, §9.4; Spec 04 §6, §10, §13.3; Spec 05 §10.4; DEC-081.
 **Tipo:** Cálculo | Domínio. **Criticidade:** Alta. **Afeta:** F, C, P, T.
 
 ## RN-070 — Calendário de feriados é externo
@@ -700,6 +700,22 @@ _(Detalhamento com riscos e revisão em `11-NEGATIVE_REQUIREMENTS.md` — aqui s
 **Descrição:** Formulário, Comparador e Ingestor não compartilham estado; o único contrato é o JSON de operação. Comparador não altera JSON; comparativo não é gravado dentro do JSON nem do formulário.
 **Origem:** Spec 01 §2, §5, §8; Spec 05 §2.
 **Tipo:** Arquitetura. **Criticidade:** Alta. **Afeta:** F, C, I, J, T.
+
+---
+
+## Grupo 21 — Operação excepcional
+
+## RN-098 — Entidade TabelaExcepcional no Serviço
+
+**Descrição:** `servico.tabelas_excepcionais[]` é uma coleção de grades de operação excepcional, cada elemento `{ uuid, tipo, descricao? }`. `uuid` é UUIDv4 preservada na importação (identidade — RN-001..004). `tipo ∈ { "ferias_verao", "ferias_inverno", "personalizado" }`: os dois primeiros são rótulos fixos (filtráveis por serem valores fechados), o terceiro é categoria livre. `descricao` (string) é **obrigatória sse `tipo == "personalizado"`** e ausente/nula nos demais. **Cardinalidade:** no máximo **uma** `ferias_verao` e **uma** `ferias_inverno` por Serviço (tipos canônicos únicos); `personalizado` pode repetir. **Não** há verificação de sobreposição entre tabelas — a vigência é categoria textual, responsabilidade do usuário. Campos opcionais com default (`versao_schema` 1.0 → 1.1; documentos antigos seguem válidos).
+**Origem:** Spec 02 §6.1, §14, §13; Spec 04 §8.5; DEC-081.
+**Tipo:** Domínio | JSON | Validação. **Criticidade:** Alta. **Afeta:** F, C, I, J, P, T.
+
+## RN-099 — Grade excepcional da Viagem e sua semântica
+
+**Descrição:** Uma Viagem com `tabela_excepcional_uuid ≠ null` pertence à tabela excepcional (do mesmo Serviço) de igual `uuid` — não à grade comum nem à de feriado; a referência deve apontar para uma tabela existente. Invariante: `tabela_excepcional_uuid ≠ null ⇒ viagem_feriado = false` (RN-061). **Precedência feriado > excepcional > comum:** em feriado, a operação de feriado prevalece e a excepcional cai; a tabela excepcional **não** tem sub-grade de feriado própria (RN-068). Viagens excepcionais **não** entram nas contagens da semana padrão (RN-069). No Formulário, cada tabela excepcional é uma grade própria (mesma estrutura da grade comum), semeável por "copiar dias comuns" (Viagens novas, UUIDs novas — RN-007). No Comparador, cada grade excepcional é casada por `uuid` da tabela e exibida em tabela separada, sem misturar; mudança de grade aparece como `comum → Férias de verão`, etc.
+**Origem:** Spec 02 §11, §6.1; Spec 03 §9.1, §9.2; Spec 04 §8.5; Spec 05 §10.4, §12.3; DEC-081.
+**Tipo:** Domínio | JSON. **Criticidade:** Alta. **Afeta:** F, C, I, J, P, T.
 
 ---
 

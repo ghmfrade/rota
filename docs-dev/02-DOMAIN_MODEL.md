@@ -136,14 +136,23 @@
 **Participa de tarifa?** **Sim** — é a "matriz tarifária" (em km; R$ é externo, RN-013).
 **Observações:** alimenta `pares_compraveis` junto com o par ponta-a-ponta (RN-072).
 
+## Tabela excepcional
+
+**Definição:** Grade de operação excepcional de um Serviço — categoria **textual**, não datada: `{ uuid, tipo, descricao? }`, `tipo ∈ {ferias_verao, ferias_inverno, personalizado}`, `descricao` só para `personalizado` (Spec 02 §6.1; DEC-081).
+**Pertence a:** Serviço (`servico.tabelas_excepcionais[]`).
+**Pode referenciar:** — (é referenciada pelas Viagens via `tabela_excepcional_uuid`).
+**Tem UUID estável?** **Sim** (preservada na importação; chave que a Viagem referencia).
+**Entra no JSON?** Sim. **Entra no PDF?** Sim (grade própria, tabela separada como a de feriados).
+**Observações:** canônicas (`ferias_verao`/`ferias_inverno`) únicas por Serviço, `personalizado` repetível; sem verificação de sobreposição; em feriado a operação de feriado prevalece (não tem sub-grade de feriado própria); Viagens excepcionais não entram nas contagens da semana padrão (RN-098/099).
+
 ## Viagem
 
-**Definição:** Uma partida de um itinerário em **um único** `dia_semana`, comum (`viagem_feriado=false`) ou de feriado (`true`), com `horario_saida` e offsets próprios (Spec 02 §11).
+**Definição:** Uma partida de um itinerário em **um único** `dia_semana`, em **exatamente uma** grade — comum (`viagem_feriado=false`, `tabela_excepcional_uuid=null`), de feriado (`viagem_feriado=true`) ou de uma **tabela excepcional** (`tabela_excepcional_uuid ≠ null`, que implica `viagem_feriado=false`) — com `horario_saida` e offsets próprios (Spec 02 §11; DEC-081).
 **Pertence a:** Itinerário (`itinerario.viagens[]`).
-**Pode referenciar:** Paradas (via `horarios_paradas[].parada_ordem`).
+**Pode referenciar:** Paradas (via `horarios_paradas[].parada_ordem`); uma Tabela excepcional do Serviço-pai (via `tabela_excepcional_uuid`).
 **Tem UUID estável?** **Sim.**
-**Entra no JSON?** Sim. **Entra no PDF?** Sim (grade de horários; feriados em tabela separada).
-**Participa de tarifa?** Não diretamente (entra na contagem de opções). **Participa de rota?** Não (usa a do itinerário).
+**Entra no JSON?** Sim. **Entra no PDF?** Sim (grade de horários; feriados e cada grade excepcional em tabelas separadas).
+**Participa de tarifa?** Não diretamente (entra na contagem de opções, só a grade comum). **Participa de rota?** Não (usa a do itinerário).
 **Observações:** célula preenchida da grade = uma Viagem; cópias geram UUID nova (RN-007); reforço de horário é válido (RN-062).
 
 ## Horários de passagem
@@ -209,6 +218,7 @@ graph TD
   SECOES --> SS["secao.servicos[]<br/>geoloc ida/volta por Serviço"]
   SS -. referencia .-> SERVICOS
   SERVICOS --> LOCAIS["Locais (servico.locais[]) — UUID"]
+  SERVICOS --> TABEXC["tabelas_excepcionais[] — UUID<br/>tipo, descricao?"]
   SERVICOS --> MD["matriz_distancias[]<br/>pares de secao_uuid"]
   SERVICOS --> MS["matriz_seccionamento[]<br/>pares habilitados"]
   SERVICOS --> ITIN["Itinerários (1..2, ida/volta)"]
@@ -219,7 +229,8 @@ graph TD
   ROTA --> PDR["pontos_de_rota[] (sem UUID)"]
   ROTA --> DESC["descricao_itinerario<br/>itens: secao | via"]
   DESC -. referencia .-> SECOES
-  ITIN --> VIAGENS["Viagens — UUID<br/>dia_semana + viagem_feriado"]
+  ITIN --> VIAGENS["Viagens — UUID<br/>dia_semana + viagem_feriado + tabela_excepcional_uuid?"]
+  VIAGENS -. referencia .-> TABEXC
   VIAGENS --> HP["horarios_paradas[]<br/>offset por parada_ordem"]
   MD -. referencia .-> SECOES
   MS -. referencia .-> SECOES
@@ -260,5 +271,5 @@ graph LR
 | **UUID vs número/rótulo humano** | `uuid` é identidade de máquina — estável, preservada na importação, base do diff e chave futura no banco. `numero_n`, `nome`, rótulos são display — mutáveis e reaproveitáveis, proibidos como chave (RN-006). |
 | **Matriz de distâncias vs matriz de seccionamento** | Distâncias: **computada** (soma de trechos), congelada, cobre **todos** os pares, somente-leitura. Seccionamento: **decisão do usuário** — quais pares vendem passagem parcial e com que distância de referência (sugerida, mas confirmada manualmente); subconjunto dos pares da matriz de distâncias. |
 | **`rota.trechos` vs `matriz_distancias`** | Trechos: granulares por **parada consecutiva** (incluem Locais), por sentido, com duração. Matriz: agregada por **par de Seções**, Ida e Volta juntas, sem duração. |
-| **Viagem comum vs viagem de feriado** | Entidades distintas (UUIDs distintas), grades independentes; no feriado a grade de feriados **substitui integralmente** a comum; feriados nunca entram nas contagens (semana padrão). |
+| **Viagem comum vs viagem de feriado vs excepcional** | Entidades distintas (UUIDs distintas), grades independentes e mutuamente exclusivas por Viagem (comum / feriado / tabela excepcional). Precedência **feriado > excepcional > comum**: no feriado a grade de feriados **substitui integralmente** a comum **e** a excepcional. Feriados e excepcionais **nunca** entram nas contagens (semana padrão = só a grade comum). Tabela excepcional é categoria **textual** (`ferias_verao`/`ferias_inverno`/`personalizado`), não datada (DEC-081). |
 | **Distância Haversine vs distância roteada** | Haversine: linha reta, **só** para regras espaciais (350 m, deslocamento relatado no Comparador). Roteada (OSRM): a que alimenta trechos, matrizes e tarifa. Nunca usar uma no lugar da outra. |
