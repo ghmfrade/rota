@@ -1,6 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { REGEX_UUID_V4 } from "@/shared/contrato";
-import { duplicarServico } from "@/formulario/servicos/duplicar";
+import { REGEX_UUID_V4, esquemaDocumentoOperacao } from "@/shared/contrato";
+import {
+  duplicarServico,
+  reconciliarSecoesDaDuplicacao,
+} from "@/formulario/servicos/duplicar";
 import {
   documentoBidirecionalMultiServico,
   documentoExemploMinimo,
@@ -147,5 +150,129 @@ describe("duplicarServico — UUIDs novas, referências de Seção mantidas (RN-
     const copia = duplicarServico(original);
     expect(copia.locais).toHaveLength(0);
     expect(copia.uuid).not.toBe(original.uuid);
+  });
+});
+
+describe("reconciliarSecoesDaDuplicacao — contribuições da cópia (TASK-101)", () => {
+  test("Serviço bidirecional ganha contribuição própria em cada Seção usada (RN-007/RN-026)", () => {
+    const doc = documentoBidirecionalMultiServico();
+    const original = doc.autos.servicos[0];
+    const copia = duplicarServico(original);
+    const secoes = reconciliarSecoesDaDuplicacao(doc.autos.secoes, original, copia);
+    const usadas = new Set(
+      copia.itinerarios.flatMap((itinerario) =>
+        itinerario.paradas.flatMap((parada) =>
+          parada.secao_uuid === undefined ? [] : [parada.secao_uuid],
+        ),
+      ),
+    );
+
+    for (const secao of secoes) {
+      const contribuicaoCopia = secao.servicos.find(
+        (entrada) => entrada.servico_uuid === copia.uuid,
+      );
+      if (!usadas.has(secao.uuid)) {
+        expect(contribuicaoCopia).toBeUndefined();
+        continue;
+      }
+      const contribuicaoOriginal = doc.autos.secoes
+        .find((originalSecao) => originalSecao.uuid === secao.uuid)!
+        .servicos.find((entrada) => entrada.servico_uuid === original.uuid)!;
+      expect(contribuicaoCopia?.geolocalizacao_ida).toEqual(
+        contribuicaoOriginal.geolocalizacao_ida,
+      );
+      expect(contribuicaoCopia?.geolocalizacao_volta).toEqual(
+        contribuicaoOriginal.geolocalizacao_volta,
+      );
+      expect(contribuicaoCopia?.geolocalizacao_ida).not.toBe(
+        contribuicaoOriginal.geolocalizacao_ida,
+      );
+      expect(contribuicaoCopia?.geolocalizacao_volta).not.toBe(
+        contribuicaoOriginal.geolocalizacao_volta,
+      );
+    }
+
+    expect(
+      esquemaDocumentoOperacao.safeParse({
+        ...doc,
+        autos: {
+          ...doc.autos,
+          secoes,
+          servicos: [...doc.autos.servicos, copia],
+        },
+      }).success,
+    ).toBe(true);
+  });
+
+  test("Serviço unidirecional copia somente a geolocalização do seu sentido", () => {
+    const doc = documentoExemploMinimo();
+    const original = doc.autos.servicos[0];
+    original.itinerarios = original.itinerarios.filter(
+      (itinerario) => itinerario.sentido === "ida",
+    );
+    for (const secao of doc.autos.secoes) {
+      const entrada = secao.servicos.find(
+        (contribuicao) => contribuicao.servico_uuid === original.uuid,
+      );
+      if (entrada) delete entrada.geolocalizacao_volta;
+    }
+    const copia = duplicarServico(original);
+    expect(copia.itinerarios.map((itinerario) => itinerario.sentido)).toEqual(["ida"]);
+
+    const secoes = reconciliarSecoesDaDuplicacao(doc.autos.secoes, original, copia);
+    for (const secao of secoes) {
+      const entrada = secao.servicos.find(
+        (contribuicao) => contribuicao.servico_uuid === copia.uuid,
+      );
+      if (!entrada) continue;
+      expect(entrada.geolocalizacao_ida).toBeDefined();
+      expect(entrada.geolocalizacao_volta).toBeUndefined();
+    }
+  });
+
+  test("não cria entrada órfã, não muta a origem e é idempotente (RN-018)", () => {
+    const doc = documentoExemploMinimo();
+    const original = doc.autos.servicos[0];
+    const copia = duplicarServico(original);
+    const secaoOrfa = structuredClone(doc.autos.secoes[0]);
+    secaoOrfa.uuid = "bb733b85-8580-4bb8-bec5-f972427d86b4";
+    const entradaAntes = structuredClone(doc.autos.secoes[0].servicos);
+    const primeira = reconciliarSecoesDaDuplicacao(
+      [...doc.autos.secoes, secaoOrfa],
+      original,
+      copia,
+    );
+    const segunda = reconciliarSecoesDaDuplicacao(primeira, original, copia);
+
+    expect(
+      primeira.at(-1)?.servicos.some(
+        (entrada) => entrada.servico_uuid === copia.uuid,
+      ),
+    ).toBe(false);
+    expect(segunda).toEqual(primeira);
+    expect(doc.autos.secoes[0].servicos).toEqual(entradaAntes);
+  });
+
+  test("caso inválido: sem contribuição original não inventa coordenadas", () => {
+    const doc = documentoExemploMinimo();
+    const original = doc.autos.servicos[0];
+    const copia = duplicarServico(original);
+    const secoesInvalidas = doc.autos.secoes.map((secao) => ({
+      ...secao,
+      servicos: secao.servicos.filter(
+        (entrada) => entrada.servico_uuid !== original.uuid,
+      ),
+    }));
+
+    const resultado = reconciliarSecoesDaDuplicacao(
+      secoesInvalidas,
+      original,
+      copia,
+    );
+    expect(
+      resultado.some((secao) =>
+        secao.servicos.some((entrada) => entrada.servico_uuid === copia.uuid),
+      ),
+    ).toBe(false);
   });
 });

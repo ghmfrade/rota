@@ -1,6 +1,11 @@
 import { expect, test } from "@playwright/test";
 import multiServico from "../fixtures/carregar-multi-servico.json";
 
+const PNG_1x1 = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=",
+  "base64",
+);
+
 // E2E da etapa Serviços (Spec 04 §6; TASK-016). Dirige o fluxo de documento
 // criado do zero (modo novo), onde os Serviços vivem como estado de sessão em
 // construção (DEC-035) — não há banco (RN-096/NEG-009), é tudo memória. Prova as
@@ -184,5 +189,30 @@ test.describe("Serviços — modo carregado (Serviços completos do JSON)", () =
     await page.getByTestId("servico-remover").first().click();
     await page.getByTestId("servico-remover-confirmar").click();
     await expect(page.getByTestId("servico-item")).toHaveCount(2);
+  });
+
+  test("duplicar Serviço completo mantém os marcadores das Seções no mapa (TASK-101)", async ({
+    page,
+  }) => {
+    await page.route("https://tile.openstreetmap.org/**", (rota) =>
+      rota.fulfill({ contentType: "image/png", body: PNG_1x1 }),
+    );
+    await carregarMultiServico(page);
+
+    await page.getByTestId("servico-duplicar").first().click();
+    await page
+      .getByTestId("etapa-botao")
+      .filter({ hasText: "Seções, Locais e Itinerários" })
+      .click();
+    await page
+      .getByTestId("select-servico-itinerario")
+      .selectOption({ label: "1-3SU" });
+    await page
+      .locator('[data-testid="botao-sentido"][data-sentido="ida"]')
+      .click();
+
+    await expect(
+      page.getByTestId("mapa-base").locator(".marcador-mapa-quadrado"),
+    ).toHaveCount(3);
   });
 });

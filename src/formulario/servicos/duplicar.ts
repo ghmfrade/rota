@@ -4,6 +4,7 @@ import {
   criarViagem,
   type Itinerario,
   type Parada,
+  type Secao,
   type Servico,
 } from "@/shared/contrato";
 
@@ -87,5 +88,71 @@ export function duplicarServico(servico: Servico): Servico {
     matriz_distancias: clone.matriz_distancias,
     matriz_seccionamento: clone.matriz_seccionamento,
     itinerarios,
+  });
+}
+
+/**
+ * Acrescenta às Seções usadas pela cópia a contribuição do novo Serviço
+ * (RN-007/RN-026/RN-036). Seção é compartilhada: sua identidade e todas as
+ * contribuições preexistentes permanecem intactas; somente nasce a entrada
+ * identificada pela `uuid` da cópia.
+ *
+ * Uma origem estruturalmente inválida não é "curada": sem contribuição do
+ * Serviço original, ou sem a geolocalização exigida, nenhum dado é inventado.
+ * A função é idempotente para proteger o commit de sessão contra repetição.
+ */
+export function reconciliarSecoesDaDuplicacao(
+  secoes: readonly Secao[],
+  original: Servico,
+  copia: Servico,
+): Secao[] {
+  const secoesUsadas = new Set(
+    copia.itinerarios.flatMap((itinerario) =>
+      itinerario.paradas.flatMap((parada) =>
+        parada.secao_uuid === undefined ? [] : [parada.secao_uuid],
+      ),
+    ),
+  );
+  const usaIda = copia.itinerarios.some((itinerario) => itinerario.sentido === "ida");
+  const usaVolta = copia.itinerarios.some(
+    (itinerario) => itinerario.sentido === "volta",
+  );
+
+  return secoes.map((secao) => {
+    if (
+      !secoesUsadas.has(secao.uuid) ||
+      secao.servicos.some((entrada) => entrada.servico_uuid === copia.uuid)
+    ) {
+      return secao;
+    }
+
+    const contribuicaoOriginal = secao.servicos.find(
+      (entrada) => entrada.servico_uuid === original.uuid,
+    );
+    if (!contribuicaoOriginal) return secao;
+
+    return {
+      ...secao,
+      servicos: [
+        ...secao.servicos,
+        {
+          servico_uuid: copia.uuid,
+          ...(usaIda && contribuicaoOriginal.geolocalizacao_ida !== undefined
+            ? {
+                geolocalizacao_ida: structuredClone(
+                  contribuicaoOriginal.geolocalizacao_ida,
+                ),
+              }
+            : {}),
+          ...(usaVolta && contribuicaoOriginal.geolocalizacao_volta !== undefined
+            ? {
+                geolocalizacao_volta: structuredClone(
+                  contribuicaoOriginal.geolocalizacao_volta,
+                ),
+              }
+            : {}),
+        },
+      ],
+    };
   });
 }

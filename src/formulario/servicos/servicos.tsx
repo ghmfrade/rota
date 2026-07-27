@@ -15,6 +15,7 @@ import {
 import {
   comServicosDaSessao,
   identidadeDaSessao,
+  secoesDaSessao,
   servicosDaSessao,
   servicosEmConstrucaoDaSessao,
   type Direcionalidade,
@@ -23,7 +24,10 @@ import {
 } from "@/formulario/sessao";
 import { Botao, Campo, Painel, Select, Selo, Tabela } from "@/shared/ui";
 import { contarServico, ROTULO_SEMANA_PADRAO } from "@/shared/contagens";
-import { duplicarServico } from "./duplicar";
+import {
+  duplicarServico,
+  reconciliarSecoesDaDuplicacao,
+} from "./duplicar";
 import { podeRemoverServico, removerServico, removerServicoDeLista } from "./remover";
 import { regenerarSufixoNumeroN, sugerirNumeroN } from "./numero-n";
 
@@ -275,8 +279,25 @@ export function EtapaServicos({
           original.caracteristica_veiculo,
         ),
       });
+      const secoes = reconciliarSecoesDaDuplicacao(
+        secoesDaSessao(sessao),
+        original,
+        copia,
+      );
+      const comServicos = comServicosDaSessao(sessao, [
+        ...servicosAtuais,
+        copia,
+      ]);
       aoAtualizarSessao(
-        comServicosDaSessao(sessao, [...servicosAtuais, copia]),
+        comServicos.modo === "carregado"
+          ? {
+              ...comServicos,
+              documento: {
+                ...comServicos.documento,
+                autos: { ...comServicos.documento.autos, secoes },
+              },
+            }
+          : { ...comServicos, secoesEmConstrucao: secoes },
       );
       return;
     }

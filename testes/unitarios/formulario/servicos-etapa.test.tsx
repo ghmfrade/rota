@@ -175,6 +175,23 @@ describe("EtapaServicos — modo novo, Serviço promovido (DEC-053/TASK-072)", (
       .map((p) => p.secao_uuid)
       .filter((v): v is string => v !== undefined);
     expect(secoesCopia).toEqual(secoesOriginais);
+    const secoes =
+      sessaoAtual.modo === "novo"
+        ? (sessaoAtual.secoesEmConstrucao ?? [])
+        : [];
+    for (const secaoUuid of new Set(secoesCopia)) {
+      const secao = secoes.find((item) => item.uuid === secaoUuid)!;
+      const contribuicaoOriginal = secao.servicos.find(
+        (entrada) => entrada.servico_uuid === UUID_PROMOVIDO,
+      );
+      const contribuicaoCopia = secao.servicos.find(
+        (entrada) => entrada.servico_uuid === copia.uuid,
+      );
+      expect(contribuicaoCopia).toEqual({
+        ...contribuicaoOriginal,
+        servico_uuid: copia.uuid,
+      });
+    }
 
     desmontar();
   });
