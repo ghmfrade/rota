@@ -194,6 +194,84 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     await expect(linhas.nth(2).getByTestId("celula-passante").locator("input")).toHaveValue("11:00");
   });
 
+  test("inserção relativa cria Viagem no mesmo dia, herda offsets e só aparece no hover (TASK-107)", async ({
+    page,
+  }) => {
+    let chamouOsrm = false;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamouOsrm = true;
+      return rota.abort();
+    });
+
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+    const partidaOrigem = grade.getByLabel("Horário de partida — segunda, viagem 1");
+    const celulaOrigem = partidaOrigem.locator("xpath=ancestor::td");
+
+    await celulaOrigem.hover();
+    await expect(celulaOrigem.getByTestId("acao-inserir-anterior")).toHaveCSS("opacity", "1");
+    await expect(celulaOrigem.getByLabel("Deslocamento anterior — segunda, viagem 1")).toHaveValue(
+      "00:10",
+    );
+    await expect(celulaOrigem.getByLabel("Deslocamento posterior — segunda, viagem 1")).toHaveValue(
+      "00:10",
+    );
+
+    await celulaOrigem.getByLabel("Deslocamento posterior — segunda, viagem 1").fill("01:10");
+    await celulaOrigem.getByLabel("Inserir viagem depois — segunda, viagem 1").click();
+
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toHaveValue("08:00");
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 2")).toHaveValue("09:10");
+    const linhas = grade.getByTestId("linha-grade");
+    await expect(linhas.nth(4).getByTestId("celula-passante").locator("input")).toHaveValue("09:50");
+    await expect(linhas.nth(5).getByTestId("celula-passante").locator("input")).toHaveValue("10:10");
+
+    await grade.getByRole("columnheader", { name: "DOM" }).hover();
+    await expect(celulaOrigem.getByTestId("acao-inserir-anterior")).toHaveCSS("opacity", "0");
+    expect(chamouOsrm).toBe(false);
+  });
+
+  test("inserção relativa herda a âncora manual e recusa resultado fora do dia (TASK-107)", async ({
+    page,
+  }) => {
+    let chamouOsrm = false;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamouOsrm = true;
+      return rota.abort();
+    });
+
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+    const linhas = grade.getByTestId("linha-grade");
+    const passanteFinalOrigem = linhas.nth(2).getByTestId("celula-passante").locator("input");
+    await passanteFinalOrigem.fill("08:50");
+
+    const partidaOrigem = grade.getByLabel("Horário de partida — segunda, viagem 1");
+    const celulaOrigem = partidaOrigem.locator("xpath=ancestor::td");
+    await celulaOrigem.hover();
+    await celulaOrigem.getByLabel("Inserir viagem depois — segunda, viagem 1").click();
+
+    const passanteIntermediarioCopia = grade
+      .getByTestId("linha-grade")
+      .nth(4)
+      .getByTestId("celula-passante")
+      .locator("input");
+    await expect(passanteIntermediarioCopia).toHaveValue("08:40");
+    await passanteIntermediarioCopia.fill("09:05");
+    await expect(passanteIntermediarioCopia).toHaveValue("08:40");
+    await expect(grade.getByTestId("erro-passante")).toBeVisible();
+
+    await partidaOrigem.fill("00:05");
+    await celulaOrigem.hover();
+    await celulaOrigem.getByLabel("Inserir viagem antes — segunda, viagem 1").click();
+    await expect(celulaOrigem.getByTestId("erro-insercao-relativa")).toContainText(
+      "00:00 e 23:59",
+    );
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toHaveValue("00:05");
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 2")).toHaveValue("08:10");
+    expect(chamouOsrm).toBe(false);
+  });
+
   test("editar horário passante ancora e redistribui; reset volta à sugestão inicial (RN-065/066)", async ({
     page,
   }) => {

@@ -1,5 +1,9 @@
 import { criarViagem, type Itinerario, type Viagem } from "@/shared/contrato";
-import { horaMinutoParaHorarioRelogio, horarioParaSegundos } from "./horario-relogio";
+import {
+  formatarHms,
+  horaMinutoParaHorarioRelogio,
+  horarioParaSegundos,
+} from "./horario-relogio";
 import {
   offsetForaDeOrdem,
   recomputarOffsetsComAncoras,
@@ -48,6 +52,34 @@ export function atualizarHorarioSaida(
   const horarioSaida = horaMinutoParaHorarioRelogio(horaMinuto);
   if (horarioSaida === null) return null;
   return { ...viagem, horario_saida: horarioSaida };
+}
+
+/**
+ * Cria uma nova Viagem a partir da selecionada, deslocando sua partida em
+ * minutos (DEC-082/TASK-107). É uma cópia: preserva os offsets já confirmados
+ * — inclusive os resultantes de redistribuições manuais — e cria UUID nova.
+ *
+ * O deslocamento não faz módulo de 24 h: resultado antes de 00:00 ou depois de
+ * 23:59 é recusado para não criar uma Viagem em outro dia. A grade de origem
+ * também é preservada por `viagem_feriado` e `tabela_excepcional_uuid`.
+ */
+export function inserirViagemPorOffsetRelativo(
+  viagem: Viagem,
+  deslocamentoMinutos: number,
+): Viagem | null {
+  if (!Number.isInteger(deslocamentoMinutos)) return null;
+
+  const horarioSaidaSegundos = horarioParaSegundos(viagem.horario_saida);
+  const horarioNovoSegundos = horarioSaidaSegundos + deslocamentoMinutos * 60;
+  if (horarioNovoSegundos < 0 || horarioNovoSegundos >= 24 * 60 * 60) return null;
+
+  return criarViagem({
+    horario_saida: formatarHms(horarioNovoSegundos),
+    dia_semana: viagem.dia_semana,
+    viagem_feriado: viagem.viagem_feriado,
+    tabela_excepcional_uuid: viagem.tabela_excepcional_uuid,
+    horarios_paradas: viagem.horarios_paradas.map((horario) => ({ ...horario })),
+  });
 }
 
 /** Resultado de editar um horário passante (Spec 04 §8.2). */

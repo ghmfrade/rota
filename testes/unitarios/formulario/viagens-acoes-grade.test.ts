@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { REGEX_UUID_V4 } from "@/shared/contrato";
-import { atualizarHorarioSaida, criarViagemNaCelula } from "@/formulario/viagens";
+import {
+  atualizarHorarioSaida,
+  criarViagemNaCelula,
+  inserirViagemPorOffsetRelativo,
+} from "@/formulario/viagens";
 import { documentoExemploMinimo } from "../../fixtures";
 
 // TASK-028 — ações da grade: criar Viagem por célula (RN-061/064/067) e
@@ -72,5 +76,48 @@ describe("atualizarHorarioSaida (reeditar a partida — TASK-029: preserva offse
 
     expect(resultado).toBeNull();
     expect(original.horario_saida).toBe("08:00:00"); // Viagem original intocada
+  });
+});
+
+describe("inserirViagemPorOffsetRelativo (TASK-107; DEC-082)", () => {
+  test("cria outra Viagem no mesmo dia e grade, com UUID nova e offsets herdados", () => {
+    const origem = {
+      ...itinerarioDaFixture().viagens[0],
+      tabela_excepcional_uuid: "11111111-1111-4111-8111-111111111111",
+      horarios_paradas: itinerarioDaFixture().viagens[0].horarios_paradas.map((h, indice) =>
+        indice === 1 ? { ...h, offset_horario: "00:07:00" } : { ...h },
+      ),
+    };
+
+    const copia = inserirViagemPorOffsetRelativo(origem, 70);
+
+    expect(copia).not.toBeNull();
+    expect(copia!.uuid).toMatch(REGEX_UUID_V4);
+    expect(copia!.uuid).not.toBe(origem.uuid);
+    expect(copia!.horario_saida).toBe("09:10:00");
+    expect(copia!.dia_semana).toBe(origem.dia_semana);
+    expect(copia!.viagem_feriado).toBe(origem.viagem_feriado);
+    expect(copia!.tabela_excepcional_uuid).toBe(origem.tabela_excepcional_uuid);
+    expect(copia!.horarios_paradas).toEqual(origem.horarios_paradas);
+    expect(copia!.horarios_paradas).not.toBe(origem.horarios_paradas);
+    expect(copia!.horarios_paradas[1]).not.toBe(origem.horarios_paradas[1]);
+  });
+
+  test("aceita limites do dia e reforço de horário", () => {
+    const origem = itinerarioDaFixture().viagens[0];
+    expect(inserirViagemPorOffsetRelativo({ ...origem, horario_saida: "00:10:00" }, -10)?.horario_saida).toBe(
+      "00:00:00",
+    );
+    expect(inserirViagemPorOffsetRelativo({ ...origem, horario_saida: "23:49:00" }, 10)?.horario_saida).toBe(
+      "23:59:00",
+    );
+    expect(inserirViagemPorOffsetRelativo(origem, 0)?.horario_saida).toBe(origem.horario_saida);
+  });
+
+  test("[inválido] recusa resultado fora do dia ou deslocamento fracionário", () => {
+    const origem = itinerarioDaFixture().viagens[0];
+    expect(inserirViagemPorOffsetRelativo({ ...origem, horario_saida: "00:05:00" }, -10)).toBeNull();
+    expect(inserirViagemPorOffsetRelativo({ ...origem, horario_saida: "23:55:00" }, 10)).toBeNull();
+    expect(inserirViagemPorOffsetRelativo(origem, 1.5)).toBeNull();
   });
 });

@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { ROTULO_SEMANA_PADRAO } from "@/shared/contagens";
 import { DIAS_SEMANA, type Itinerario, type Parada, type Secao, type Servico } from "@/shared/contrato";
-import { Botao, Painel, Select, Tabela } from "@/shared/ui";
+import { Botao, Campo, Painel, Select, Tabela } from "@/shared/ui";
 import { nomeExibicaoSecao } from "@/formulario/secoes";
 import {
   ancorasHorarioDaSessao,
@@ -17,6 +17,7 @@ import {
   atualizarHorarioSaida,
   criarViagemNaCelula,
   editarHorarioPassante,
+  inserirViagemPorOffsetRelativo,
   resetarOffsetsEmLote,
   resetarOffsetsViagem,
 } from "./acoes-grade";
@@ -25,7 +26,11 @@ import {
   clonarDiasComunsParaFeriado,
   copiarViagemParaDias,
 } from "./copias-grade";
-import { horarioParaHoraMinuto } from "./horario-relogio";
+import {
+  horaMinutoParaHorarioRelogio,
+  horarioParaHoraMinuto,
+  horarioParaSegundos,
+} from "./horario-relogio";
 import {
   destinoNavegacaoGrade,
   horarioAbsolutoNaParada,
@@ -61,6 +66,8 @@ const ROTULO_DIA: Record<DiaSemana, string> = {
   domingo: "DOM",
 };
 
+const DESLOCAMENTO_RELATIVO_PADRAO = "00:10";
+
 function secaoDaParada(parada: Parada, secoes: readonly Secao[]): Secao | undefined {
   return secoes.find((s) => s.uuid === parada.secao_uuid);
 }
@@ -88,6 +95,13 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   const [diaCopiaPorViagem, definirDiaCopiaPorViagem] = useState<Record<string, DiaSemana>>({});
   const [viagemSelecionadaUuid, definirViagemSelecionadaUuid] = useState<string | null>(null);
   const [viagemEmHoverUuid, definirViagemEmHoverUuid] = useState<string | null>(null);
+  const [deslocamentoAnteriorPorViagem, definirDeslocamentoAnteriorPorViagem] = useState<
+    Record<string, string>
+  >({});
+  const [deslocamentoPosteriorPorViagem, definirDeslocamentoPosteriorPorViagem] = useState<
+    Record<string, string>
+  >({});
+  const [errosInsercaoRelativa, definirErrosInsercaoRelativa] = useState<Record<string, string>>({});
 
   const servicos: Servico[] = servicosDaSessao(sessao);
   const servicoAtual = servicos.find((s) => s.uuid === servicoSelecionadoUuid) ?? null;
@@ -156,6 +170,45 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
       viagens: itinerarioAtual.viagens.map((v) => (v.uuid === viagemUuid ? viagemAtualizada : v)),
     });
     return true;
+  }
+
+  function aoInserirViagemPorOffset(viagemUuid: string, direcao: -1 | 1) {
+    if (!itinerarioAtual) return;
+    const viagem = itinerarioAtual.viagens.find((item) => item.uuid === viagemUuid);
+    if (!viagem) return;
+
+    const entrada =
+      direcao === -1
+        ? (deslocamentoAnteriorPorViagem[viagemUuid] ?? DESLOCAMENTO_RELATIVO_PADRAO)
+        : (deslocamentoPosteriorPorViagem[viagemUuid] ?? DESLOCAMENTO_RELATIVO_PADRAO);
+    const horario = horaMinutoParaHorarioRelogio(entrada);
+    if (horario === null) {
+      definirErrosInsercaoRelativa((atuais) => ({
+        ...atuais,
+        [viagemUuid]: "Informe o deslocamento no formato HH:MM.",
+      }));
+      return;
+    }
+
+    const minutos = horarioParaSegundos(horario) / 60;
+    const viagemNova = inserirViagemPorOffsetRelativo(viagem, direcao * minutos);
+    if (!viagemNova) {
+      definirErrosInsercaoRelativa((atuais) => ({
+        ...atuais,
+        [viagemUuid]: "O horário resultante deve ficar entre 00:00 e 23:59.",
+      }));
+      return;
+    }
+
+    definirErrosInsercaoRelativa((atuais) => {
+      const proximos = { ...atuais };
+      delete proximos[viagemUuid];
+      return proximos;
+    });
+    aplicar(
+      { ...itinerarioAtual, viagens: [...itinerarioAtual.viagens, viagemNova] },
+      { ...ancoras, [viagemNova.uuid]: [...(ancoras[viagemUuid] ?? [])] },
+    );
   }
 
   function aoEditarPassante(
@@ -379,6 +432,11 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
 
                 if (ehPrimeiraSecao) {
                   const viagemUuid = celula.viagem.uuid;
+                  const deslocamentoAnterior =
+                    deslocamentoAnteriorPorViagem[viagemUuid] ?? DESLOCAMENTO_RELATIVO_PADRAO;
+                  const deslocamentoPosterior =
+                    deslocamentoPosteriorPorViagem[viagemUuid] ?? DESLOCAMENTO_RELATIVO_PADRAO;
+                  const erroInsercaoRelativa = errosInsercaoRelativa[viagemUuid];
                   return (
                     <td
                       key={dia}
@@ -404,6 +462,33 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                           atributosNavegacao={atributosNavegacao}
                           aoSelecionar={() => definirViagemSelecionadaUuid(viagemUuid)}
                         />
+                        <div
+                          data-testid="acao-inserir-anterior"
+                          className={`absolute bottom-full left-1/2 z-20 mb-1 flex -translate-x-1/2 items-center gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3 [transition:opacity_var(--transicao-rapida)] ${
+                            emHover ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+                          }`}
+                        >
+                          <Campo
+                            densidade="compacta"
+                            aria-label={`Deslocamento anterior — ${dia}, viagem ${indiceBloco + 1}`}
+                            value={deslocamentoAnterior}
+                            onChange={(evento) =>
+                              definirDeslocamentoAnteriorPorViagem((atuais) => ({
+                                ...atuais,
+                                [viagemUuid]: evento.target.value,
+                              }))
+                            }
+                          />
+                          <Botao
+                            variante="fantasma"
+                            tamanho="compacto"
+                            data-testid="inserir-viagem-anterior"
+                            aria-label={`Inserir viagem antes — ${dia}, viagem ${indiceBloco + 1}`}
+                            onClick={() => aoInserirViagemPorOffset(viagemUuid, -1)}
+                          >
+                            ↑
+                          </Botao>
+                        </div>
                         <div
                           data-testid="acoes-viagem"
                           className={`absolute left-1/2 top-full z-20 mt-1 flex -translate-x-1/2 items-center gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3 [transition:opacity_var(--transicao-rapida)] ${
@@ -446,6 +531,26 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                           >
                             Copiar
                           </Botao>
+                          <Campo
+                            densidade="compacta"
+                            aria-label={`Deslocamento posterior — ${dia}, viagem ${indiceBloco + 1}`}
+                            value={deslocamentoPosterior}
+                            onChange={(evento) =>
+                              definirDeslocamentoPosteriorPorViagem((atuais) => ({
+                                ...atuais,
+                                [viagemUuid]: evento.target.value,
+                              }))
+                            }
+                          />
+                          <Botao
+                            variante="fantasma"
+                            tamanho="compacto"
+                            data-testid="inserir-viagem-posterior"
+                            aria-label={`Inserir viagem depois — ${dia}, viagem ${indiceBloco + 1}`}
+                            onClick={() => aoInserirViagemPorOffset(viagemUuid, 1)}
+                          >
+                            ↓
+                          </Botao>
                           <Botao
                             variante="perigo"
                             tamanho="compacto"
@@ -455,6 +560,11 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                           >
                             X
                           </Botao>
+                          {erroInsercaoRelativa && (
+                            <span role="alert" data-testid="erro-insercao-relativa" className="text-xs text-erro">
+                              {erroInsercaoRelativa}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </td>

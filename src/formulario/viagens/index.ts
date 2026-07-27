@@ -27,6 +27,7 @@ export {
 } from "./copias-grade";
 export {
   criarViagemNaCelula,
+  inserirViagemPorOffsetRelativo,
   atualizarHorarioSaida,
   editarHorarioPassante,
   resetarOffsetsViagem,
