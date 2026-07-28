@@ -48,7 +48,10 @@ export function CampoHorarioGrade({
     if (normalizado === null) {
       return false;
     }
-    if (normalizado === ultimoConfirmadoRef.current) return true;
+    if (normalizado === ultimoConfirmadoRef.current) {
+      definirRascunho(normalizado);
+      return true;
+    }
     const confirmou = aoConfirmar(normalizado);
     if (confirmou) ultimoConfirmadoRef.current = normalizado;
     definirRascunho(confirmou ? normalizado : valor);

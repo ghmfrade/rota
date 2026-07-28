@@ -110,6 +110,53 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     await expect(partidaSegunda).toHaveValue("08:00");
   });
 
+  test("TASK-116: Enter e Tab normalizam valor equivalente sem editar a Viagem", async ({
+    page,
+  }) => {
+    let chamouOsrm = false;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamouOsrm = true;
+      return rota.abort();
+    });
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+    const partidasAntes = await grade.getByTestId("celula-partida").count();
+    const partidaSegunda = grade.getByLabel("Horário de partida — segunda, viagem 1");
+    const celulaPartida = partidaSegunda.locator("xpath=ancestor::td");
+    const viagemUuid = await celulaPartida.getAttribute("data-viagem-uuid");
+
+    await partidaSegunda.fill("0800");
+    await partidaSegunda.press("Enter");
+    await expect(partidaSegunda).toHaveValue("08:00");
+
+    await partidaSegunda.fill("0800");
+    await partidaSegunda.press("Tab");
+    await expect(partidaSegunda).toHaveValue("08:00");
+    await expect(grade.getByTestId("celula-partida")).toHaveCount(partidasAntes);
+    await expect(celulaPartida).toHaveAttribute("data-viagem-uuid", viagemUuid!);
+    expect(chamouOsrm).toBe(false);
+  });
+
+  test("TASK-116: Enter e Tab recusam o parcial 10:3 sem criar Viagem nem navegar", async ({
+    page,
+  }) => {
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+    const criavel = grade.getByLabel("Criar viagem — terca");
+    const partidasAntes = await grade.getByTestId("celula-partida").count();
+
+    await criavel.fill("10:3");
+    await criavel.press("Enter");
+    await expect(criavel).toBeFocused();
+    await expect(criavel).toHaveValue("10:3");
+    await expect(grade.getByTestId("celula-partida")).toHaveCount(partidasAntes);
+
+    await criavel.press("Tab");
+    await expect(criavel).toBeFocused();
+    await expect(criavel).toHaveValue("10:3");
+    await expect(grade.getByTestId("celula-partida")).toHaveCount(partidasAntes);
+  });
+
   test("seleção forma superfície contínua; ações aparecem só no hover; Tab navega", async ({
     page,
   }) => {

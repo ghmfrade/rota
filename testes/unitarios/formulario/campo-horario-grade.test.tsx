@@ -119,6 +119,31 @@ describe("CampoHorarioGrade (TASK-116; RN-067)", () => {
     desmontar();
   });
 
+  it.each(["Enter", "Tab"] as const)(
+    "%s normaliza a exibição de valor equivalente sem confirmar novamente",
+    (tecla) => {
+      const aoConfirmar = vi.fn(() => true);
+      const aoNavegar = vi.fn(() => true);
+      const { container, desmontar } = renderizar(
+        <CampoHorarioGrade
+          valor="08:00"
+          rotuloAcessivel="Horário de partida"
+          aoConfirmar={aoConfirmar}
+          aoNavegar={aoNavegar}
+        />,
+      );
+      const input = container.querySelector("input") as HTMLInputElement;
+      preencher(input, "0800");
+
+      pressionar(input, tecla);
+
+      expect(input.value).toBe("08:00");
+      expect(aoConfirmar).not.toHaveBeenCalled();
+      expect(aoNavegar).toHaveBeenCalledWith(tecla);
+      desmontar();
+    },
+  );
+
   it("Tab em célula criável vazia navega sem tentar criar Viagem", () => {
     const aoConfirmar = vi.fn(() => true);
     const aoNavegar = vi.fn(() => true);
@@ -136,6 +161,33 @@ describe("CampoHorarioGrade (TASK-116; RN-067)", () => {
     expect(aoNavegar).toHaveBeenCalledWith("Tab");
     desmontar();
   });
+
+  it.each(["Enter", "Tab"] as const)(
+    "[inválido] %s com parcial 10:3 não confirma, não navega e mantém foco e rascunho",
+    (tecla) => {
+      const aoConfirmar = vi.fn(() => true);
+      const aoNavegar = vi.fn(() => true);
+      const { container, desmontar } = renderizar(
+        <CampoHorarioGrade
+          valor=""
+          rotuloAcessivel="Criar viagem"
+          aoConfirmar={aoConfirmar}
+          aoNavegar={aoNavegar}
+        />,
+      );
+      const input = container.querySelector("input") as HTMLInputElement;
+      act(() => input.focus());
+      preencher(input, "10:3");
+
+      pressionar(input, tecla);
+
+      expect(aoConfirmar).not.toHaveBeenCalled();
+      expect(aoNavegar).not.toHaveBeenCalled();
+      expect(input.value).toBe("10:3");
+      expect(document.activeElement).toBe(input);
+      desmontar();
+    },
+  );
 
   it("[inválido] Tab com rascunho não vazio inválido não navega", () => {
     const aoConfirmar = vi.fn(() => true);
