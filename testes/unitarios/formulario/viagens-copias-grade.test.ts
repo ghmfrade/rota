@@ -250,6 +250,29 @@ describe("operações de dia inteiro (DEC-085; RN-007/061/062)", () => {
     expect(resultado.copias.every((copia) => copia.horarios_paradas[1].offset_horario === "00:07:00")).toBe(true);
   });
 
+  test("preserva todos os reforços da origem no mesmo horário quando o destino estava vazio", () => {
+    const origem08 = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
+    const reforco08 = viagem("bbbbbbbb-0000-4000-8000-000000000002", "segunda", "08:00:00");
+    reforco08.horarios_paradas[1].offset_horario = "00:12:00";
+
+    const resultado = copiarDiaParaDiasComGuarda(
+      itinerario([origem08, reforco08]),
+      "segunda",
+      ["sabado"],
+      { viagem_feriado: false, tabela_excepcional_uuid: null },
+    );
+
+    expect(resultado.copias).toHaveLength(2);
+    expect(resultado.horariosIgnorados).toBe(0);
+    expect(new Set(resultado.copias.map((copia) => copia.uuid)).size).toBe(2);
+    expect(resultado.copias.every((copia) => copia.horario_saida === "08:00:00")).toBe(true);
+    expect(
+      resultado.copias
+        .map((copia) => copia.horarios_paradas[1].offset_horario)
+        .sort(),
+    ).toEqual(["00:07:00", "00:12:00"]);
+  });
+
   test("mescla sem substituir e avisa as cópias bloqueadas pela guarda da mesma grade", () => {
     const origem08 = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
     const origem09 = viagem("bbbbbbbb-0000-4000-8000-000000000002", "segunda", "09:00:00");
@@ -267,6 +290,24 @@ describe("operações de dia inteiro (DEC-085; RN-007/061/062)", () => {
     expect(resultado.copias[0].horario_saida).toBe("09:00:00");
     expect(resultado.horariosIgnorados).toBe(1);
     expect(resultado.itinerario.viagens.find((item) => item.uuid === existente.uuid)).toEqual(existente);
+  });
+
+  test("[inválido] destino preexistente bloqueia todos os reforços da origem naquele horário", () => {
+    const origem08 = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
+    const reforco08 = viagem("bbbbbbbb-0000-4000-8000-000000000002", "segunda", "08:00:00");
+    const existente = viagem("cccccccc-0000-4000-8000-000000000003", "sabado", "08:00:00");
+    const it = itinerario([origem08, reforco08, existente]);
+
+    const resultado = copiarDiaParaDiasComGuarda(
+      it,
+      "segunda",
+      ["sabado"],
+      { viagem_feriado: false, tabela_excepcional_uuid: null },
+    );
+
+    expect(resultado.copias).toEqual([]);
+    expect(resultado.horariosIgnorados).toBe(2);
+    expect(resultado.itinerario).toEqual(it);
   });
 
   test("[inválido] não copia para a origem, ignora lista vazia e não confunde outra grade", () => {

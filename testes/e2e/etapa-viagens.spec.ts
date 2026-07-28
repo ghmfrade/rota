@@ -877,6 +877,41 @@ test.describe("Etapa Viagens — grade de feriados e cópias (TASK-030; Spec 04 
     await expect(grade.getByLabel("Horário de partida — domingo, viagem 2")).toHaveValue("09:00");
   });
 
+  test("TASK-110: copia todos os reforços do mesmo horário para destino vazio", async ({
+    page,
+  }) => {
+    const documentoComReforco = structuredClone(multiServico);
+    const viagens =
+      documentoComReforco.autos.servicos[0].itinerarios[0].viagens;
+    viagens.push({
+      ...structuredClone(viagens[0]),
+      uuid: "a1a1a1a1-0000-4000-8000-000000000099",
+      horarios_paradas: viagens[0].horarios_paradas.map((horario) => ({
+        ...horario,
+        offset_horario:
+          horario.parada_ordem === 2 ? "00:45:00" : horario.offset_horario,
+      })),
+    });
+    await abrirEtapaViagens(page, documentoComReforco);
+    const grade = gradeComum(page);
+
+    await grade
+      .getByLabel("Horário de partida — segunda, viagem 1")
+      .locator("xpath=ancestor::td")
+      .hover();
+    await grade
+      .getByLabel("Horário de partida — segunda, viagem 1")
+      .locator("xpath=ancestor::td")
+      .getByTestId("copiar-dia")
+      .click();
+    const dialogo = page.getByTestId("dialogo-copiar-dia");
+    await dialogo.getByTestId("destino-copiar-dia-sabado").click();
+    await dialogo.getByTestId("confirmar-copiar-dia").click();
+
+    await expect(grade.getByLabel("Horário de partida — sabado, viagem 1")).toHaveValue("08:00");
+    await expect(grade.getByLabel("Horário de partida — sabado, viagem 2")).toHaveValue("08:00");
+  });
+
   test("TASK-110: cancelar preserva e confirmar apaga somente as Viagens do dia", async ({ page }) => {
     await abrirEtapaViagens(page, structuredClone(multiServico));
     const grade = gradeComum(page);

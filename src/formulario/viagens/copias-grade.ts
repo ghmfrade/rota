@@ -164,19 +164,24 @@ export function copiarDiaParaDiasComGuarda(
 
   for (const diaDestino of diasDestino) {
     if (diaDestino === diaOrigem) continue;
+    const horariosPreexistentes = new Set(
+      itinerario.viagens
+        .filter(
+          (viagem) =>
+            viagem.dia_semana === diaDestino && mesmaGrade(viagem, grade),
+        )
+        .map((viagem) => viagem.horario_saida),
+    );
+
     for (const origem of origens) {
-      const copia = copiarViagemParaDiaComGuarda(
-        resultado,
-        origem.uuid,
-        diaDestino,
-        grade,
-      );
-      if (copia.ok) {
-        copias.push(copia.copia);
-        resultado = { ...resultado, viagens: [...resultado.viagens, copia.copia] };
-      } else if (copia.motivo === "horario-existente") {
+      if (horariosPreexistentes.has(origem.horario_saida)) {
         horariosIgnorados += 1;
+        continue;
       }
+
+      const [copia] = copiarViagemParaDias(origem, [diaDestino], grade);
+      copias.push(copia);
+      resultado = { ...resultado, viagens: [...resultado.viagens, copia] };
     }
   }
 
