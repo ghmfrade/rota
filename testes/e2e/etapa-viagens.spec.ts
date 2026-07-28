@@ -514,6 +514,78 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     expect(chamouOsrm).toBe(false);
   });
 
+  test("ações da Viagem de domingo ficam visíveis, clicáveis e não cobrem o horário (TASK-114)", async ({
+    page,
+  }) => {
+    let chamouOsrm = false;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamouOsrm = true;
+      return rota.abort();
+    });
+
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+    await grade.getByLabel("Criar viagem — domingo").fill("08:00");
+
+    const partidaDomingo = grade.getByLabel("Horário de partida — domingo, viagem 1");
+    const celulaDomingo = partidaDomingo.locator("xpath=ancestor::td");
+    const passanteDomingo = grade.getByLabel(
+      "Horário de passagem — Praia Grande - Rodoviária Praia Grande, domingo, viagem 1",
+    );
+    const areaVisivel = grade.locator("div.overflow-x-auto");
+
+    await celulaDomingo.hover();
+    const [caixaArea, caixaApagar, caixaRestaurar] = await Promise.all([
+      areaVisivel.boundingBox(),
+      celulaDomingo.getByTestId("apagar-viagem").boundingBox(),
+      celulaDomingo.getByTestId("restaurar-viagem").boundingBox(),
+    ]);
+    expect(caixaArea).not.toBeNull();
+    expect(caixaApagar).not.toBeNull();
+    expect(caixaRestaurar).not.toBeNull();
+    for (const caixa of [caixaApagar!, caixaRestaurar!]) {
+      expect(caixa.x).toBeGreaterThanOrEqual(caixaArea!.x);
+      expect(caixa.x + caixa.width).toBeLessThanOrEqual(caixaArea!.x + caixaArea!.width);
+    }
+    expect(caixaRestaurar!.x).toBeCloseTo(caixaApagar!.x, 0);
+    expect(caixaRestaurar!.y).toBeGreaterThanOrEqual(caixaApagar!.y + caixaApagar!.height);
+
+    await partidaDomingo.click();
+    await expect(partidaDomingo).toBeFocused();
+
+    await passanteDomingo.fill("08:50");
+    await expect(passanteDomingo).toHaveValue("08:50");
+    await celulaDomingo.hover();
+    await celulaDomingo.getByTestId("restaurar-viagem").click();
+    await expect(passanteDomingo).toHaveValue("08:30");
+
+    page.once("dialog", (dialogo) => dialogo.accept());
+    await celulaDomingo.hover();
+    await celulaDomingo.getByTestId("apagar-viagem").click();
+    await expect(grade.getByLabel("Criar viagem — domingo")).toBeVisible();
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toHaveValue("08:00");
+
+    const feriados = gradeFeriados(page);
+    await feriados.getByLabel("Criar viagem — domingo").fill("08:00");
+    const celulaFeriadoDomingo = feriados
+      .getByLabel("Horário de partida — domingo, viagem 1")
+      .locator("xpath=ancestor::td");
+    await celulaFeriadoDomingo.hover();
+    const [caixaAreaFeriados, caixaApagarFeriados, caixaRestaurarFeriados] = await Promise.all([
+      feriados.locator("div.overflow-x-auto").boundingBox(),
+      celulaFeriadoDomingo.getByTestId("apagar-viagem").boundingBox(),
+      celulaFeriadoDomingo.getByTestId("restaurar-viagem").boundingBox(),
+    ]);
+    expect(caixaAreaFeriados).not.toBeNull();
+    for (const caixa of [caixaApagarFeriados, caixaRestaurarFeriados]) {
+      expect(caixa).not.toBeNull();
+      expect(caixa!.x + caixa!.width).toBeLessThanOrEqual(
+        caixaAreaFeriados!.x + caixaAreaFeriados!.width,
+      );
+    }
+    expect(chamouOsrm).toBe(false);
+  });
+
   test("sem R$ na etapa", async ({ page }) => {
     await abrirEtapaViagens(page, structuredClone(multiServico));
     await expect(page.locator("body")).not.toContainText("R$");

@@ -442,6 +442,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
 
                 const selecionada = viagemSelecionadaUuid === celula.viagem.uuid;
                 const emHover = viagemEmHoverUuid === celula.viagem.uuid;
+                const ehUltimoDia = dia === DIAS_SEMANA[DIAS_SEMANA.length - 1];
                 const posicaoNaSuperficie =
                   indiceSecao === 0
                     ? "inicio"
@@ -450,6 +451,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                       : "meio";
                 const classesCelula = [
                   "relative",
+                  ehPrimeiraSecao && ehUltimoDia ? "pr-8" : "",
                   selecionada
                     ? [
                         "bg-azul-100 border-x-2 border-azul-600",
@@ -530,7 +532,11 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                         }`}
                         onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
                       >
-                        <div className="pointer-events-auto absolute left-full top-0 flex flex-col items-stretch gap-0.5">
+                        <div
+                          className={`pointer-events-auto absolute top-0 z-10 flex flex-col items-stretch gap-0.5 ${
+                            ehUltimoDia ? "right-0" : "left-full"
+                          }`}
+                        >
                           <Botao
                             variante="perigo"
                             tamanho="compacto"
