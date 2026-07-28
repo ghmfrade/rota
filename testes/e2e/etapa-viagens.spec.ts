@@ -218,6 +218,10 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     const acaoPosterior = celulaFinalOrigem.getByTestId("acao-inserir-posterior");
     await expect(acaoAnterior).toHaveCSS("opacity", "1");
     await expect(acaoPosterior).toHaveCSS("opacity", "1");
+    await expect(acaoAnterior).toBeInViewport({ ratio: 1 });
+    await acaoAnterior.hover();
+    await page.waitForTimeout(350);
+    await expect(acaoAnterior).toHaveCSS("opacity", "1");
     await expect(celulaOrigem.getByLabel("Deslocamento anterior — segunda, viagem 1")).toHaveValue(
       "00:10",
     );
@@ -265,12 +269,15 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     expect(caixaAcaoPosterior!.y).toBeGreaterThanOrEqual(
       caixaFinal!.y + caixaFinal!.height - 1,
     );
-    expect(caixaRestaurar!.x + caixaRestaurar!.width / 2).toBeLessThan(
-      caixaOrigem!.x + caixaOrigem!.width / 2,
-    );
     expect(caixaApagar!.x + caixaApagar!.width / 2).toBeGreaterThan(
       caixaOrigem!.x + caixaOrigem!.width / 2,
     );
+    expect(caixaRestaurar!.x).toBeCloseTo(caixaApagar!.x, 0);
+    expect(caixaRestaurar!.y).toBeGreaterThanOrEqual(caixaApagar!.y + caixaApagar!.height);
+    expect(caixaRestaurar!.width).toBeCloseTo(caixaApagar!.width, 0);
+    expect(caixaRestaurar!.height).toBeCloseTo(caixaApagar!.height, 0);
+    expect(caixaApagar!.x).toBeCloseTo(caixaOrigem!.x + caixaOrigem!.width, 0);
+    await expect(celulaOrigem.getByTestId("restaurar-viagem")).toHaveClass(/bg-azul-600/);
     expect(caixaCampoAnterior!.width).toBeGreaterThanOrEqual(80);
     expect(caixaCampoPosterior!.width).toBeGreaterThanOrEqual(80);
     expect(caixaSetaAnterior!.width).toBeGreaterThanOrEqual(40);

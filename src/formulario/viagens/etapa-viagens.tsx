@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ROTULO_SEMANA_PADRAO } from "@/shared/contagens";
 import { DIAS_SEMANA, type Itinerario, type Parada, type Secao, type Servico } from "@/shared/contrato";
 import { Botao, Campo, Painel, Select, Tabela } from "@/shared/ui";
@@ -84,6 +84,7 @@ interface PropsEtapaViagens {
 
 export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   const raizEtapaRef = useRef<HTMLDivElement>(null);
+  const temporizadorSaidaHoverRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [servicoSelecionadoUuid, definirServicoSelecionadoUuid] = useState<string | null>(null);
   const [sentidoSelecionado, definirSentidoSelecionado] = useState<Itinerario["sentido"] | null>(
     null,
@@ -102,6 +103,39 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
     Record<string, string>
   >({});
   const [errosInsercaoRelativa, definirErrosInsercaoRelativa] = useState<Record<string, string>>({});
+
+  useEffect(
+    () => () => {
+      if (temporizadorSaidaHoverRef.current) {
+        clearTimeout(temporizadorSaidaHoverRef.current);
+      }
+    },
+    [],
+  );
+
+  function cancelarSaidaHover() {
+    if (!temporizadorSaidaHoverRef.current) return;
+    clearTimeout(temporizadorSaidaHoverRef.current);
+    temporizadorSaidaHoverRef.current = null;
+  }
+
+  function mostrarAcoesDaViagem(viagemUuid: string) {
+    cancelarSaidaHover();
+    definirViagemEmHoverUuid(viagemUuid);
+  }
+
+  function ocultarAcoesDaViagem() {
+    cancelarSaidaHover();
+    definirViagemEmHoverUuid(null);
+  }
+
+  function agendarSaidaHover() {
+    cancelarSaidaHover();
+    temporizadorSaidaHoverRef.current = setTimeout(() => {
+      definirViagemEmHoverUuid(null);
+      temporizadorSaidaHoverRef.current = null;
+    }, 300);
+  }
 
   const servicos: Servico[] = servicosDaSessao(sessao);
   const servicoAtual = servicos.find((s) => s.uuid === servicoSelecionadoUuid) ?? null;
@@ -386,7 +420,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
             <th
               scope="row"
               className="whitespace-nowrap font-semibold"
-              onMouseEnter={() => definirViagemEmHoverUuid(null)}
+              onMouseEnter={ocultarAcoesDaViagem}
             >
               {nomeSecao}
             </th>
@@ -448,9 +482,9 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                       onClick={() => definirViagemSelecionadaUuid(viagemUuid)}
                       onFocus={() => {
                         definirViagemSelecionadaUuid(viagemUuid);
-                        definirViagemEmHoverUuid(viagemUuid);
+                        mostrarAcoesDaViagem(viagemUuid);
                       }}
-                      onMouseEnter={() => definirViagemEmHoverUuid(viagemUuid)}
+                      onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
                     >
                       <CampoHorarioGrade
                         key={`${viagemUuid}-${horarioMostrar}`}
@@ -463,9 +497,10 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                       />
                       <div
                         data-testid="acao-inserir-anterior"
-                        className={`absolute bottom-full left-1/2 z-20 mb-1 flex -translate-x-1/2 items-stretch gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3 [transition:opacity_var(--transicao-rapida)] ${
+                        className={`absolute bottom-full left-1/2 z-40 flex -translate-x-1/2 items-stretch gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3 [transition:opacity_var(--transicao-rapida)] ${
                           emHover ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
                         }`}
+                        onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
                       >
                         <Campo
                           densidade="compacta"
@@ -494,27 +529,30 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                         className={`pointer-events-none absolute inset-0 z-30 [transition:opacity_var(--transicao-rapida)] ${
                           emHover ? "visible opacity-100" : "invisible opacity-0"
                         }`}
+                        onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
                       >
-                        <Botao
-                          variante="fantasma"
-                          tamanho="compacto"
-                          className="pointer-events-auto absolute right-full top-1/2 mr-1 -translate-y-1/2"
-                          data-testid="restaurar-viagem"
-                          aria-label={`Restaurar sugestão — ${dia}, viagem ${indiceBloco + 1}`}
-                          onClick={() => aoResetarViagem(viagemUuid)}
-                        >
-                          ↻
-                        </Botao>
-                        <Botao
-                          variante="perigo"
-                          tamanho="compacto"
-                          className="pointer-events-auto absolute left-full top-1/2 ml-1 -translate-y-1/2"
-                          data-testid="apagar-viagem"
-                          aria-label={`Apagar viagem — ${dia}, viagem ${indiceBloco + 1}`}
-                          onClick={() => aoApagarViagem(viagemUuid)}
-                        >
-                          X
-                        </Botao>
+                        <div className="pointer-events-auto absolute left-full top-0 flex flex-col items-stretch gap-0.5">
+                          <Botao
+                            variante="perigo"
+                            tamanho="compacto"
+                            className="min-h-8 min-w-8"
+                            data-testid="apagar-viagem"
+                            aria-label={`Apagar viagem — ${dia}, viagem ${indiceBloco + 1}`}
+                            onClick={() => aoApagarViagem(viagemUuid)}
+                          >
+                            X
+                          </Botao>
+                          <Botao
+                            variante="primario"
+                            tamanho="compacto"
+                            className="min-h-8 min-w-8"
+                            data-testid="restaurar-viagem"
+                            aria-label={`Restaurar sugestão — ${dia}, viagem ${indiceBloco + 1}`}
+                            onClick={() => aoResetarViagem(viagemUuid)}
+                          >
+                            ↻
+                          </Botao>
+                        </div>
                         <div className="pointer-events-auto absolute left-1/2 top-full mt-1 flex -translate-x-1/2 items-center gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3">
                           <Select
                             densidade="compacta"
@@ -561,9 +599,9 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                     onClick={() => definirViagemSelecionadaUuid(celula.viagem.uuid)}
                     onFocus={() => {
                       definirViagemSelecionadaUuid(celula.viagem.uuid);
-                      definirViagemEmHoverUuid(celula.viagem.uuid);
+                      mostrarAcoesDaViagem(celula.viagem.uuid);
                     }}
-                    onMouseEnter={() => definirViagemEmHoverUuid(celula.viagem.uuid)}
+                    onMouseEnter={() => mostrarAcoesDaViagem(celula.viagem.uuid)}
                   >
                     <CampoHorarioGrade
                       key={`${celula.viagem.uuid}-${parada.ordem}-${horarioMostrar}`}
@@ -585,9 +623,10 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                     {posicaoNaSuperficie === "fim" && (
                       <div
                         data-testid="acao-inserir-posterior"
-                        className={`absolute left-1/2 top-full z-20 mt-1 flex -translate-x-1/2 items-stretch gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3 [transition:opacity_var(--transicao-rapida)] ${
+                        className={`absolute left-1/2 top-full z-40 flex -translate-x-1/2 items-stretch gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3 [transition:opacity_var(--transicao-rapida)] ${
                           emHover ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
                         }`}
+                        onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
                       >
                         <Campo
                           densidade="compacta"
@@ -636,7 +675,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                   <td
                     key={dia}
                     data-testid="celula-criavel"
-                    onMouseEnter={() => definirViagemEmHoverUuid(null)}
+                    onMouseEnter={ocultarAcoesDaViagem}
                   >
                     <CampoHorarioGrade
                       rotuloAcessivel={`Criar viagem — ${dia}`}
@@ -659,7 +698,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                 <td
                   key={dia}
                   data-testid="celula-vazia"
-                  onMouseEnter={() => definirViagemEmHoverUuid(null)}
+                  onMouseEnter={ocultarAcoesDaViagem}
                 >
                   —
                 </td>
@@ -743,9 +782,9 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
             >
               Restaurar sugestão (toda a grade)
             </Botao>
-            <Tabela densidade="compacta" className="mt-2">
+            <Tabela densidade="compacta" className="mt-4">
               {cabecalhoGrade()}
-              <tbody onMouseLeave={() => definirViagemEmHoverUuid(null)}>
+              <tbody onMouseEnter={cancelarSaidaHover} onMouseLeave={agendarSaidaHover}>
                 {corpoGrade(blocosComuns, false)}
               </tbody>
             </Tabela>
@@ -785,9 +824,9 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                 </Botao>
               )}
             </div>
-            <Tabela densidade="compacta" className="mt-2">
+            <Tabela densidade="compacta" className="mt-4">
               {cabecalhoGrade()}
-              <tbody onMouseLeave={() => definirViagemEmHoverUuid(null)}>
+              <tbody onMouseEnter={cancelarSaidaHover} onMouseLeave={agendarSaidaHover}>
                 {corpoGrade(blocosFeriados, true)}
               </tbody>
             </Tabela>
