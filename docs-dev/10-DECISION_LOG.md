@@ -850,3 +850,33 @@ da UI antiga; preservar e reutilizar o motor puro de cópia onde couber, sem
 duplicar lógica. A UI calcula a existência do dia adjacente antes de renderizar
 cada seta; não deve renderizar controle desabilitado nem aplicar wrap
 SEG↔DOM.
+
+## DEC-090 — “Restaurar sugestão” fica abaixo do X na superfície da Viagem
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, opção B
+da **Q-068**; Spec 04 §8.2; TASK-107; DEC-050 · **Data:** 2026-07-27
+
+**Decisão:** na superfície selecionada da Viagem, a ação
+**“Restaurar sugestão”** usa a seta circular `↻` e fica imediatamente
+**abaixo do X**, formando com a ação de apagar uma coluna vertical à direita
+da Viagem. Para esse detalhe de composição, esta decisão prevalece sobre a
+posição à esquerda do controle superior retratada na imagem-modelo
+`docs-dev/selecao de horario e botoes 1.png`.
+
+**Motivo:** durante a implementação da TASK-107, o responsável pelo domínio
+comparou as composições e determinou que o restaurar abaixo do X ficou
+visualmente melhor. A orientação foi reiterada explicitamente na reavaliação
+de 2026-07-27.
+
+**Consequências:** resolve a **Q-068** e remove como achado da TASK-107 a
+divergência de posição do restaurar em relação à imagem-modelo. Os demais
+requisitos visuais continuam válidos: X no topo à direita; controles ±X
+largos e legíveis; ação anterior acima da seleção; ação posterior abaixo da
+última Seção; ações exibidas somente no hover.
+
+**Impacto em implementação:** nenhuma mudança no contrato JSON, nas RN, no
+Comparador, no PDF ou nas contagens. Afeta somente a composição da UI em
+`src/formulario/viagens/etapa-viagens.tsx`, os testes geométricos de
+`testes/e2e/etapa-viagens.spec.ts`, a documentação da TASK-107 e seu parecer de
+aderência. A implementação atual — X e `↻` na mesma coordenada horizontal, com
+`↻` abaixo — corresponde à decisão.

@@ -5381,6 +5381,11 @@ Com uma Viagem selecionada, botões acima/abaixo da célula criam **outra Viagem
 
 Gesto de conveniência sobre a criação já prevista (§8.2/§8.3). Depende da fundação da TASK-106. **Q-060 decidida (DEC-082):** herda offsets da origem; escopo só o dia selecionado; X editável, default 10 min.
 
+**Composição visual decidida (Q-068/DEC-090):** a ação `↻` de “Restaurar
+sugestão” fica imediatamente abaixo do X, formando uma coluna vertical à
+direita da Viagem. Para esse detalhe, a DEC-090 prevalece sobre a posição
+retratada na imagem-modelo.
+
 ## Fora de escopo
 
 - Geração em lote por headway (TASK-108); demais gestos (TASK-109..112). Contrato/PDF/Comparador/contagens.
@@ -5408,6 +5413,9 @@ Gesto de conveniência sobre a criação já prevista (§8.2/§8.3). Depende da 
 - [ ] A nova Viagem **herda os offsets** da origem (translação rígida).
 - [ ] Escopo: **só o dia da célula selecionada**.
 - [ ] Os botões ±X aparecem **no hover** da Viagem (modelo da TASK-106), não na seleção.
+- [ ] O X fica no topo à direita e o `↻` imediatamente abaixo dele
+  (Q-068/DEC-090); a ação anterior fica acima da seleção e a posterior abaixo
+  da última Seção.
 
 ## Casos válidos
 

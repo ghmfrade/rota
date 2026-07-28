@@ -704,3 +704,33 @@ adjacente e a cópia de dia inteiro. A retirada/refatoração fica na TASK-109 e
 não bloqueia a correção visual/reavaliação da TASK-107. A Spec 04 §8.3 já foi
 alinhada pelo responsável. **Complemento explícito:** a navegação não é
 circular; em SEG não aparece ← e em DOM não aparece →. Ver DEC-089.
+
+---
+
+## Q-068 — Onde fica a ação “Restaurar sugestão” na superfície da Viagem?
+
+**Status:** Decidida — DEC-090
+
+**Origem:** correção e reavaliação visual da TASK-107 (2026-07-27)
+
+**Contexto:** a imagem-modelo
+`docs-dev/selecao de horario e botoes 1.png` posiciona a seta circular de
+restauração à esquerda do controle superior. Durante a implementação da
+TASK-107, o responsável pelo domínio solicitou que a ação ficasse
+**imediatamente abaixo do X**, formando com ele uma coluna vertical à direita
+da Viagem, porque essa composição ficou visualmente melhor. A orientação não
+havia sido persistida e, por isso, a reavaliação voltou a tratar a imagem como
+prescrição literal.
+
+**Spec relacionada:** Spec 04 §8.2 (“Restaurar sugestão”); TASK-107; DEC-050.
+Não altera a semântica da restauração, o contrato JSON nem qualquer RN de
+domínio.
+
+**Opções:** A — seguir literalmente a imagem-modelo e colocar a restauração à
+esquerda do controle superior; B — colocar a restauração abaixo do X, em coluna
+vertical à direita da Viagem.
+
+**Decisão:** **Decidida (DEC-090, 2026-07-27).** Opção B, por decisão explícita
+do responsável pelo domínio: a ação “Restaurar sugestão” fica imediatamente
+abaixo do X. Para esse detalhe de composição, a DEC-090 prevalece sobre a
+posição retratada na imagem-modelo.

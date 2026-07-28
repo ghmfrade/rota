@@ -1,15 +1,18 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
 **Atualização mais recente:** 2026-07-27 (branch `redesign`) — **TASK-107
-reprovada após verificação manual complementar**. Embora o motor e a suíte
-funcional estejam verdes, a superfície diverge da imagem-modelo: X/restaurar
-estão em posições erradas, os controles ±X são pequenos demais e a seta
-inferior não fica após o fim da seleção. O parecer
-`14-REVISOES/TASK-107-20260727.md` foi corrigido para **reprovado**. A task
-retorna ao Grupo H; pendentes: 15 → 16. A ação antiga “Copiar” também diverge
-da redação humana atual da Spec 04 §8.3 e deve sair na TASK-109, sem bloquear a
-correção/reavaliação visual da TASK-107; a opção B da **Q-067 foi registrada
-como DEC-089**. Antes nesta data — **TASK-106
+concluída e aprovada na reavaliação final**. A implementação `8143f6b` e as
+correções `d23b30e`/`61b6d0a` entregam o motor de inserção relativa, controles
+±X legíveis, ação posterior após a última Seção, X no topo à direita e hover
+separado do foco de teclado. O responsável confirmou que o restaurar deve
+ficar **abaixo do X**; a orientação, dada durante a implementação mas não
+persistida, foi registrada como **Q-068/DEC-090** e prevalece sobre esse
+detalhe da imagem-modelo. O parecer
+`14-REVISOES/TASK-107-20260727.md` está aprovado, com evidência canônica verde
+(1.282 unitários + 79 E2E; fingerprint `f30dd3a1…`; identidade
+`498d7fa6…`). A TASK-107 sai do Grupo H; pendentes: 16 → 15. A ação antiga
+“Copiar” permanece atribuída à TASK-109 pela **DEC-089**, sem condição
+remanescente para a 107. Antes nesta data — **TASK-106
 concluída e aprovada**. A correção `75f2afa` fechou seleção contínua, Enter
 entre Viagens, Tab em células criáveis e retirou “Apagar bloco” conforme a
 **Q-066/DEC-088**. O commit `5e03efa` documentou as variantes públicas
@@ -105,7 +108,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 
 ## 3. Tasks executadas
 
-83 tasks concluídas. Agrupadas pela fase do backlog.
+84 tasks concluídas. Agrupadas pela fase do backlog.
 
 ### Fases 1–3 — Fundação, contrato JSON e validações de domínio
 
@@ -232,6 +235,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 100 | Botão "redefinir Seção": colapsa todas as contribuições no ponto do Serviço/sentido em edição (DEC-080) — aprovada com ressalvas (`14-REVISOES/TASK-100-20260724.md`); ressalva única (commitar os docs de fundamentação) **resolvida em `668124b`** (adendo no parecer) |
 | 075 | Identificação (fluxo novo): pré-visualização do Autos trocável + confirmação explícita ("Confirmar Autos") antes de congelar `codigo`/`empresa` (DEC-064) — aprovada (`14-REVISOES/TASK-075-20260724.md`) |
 | 106 | Redesign da grade de horários: layout tabular compacto, ordenação temporal, seleção contínua, ações no hover e navegação Tab/Enter — aprovada no parecer final `14-REVISOES/TASK-106-20260727-final.md` |
+| 107 | Inserção de Viagem por offset relativo (±X min), com offsets herdados, UUID nova e composição visual da DEC-090 — aprovada em `14-REVISOES/TASK-107-20260727.md` |
 
 ---
 
@@ -246,12 +250,12 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 ## 5. Tasks a executar — ordem recomendada
 
-**Estado atual: 16 tasks pendentes.** Em 2026-07-27, a TASK-107 retornou à
-lista: a aprovação inicial foi substituída por **reprovação** após verificação
-manual contra a imagem-modelo. A correção permanece na própria TASK-107; a
-ação antiga “Copiar” deve sair conforme a Spec 04 §8.3 atual; a Q-067 foi
-resolvida pela DEC-089. A remoção fica para a TASK-109 e não bloqueia a
-reavaliação da 107. Antes disso, a TASK-106 saiu da lista:
+**Estado atual: 15 tasks pendentes.** Em 2026-07-27, a TASK-107 saiu da lista
+após as correções `d23b30e`/`61b6d0a` e a reavaliação final aprovada. A
+posição deliberada do restaurar abaixo do X foi persistida na
+**Q-068/DEC-090**, eliminando a divergência aparente com a imagem-modelo. A
+ação antiga “Copiar” deve sair na TASK-109 conforme a DEC-089, sem pendência
+para a 107. Antes disso, a TASK-106 saiu da lista:
 implementada em `c2db60a`, corrigida em `75f2afa` e **aprovada** no parecer
 final `14-REVISOES/TASK-106-20260727-final.md`, após `5e03efa` documentar a
 prop pública `densidade` de `Campo`/`Select` no design system. As três falhas
@@ -350,16 +354,15 @@ Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Servi
 
 ### Grupo H — Redesign da grade de horários (proposta 2026-07-27)
 
-Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). A **TASK-106 foi concluída e aprovada**: a entrega `c2db60a` foi reprovada, a correção `75f2afa` fechou seleção, Enter, Tab e retirou “Apagar bloco” conforme **Q-066/DEC-088**, e `5e03efa` documentou a densidade pública de `Campo`/`Select`, encerrando a ressalva da reavaliação. Parecer final em `14-REVISOES/TASK-106-20260727-final.md`. A **TASK-107 foi implementada, mas está reprovada** após verificação manual da composição visual; precisa corrigir a posição/tamanho dos controles conforme as quatro imagens-modelo. O restaurar é uma seta circular à esquerda do controle superior, não na quina esquerda. A ação antiga “Copiar” será removida/refatorada na TASK-109 conforme a **DEC-089** e não bloqueia a reavaliação da 107. As TASK-108..111 estão liberadas pela fundação aprovada, mas a ordem mantém a correção da 107 antes de avançar. A TASK-112 não depende da 106; continua condicionada ao motor da TASK-105. Botões de ação da Viagem surgem **no hover** (não na seleção — dobrado na TASK-106).
+Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). A **TASK-106 foi concluída e aprovada**: a entrega `c2db60a` foi reprovada, a correção `75f2afa` fechou seleção, Enter, Tab e retirou “Apagar bloco” conforme **Q-066/DEC-088**, e `5e03efa` documentou a densidade pública de `Campo`/`Select`, encerrando a ressalva da reavaliação. Parecer final em `14-REVISOES/TASK-106-20260727-final.md`. A **TASK-107 também foi concluída e aprovada** após `d23b30e` corrigir a composição/hover e `61b6d0a` separar foco de teclado do hover. O responsável confirmou como composição final o restaurar abaixo do X; a escolha foi persistida na **Q-068/DEC-090** e prevalece sobre esse detalhe da imagem-modelo. A ação antiga “Copiar” será removida/refatorada na TASK-109 conforme a **DEC-089**. As TASK-108..111 seguem liberadas; a ordem passa a iniciar na 108. A TASK-112 não depende da 106; continua condicionada ao motor da TASK-105. Botões de ação da Viagem surgem **no hover** (não na seleção — dobrado na TASK-106).
 
 | # | Task | Complex. | Estado | Observação |
 |:---:|---|:---:|---|---|
-| 1 | **107** — Inserção de Viagem por offset relativo (±X min) | **2** | **Reprovada; corrigir e reavaliar** | Posição/tamanho conforme imagens 1–4; DEC-089 não bloqueia. |
-| 2 | **108** — Cópia por headway até horário-limite (lote) | **3** | Desbloqueada (DEC-083; TASK-106 aprovada) | Limite inclusivo; para antes das 24h. |
-| 3 | **109** — Cópia p/ dia adjacente (setas ←/→) + guarda de duplicidade | **2** | Desbloqueada (DEC-084/089; TASK-106 aprovada) | Remove/refatora “Copiar”; sem ← em SEG/→ em DOM; sem wrap. |
-| 4 | **110** — Operações de dia inteiro: copiar dia→dias e apagar Viagens do dia | **3** | Desbloqueada (DEC-085; TASK-106 aprovada) | Reusa a guarda da 109. |
-| 5 | **111** — Modo compacto: ocultar Seções intermediárias e final | **2** | Desbloqueada (DEC-086; TASK-106 aprovada) | Versão simples do PDF é da TASK-034 (§13.2). |
-| 6 | **112** — "Copiar dias comuns" origem estendida + mescla = sincronização preservando UUID | **4** | Desbloqueada (DEC-087) | Spec 04 §8.4/§8.5 aplicada + carve-out RN-007 registrada. Reusa o motor de sincronização da 105. |
+| 1 | **108** — Cópia por headway até horário-limite (lote) | **3** | Desbloqueada (DEC-083; TASK-106 aprovada) | Limite inclusivo; para antes das 24h. |
+| 2 | **109** — Cópia p/ dia adjacente (setas ←/→) + guarda de duplicidade | **2** | Desbloqueada (DEC-084/089; TASK-106 aprovada) | Remove/refatora “Copiar”; sem ← em SEG/→ em DOM; sem wrap. |
+| 3 | **110** — Operações de dia inteiro: copiar dia→dias e apagar Viagens do dia | **3** | Desbloqueada (DEC-085; TASK-106 aprovada) | Reusa a guarda da 109. |
+| 4 | **111** — Modo compacto: ocultar Seções intermediárias e final | **2** | Desbloqueada (DEC-086; TASK-106 aprovada) | Versão simples do PDF é da TASK-034 (§13.2). |
+| 5 | **112** — "Copiar dias comuns" origem estendida + mescla = sincronização preservando UUID | **4** | Desbloqueada (DEC-087) | Spec 04 §8.4/§8.5 aplicada + carve-out RN-007 registrada. Reusa o motor de sincronização da 105. |
 
 **Ação de spec (DEC-087) — concluída:** a **Spec 04 §8.4/§8.5** foi atualizada (origem selecionável; "mesclar" = sincronização preservando UUID; "sobrescrever" = UUIDs novas) e a **carve-out da RN-007** foi registrada no `01-RULE_INDEX.md` e `03-TRACEABILITY_MATRIX.md`. O casamento sob duplicatas (RN-062) ficou resolvido na spec (§8.5, "por contagem").
 
