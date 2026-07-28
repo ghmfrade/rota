@@ -223,7 +223,8 @@ Municipio D - Seção 4    10:00  10:00  11:00  10:00  10:00    —     —
 ### 8.3 Ações da grade
 
 - **Apagar viagem inteira:** remove a Viagem de um dia (limpa a coluna do bloco naquele dia). Não fica disponivel apagar o **bloco inteiro** (a n-ésima partida em todos os dias), o bloco é apenas um alinhamento visual por posição — não uma entidade nem uma unidade de operação — e pode juntar Viagens com horários diferentes em cada dia. Portanto, o gesto destrutivo agrupa partidas sem vínculo operacional real.
-- **Copiar viagem para dia ao lado:** duplica a Viagem para o dia à esquerda ou à direita — mesma `horario_saida` e mesmos offsets, **UUID nova** (é entidade nova — Spec 02 §12). Obs.: Se já houver viagem com o mesmo horário, não copia (mantendo o uuid e dados da viagem destino) e avisa que já tem viagem no dia X (dia ao lado) nesse horario.
+- **Copiar viagem para dia ao lado:** duplica a Viagem para o dia à esquerda ou à direita, usando atalho do teclado — mesma `horario_saida` e mesmos offsets, **UUID nova** (é entidade nova — Spec 02 §12). Obs.: Se já houver viagem com o mesmo horário, não copia (mantendo o uuid e dados da viagem destino) e avisa que já tem viagem no dia X (dia ao lado) nesse horario.
+- **Copiar viagem para dia de escolha do usuário:** duplica a Viagem para o dia de escolha do usuário, usando o segurar e arrastar do mouse — mesma `horario_saida` e mesmos offsets, **UUID nova** (é entidade nova — Spec 02 §12). Obs.: Se já houver viagem com o mesmo horário, não copia (mantendo o uuid e dados da viagem destino) e avisa que já tem viagem no dia X (dia escolhido) nesse horario.
 - **Inserir viagem entre viagens ou no início da grade:** cria um bloco vazio na posição indicada; o horário digitado define a posição real (a grade sempre reordena por `horario_saida` dentro do dia).
 
 ### 8.4 Tabela de feriados
