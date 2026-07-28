@@ -702,4 +702,5 @@ sem bloquear a correção visual e a reavaliação da TASK-107.
 do responsável: retirar a ação unitária arbitrária; manter as setas de dia
 adjacente e a cópia de dia inteiro. A retirada/refatoração fica na TASK-109 e
 não bloqueia a correção visual/reavaliação da TASK-107. A Spec 04 §8.3 já foi
-alinhada pelo responsável. Ver DEC-089.
+alinhada pelo responsável. **Complemento explícito:** a navegação não é
+circular; em SEG não aparece ← e em DOM não aparece →. Ver DEC-089.

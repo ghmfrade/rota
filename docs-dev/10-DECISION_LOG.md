@@ -818,6 +818,11 @@ substitutas deliberadas:
 - cópia de **um dia inteiro para vários dias** da **TASK-110**, com a política
   da DEC-085.
 
+A navegação entre dias **não é circular**: em **SEG** não existe dia anterior,
+portanto a seta ← **não é renderizada**; em **DOM** não existe dia seguinte,
+portanto a seta → **não é renderizada**. Nenhuma das duas bordas volta para a
+outra ponta da semana.
+
 A remoção do controle antigo e a refatoração do motor ficam na **TASK-109** e
 não bloqueiam a correção visual nem a reavaliação da TASK-107.
 
@@ -828,7 +833,9 @@ retirada elimina o caminho arbitrário unitário de forma deliberada.
 
 **Consequências:** resolve a **Q-067** pela opção B. A Spec 04 §8.3 já foi
 atualizada pelo responsável para “Copiar viagem para dia ao lado”, com a guarda
-de horário existente. A TASK-109 absorve a retirada da UI antiga e deve
+de horário existente. O detalhe de borda SEG/DOM deste complemento deve ser
+refletido na próxima consolidação humana da §8.3. A TASK-109 absorve a retirada
+da UI antiga e deve
 reutilizar/refatorar `copiarViagemParaDias`, evitando dois motores de clonagem.
 A TASK-110 permanece com granularidade de coluna/dia inteiro. A correção da
 TASK-107 continua bloqueada somente pelos achados visuais do parecer, não pela
@@ -840,4 +847,6 @@ nova e preservação de grade/offsets; **RN-062** continua permitindo duplicatas
 no contrato, com a guarda restrita ao gesto da DEC-084. Na TASK-109, remover
 `diaCopiaPorViagem`, o `Select`, o botão/handler `aoCopiarViagem` e os testes E2E
 da UI antiga; preservar e reutilizar o motor puro de cópia onde couber, sem
-duplicar lógica.
+duplicar lógica. A UI calcula a existência do dia adjacente antes de renderizar
+cada seta; não deve renderizar controle desabilitado nem aplicar wrap
+SEG↔DOM.

@@ -356,7 +356,7 @@ Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev
 |:---:|---|:---:|---|---|
 | 1 | **107** — Inserção de Viagem por offset relativo (±X min) | **2** | **Reprovada; corrigir e reavaliar** | Posição/tamanho conforme imagens 1–4; DEC-089 não bloqueia. |
 | 2 | **108** — Cópia por headway até horário-limite (lote) | **3** | Desbloqueada (DEC-083; TASK-106 aprovada) | Limite inclusivo; para antes das 24h. |
-| 3 | **109** — Cópia p/ dia adjacente (setas ←/→) + guarda de duplicidade | **2** | Desbloqueada (DEC-084/089; TASK-106 aprovada) | Remove/refatora “Copiar” antigo; guarda só no gesto. |
+| 3 | **109** — Cópia p/ dia adjacente (setas ←/→) + guarda de duplicidade | **2** | Desbloqueada (DEC-084/089; TASK-106 aprovada) | Remove/refatora “Copiar”; sem ← em SEG/→ em DOM; sem wrap. |
 | 4 | **110** — Operações de dia inteiro: copiar dia→dias e apagar Viagens do dia | **3** | Desbloqueada (DEC-085; TASK-106 aprovada) | Reusa a guarda da 109. |
 | 5 | **111** — Modo compacto: ocultar Seções intermediárias e final | **2** | Desbloqueada (DEC-086; TASK-106 aprovada) | Versão simples do PDF é da TASK-034 (§13.2). |
 | 6 | **112** — "Copiar dias comuns" origem estendida + mescla = sincronização preservando UUID | **4** | Desbloqueada (DEC-087) | Spec 04 §8.4/§8.5 aplicada + carve-out RN-007 registrada. Reusa o motor de sincronização da 105. |

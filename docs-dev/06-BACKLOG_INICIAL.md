@@ -5547,6 +5547,7 @@ guarda vale **só no gesto**, sem reintroduzir validação de unicidade no contr
 ## Critérios de aceite
 
 - [ ] Seta → copia a Viagem para o dia seguinte (UUID nova); seta ← para o anterior. Botões surgem **no hover** (TASK-106).
+- [ ] Em **SEG**, a seta ← não aparece; em **DOM**, a seta → não aparece. A navegação não faz wrap SEG↔DOM (DEC-089).
 - [ ] Se o destino já tem Viagem com o mesmo `horario_saida` na mesma grade, **não copia** e avisa ("já tem horário").
 - [ ] Nenhuma validação de unicidade é adicionada a outros caminhos (RN-062 preservada — a guarda é só de UI).
 - [ ] O `Select` de dia e o botão antigo “Copiar” são removidos; o motor puro de clonagem é reutilizado/refatorado, sem lógica repetida (DEC-089).
@@ -5558,11 +5559,12 @@ guarda vale **só no gesto**, sem reintroduzir validação de unicidade no contr
 ## Casos inválidos
 
 - Destino já tem 08:00 (mesma grade) → aviso "já tem horário", nada criado.
+- Tentar navegar antes de SEG ou depois de DOM → gesto inexistente; a seta correspondente não é renderizada.
 
 ## Testes esperados
 
-- Unitários: cópia p/ dia adjacente com UUID nova; detecção de duplicidade pelo critério da Q-062.
-- E2E: gesto, aviso e ausência do seletor/botão antigo (OSRM mockado).
+- Unitários: cópia p/ dia adjacente com UUID nova; detecção de duplicidade pelo critério da Q-062; resolução de vizinho sem wrap nas bordas SEG/DOM.
+- E2E: gesto, aviso, ausência de ← em SEG/→ em DOM e ausência do seletor/botão antigo (OSRM mockado).
 - Contrato: round-trip mantém RN-062 (duplicatas ainda aceitas em import).
 
 ## Arquivos prováveis
