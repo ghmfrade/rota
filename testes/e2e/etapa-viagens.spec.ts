@@ -121,6 +121,32 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     await expect(grade.getByLabel("Criar viagem — segunda")).toBeFocused();
   });
 
+  test("Tab seleciona o dia seguinte sem acionar hover ou ações da Viagem", async ({ page }) => {
+    let chamouOsrm = false;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamouOsrm = true;
+      return rota.abort();
+    });
+
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+    await grade.getByLabel("Criar viagem — terca").fill("09:00");
+
+    const partidaSegunda = grade.getByLabel("Horário de partida — segunda, viagem 1");
+    const partidaTerca = grade.getByLabel("Horário de partida — terca, viagem 1");
+    const celulaTerca = partidaTerca.locator("xpath=ancestor::td");
+
+    await grade.getByRole("columnheader", { name: "DOM" }).hover();
+    await partidaSegunda.focus();
+    await partidaSegunda.press("Tab");
+
+    await expect(partidaTerca).toBeFocused();
+    await expect(celulaTerca).toHaveAttribute("data-selecionada", "true");
+    await expect(celulaTerca.getByTestId("acoes-viagem")).toHaveCSS("opacity", "0");
+    await expect(celulaTerca.getByTestId("acao-inserir-anterior")).toHaveCSS("opacity", "0");
+    expect(chamouOsrm).toBe(false);
+  });
+
   test("Viagem gravada aparece com horários propagados por Seção; dias sem Viagem mostram célula criável", async ({
     page,
   }) => {

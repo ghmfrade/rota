@@ -482,7 +482,6 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                       onClick={() => definirViagemSelecionadaUuid(viagemUuid)}
                       onFocus={() => {
                         definirViagemSelecionadaUuid(viagemUuid);
-                        mostrarAcoesDaViagem(viagemUuid);
                       }}
                       onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
                     >
@@ -599,7 +598,6 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                     onClick={() => definirViagemSelecionadaUuid(celula.viagem.uuid)}
                     onFocus={() => {
                       definirViagemSelecionadaUuid(celula.viagem.uuid);
-                      mostrarAcoesDaViagem(celula.viagem.uuid);
                     }}
                     onMouseEnter={() => mostrarAcoesDaViagem(celula.viagem.uuid)}
                   >
