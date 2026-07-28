@@ -659,3 +659,42 @@ do responsável pelo domínio: retirar "Apagar bloco inteiro"; manter o bloco
 apenas como alinhamento visual e preservar as ações de apagar uma Viagem e de
 apagar um dia inteiro. A Spec 04 §8.3 já foi alinhada pelo responsável. Ver
 DEC-088.
+
+---
+
+## Q-067 — A ação antiga “Copiar uma Viagem para outro dia” permanece após as setas adjacentes e a cópia de dia inteiro?
+
+**Status:** Pendente
+
+**Origem:** verificação manual da TASK-107 (2026-07-27)
+
+**Contexto:** a UI atual oferece `Select` de dia + botão “Copiar”, que duplica
+uma única Viagem para um dia arbitrário. O novo modelo visual reserva as ações
+flutuantes para restaurar, apagar, inserir ±X, copiar para o dia
+anterior/seguinte (TASK-109) e copiar um dia inteiro para vários dias
+(TASK-110). O responsável apontou que a ação antiga parece redundante e polui a
+composição. Contudo, as operações não são equivalentes: a TASK-109 alcança
+somente o dia adjacente, e a TASK-110 copia todas as Viagens do dia, não uma
+Viagem isolada.
+
+**Spec relacionada:** Spec 04 §8.3 (“Copiar viagem para outro dia”); Spec 02
+§12; RN-004/RN-007/RN-061/RN-062; DEC-084/TASK-109; DEC-085/TASK-110.
+
+**Impacto:** somente Formulário e testes. Sem campo novo ou migração de JSON;
+qualquer cópia continua criando UUID nova. A alteração humana já presente na
+Spec 04 §8.3 substitui a ação antiga pela cópia ao dia à esquerda/direita; falta
+somente versionar esse texto e formalizar a decisão em DEC.
+
+**Opções:** A — manter as três operações (cópia unitária arbitrária, setas
+adjacentes e cópia de dia inteiro); B — retirar a ação antiga e considerar
+setas + cópia de dia inteiro como substituição deliberada, alterando antes a
+Spec 04 §8.3; C — incorporar à TASK-110 um diálogo de cópia **unitária** para
+vários dias e então retirar o seletor/botão antigo, preservando a capacidade
+unitária arbitrária em uma UI menos poluída.
+
+**Recomendação técnica:** B, por corresponder ao modelo visual solicitado e
+evitar três caminhos parcialmente sobrepostos. A alteração humana já presente
+na Spec 04 §8.3 aplica materialmente essa opção; falta confirmação literal
+“Q-067, opção B” para o registro formal via DEC.
+
+**Decisão:** Pendente de confirmação formal do responsável.
