@@ -5803,4 +5803,133 @@ Estender a semente de grades para copiar Viagens da grade comum, **de feriados**
 
 ---
 
+## TASK-113 — Reutilizar o último deslocamento relativo por direção entre hovers — **desbloqueada (DEC-091)**
+
+## Objetivo
+
+Manter e reapresentar nos controles da inserção relativa da TASK-107 o último
+deslocamento válido informado pelo usuário, separadamente para a ação anterior
+(seta para cima, subtração) e para a ação posterior (seta para baixo, adição),
+em vez de retornar a `00:10` ao passar o mouse sobre outra Viagem.
+
+## Contexto
+
+A DEC-082/TASK-107 entregou X editável com default de 10 minutos, mas a
+implementação atual armazena os dois deslocamentos por UUID de Viagem. Em uso
+sequencial, cada hover sobre outra Viagem volta ao default, obrigando a
+redigitação. O responsável solicitou dois últimos valores reutilizáveis e
+independentes para acelerar a criação de vários horários. A **Q-069** foi
+decidida pela opção A (**DEC-091**): dois últimos valores válidos por instância
+aberta da etapa, compartilhados entre todas as Viagens, grades, Serviços e
+sentidos, com reset ao desmontar a etapa.
+
+## Fora de escopo
+
+- Alterar o cálculo de inserção relativa, a herança de offsets, a criação de
+  UUID ou a recusa fora de 00:00–23:59 da TASK-107/DEC-082.
+- Unificar os valores das duas direções; criar preferências persistentes em
+  servidor, navegador ou contrato JSON.
+- Geração em lote por headway (TASK-108), cópia para dias adjacentes
+  (TASK-109), demais ações da grade, PDF, Comparador e contagens.
+
+## Specs fonte
+
+- Spec 04 §8.2 (preenchimento da grade e escopo de edição)
+- Spec 04 §8.3 (ações e inserção de Viagem)
+
+## Regras envolvidas
+
+- RN-067 (a UI recebe horários de relógio, nunca offsets)
+- RN-096 (estado de conveniência do Formulário não persiste no servidor)
+- RN-004, RN-061 e RN-063 (invariantes da inserção relativa preservadas)
+
+## Entidades afetadas
+
+- Viagem (somente interação de criação; sem mudança na entidade)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor (⚠ exige decisão humana — RN-093)
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] O primeiro hover de cada direção apresenta `00:10`.
+- [ ] Após informar e aceitar um deslocamento válido na ação anterior, outra
+  Viagem apresenta esse valor na seta para cima.
+- [ ] Após informar e aceitar outro deslocamento válido na ação posterior,
+  outra Viagem apresenta esse segundo valor na seta para baixo, sem alterar o
+  valor lembrado da ação anterior.
+- [ ] Os dois valores são compartilhados entre todas as Viagens, grades,
+  Serviços e sentidos da mesma instância aberta da etapa (DEC-091).
+- [ ] Ao sair ou desmontar a etapa, ambos voltam independentemente a `00:10`.
+- [ ] Entrada inválida não contamina o último valor válido e continua exibindo
+  a recusa amigável da TASK-107.
+- [ ] A inserção continua criando somente no dia da célula selecionada, com
+  UUID nova, offsets herdados e recusa de resultado fora de 00:00–23:59.
+- [ ] Nenhum dos dois valores é incluído no contrato JSON nem persistido em
+  servidor.
+
+## Casos válidos
+
+- No controle anterior de uma Viagem, informar `00:07`; no hover de outra
+  Viagem, a seta para cima exibe `00:07`.
+- No controle posterior, informar `00:25`; no hover seguinte, a seta para baixo
+  exibe `00:25`, enquanto a seta para cima permanece em `00:07`.
+- Criar a partir de 08:00 com o último valor posterior `00:25` produz 08:25 e
+  mantém os offsets herdados, conforme DEC-082.
+
+## Casos inválidos
+
+- Digitar valor fora do formato `HH:MM` não cria Viagem e não deve fazer um
+  hover posterior perder o último valor válido (DEC-091).
+- O valor digitado na seta para cima não pode substituir o último valor da seta
+  para baixo, nem o inverso.
+- Um valor lembrado que leve o resultado para antes de 00:00 ou depois de 23:59
+  continua sendo recusado sem criar Viagem.
+
+## Testes esperados
+
+- Unitários: se houver extração de helper puro, transição independente dos dois
+  últimos valores e rejeição de entrada inválida.
+- Integração: estado dos controles entre Viagens, grades, Serviços e sentidos
+  da mesma instância; reset ao desmontar/reabrir a etapa.
+- E2E: editar valores distintos nas duas direções, trocar o hover para outras
+  Viagens e inserir com os valores reapresentados; cobrir entrada inválida
+  (OSRM mockado).
+- Snapshot/contrato JSON: não aplicável; confirmar por teste existente que não
+  há campo novo e que a Viagem criada mantém o contrato da DEC-082.
+- PDF: não aplicável.
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/etapa-viagens.tsx`
+- `testes/e2e/etapa-viagens.spec.ts`
+- `testes/unitarios/formulario/viagens-acoes-grade.test.ts` (somente se houver
+  helper puro novo)
+
+## Riscos
+
+- Compartilhar em alcance maior que o decidido pode vazar preferência entre
+  contextos que o usuário esperava independentes; alcance menor mantém a
+  redigitação que motivou a task.
+- Atualizar o último valor durante uma digitação inválida pode propagar erro
+  para os hovers seguintes.
+- A refatoração dos mapas por UUID não pode misturar as duas direções nem
+  regredir a recusa de virada de dia da DEC-082.
+
+## Dependências
+
+- TASK-107 concluída; DEC-082.
+- Q-069 decidida pela opção A (DEC-091).
+
+## Perguntas em aberto
+
+- Nenhuma — Q-069 decidida (DEC-091).
+
+---
+
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.

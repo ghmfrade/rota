@@ -880,3 +880,38 @@ Comparador, no PDF ou nas contagens. Afeta somente a composição da UI em
 `testes/e2e/etapa-viagens.spec.ts`, a documentação da TASK-107 e seu parecer de
 aderência. A implementação atual — X e `↻` na mesma coordenada horizontal, com
 `↻` abaixo — corresponde à decisão.
+
+## DEC-091 — Últimos deslocamentos relativos compartilhados na etapa por direção
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, opção A
+da **Q-069**; Spec 04 §8.2/§8.3; DEC-082/TASK-107 · **Data:** 2026-07-27
+
+**Decisão:** a etapa “Viagens e horários” mantém dois últimos deslocamentos
+relativos **válidos** e independentes: um para a ação anterior (seta para cima,
+subtração de tempo) e outro para a ação posterior (seta para baixo, adição de
+tempo). Os dois valores são compartilhados entre todas as Viagens, grades,
+Serviços e sentidos exibidos na mesma instância aberta da etapa. Cada direção
+inicia em `00:10`; ao sair ou desmontar a etapa, ambas voltam
+independentemente a `00:10`. Entrada inválida não substitui o último valor
+válido da direção correspondente.
+
+**Motivo:** o responsável identificou, ao final da TASK-107, que retornar ao
+default a cada novo hover obriga a repetir a digitação e reduz a agilidade no
+preenchimento de vários horários. Dois valores independentes preservam ritmos
+distintos de antecipação e postergação sem ampliar o estado da sessão.
+
+**Consequências:** resolve a **Q-069** e **desbloqueia a TASK-113**. A
+preferência é estritamente efêmera na instância aberta da etapa: não sobrevive
+à navegação que a desmonte, não integra a `SessaoFormulario` e não entra no
+contrato JSON. Permanecem inalteradas todas as regras da DEC-082 para criar a
+Viagem: dia da célula selecionada, UUID nova, offsets herdados e recusa de
+resultado fora de 00:00–23:59.
+
+**Impacto em implementação:** nenhuma mudança no texto das RN existentes, no
+contrato JSON, Comparador, PDF ou contagens. **RN-067** continua governando o
+formato de relógio da UI e **RN-096** fundamenta o estado efêmero, sem
+persistência de servidor. Na **TASK-113**,
+`src/formulario/viagens/etapa-viagens.tsx` substitui os mapas de deslocamento
+por UUID de Viagem por dois valores escalares independentes no estado local da
+etapa; os testes cobrem compartilhamento entre hovers/contextos, independência
+das direções, reset no desmonte e rejeição de entrada inválida.

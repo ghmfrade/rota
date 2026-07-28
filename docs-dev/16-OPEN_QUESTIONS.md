@@ -734,3 +734,51 @@ vertical à direita da Viagem.
 do responsável pelo domínio: a ação “Restaurar sugestão” fica imediatamente
 abaixo do X. Para esse detalhe de composição, a DEC-090 prevalece sobre a
 posição retratada na imagem-modelo.
+
+---
+
+## Q-069 — Qual é o escopo e o ciclo de vida dos últimos deslocamentos relativos?
+
+**Status:** Decidida — DEC-091
+
+**Origem:** necessidade identificada pelo responsável ao final da TASK-107
+(2026-07-27)
+
+**Contexto:** a DEC-082 definiu dois controles de inserção relativa, com X
+editável e default de 10 minutos. A implementação da TASK-107 mantém hoje um
+valor de deslocamento anterior e outro posterior **por Viagem**; por isso, ao
+passar o mouse sobre outra Viagem, os campos voltam a `00:10`. O responsável
+determinou que o último valor digitado deve ser reaproveitado nos hovers
+seguintes, preservando dois valores independentes: um para a seta para cima
+(subtração de tempo) e outro para a seta para baixo (adição de tempo). Falta
+fixar até onde esses dois valores são compartilhados e quando voltam ao
+default.
+
+**Spec relacionada:** Spec 04 §8.2/§8.3; DEC-082/TASK-107; RN-067/RN-096. É
+estado de conveniência da UI: não altera Viagem, contrato JSON, PDF,
+Comparador ou contagens.
+
+**Impacto se não decidir:** a TASK-113 não pode escolher sem respaldo entre
+compartilhar os valores em toda a etapa, isolá-los por Serviço/sentido/grade ou
+levá-los para a sessão do Formulário. Também fica indefinido se uma entrada
+inválida substitui o último valor reutilizável.
+
+**Opções:** A — manter dois últimos valores **válidos** por instância aberta da
+etapa “Viagens e horários”, compartilhados entre todas as Viagens, grades,
+Serviços e sentidos exibidos nessa instância; ao sair/desmontar a etapa, ambos
+voltam independentemente a `00:10`; entrada inválida não substitui o último
+valor válido. B — manter dois valores válidos por Serviço × sentido × grade,
+com o mesmo reset ao desmontar a etapa. C — guardar os dois valores na
+`SessaoFormulario`, sobrevivendo à navegação entre etapas até iniciar nova
+sessão ou importar outro JSON.
+
+**Recomendação técnica:** A. É a leitura mais direta de “agilizar o
+preenchimento de vários horários rapidamente”, reduz o estado atual de mapas
+por UUID para dois valores escalares e mantém a preferência estritamente
+efêmera, sem ampliar o modelo da sessão nem tocar o contrato (RN-096).
+
+**Decisão:** **Decidida (DEC-091, 2026-07-27).** Opção A, por decisão explícita
+do responsável pelo domínio: dois últimos valores válidos e independentes por
+instância aberta da etapa, compartilhados entre todas as Viagens, grades,
+Serviços e sentidos; ambos voltam a `00:10` ao desmontar a etapa; entrada
+inválida não substitui o último valor válido. Ver DEC-091.
