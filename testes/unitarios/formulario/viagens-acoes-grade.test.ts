@@ -3,6 +3,7 @@ import { REGEX_UUID_V4 } from "@/shared/contrato";
 import {
   atualizarHorarioSaida,
   criarViagemNaCelula,
+  gerarViagensPorHeadway,
   inserirViagemPorOffsetRelativo,
 } from "@/formulario/viagens";
 import { documentoExemploMinimo } from "../../fixtures";
@@ -120,4 +121,96 @@ describe("inserirViagemPorOffsetRelativo (TASK-107; DEC-082)", () => {
     expect(inserirViagemPorOffsetRelativo({ ...origem, horario_saida: "23:55:00" }, 10)).toBeNull();
     expect(inserirViagemPorOffsetRelativo(origem, 1.5)).toBeNull();
   });
+});
+
+describe("gerarViagensPorHeadway (TASK-108; DEC-083)", () => {
+  test("gera partidas posteriores até o limite inclusivo, com UUIDs novas e offsets herdados", () => {
+    const origem = {
+      ...itinerarioDaFixture().viagens[0],
+      tabela_excepcional_uuid: "11111111-1111-4111-8111-111111111111",
+      horarios_paradas: itinerarioDaFixture().viagens[0].horarios_paradas.map((h, indice) =>
+        indice === 1 ? { ...h, offset_horario: "00:07:00" } : { ...h },
+      ),
+    };
+
+    const resultado = gerarViagensPorHeadway(origem, "01:10", "17:00");
+
+    expect(resultado.ok).toBe(true);
+    if (!resultado.ok) return;
+    expect(resultado.viagens.map((viagem) => viagem.horario_saida)).toEqual([
+      "09:10:00",
+      "10:20:00",
+      "11:30:00",
+      "12:40:00",
+      "13:50:00",
+      "15:00:00",
+      "16:10:00",
+    ]);
+    expect(new Set(resultado.viagens.map((viagem) => viagem.uuid)).size).toBe(
+      resultado.viagens.length,
+    );
+    for (const viagem of resultado.viagens) {
+      expect(viagem.uuid).toMatch(REGEX_UUID_V4);
+      expect(viagem.uuid).not.toBe(origem.uuid);
+      expect(viagem.dia_semana).toBe(origem.dia_semana);
+      expect(viagem.viagem_feriado).toBe(origem.viagem_feriado);
+      expect(viagem.tabela_excepcional_uuid).toBe(origem.tabela_excepcional_uuid);
+      expect(viagem.horarios_paradas).toEqual(origem.horarios_paradas);
+      expect(viagem.horarios_paradas).not.toBe(origem.horarios_paradas);
+    }
+  });
+
+  test("inclui partida exatamente no limite e para antes de virar o dia", () => {
+    const origem = itinerarioDaFixture().viagens[0];
+    const inclusivo = gerarViagensPorHeadway(
+      { ...origem, horario_saida: "08:00:00" },
+      "01:00",
+      "10:00",
+    );
+    const fimDoDia = gerarViagensPorHeadway(
+      { ...origem, horario_saida: "22:30:00" },
+      "00:45",
+      "23:59",
+    );
+
+    expect(inclusivo).toMatchObject({
+      ok: true,
+      viagens: [{ horario_saida: "09:00:00" }, { horario_saida: "10:00:00" }],
+    });
+    expect(fimDoDia).toMatchObject({
+      ok: true,
+      viagens: [{ horario_saida: "23:15:00" }],
+    });
+  });
+
+  test("limite igual à origem ou headway maior que a janela produz lote vazio", () => {
+    const origem = itinerarioDaFixture().viagens[0];
+
+    expect(gerarViagensPorHeadway(origem, "00:10", "08:00")).toEqual({
+      ok: true,
+      viagens: [],
+    });
+    expect(gerarViagensPorHeadway(origem, "10:00", "09:00")).toEqual({
+      ok: true,
+      viagens: [],
+    });
+  });
+
+  test.each([
+    ["00:00", "17:00", "headway-invalido"],
+    ["-01:00", "17:00", "headway-invalido"],
+    ["abc", "17:00", "headway-invalido"],
+    ["01:10", "25:00", "limite-invalido"],
+    ["01:10", "07:00", "limite-anterior"],
+  ] as const)(
+    "[inválido] recusa headway/limite inválido sem gerar Viagem",
+    (headway, limite, motivo) => {
+      const resultado = gerarViagensPorHeadway(
+        itinerarioDaFixture().viagens[0],
+        headway,
+        limite,
+      );
+      expect(resultado).toEqual({ ok: false, motivo });
+    },
+  );
 });

@@ -29,11 +29,13 @@ export {
 } from "./copias-grade";
 export {
   criarViagemNaCelula,
+  gerarViagensPorHeadway,
   inserirViagemPorOffsetRelativo,
   atualizarHorarioSaida,
   editarHorarioPassante,
   resetarOffsetsViagem,
   resetarOffsetsEmLote,
+  type ResultadoGeracaoHeadway,
   type ResultadoEdicaoPassante,
 } from "./acoes-grade";
 export {

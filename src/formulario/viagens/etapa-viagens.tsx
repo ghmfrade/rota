@@ -17,6 +17,7 @@ import {
   atualizarHorarioSaida,
   criarViagemNaCelula,
   editarHorarioPassante,
+  gerarViagensPorHeadway,
   inserirViagemPorOffsetRelativo,
   resetarOffsetsEmLote,
   resetarOffsetsViagem,
@@ -107,6 +108,12 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   const ultimoDeslocamentoAnteriorValidoRef = useRef(DESLOCAMENTO_RELATIVO_PADRAO);
   const ultimoDeslocamentoPosteriorValidoRef = useRef(DESLOCAMENTO_RELATIVO_PADRAO);
   const [errosInsercaoRelativa, definirErrosInsercaoRelativa] = useState<Record<string, string>>({});
+  const [modoHeadwayPorViagem, definirModoHeadwayPorViagem] = useState<Record<string, boolean>>({});
+  const [headwayPorViagem, definirHeadwayPorViagem] = useState<Record<string, string>>({});
+  const [limiteHeadwayPorViagem, definirLimiteHeadwayPorViagem] = useState<Record<string, string>>(
+    {},
+  );
+  const [errosHeadway, definirErrosHeadway] = useState<Record<string, string>>({});
 
   useEffect(
     () => () => {
@@ -301,6 +308,61 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
     aplicar(
       { ...itinerarioAtual, viagens: [...itinerarioAtual.viagens, viagemNova] },
       { ...ancoras, [viagemNova.uuid]: [...(ancoras[viagemUuid] ?? [])] },
+    );
+  }
+
+  function aoAlternarModoHeadway(viagemUuid: string) {
+    definirModoHeadwayPorViagem((atuais) => ({
+      ...atuais,
+      [viagemUuid]: !atuais[viagemUuid],
+    }));
+    definirErrosHeadway((atuais) => {
+      const proximos = { ...atuais };
+      delete proximos[viagemUuid];
+      return proximos;
+    });
+  }
+
+  function aoGerarViagensPorHeadway(viagemUuid: string) {
+    if (!itinerarioAtual) return;
+    const viagem = itinerarioAtual.viagens.find((item) => item.uuid === viagemUuid);
+    if (!viagem) return;
+
+    const resultado = gerarViagensPorHeadway(
+      viagem,
+      headwayPorViagem[viagemUuid] ?? "",
+      limiteHeadwayPorViagem[viagemUuid] ?? "",
+    );
+    if (!resultado.ok) {
+      const mensagemPorMotivo = {
+        "headway-invalido": "Informe um headway maior que 00:00 no formato HH:MM.",
+        "limite-invalido": "Informe o horário-limite no formato HH:MM.",
+        "limite-anterior": "O horário-limite não pode ser anterior à partida.",
+      } satisfies Record<typeof resultado.motivo, string>;
+      definirErrosHeadway((atuais) => ({
+        ...atuais,
+        [viagemUuid]: mensagemPorMotivo[resultado.motivo],
+      }));
+      return;
+    }
+
+    definirErrosHeadway((atuais) => {
+      const proximos = { ...atuais };
+      delete proximos[viagemUuid];
+      return proximos;
+    });
+    if (resultado.viagens.length === 0) return;
+
+    const ancorasAtualizadas = { ...ancoras };
+    for (const viagemNova of resultado.viagens) {
+      ancorasAtualizadas[viagemNova.uuid] = [...(ancoras[viagemUuid] ?? [])];
+    }
+    aplicar(
+      {
+        ...itinerarioAtual,
+        viagens: [...itinerarioAtual.viagens, ...resultado.viagens],
+      },
+      ancorasAtualizadas,
     );
   }
 
@@ -558,6 +620,8 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                   );
                 const viagemUuid = celula.viagem.uuid;
                 const erroInsercaoRelativa = errosInsercaoRelativa[viagemUuid];
+                const modoHeadway = modoHeadwayPorViagem[viagemUuid] ?? false;
+                const erroHeadway = errosHeadway[viagemUuid];
 
                 if (ehPrimeiraSecao) {
                   return (
@@ -640,6 +704,17 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                           >
                             ↻
                           </Botao>
+                          <Botao
+                            variante={modoHeadway ? "primario" : "fantasma"}
+                            tamanho="compacto"
+                            className="min-h-8 min-w-8"
+                            data-testid="alternar-modo-headway"
+                            aria-label={`Alternar geração por headway — ${dia}, viagem ${indiceBloco + 1}`}
+                            aria-pressed={modoHeadway}
+                            onClick={() => aoAlternarModoHeadway(viagemUuid)}
+                          >
+                            ↪
+                          </Botao>
                         </div>
                         <div className="pointer-events-auto absolute left-1/2 top-full mt-1 flex -translate-x-1/2 items-center gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3">
                           <Select
@@ -714,34 +789,80 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                     {posicaoNaSuperficie === "fim" && (
                       <div
                         data-testid="acao-inserir-posterior"
-                        className={`absolute left-1/2 top-full z-40 flex -translate-x-1/2 items-stretch gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3 [transition:opacity_var(--transicao-rapida)] ${
+                        className={`absolute top-full z-40 flex items-stretch gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3 [transition:opacity_var(--transicao-rapida)] ${
+                          ehUltimoDia ? "right-0" : "left-1/2 -translate-x-1/2"
+                        } ${
                           emHover ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
                         }`}
                         onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
                       >
-                        <Campo
-                          densidade="compacta"
-                          className="min-w-20 text-center tabular-nums"
-                          aria-label={`Deslocamento posterior — ${dia}, viagem ${indiceBloco + 1}`}
-                          value={deslocamentoPosterior}
-                          onChange={(evento) => definirDeslocamentoPosterior(evento.target.value)}
-                        />
-                        <Botao
-                          variante="primario"
-                          className="min-w-10"
-                          data-testid="inserir-viagem-posterior"
-                          aria-label={`Inserir viagem depois — ${dia}, viagem ${indiceBloco + 1}`}
-                          onClick={() => aoInserirViagemPorOffset(viagemUuid, 1)}
-                        >
-                          ↓
-                        </Botao>
-                        {erroInsercaoRelativa && (
+                        {modoHeadway ? (
+                          <>
+                            <Campo
+                              densidade="compacta"
+                              className="min-w-20 text-center tabular-nums"
+                              aria-label={`Headway — ${dia}, viagem ${indiceBloco + 1}`}
+                              placeholder="HH:MM"
+                              value={headwayPorViagem[viagemUuid] ?? ""}
+                              onChange={(evento) =>
+                                definirHeadwayPorViagem((atuais) => ({
+                                  ...atuais,
+                                  [viagemUuid]: evento.target.value,
+                                }))
+                              }
+                            />
+                            <Campo
+                              densidade="compacta"
+                              className="min-w-20 text-center tabular-nums"
+                              aria-label={`Horário-limite — ${dia}, viagem ${indiceBloco + 1}`}
+                              placeholder="HH:MM"
+                              value={limiteHeadwayPorViagem[viagemUuid] ?? ""}
+                              onChange={(evento) =>
+                                definirLimiteHeadwayPorViagem((atuais) => ({
+                                  ...atuais,
+                                  [viagemUuid]: evento.target.value,
+                                }))
+                              }
+                            />
+                            <Botao
+                              variante="primario"
+                              className="min-w-10"
+                              data-testid="gerar-viagens-headway"
+                              aria-label={`Gerar viagens por headway — ${dia}, viagem ${indiceBloco + 1}`}
+                              onClick={() => aoGerarViagensPorHeadway(viagemUuid)}
+                            >
+                              ↓
+                            </Botao>
+                          </>
+                        ) : (
+                          <>
+                            <Campo
+                              densidade="compacta"
+                              className="min-w-20 text-center tabular-nums"
+                              aria-label={`Deslocamento posterior — ${dia}, viagem ${indiceBloco + 1}`}
+                              value={deslocamentoPosterior}
+                              onChange={(evento) =>
+                                definirDeslocamentoPosterior(evento.target.value)
+                              }
+                            />
+                            <Botao
+                              variante="primario"
+                              className="min-w-10"
+                              data-testid="inserir-viagem-posterior"
+                              aria-label={`Inserir viagem depois — ${dia}, viagem ${indiceBloco + 1}`}
+                              onClick={() => aoInserirViagemPorOffset(viagemUuid, 1)}
+                            >
+                              ↓
+                            </Botao>
+                          </>
+                        )}
+                        {(modoHeadway ? erroHeadway : erroInsercaoRelativa) && (
                           <span
                             role="alert"
-                            data-testid="erro-insercao-relativa"
+                            data-testid={modoHeadway ? "erro-headway" : "erro-insercao-relativa"}
                             className="absolute left-1/2 top-full mt-1 min-w-52 -translate-x-1/2 rounded-controle bg-white p-1 text-xs text-erro shadow-sombra-3"
                           >
-                            {erroInsercaoRelativa}
+                            {modoHeadway ? erroHeadway : erroInsercaoRelativa}
                           </span>
                         )}
                       </div>

@@ -479,6 +479,63 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     expect(chamouOsrm).toBe(false);
   });
 
+  test("modo headway gera lote até limite inclusivo e recusa entrada inválida (TASK-108)", async ({
+    page,
+  }) => {
+    let chamouOsrm = false;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamouOsrm = true;
+      return rota.abort();
+    });
+
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+    const partidaOrigem = grade.getByLabel("Horário de partida — segunda, viagem 1");
+    const celulaOrigem = partidaOrigem.locator("xpath=ancestor::td");
+    const viagemUuid = await celulaOrigem.getAttribute("data-viagem-uuid");
+    expect(viagemUuid).toBeTruthy();
+    const celulaFinalOrigem = grade
+      .locator(`[data-testid="celula-passante"][data-viagem-uuid="${viagemUuid}"]`)
+      .last();
+
+    await celulaOrigem.hover();
+    const alternarModo = celulaOrigem.getByTestId("alternar-modo-headway");
+    await expect(alternarModo).toHaveAttribute("aria-pressed", "false");
+    await alternarModo.click();
+    await expect(alternarModo).toHaveAttribute("aria-pressed", "true");
+
+    // A ação superior continua sendo a inserção unitária regressiva; apenas o
+    // controle inferior troca +X pela geração futura em lote.
+    await expect(celulaOrigem.getByLabel(/Deslocamento anterior/)).toBeVisible();
+    await expect(celulaFinalOrigem.getByLabel(/Deslocamento posterior/)).toHaveCount(0);
+    const campoHeadway = celulaFinalOrigem.getByRole("textbox", {
+      name: "Headway — segunda, viagem 1",
+      exact: true,
+    });
+    const campoLimite = celulaFinalOrigem.getByLabel("Horário-limite — segunda, viagem 1");
+    await expect(campoHeadway).toBeVisible();
+    await expect(campoLimite).toBeVisible();
+
+    // Entrada inválida é atômica: mostra aviso e não cria nenhuma Viagem.
+    await campoHeadway.fill("00:00");
+    await campoLimite.fill("10:00");
+    await celulaFinalOrigem.getByTestId("gerar-viagens-headway").click();
+    await expect(celulaFinalOrigem.getByTestId("erro-headway")).toContainText(
+      "maior que 00:00",
+    );
+    await expect(grade.getByLabel(/Horário de partida — segunda/)).toHaveCount(1);
+
+    // 08:00 + 01:00 até 10:00 inclui a partida exatamente no limite.
+    await campoHeadway.fill("01:00");
+    await campoLimite.fill("10:00");
+    await celulaFinalOrigem.getByTestId("gerar-viagens-headway").click();
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toHaveValue("08:00");
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 2")).toHaveValue("09:00");
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 3")).toHaveValue("10:00");
+    await expect(grade.getByLabel(/Horário de partida — terca/)).toHaveCount(0);
+    expect(chamouOsrm).toBe(false);
+  });
+
   test("reutiliza os últimos deslocamentos válidos por direção na instância da etapa (TASK-113)", async ({
     page,
   }) => {

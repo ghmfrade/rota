@@ -82,6 +82,62 @@ export function inserirViagemPorOffsetRelativo(
   });
 }
 
+export type ResultadoGeracaoHeadway =
+  | { ok: true; viagens: Viagem[] }
+  | {
+      ok: false;
+      motivo: "headway-invalido" | "limite-invalido" | "limite-anterior";
+    };
+
+/**
+ * Gera Viagens posteriores à selecionada por headway fixo até um
+ * horário-limite inclusivo (DEC-083/TASK-108).
+ *
+ * A origem já existe na grade e não é recriada: são geradas somente as partidas
+ * `origem + k × headway`, para `k >= 1`. Cada cópia permanece no mesmo dia e na
+ * mesma grade, herda os offsets confirmados e recebe UUID nova. A validação
+ * ocorre antes da criação para que entradas inválidas não produzam lote parcial.
+ */
+export function gerarViagensPorHeadway(
+  viagem: Viagem,
+  headwayHoraMinuto: string,
+  limiteHoraMinuto: string,
+): ResultadoGeracaoHeadway {
+  const headway = horaMinutoParaHorarioRelogio(headwayHoraMinuto);
+  if (headway === null) return { ok: false, motivo: "headway-invalido" };
+
+  const headwaySegundos = horarioParaSegundos(headway);
+  if (headwaySegundos <= 0) return { ok: false, motivo: "headway-invalido" };
+
+  const limite = horaMinutoParaHorarioRelogio(limiteHoraMinuto);
+  if (limite === null) return { ok: false, motivo: "limite-invalido" };
+
+  const origemSegundos = horarioParaSegundos(viagem.horario_saida);
+  const limiteSegundos = horarioParaSegundos(limite);
+  if (limiteSegundos < origemSegundos) {
+    return { ok: false, motivo: "limite-anterior" };
+  }
+
+  const viagens: Viagem[] = [];
+  for (
+    let horarioSegundos = origemSegundos + headwaySegundos;
+    horarioSegundos <= limiteSegundos && horarioSegundos < 24 * 60 * 60;
+    horarioSegundos += headwaySegundos
+  ) {
+    viagens.push(
+      criarViagem({
+        horario_saida: formatarHms(horarioSegundos),
+        dia_semana: viagem.dia_semana,
+        viagem_feriado: viagem.viagem_feriado,
+        tabela_excepcional_uuid: viagem.tabela_excepcional_uuid,
+        horarios_paradas: viagem.horarios_paradas.map((horario) => ({ ...horario })),
+      }),
+    );
+  }
+
+  return { ok: true, viagens };
+}
+
 /** Resultado de editar um horário passante (Spec 04 §8.2). */
 export type ResultadoEdicaoPassante =
   | { ok: true; viagem: Viagem; ancoras: number[] }
