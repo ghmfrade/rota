@@ -5930,6 +5930,154 @@ sentidos, com reset ao desmontar a etapa.
 
 - Nenhuma — Q-069 decidida (DEC-091).
 
+## TASK-114 — Manter visíveis as ações "restaurar" e "apagar" da Viagem na última coluna de dia
+
+## Objetivo
+
+As ações por Viagem "Restaurar sugestão" (↻) e "Apagar viagem" (X) ficam
+inteiramente visíveis e clicáveis em **todas** as colunas de dia da grade,
+inclusive **domingo**, onde hoje aparecem cortadas.
+
+## Contexto
+
+Na etapa Viagens e horários, o grupo de ações por Viagem é posicionado fora da
+célula, à direita dela (`absolute left-full top-0` em
+`src/formulario/viagens/etapa-viagens.tsx`, bloco `data-testid="acoes-viagem"`).
+A grade é renderizada dentro do wrapper com `overflow-x-auto` do componente
+`Tabela` (doc 18 §3). Na coluna de domingo — última do `<tr>` — o grupo cai além
+da borda direita da tabela e é recortado pelo wrapper, deixando o ↻ e o X
+parcial ou totalmente inacessíveis ao usuário. É um defeito de apresentação das
+ações exigidas pela Spec 04 §8.2 (restaurar sugestão por Viagem) e §8.3 (apagar
+viagem), não uma mudança de comportamento: o gesto, os `data-testid`, os
+`aria-label` e o efeito de cada ação permanecem os mesmos.
+
+O E2E atual (`testes/e2e/etapa-viagens.spec.ts`) fixa a posição à direita para
+uma Viagem de **segunda** (`caixaApagar.x ≈ caixaOrigem.x + caixaOrigem.width`);
+esse comportamento das colunas não-finais é para ser preservado.
+
+## Fora de escopo
+
+- Alterar o efeito, a confirmação, os `data-testid` ou os `aria-label` de
+  "restaurar" e "apagar" (doc 18 §6 item 5).
+- Alterar a posição do grupo de ações nas colunas que **não** são a última
+  (segunda a sábado) — o E2E existente é o contrato dessa posição.
+- Mudar o `overflow-x-auto` de `src/shared/ui/tabela.tsx` ou qualquer contrato
+  visual do componente `Tabela`, que serve todas as tabelas do app (doc 18 §3);
+  qualquer necessidade nesse nível vira Q-xxx em `docs-dev/16`, não decisão da
+  task.
+- Reposicionar os demais flutuantes da célula (controles de inserção relativa
+  da TASK-107/TASK-113, popover de cópia para outro dia) — apenas garantir que
+  não regridam.
+- Ações em lote ("Restaurar sugestão (toda a grade)"), grade de feriados como
+  estrutura, contagens, PDF, Comparador e contrato JSON.
+
+## Specs fonte
+
+- Spec 04 §8.2 (restaurar sugestão como ação por Viagem, no menu da célula)
+- Spec 04 §8.3 (apagar viagem inteira de um dia)
+- Spec 04 §8.1 (grade Seções × dias da semana, colunas SEG…DOM)
+
+## Regras envolvidas
+
+- RN-066 (reset à sugestão inicial — a ação que precisa continuar alcançável)
+- RN-061 (Viagem estratificada por dia: apagar/restaurar afeta somente o dia da
+  célula, inclusive domingo)
+- RN-067 (a UI opera em horários de relógio; nada de offset exposto)
+
+## Entidades afetadas
+
+- Viagem (somente apresentação das ações; nenhuma mudança na entidade)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor (⚠ exige decisão humana — RN-093)
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Com o hover numa Viagem de **domingo**, os botões ↻ e X ficam
+  integralmente dentro da área visível da grade (nenhuma parte além da borda
+  direita do wrapper de rolagem).
+- [ ] Ambos permanecem clicáveis em domingo e produzem exatamente o mesmo efeito
+  de hoje: X remove a Viagem apenas do dia da célula; ↻ desfaz as âncoras
+  manuais apenas daquela Viagem.
+- [ ] Nas colunas de segunda a sábado, a posição do grupo (à direita da célula,
+  X acima de ↻, mesma largura/altura) permanece inalterada.
+- [ ] `data-testid="apagar-viagem"`, `data-testid="restaurar-viagem"` e os
+  `aria-label` por dia/viagem permanecem idênticos.
+- [ ] Nenhum `style=` inline novo; posição por utilitários Tailwind e variantes
+  de `Botao` já existentes (doc 18 §6 itens 1–4).
+- [ ] Os flutuantes de inserção relativa e o popover de cópia da mesma célula
+  continuam funcionando em domingo, sem sobreposição que impeça o clique nas
+  ações (doc 18 §5).
+
+## Casos válidos
+
+- Grade comum com uma Viagem em domingo às 08:00: hover na célula de partida →
+  ↻ e X inteiramente visíveis; clicar X (confirmando) remove só a Viagem de
+  domingo, mantendo as dos outros dias.
+- Mesma Viagem de domingo com horário passante editado (âncora manual): clicar ↻
+  volta aos horários sugeridos apenas dessa Viagem.
+- Viagem em segunda: hover mantém ↻ e X à direita da célula, como hoje.
+- Grade de feriados com Viagem em domingo: mesmo comportamento visível da grade
+  comum.
+
+## Casos inválidos
+
+- Nenhuma parte de ↻ ou X pode ficar fora da área visível em domingo — recorte
+  parcial é falha, ainda que o clique funcione por rolagem.
+- O grupo de ações não pode cobrir o campo de horário da própria célula nem o
+  da célula vizinha de forma a impedir a digitação.
+- Recusar qualquer solução que altere `data-testid`/`aria-label` existentes ou
+  que remova a rolagem horizontal do `Tabela`.
+
+## Testes esperados
+
+- Unitários: se a decisão de posição virar helper puro (ex.: "última coluna de
+  dia → lado interno"), teste do helper para cada dia de `DIAS_SEMANA`.
+- Integração: não aplicável (posicionamento é geométrico).
+- E2E (`testes/e2e/etapa-viagens.spec.ts`, OSRM mockado): criar Viagem em
+  domingo, fazer hover e comparar `boundingBox()` de `apagar-viagem` e
+  `restaurar-viagem` com o retângulo visível do wrapper de rolagem da grade
+  (borda direita como limite); clicar X e ↻ em domingo verificando os efeitos;
+  manter verde a asserção existente de posição para segunda.
+- Snapshot/contrato JSON: não aplicável — nenhum campo novo; confirmar por teste
+  existente que apagar/restaurar em domingo não muda o contrato.
+- PDF: não aplicável.
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/etapa-viagens.tsx` (alterar)
+- `testes/e2e/etapa-viagens.spec.ts` (alterar)
+- `testes/unitarios/formulario/viagens-acoes-grade.test.ts` (somente se houver
+  helper puro novo)
+
+## Riscos
+
+- Espelhar o grupo para dentro da célula em domingo pode sobrepor a coluna de
+  sábado ou o campo de horário — precisa de verificação geométrica no E2E, não
+  só visual.
+- A asserção existente de posição para segunda pode ficar vermelha se a
+  refatoração generalizar o posicionamento; ela é contrato e deve continuar
+  verde.
+- Se a solução escolhida exigir tocar o contrato visual do `Tabela`, ela sai do
+  escopo desta task e exige registro em `docs-dev/16` antes.
+- Mesma classe de recorte pode existir para outros flutuantes da última coluna;
+  corrigi-los aqui seria ampliação de escopo — abrir task própria se
+  confirmado.
+
+## Dependências
+
+- TASK-030 (apagar viagem) e TASK-107/TASK-113 concluídas (flutuantes atuais da
+  célula).
+
+## Perguntas em aberto
+
+- Nenhuma.
+
 ---
 
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.
