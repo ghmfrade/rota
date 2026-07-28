@@ -6335,4 +6335,182 @@ reordenação temporal por `horario_saida` (§8.1) move a linha de posição.
 
 ---
 
+## TASK-116 — Confirmar horário da grade somente após `Enter` ou `Tab`
+
+## Objetivo
+
+Manter a digitação do horário como rascunho local da célula até o usuário
+confirmar explicitamente com `Enter` ou `Tab`. A Viagem e os horários seguintes
+só são criados ou atualizados após essa confirmação, sem normalização prematura
+que transforme a sequência digitada.
+
+## Contexto
+
+Defeito observado pelo responsável na grade da etapa Viagens: ao digitar
+`10:32`, o componente confirma parciais durante o próprio `onChange`. Quando o
+rascunho chega a `103`, a normalização permissiva o interpreta como `01:03`,
+cria ou atualiza a Viagem nesse horário e substitui o conteúdo do campo; ao
+digitar o último `2`, o texto aparenta ser empurrado até `10:32`. Em célula
+criável, isso também carrega os horários seguintes antes de o usuário terminar
+de digitar, forçando-o em alguns fluxos a apagar a Viagem e escrever novamente.
+
+A entrada continua aceitando horário com ou sem `:` conforme o comportamento
+existente. O separador pode ser inserido automaticamente como máscara de
+digitação, desde que isso não mude a ordem dos algarismos, não complete horas ou
+minutos por suposição e não confirme o rascunho. A persistência ocorre somente
+quando `Enter` ou `Tab` valida o valor completo.
+
+## Fora de escopo
+
+- Alterar os formatos finais já aceitos (`830`, `0830`, `8:30`, `08:30`) ou o
+  intervalo válido `00:00`–`23:59`.
+- Mudar a sugestão inicial dos horários seguintes (RN-064), a redistribuição
+  proporcional (RN-065), a ordenação temporal dos blocos ou o contrato JSON.
+- Redefinir o destino de navegação de `Enter`/`Tab` (TASK-106) ou a preservação
+  de foco após criação/redistribuição (TASK-115).
+- Criar seletor nativo de horário, novos atalhos, debounce, salvamento
+  automático, mensagens ou componentes visuais novos.
+- Alterar hover, seleção, ações flutuantes, cópias de Viagem, feriados ou
+  tabelas excepcionais além de herdarem a correção do campo compartilhado.
+
+## Specs fonte
+
+- Spec 04 §8.1 (célula preenchível e exibição em `HH:MM`)
+- Spec 04 §8.2 (preencher a primeira Seção cria a Viagem e carrega os demais
+  horários; alterar passante redistribui; entrada inválida não confirma)
+- Spec 04 §2.4–§2.5 (usuário digita horários de relógio; offsets permanecem
+  internos)
+- Spec 02 §11/§11.1 (`horario_saida` e `offset_horario` persistidos em
+  `HH:MM:SS`)
+
+## Regras envolvidas
+
+- RN-061 (Viagem estratificada por dia)
+- RN-063 (`horarios_paradas` completo e monotônico)
+- RN-064 (sugestão inicial por acúmulo de durações)
+- RN-065 (redistribuição proporcional entre âncoras)
+- RN-067 (usuário digita horários de relógio, nunca offsets)
+
+## Entidades afetadas
+
+- Viagem (criação e edição de `horario_saida`/horários passantes)
+- Seção (células de horário exibidas na grade)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Digitar sequencialmente `1`, `0`, `:`, `3`, `2` mantém apenas um
+      rascunho local; nenhum estado de Viagem é criado/atualizado e nenhum
+      horário seguinte é carregado antes da confirmação.
+- [ ] Durante a sequência destinada a `10:32`, o campo não substitui nenhum
+      parcial por `01:03`, não reordena/empurra algarismos e termina exibindo
+      `10:32`.
+- [ ] Pressionar `Enter` com `10:32` completo valida e confirma uma única vez;
+      em célula criável, cria uma única Viagem às `10:32` e só então preenche os
+      horários seguintes pela RN-064.
+- [ ] Pressionar `Tab` com `10:32` completo produz a mesma confirmação única e,
+      depois dela, navega conforme a TASK-106.
+- [ ] A inserção automática de `:` é permitida, mas nunca confirma o horário,
+      acrescenta zeros, muda a ordem dos algarismos ou impede continuar a
+      digitação.
+- [ ] Tirar o foco por clique, sem `Enter`/`Tab`, não cria nem atualiza Viagem;
+      o campo restaura o último valor confirmado (ou vazio na célula criável).
+- [ ] `Enter`/`Tab` com rascunho vazio numa célula criável preserva a navegação
+      existente sem criar Viagem; com rascunho inválido, não confirma nem
+      navega e mantém o foco para correção.
+- [ ] A edição de uma Viagem existente também só aplica `horario_saida` ou
+      redistribuição de passantes após `Enter`/`Tab`, uma única vez.
+- [ ] O comportamento vale pelo mesmo componente nas grades comum, de feriados
+      e excepcionais; nenhum `data-testid`/`aria-*` existente é removido ou
+      renomeado.
+
+## Casos válidos
+
+- Célula criável vazia: digitar `10:32` → nenhuma Viagem durante a digitação;
+  `Enter` → uma Viagem com `horario_saida = "10:32:00"` e horários seguintes
+  preenchidos.
+- Célula criável vazia: digitar `1032`, com `:` inserido ou não pela máscara →
+  `Tab` confirma `10:32` uma única vez e move para a célula prevista pela
+  TASK-106.
+- Entrada curta já suportada: digitar `830` → permanece rascunho; `Enter`
+  confirma `08:30`.
+- Viagem existente `08:00`: digitar `10:32` na partida → o estado continua
+  `08:00` durante a digitação; `Enter` aplica `10:32` e só então reordena o
+  bloco, preservando o foco conforme a TASK-115.
+- Horário passante existente: digitar um novo valor válido → nenhuma
+  redistribuição durante os parciais; `Tab` confirma e redistribui uma vez
+  (RN-065).
+
+## Casos inválidos
+
+- Digitar apenas `10:3` e pressionar `Enter` ou `Tab` → não confirma, não cria
+  nem atualiza Viagem, não navega e mantém o rascunho em foco para correção.
+- Digitar `24:60` e pressionar `Enter`/`Tab` → mesma recusa, sem carregar
+  horários seguintes.
+- Digitar `10:32` e clicar fora sem `Enter`/`Tab` → não confirma; restaura o
+  valor persistido anterior ou a célula vazia.
+- Digitar caracteres diferentes de algarismos e `:` → permanece recusado, sem
+  mutação de Viagem.
+- Um parcial normalizável como `103` nunca pode ser persistido como `01:03`.
+
+## Testes esperados
+
+- Unitários: `CampoHorarioGrade` não chama `aoConfirmar` em nenhum `onChange`;
+  sequência `10:32` preserva o rascunho; `Enter` e `Tab` chamam uma vez com
+  `10:32`; blur descarta sem confirmar; parciais/horários impossíveis são
+  recusados sem navegação.
+- Integração (Vitest + Testing Library): célula criável não cria Viagem nem
+  preenche Seções derivadas durante a digitação; confirmação cria uma única
+  Viagem; edição passante redistribui uma única vez; foco/navegação das
+  TASK-106/115 não regridem.
+- E2E (Playwright, OSRM mockado): digitar `10:32` caractere a caractere numa
+  grade real, comprovar ausência de `01:03`/criação intermediária e confirmar
+  por `Enter` e por `Tab`.
+- Snapshot/contrato JSON: exportação inalterada; após confirmação,
+  `horario_saida` permanece `HH:MM:SS` com segundos `00`.
+- PDF: n/a.
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/campo-horario-grade.tsx`
+- `src/formulario/viagens/horario-relogio.ts` (somente se a máscara/validação
+  de rascunho precisar ser separada da normalização final)
+- `testes/unitarios/formulario/campo-horario-grade.test.tsx`
+- `testes/unitarios/formulario/etapa-viagens-foco.test.tsx`
+- teste E2E da etapa Viagens
+
+## Riscos
+
+- O `blur` disparado como consequência de `Tab` pode descartar o valor logo
+  após a confirmação; a coordenação atual entre teclado e blur precisa
+  continuar idempotente.
+- A confirmação cria/reordena a Viagem e pode remontar a célula; deve compor com
+  a preservação de foco da TASK-115 sem confirmar duas vezes.
+- A normalização final permissiva aceita entradas de três algarismos (`830`);
+  separar rascunho de valor confirmado não pode remover esse contrato atual.
+- Como o componente é compartilhado, uma regressão afeta partida, passantes e
+  todas as grades.
+
+## Dependências
+
+- TASK-106 concluída (confirmação e navegação por `Enter`/`Tab`).
+- TASK-115 concluída ou aplicada em conjunto antes desta correção (preservação
+  de foco e sincronização do rascunho após criação/redistribuição).
+- Nenhuma Q-xxx pendente.
+
+## Perguntas em aberto
+
+- Nenhuma. O responsável definiu explicitamente que a inclusão/alteração só
+  ocorre após `Enter` ou `Tab`; a inserção automática de `:` é apenas uma
+  máscara opcional e não autoriza confirmação antecipada.
+
+---
+
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.
