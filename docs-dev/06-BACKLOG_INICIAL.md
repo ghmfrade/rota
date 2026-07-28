@@ -6080,4 +6080,190 @@ esse comportamento das colunas não-finais é para ser preservado.
 
 ---
 
+## TASK-115 — Preservar o foco de digitação na célula após a criação da Viagem e após a redistribuição
+
+## Objetivo
+
+Ao digitar um horário numa célula da grade de horários, o cursor de texto
+permanece na mesma célula depois que o Formulário cria a Viagem e preenche os
+horários das Seções intermediárias — sem exigir `Tab` para voltar. O usuário
+digita `08:00` e segue com `Enter`/`Tab` a partir dali, sem interrupção.
+
+## Contexto
+
+Defeito observado pelo responsável na grade da etapa Viagens (branch
+`redesign`): ao preencher uma célula criável ("célula preenchível" da Spec 04
+§8.1), a Viagem é criada e os horários derivados aparecem corretamente
+(§8.2/RN-064), mas o campo perde o foco no mesmo instante. Isso quebra na
+prática o critério de navegação por teclado já entregue pela **TASK-106**
+(`Enter` percorre as Seções de cima para baixo e segue para a Viagem de baixo),
+porque o `Enter` seguinte não chega a acontecer — o foco já saiu do documento
+ativo e o usuário precisa pressionar `Tab` para voltar.
+
+Causa provável, a confirmar na implementação (não é parte do critério de
+aceite):
+
+1. Em `etapa-viagens.tsx:660-688`
+   a célula criável renderiza um `CampoHorarioGrade` próprio; assim que
+   `aoConfirmarCriacao` cria a Viagem, a mesma posição passa a ser renderizada
+   pelo ramo "existente" (`etapa-viagens.tsx:478-501`),
+   em outro `<td>` — o input digitado é desmontado e um novo é montado.
+2. No ramo "existente", `key={`${viagemUuid}-${horarioMostrar}`}`
+   (`etapa-viagens.tsx:494`)
+   remonta o input a cada mudança do horário exibido, o que reproduz a mesma
+   perda de foco ao editar um horário passante (redistribuição — RN-065).
+
+Direção explícita do responsável quanto ao destino do foco: o foco acompanha a
+**Viagem criada/editada** (a célula onde o usuário digitou), mesmo quando a
+reordenação temporal por `horario_saida` (§8.1) move a linha de posição.
+
+## Fora de escopo
+
+- Mudar a regra de quando a Viagem é criada, os offsets sugeridos (RN-064) ou a
+  redistribuição proporcional (RN-065) — só o foco muda.
+- Redefinir o mapeamento de `Tab`/`Enter` da TASK-106 (`destinoNavegacaoGrade`),
+  criar novos atalhos ou auto-avanço automático de célula após a criação.
+- Os gestos de hover/seleção e seus flutuantes (TASK-107/113/114), cópia entre
+  dias, geração em lote, modo compacto.
+- Grade de feriados e grades excepcionais **além** de herdar a mesma correção
+  pelo componente compartilhado — sem UI nova para elas.
+- Contrato JSON, contagens, PDF, Comparador.
+
+## Specs fonte
+
+- Spec 04 §8.1 (estrutura da grade; célula preenchível; ordenação por
+  `horario_saida` dentro do dia)
+- Spec 04 §8.2 (preencher a 1ª Seção cria a Viagem e preenche as demais pela
+  sugestão inicial; alterar passante redistribui)
+- Spec 04 §2.4–§2.5 (usuário digita horários de relógio; offsets internos)
+- `docs-dev/18-DESIGN_SYSTEM.md` (DEC-050 — vinculante para UI)
+
+## Regras envolvidas
+
+- RN-067 (usuário digita horários de relógio, nunca offsets) — o fluxo de
+  digitação é o objeto da correção
+- RN-064 (sugestão inicial por acúmulo) — preservada, é o evento que hoje
+  derruba o foco
+- RN-065 (redistribuição proporcional ao editar passante) — preservada, mesma
+  classe de perda de foco
+- RN-062 (reforço de horário é válido) — duas Viagens no mesmo dia/horário não
+  podem tornar ambígua a célula que recebe o foco
+- RN-063 (`horarios_paradas` completo) — inalterado
+
+## Entidades afetadas
+
+- Viagem (apresentação/edição na grade), Seção (linhas da grade)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Digitar um horário válido numa célula criável cria a Viagem (§8.2) e o
+      **foco permanece no campo daquela célula** após a criação e o
+      preenchimento das Seções derivadas — sem `Tab` intermediário.
+- [ ] Com o foco preservado, `Enter` desce para a Seção seguinte da **Viagem
+      recém-criada** e `Tab` vai para a mesma Seção no dia seguinte, exatamente
+      como definido pela TASK-106.
+- [ ] O conteúdo do campo após a criação é o horário confirmado em `HH:MM`
+      (nada de rascunho perdido, duplicado ou revertido) e a posição do cursor
+      permite continuar digitando/corrigir sem seleção parcial inesperada.
+- [ ] Quando a ordenação temporal (§8.1) move a Viagem criada para outro bloco
+      (ex.: `07:00` digitado abaixo de uma Viagem `08:00`), o foco acompanha a
+      **Viagem criada**, na nova posição.
+- [ ] Editar um horário passante de uma Viagem existente (redistribuição —
+      RN-065) também preserva o foco na célula editada.
+- [ ] Recusa de horário fora de ordem (§8.2) continua deixando a célula em erro
+      **e com o foco nela**, sem confirmar.
+- [ ] O mesmo comportamento vale na grade de feriados (§8.4) e nas grades
+      excepcionais (§8.5), por reuso do mesmo componente — sem código
+      duplicado por grade.
+- [ ] Nenhum `data-testid`/`aria-*` existente removido ou renomeado; nenhuma
+      chamada ao OSRM pela grade.
+
+## Casos válidos
+
+- Grade vazia, SEG: digitar `0800` na célula criável → Viagem criada, Seções
+  intermediárias preenchidas, foco ainda no campo de SEG/Seção 1 com `08:00`;
+  `Enter` leva à Seção 2 da mesma Viagem; `Enter` até o fim do bloco leva à
+  célula criável seguinte, onde `1000` cria a segunda Viagem e o foco de novo
+  permanece.
+- Dia com Viagem `08:00`: digitar `07:00` na célula criável → a nova Viagem
+  passa a ser a primeira do dia (§8.1) e o foco segue com ela para o bloco
+  acima.
+- Viagem existente `08:00`: alterar a Seção 3 de `08:45` para `08:40` →
+  redistribuição aplicada (RN-065) e foco mantido na Seção 3.
+- Mesmo dia com duas Viagens no mesmo `horario_saida` (reforço — RN-062):
+  criar a segunda mantém o foco na célula da Viagem recém-criada, não na outra.
+- Grade de feriados: mesmo fluxo de criação com foco preservado.
+
+## Casos inválidos
+
+- Digitar `2575` (horário impossível): a célula não confirma, nenhuma Viagem é
+  criada e o foco permanece no campo para correção — sem salto de célula.
+- Digitar um horário passante fora de ordem (menor que a âncora anterior): a
+  célula fica em erro (§8.2), não confirma e mantém o foco.
+- Apagar a Viagem que detinha o foco (X): a grade não pode tentar devolver o
+  foco a um campo inexistente nem lançar erro — comportamento atual de seleção
+  preservado.
+
+## Testes esperados
+
+- Unitários: a lógica de "qual célula deve receber o foco" (mapeamento
+  `uuid da Viagem + índice de Seção + dia` → alvo) isolada de React, incluindo
+  o caso de reordenação temporal e o de reforço (RN-062); `destinoNavegacaoGrade`
+  inalterado (teste de regressão).
+- Integração (Vitest + Testing Library): digitar na célula criável mantém
+  `document.activeElement` no mesmo campo lógico após a criação; editar
+  passante mantém o foco; entrada inválida mantém o foco sem criar Viagem.
+- E2E (Playwright, OSRM mockado): preencher um dia inteiro digitando
+  `horário → Enter → … → Enter` sem nenhum `Tab` de recuperação; asserção de
+  foco (`toBeFocused`) após cada criação.
+- Snapshot/contrato JSON: exportação inalterada (nenhuma mudança de contrato) —
+  teste de regressão existente basta.
+- PDF: n/a.
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/etapa-viagens.tsx` (unificação da célula
+  criável/existente e/ou remoção da `key` que remonta o input; restauração de
+  foco após `aplicar`)
+- `src/formulario/viagens/campo-horario-grade.tsx` (sincronizar `valor`
+  externo sem remontar)
+- `src/formulario/viagens/montagem-grade.ts` (se o alvo do foco precisar de um
+  localizador por `uuid` além da coordenada por índice)
+- Testes em `src/formulario/viagens/__tests__/` e o E2E da grade em `e2e/`
+
+## Riscos
+
+- Restaurar foco via efeito/`querySelector` pode brigar com a navegação
+  explícita da TASK-106 (`navegarNaGrade`) e roubar o foco de uma célula para
+  onde o usuário acabou de navegar — a correção precisa ser idempotente e
+  restrita ao ciclo de render provocado pela própria confirmação.
+- Remover a `key` que hoje remonta o input expõe o `rascunho` interno do
+  `CampoHorarioGrade` a divergir do `valor` vindo do estado (regressão possível
+  em "restaurar sugestão" e na redistribuição, que mudam o valor sem digitação).
+- Superfície muito ativa: hover/seleção (TASK-107/113/114) e flutuantes podem
+  regredir; a suíte E2E da grade é o freio.
+- Interação com a TASK-114 (mesma célula/flutuantes) — não conflita em regra,
+  mas pode conflitar em arquivo se implementadas em paralelo.
+
+## Dependências
+
+- TASK-106 concluída (navegação por teclado e layout da grade); TASK-107/113
+  concluídas (flutuantes da célula). Nenhuma Q-xxx pendente.
+
+## Perguntas em aberto
+
+- Nenhuma. O destino do foco em caso de reordenação temporal foi definido pelo
+  responsável (segue a Viagem criada/editada) e é mecânica de UI, não regra de
+  negócio nova.
+
+---
+
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.
