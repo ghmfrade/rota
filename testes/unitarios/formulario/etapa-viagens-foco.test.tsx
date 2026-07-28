@@ -20,6 +20,14 @@ function preencher(input: HTMLInputElement, valor: string) {
   });
 }
 
+function confirmar(input: HTMLInputElement, tecla: "Enter" | "Tab" = "Enter") {
+  act(() => {
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { key: tecla, bubbles: true, cancelable: true }),
+    );
+  });
+}
+
 function selecionar(select: HTMLSelectElement, valor: string) {
   const setter = Object.getOwnPropertyDescriptor(
     window.HTMLSelectElement.prototype,
@@ -71,26 +79,20 @@ describe("EtapaViagens — foco lógico da célula (TASK-115)", () => {
     ) as HTMLInputElement;
 
     preencher(criavel, "0700");
+    expect(container.querySelector('[data-testid="celula-partida"]')).not.toBeNull();
+    confirmar(criavel);
 
     const campoCriado = container.querySelector(
       '[data-testid="grade-dias-comuns"] input[data-dia="segunda"][data-secao-index="0"][value="07:00"]',
     ) as HTMLInputElement;
     expect(campoCriado).not.toBeNull();
-    expect(document.activeElement).toBe(campoCriado);
-    expect(campoCriado.selectionStart).toBe(5);
-    const viagemUuid = campoCriado.dataset.viagemUuid;
-    expect(viagemUuid).toBeTruthy();
-
-    act(() => {
-      campoCriado.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
-      );
-    });
     const campoSeguinte = container.querySelector(
-      `input[data-grade="comuns"][data-viagem-uuid="${viagemUuid}"]` +
+      `input[data-grade="comuns"][data-viagem-uuid="${campoCriado.dataset.viagemUuid}"]` +
         '[data-secao-index="1"][data-dia="segunda"]',
     );
     expect(document.activeElement).toBe(campoSeguinte);
+    const viagemUuid = campoCriado.dataset.viagemUuid;
+    expect(viagemUuid).toBeTruthy();
     desmontar();
   });
 
@@ -109,11 +111,15 @@ describe("EtapaViagens — foco lógico da célula (TASK-115)", () => {
     ) as HTMLInputElement;
 
     preencher(final, "0850");
-    expect(document.activeElement).toBe(final);
+    confirmar(final);
+    expect(document.activeElement).toBe(
+      grade.querySelector('input[aria-label="Criar viagem — segunda"]'),
+    );
     expect(final.value).toBe("08:50");
     expect(intermediaria.value).toBe("08:30");
 
     preencher(intermediaria, "0855");
+    confirmar(intermediaria);
     expect(document.activeElement).toBe(intermediaria);
     expect(intermediaria.value).toBe("08:30");
     expect(
@@ -145,12 +151,13 @@ describe("EtapaViagens — foco lógico da célula (TASK-115)", () => {
     ) as HTMLInputElement;
 
     preencher(criavel, "0900");
+    confirmar(criavel);
 
-    const campoCriado = container.querySelector(
-      '[data-testid="grade-feriados"] input[data-grade="feriados"]' +
-        '[data-dia="terca"][data-secao-index="0"][value="09:00"]',
+    expect(document.activeElement).toBe(
+      container.querySelector(
+        '[data-testid="grade-feriados"] input[data-grade="feriados"][data-secao-index="1"][data-dia="terca"]',
+      ),
     );
-    expect(document.activeElement).toBe(campoCriado);
     desmontar();
   });
 });

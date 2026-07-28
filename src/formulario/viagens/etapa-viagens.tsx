@@ -87,6 +87,7 @@ interface PropsEtapaViagens {
 export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   const raizEtapaRef = useRef<HTMLDivElement>(null);
   const alvoFocoPendenteRef = useRef<AlvoFocoCelulaGrade | null>(null);
+  const seletorNavegacaoPendenteRef = useRef<string | null>(null);
   const temporizadorSaidaHoverRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [servicoSelecionadoUuid, definirServicoSelecionadoUuid] = useState<string | null>(null);
   const [sentidoSelecionado, definirSentidoSelecionado] = useState<Itinerario["sentido"] | null>(
@@ -120,6 +121,19 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   // reordenar os blocos. Reencontra o campo pela identidade da Viagem, antes
   // da pintura, sem disputar foco em atualizações que não vieram da célula.
   useLayoutEffect(() => {
+    const seletorNavegacaoPendente = seletorNavegacaoPendenteRef.current;
+    if (seletorNavegacaoPendente) {
+      seletorNavegacaoPendenteRef.current = null;
+      const campoNavegacao = raizEtapaRef.current?.querySelector<HTMLInputElement>(
+        seletorNavegacaoPendente,
+      );
+      if (campoNavegacao) {
+        campoNavegacao.focus();
+        campoNavegacao.select();
+      }
+      return;
+    }
+
     const alvoPendente = alvoFocoPendenteRef.current;
     if (!alvoPendente) return;
     alvoFocoPendenteRef.current = null;
@@ -442,8 +456,31 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
       `[data-bloco="${destino.indiceBloco}"]` +
       `[data-secao-index="${destino.indiceSecao}"]` +
       `[data-dia="${destino.dia}"]`;
+    const focoPendente = alvoFocoPendenteRef.current;
+    if (
+      tecla === "Enter" &&
+      focoPendente &&
+      destino.indiceBloco === origem.indiceBloco
+    ) {
+      // A grade pode reordenar a Viagem confirmada. Ao descer dentro do
+      // mesmo bloco, segue sua UUID em vez da posição ordinal anterior.
+      alvoFocoPendenteRef.current = { ...focoPendente, indiceSecao: destino.indiceSecao };
+      return true;
+    }
     const alvo = raizEtapaRef.current?.querySelector<HTMLInputElement>(seletor);
-    if (!alvo) return false;
+    if (!alvo) {
+      // Ao confirmar a primeira Seção, o destino de Enter pode ser uma
+      // célula passante que só nasce no próximo render. Adia exclusivamente
+      // a navegação que acompanha essa confirmação.
+      if (!alvoFocoPendenteRef.current) return false;
+      alvoFocoPendenteRef.current = null;
+      seletorNavegacaoPendenteRef.current = seletor;
+      return true;
+    }
+    // A confirmação pode ter agendado a restauração do foco na própria
+    // Viagem (TASK-115). Quando a navegação por teclado encontrou destino,
+    // ela tem precedência para cumprir o mapa da TASK-106/TASK-116.
+    alvoFocoPendenteRef.current = null;
     alvo.focus();
     alvo.select();
     return true;

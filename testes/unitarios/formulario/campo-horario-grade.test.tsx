@@ -15,7 +15,15 @@ function preencher(input: HTMLInputElement, valor: string) {
   });
 }
 
-describe("CampoHorarioGrade (TASK-106; RN-067)", () => {
+function pressionar(input: HTMLInputElement, tecla: "Enter" | "Tab") {
+  act(() => {
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { key: tecla, bubbles: true, cancelable: true }),
+    );
+  });
+}
+
+describe("CampoHorarioGrade (TASK-116; RN-067)", () => {
   it("é textual e não oferece seletor nativo de horário por clique", () => {
     const { container, desmontar } = renderizar(
       <CampoHorarioGrade
@@ -35,7 +43,7 @@ describe("CampoHorarioGrade (TASK-106; RN-067)", () => {
     ["830", "08:30"],
     ["08:30", "08:30"],
     ["8:30", "08:30"],
-  ])("aceita %s e confirma como %s", (entrada, normalizado) => {
+  ])("aceita %s e confirma como %s somente por Enter", (entrada, normalizado) => {
     const aoConfirmar = vi.fn(() => true);
     const { container, desmontar } = renderizar(
       <CampoHorarioGrade
@@ -46,8 +54,29 @@ describe("CampoHorarioGrade (TASK-106; RN-067)", () => {
     );
     const input = container.querySelector("input") as HTMLInputElement;
     preencher(input, entrada);
+    expect(aoConfirmar).not.toHaveBeenCalled();
+    pressionar(input, "Enter");
     expect(aoConfirmar).toHaveBeenCalledWith(normalizado);
     expect(input.value).toBe(normalizado);
+    desmontar();
+  });
+
+  it("mantém a sequência 10:32 como rascunho e não confirma parciais normalizáveis", () => {
+    const aoConfirmar = vi.fn(() => true);
+    const { container, desmontar } = renderizar(
+      <CampoHorarioGrade valor="" rotuloAcessivel="Criar viagem" aoConfirmar={aoConfirmar} />,
+    );
+    const input = container.querySelector("input") as HTMLInputElement;
+
+    for (const entrada of ["1", "10", "10:", "10:3", "10:32"]) {
+      preencher(input, entrada);
+      expect(input.value).toBe(entrada);
+      expect(aoConfirmar).not.toHaveBeenCalled();
+    }
+
+    pressionar(input, "Enter");
+    expect(aoConfirmar).toHaveBeenCalledTimes(1);
+    expect(aoConfirmar).toHaveBeenCalledWith("10:32");
     desmontar();
   });
 
@@ -82,11 +111,10 @@ describe("CampoHorarioGrade (TASK-106; RN-067)", () => {
     );
     const input = container.querySelector("input") as HTMLInputElement;
     preencher(input, "0830");
-    act(() => {
-      input.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }),
-      );
-    });
+    expect(aoConfirmar).not.toHaveBeenCalled();
+    pressionar(input, "Tab");
+    expect(aoConfirmar).toHaveBeenCalledTimes(1);
+    expect(aoConfirmar).toHaveBeenCalledWith("08:30");
     expect(aoNavegar).toHaveBeenCalledWith("Tab");
     desmontar();
   });
@@ -103,11 +131,7 @@ describe("CampoHorarioGrade (TASK-106; RN-067)", () => {
       />,
     );
     const input = container.querySelector("input") as HTMLInputElement;
-    act(() => {
-      input.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }),
-      );
-    });
+    pressionar(input, "Tab");
     expect(aoConfirmar).not.toHaveBeenCalled();
     expect(aoNavegar).toHaveBeenCalledWith("Tab");
     desmontar();
@@ -125,14 +149,13 @@ describe("CampoHorarioGrade (TASK-106; RN-067)", () => {
       />,
     );
     const input = container.querySelector("input") as HTMLInputElement;
+    act(() => input.focus());
     preencher(input, "2460");
-    act(() => {
-      input.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }),
-      );
-    });
+    pressionar(input, "Tab");
     expect(aoConfirmar).not.toHaveBeenCalled();
     expect(aoNavegar).not.toHaveBeenCalled();
+    expect(input.value).toBe("2460");
+    expect(document.activeElement).toBe(input);
     desmontar();
   });
 

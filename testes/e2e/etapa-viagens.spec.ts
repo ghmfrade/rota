@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import multiServico from "../fixtures/carregar-multi-servico.json";
 
 // E2E da etapa "Viagens e horários" — grades de dias comuns e de feriados
@@ -15,6 +15,15 @@ function gradeComum(page: Page) {
 }
 function gradeFeriados(page: Page) {
   return page.getByTestId("grade-feriados");
+}
+
+async function preencherEConfirmar(
+  campo: Locator,
+  valor: string,
+  tecla: "Enter" | "Tab" = "Enter",
+) {
+  await campo.fill(valor);
+  await campo.press(tecla);
 }
 
 async function abrirEtapaViagens(page: Page, documento: unknown) {
@@ -50,13 +59,55 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
 
     // Digitação rápida sem ":" é normalizada. Uma partida posterior inserida
     // com 0700 sobe acima da Viagem gravada das 08:00.
-    await grade.getByLabel("Criar viagem — segunda").fill("0700");
+    await preencherEConfirmar(grade.getByLabel("Criar viagem — segunda"), "0700");
     await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toHaveValue("07:00");
     await expect(grade.getByLabel("Horário de partida — segunda, viagem 2")).toHaveValue("08:00");
 
     // Três algarismos também são aceitos e normalizados.
-    await grade.getByLabel("Horário de partida — segunda, viagem 1").fill("730");
+    await preencherEConfirmar(
+      grade.getByLabel("Horário de partida — segunda, viagem 1"),
+      "730",
+    );
     await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toHaveValue("07:30");
+  });
+
+  test("TASK-116: mantém 10:32 como rascunho até Enter, sem criar 01:03", async ({ page }) => {
+    let chamouOsrm = false;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamouOsrm = true;
+      return rota.abort();
+    });
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+    const criavel = grade.getByLabel("Criar viagem — terca");
+    const partidasAntes = await grade.getByTestId("celula-partida").count();
+
+    await criavel.pressSequentially("10:32");
+    await expect(criavel).toHaveValue("10:32");
+    await expect(grade.getByTestId("celula-partida")).toHaveCount(partidasAntes);
+    await expect(grade.locator('input[value="01:03"]')).toHaveCount(0);
+
+    await criavel.press("Enter");
+    await expect(grade.getByLabel("Horário de partida — terca, viagem 1")).toHaveValue("10:32");
+    await expect(grade.getByTestId("celula-partida")).toHaveCount(partidasAntes + 1);
+    expect(chamouOsrm).toBe(false);
+  });
+
+  test("TASK-116: Tab confirma uma vez e blur descarta rascunho", async ({ page }) => {
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+    const criavel = grade.getByLabel("Criar viagem — terca");
+
+    await criavel.fill("1032");
+    await expect(grade.getByTestId("celula-partida")).toHaveCount(1);
+    await criavel.press("Tab");
+    await expect(grade.getByLabel("Horário de partida — terca, viagem 1")).toHaveValue("10:32");
+    await expect(grade.getByLabel("Criar viagem — quarta")).toBeFocused();
+
+    const partidaSegunda = grade.getByLabel("Horário de partida — segunda, viagem 1");
+    await partidaSegunda.fill("10:32");
+    await partidaSegunda.blur();
+    await expect(partidaSegunda).toHaveValue("08:00");
   });
 
   test("seleção forma superfície contínua; ações aparecem só no hover; Tab navega", async ({
@@ -106,7 +157,7 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     await abrirEtapaViagens(page, structuredClone(multiServico));
     const grade = gradeComum(page);
 
-    await grade.getByLabel("Criar viagem — segunda").fill("09:00");
+    await preencherEConfirmar(grade.getByLabel("Criar viagem — segunda"), "09:00");
     const ultimaSecaoPrimeiraViagem = grade.getByLabel(
       /Horário de passagem — Praia Grande - Rodoviária Praia Grande, segunda, viagem 1/,
     );
@@ -130,7 +181,7 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
 
     await abrirEtapaViagens(page, structuredClone(multiServico));
     const grade = gradeComum(page);
-    await grade.getByLabel("Criar viagem — terca").fill("09:00");
+    await preencherEConfirmar(grade.getByLabel("Criar viagem — terca"), "09:00");
 
     const partidaSegunda = grade.getByLabel("Horário de partida — segunda, viagem 1");
     const partidaTerca = grade.getByLabel("Horário de partida — terca, viagem 1");
@@ -184,7 +235,7 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     await abrirEtapaViagens(page, structuredClone(multiServico));
     const grade = gradeComum(page);
 
-    await grade.getByLabel("Criar viagem — terca").fill("09:00");
+    await preencherEConfirmar(grade.getByLabel("Criar viagem — terca"), "09:00");
 
     // A Viagem nasce e passa a ser exibida como partida editável.
     await expect(grade.getByLabel("Horário de partida — terca, viagem 1")).toHaveValue("09:00");
@@ -215,29 +266,20 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     await abrirEtapaViagens(page, structuredClone(multiServico));
     const grade = gradeComum(page);
 
-    // A nova Viagem sobe acima da partida das 08:00; o foco segue sua UUID.
-    await grade.getByLabel("Criar viagem — segunda").fill("0700");
+    // A nova Viagem sobe acima da partida das 08:00; Enter confirma e segue
+    // para a Seção seguinte dessa mesma UUID (TASK-106/TASK-115).
+    await preencherEConfirmar(grade.getByLabel("Criar viagem — segunda"), "0700");
     const partidaCriada = grade.getByLabel("Horário de partida — segunda, viagem 1");
     await expect(partidaCriada).toHaveValue("07:00");
-    await expect(partidaCriada).toBeFocused();
-    await expect
-      .poll(() =>
-        partidaCriada.evaluate((campo) => ({
-          inicio: (campo as HTMLInputElement).selectionStart,
-          fim: (campo as HTMLInputElement).selectionEnd,
-        })),
-      )
-      .toEqual({ inicio: 5, fim: 5 });
     const viagemUuid = await partidaCriada.getAttribute("data-viagem-uuid");
     expect(viagemUuid).toBeTruthy();
 
-    // Enter continua na Seção seguinte da mesma Viagem; Tab mantém o mapa da
-    // TASK-106 e não exige uma tecla intermediária para recuperar o foco.
-    await partidaCriada.press("Enter");
     const passagemIntermediaria = grade.locator(
       `input[data-viagem-uuid="${viagemUuid}"][data-secao-index="1"]`,
     );
     await expect(passagemIntermediaria).toBeFocused();
+    // Tab mantém o mapa da TASK-106 sem exigir uma tecla intermediária para
+    // recuperar o foco.
     await partidaCriada.focus();
     await partidaCriada.press("Tab");
     await expect(grade.getByLabel("Criar viagem — terca")).toBeFocused();
@@ -245,11 +287,11 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     const passagemFinal = grade.locator(
       `input[data-viagem-uuid="${viagemUuid}"][data-secao-index="2"]`,
     );
-    await passagemFinal.fill("07:50");
-    await expect(passagemFinal).toBeFocused();
+    await preencherEConfirmar(passagemFinal, "07:50");
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 2")).toBeFocused();
 
     // Fora-de-ordem não confirma, conserva o erro e o próprio campo em foco.
-    await passagemIntermediaria.fill("07:55");
+    await preencherEConfirmar(passagemIntermediaria, "07:55");
     await expect(passagemIntermediaria).toBeFocused();
     await expect(passagemIntermediaria).toHaveValue("07:30");
     await expect(passagemIntermediaria.locator("xpath=ancestor::td").getByTestId("erro-passante")).toBeVisible();
@@ -257,14 +299,16 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     // Horário impossível não cria Viagem nem desloca o foco.
     const criavelTerca = grade.getByLabel("Criar viagem — terca");
     const partidasAntes = await grade.getByTestId("celula-partida").count();
-    await criavelTerca.fill("2575");
+    await preencherEConfirmar(criavelTerca, "2575");
     await expect(criavelTerca).toBeFocused();
     await expect(grade.getByTestId("celula-partida")).toHaveCount(partidasAntes);
 
     // A grade de feriados reutiliza exatamente o mesmo mecanismo.
     const feriados = gradeFeriados(page);
-    await feriados.getByLabel("Criar viagem — terca").fill("0900");
-    await expect(feriados.getByLabel("Horário de partida — terca, viagem 1")).toBeFocused();
+    await preencherEConfirmar(feriados.getByLabel("Criar viagem — terca"), "0900");
+    await expect(
+      feriados.locator('input[data-dia="terca"][data-secao-index="1"]'),
+    ).toBeFocused();
     expect(chamouOsrm).toBe(false);
   });
 
@@ -277,7 +321,7 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     // Offsets gravados são 0/40/60 min. Mover a partida 08:00 → 10:00 desloca
     // tudo +2h, SEM re-derivar pela sugestão inicial (offsets preservados).
     const partida = grade.getByLabel("Horário de partida — segunda, viagem 1");
-    await partida.fill("10:00");
+    await preencherEConfirmar(partida, "10:00");
 
     await expect(partida).toHaveValue("10:00");
     const linhas = grade.getByTestId("linha-grade");
@@ -502,7 +546,7 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
       .nth(2)
       .getByTestId("celula-passante")
       .locator("input[data-grade]");
-    await passanteFinalOrigem.fill("08:50");
+    await preencherEConfirmar(passanteFinalOrigem, "08:50");
 
     const partidaOrigem = grade.getByLabel("Horário de partida — segunda, viagem 1");
     const celulaOrigem = partidaOrigem.locator("xpath=ancestor::td");
@@ -520,11 +564,11 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
       .getByTestId("celula-passante")
       .locator("input[data-grade]");
     await expect(passanteIntermediarioCopia).toHaveValue("08:40");
-    await passanteIntermediarioCopia.fill("09:05");
+    await preencherEConfirmar(passanteIntermediarioCopia, "09:05");
     await expect(passanteIntermediarioCopia).toHaveValue("08:40");
     await expect(grade.getByTestId("erro-passante")).toBeVisible();
 
-    await partidaOrigem.fill("00:05");
+    await preencherEConfirmar(partidaOrigem, "00:05");
     await celulaOrigem.hover();
     await celulaOrigem.getByLabel("Inserir viagem antes — segunda, viagem 1").click();
     await expect(celulaFinalOrigem.getByTestId("erro-insercao-relativa")).toContainText(
@@ -559,13 +603,13 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     // Fixar a última Seção (Praia Grande) em 08:50 → âncora; a intermediária
     // (São Vicente) é reinterpolada proporcionalmente ao baseline (0/18/30):
     // off(ord2) = 50 · 18/30 = 30 min → 08:30.
-    await passantePraia.fill("08:50");
+    await preencherEConfirmar(passantePraia, "08:50");
     await expect(passantePraia).toHaveValue("08:50");
     await expect(passanteVicente).toHaveValue("08:30");
 
     // Bloqueio de fora-de-ordem: São Vicente > âncora de Praia (08:50) é recusado
     // — a célula entra em erro e não confirma (reverte ao valor anterior).
-    await passanteVicente.fill("08:55");
+    await preencherEConfirmar(passanteVicente, "08:55");
     await expect(linhas.nth(1).getByTestId("erro-passante")).toBeVisible();
     await expect(passanteVicente).toHaveValue("08:30");
 
@@ -590,7 +634,7 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
 
     await abrirEtapaViagens(page, structuredClone(multiServico));
     const grade = gradeComum(page);
-    await grade.getByLabel("Criar viagem — domingo").fill("08:00");
+    await preencherEConfirmar(grade.getByLabel("Criar viagem — domingo"), "08:00");
 
     const partidaDomingo = grade.getByLabel("Horário de partida — domingo, viagem 1");
     const celulaDomingo = partidaDomingo.locator("xpath=ancestor::td");
@@ -618,7 +662,7 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     await partidaDomingo.click();
     await expect(partidaDomingo).toBeFocused();
 
-    await passanteDomingo.fill("08:50");
+    await preencherEConfirmar(passanteDomingo, "08:50");
     await expect(passanteDomingo).toHaveValue("08:50");
     await celulaDomingo.hover();
     await celulaDomingo.getByTestId("restaurar-viagem").click();
@@ -631,7 +675,7 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toHaveValue("08:00");
 
     const feriados = gradeFeriados(page);
-    await feriados.getByLabel("Criar viagem — domingo").fill("08:00");
+    await preencherEConfirmar(feriados.getByLabel("Criar viagem — domingo"), "08:00");
     const celulaFeriadoDomingo = feriados
       .getByLabel("Horário de partida — domingo, viagem 1")
       .locator("xpath=ancestor::td");
@@ -685,7 +729,7 @@ test.describe("Etapa Viagens — grade de feriados e cópias (TASK-030; Spec 04 
       .nth(1)
       .getByTestId("celula-passante")
       .locator("input[data-grade]");
-    await comumVicente.fill("08:30");
+    await preencherEConfirmar(comumVicente, "08:30");
     await expect(comumVicente).toHaveValue("08:30");
     await expect(linhas.nth(1).getByTestId("celula-passante").locator("input[data-grade]")).toHaveValue("08:40");
   });

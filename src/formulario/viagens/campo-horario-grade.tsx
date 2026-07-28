@@ -18,7 +18,7 @@ interface PropsCampoHorarioGrade {
 
 /**
  * Campo textual da grade: não abre seletor nativo de horário. Aceita digitação
- * com ou sem ":" e mantém o rascunho parcial até confirmar por blur/Tab/Enter.
+ * com ou sem ":" e mantém o rascunho local até confirmar por Enter ou Tab.
  */
 export function CampoHorarioGrade({
   valor,
@@ -46,7 +46,6 @@ export function CampoHorarioGrade({
   function confirmar(): boolean {
     const normalizado = normalizarEntradaHoraMinuto(rascunho);
     if (normalizado === null) {
-      definirRascunho(valor);
       return false;
     }
     if (normalizado === ultimoConfirmadoRef.current) return true;
@@ -54,6 +53,10 @@ export function CampoHorarioGrade({
     if (confirmou) ultimoConfirmadoRef.current = normalizado;
     definirRascunho(confirmou ? normalizado : valor);
     return confirmou;
+  }
+
+  function descartarRascunho() {
+    definirRascunho(ultimoConfirmadoRef.current);
   }
 
   function aoPressionarTecla(evento: KeyboardEvent<HTMLInputElement>) {
@@ -90,16 +93,6 @@ export function CampoHorarioGrade({
         const entrada = evento.target.value;
         if (/^[0-9:]*$/.test(entrada) && entrada.length <= 5) {
           definirRascunho(entrada);
-          const normalizado = normalizarEntradaHoraMinuto(entrada);
-          if (normalizado !== null && normalizado !== ultimoConfirmadoRef.current) {
-            const confirmou = aoConfirmar(normalizado);
-            if (confirmou) {
-              ultimoConfirmadoRef.current = normalizado;
-              definirRascunho(normalizado);
-            } else {
-              definirRascunho(valor);
-            }
-          }
         }
       }}
       onBlur={() => {
@@ -107,7 +100,7 @@ export function CampoHorarioGrade({
           ignorarProximoBlurRef.current = false;
           return;
         }
-        confirmar();
+        descartarRascunho();
       }}
       onKeyDown={aoPressionarTecla}
     />
