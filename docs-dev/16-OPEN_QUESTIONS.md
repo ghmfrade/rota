@@ -782,3 +782,61 @@ do responsável pelo domínio: dois últimos valores válidos e independentes po
 instância aberta da etapa, compartilhados entre todas as Viagens, grades,
 Serviços e sentidos; ambos voltam a `00:10` ao desmontar a etapa; entrada
 inválida não substitui o último valor válido. Ver DEC-091.
+
+---
+
+## Q-070 — Cópia unitária de Viagem entre dias: setas ←/→ no hover ou arrasto da seleção até a coluna do dia?
+
+**Status:** Decidida — DEC-092
+
+**Origem:** decisão do responsável pelo domínio ao revisar a superfície da
+Viagem antes de implementar a TASK-109 (2026-07-28)
+
+**Contexto:** a DEC-084 (Q-062) definiu a cópia unitária para o dia adjacente
+por **setas ←/→** exibidas na Viagem, e a DEC-089 (Q-067) retirou a ação antiga
+"seletor de dia + botão Copiar" justamente em favor dessas setas. Ao avaliar a
+composição já entregue nas TASK-106/107 (X, ↻ e os dois controles de inserção
+relativa aparecendo no hover), o responsável constatou que **acrescentar duas
+setas laterais polui a superfície da célula** — o gesto mais comum da grade
+passaria a custar mais dois controles flutuantes sobre uma célula já densa.
+
+A alternativa proposta é **não renderizar controle nenhum** para essa cópia e
+usar um gesto direto: **arrastar a Viagem selecionada e soltá-la na coluna do
+dia destino**, que então recebe a cópia. O ganho é superfície limpa; o custo é
+que arrasto é gesto descoberto por affordance (cursor/realce da coluna alvo) e
+não existe em teclado nem em telas de toque sem equivalente.
+
+O ponto exige decisão porque a **Spec 04 §8.3 já foi alinhada pelo responsável**
+com o texto "**Copiar viagem para dia ao lado**" — isto é, o alcance adjacente
+está na spec, não só na DEC. Trocar o gesto e ampliar o destino para **qualquer
+dia** altera o texto da spec e supera parcialmente a DEC-089, que havia
+eliminado deliberadamente a cópia unitária para dia arbitrário.
+
+**Spec relacionada:** Spec 04 §8.3 ("Copiar viagem para dia ao lado"), §8.1
+(grade Seções × dias SEG…DOM); Spec 02 §12 (entidade nova → UUID nova);
+RN-004/RN-007/RN-061/RN-062; DEC-084, DEC-089, DEC-090; TASK-109; DEC-050 e
+`docs-dev/18-DESIGN_SYSTEM.md` (affordances, estados de hover/arrasto).
+
+**Impacto se não decidir:** a TASK-109 não pode ser implementada — ela é
+literalmente "as setas ←/→". Implementá-la como está entrega uma UI que o
+responsável já rejeitou; implementá-la com arrasto sem decisão registrada seria
+inventar UX e contrariar a spec vigente (`docs-dev/04` princípio 2).
+
+**Opções:** A — manter as setas ←/→ da DEC-084/DEC-089, como a spec vigente
+descreve. B — substituir as setas pelo **arrasto da Viagem selecionada até a
+coluna do dia destino**, com destino em **qualquer** dia da semana, sempre
+**copiando** (a origem permanece), mantendo a **guarda de duplicidade** da
+DEC-084 e oferecendo um **atalho de teclado** para o caso adjacente. C —
+oferecer os dois caminhos simultaneamente (setas + arrasto), com a poluição
+visual que motivou a questão.
+
+**Recomendação técnica:** B. Elimina dois flutuantes da célula sem perder
+função, e o arrasto é o gesto que já exprime "esta Viagem passa a existir
+naquele dia". C acumula caminhos redundantes sobre a mesma operação, exatamente
+o problema que a DEC-089 fechou. O risco de B é acessibilidade — endereçado
+pelo atalho de teclado e pela permanência da cópia de dia inteiro (TASK-110).
+
+**Decisão:** **Decidida (DEC-092, 2026-07-28).** Opção B, por decisão explícita
+do responsável pelo domínio, com destino em qualquer dia, cópia sempre (nunca
+mover), guarda de duplicidade preservada e atalho `Ctrl+←` / `Ctrl+→` para o
+dia adjacente. Ver DEC-092.

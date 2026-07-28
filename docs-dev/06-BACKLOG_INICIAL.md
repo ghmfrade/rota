@@ -5298,7 +5298,7 @@ decidida pela Q-066/**DEC-088**; a Spec 04 §8.3 já foi alinhada pelo responsá
 
 ## Fora de escopo
 
-- Inserção por offset relativo (TASK-107/Q-060); cópia por headway (TASK-108/Q-061); cópia p/ dia adjacente + dedup (TASK-109/Q-062); operações de dia inteiro copiar/apagar-coluna (TASK-110/Q-063); modo compacto ocultando Seções (TASK-111/Q-064); origem estendida da cópia (TASK-112/Q-065).
+- Inserção por offset relativo (TASK-107/Q-060); cópia por headway (TASK-108/Q-061); cópia unitária p/ outro dia por arrasto + dedup (TASK-109/Q-062/Q-070); operações de dia inteiro copiar/apagar-coluna (TASK-110/Q-063); modo compacto ocultando Seções (TASK-111/Q-064); origem estendida da cópia (TASK-112/Q-065).
 - Contrato JSON / schema (nenhuma mudança); contagens; PDF; Comparador.
 - UI de tabelas excepcionais (TASK-104/105) — mas o layout resultante deve ser reusável por elas (ver Riscos).
 
@@ -5515,33 +5515,69 @@ Geração em lote não existe em spec. Depende da TASK-106. **Q-061 decidida (DE
 
 ---
 
-## TASK-109 — Cópia de Viagem para o dia adjacente (setas ←/→) com guarda de duplicidade — **desbloqueada (DEC-084)**
+## TASK-109 — Cópia de Viagem para outro dia por arrasto até a coluna do dia (+ atalhos `Ctrl+←`/`Ctrl+→`) — **desbloqueada (DEC-092; Spec 04 §8.3 atualizada em 2026-07-28)**
 
 ## Objetivo
 
-Setas ←/→ na Viagem selecionada copiam-na para o dia anterior/seguinte; se já houver Viagem "igual" no destino, não copia e avisa.
+Arrastar a Viagem selecionada e soltá-la sobre a coluna de **qualquer** dia da
+semana cria naquele dia uma cópia da Viagem (UUID nova); `Ctrl+←`/`Ctrl+→` fazem
+a mesma cópia para o dia anterior/seguinte. Se o dia destino já tiver Viagem
+"igual", não copia e avisa.
 
 ## Contexto
 
-A antiga cópia unitária por seletor de dia será **substituída** por este gesto
-(Q-067/**DEC-089**): a TASK-109 remove o `Select` + botão “Copiar” e reutiliza o
-motor de clonagem, sem manter dois caminhos equivalentes. O novo gesto de um
-clique opera no dia adjacente e aplica a guarda da **Q-062/DEC-084**: não copia
-e avisa quando já houver Viagem com o mesmo `horario_saida` na mesma grade; a
-guarda vale **só no gesto**, sem reintroduzir validação de unicidade no contrato
-(**RN-062 preservada**).
+**Reescrita pela Q-070/DEC-092 (2026-07-28).** A versão anterior desta task
+entregava **setas ←/→** no hover da Viagem (DEC-084, reforçada pela DEC-089). O
+responsável pelo domínio constatou que duas setas laterais **poluem** a
+superfície da célula, que já concentra X, ↻ e os dois controles de inserção
+relativa (DEC-082/DEC-090), e decidiu trocar o controle visível por um **gesto
+de arrasto**: nenhuma seta é renderizada.
+
+A DEC-092 fixa: destino em **qualquer** dia (o arrasto restabelece a cópia
+unitária arbitrária que a DEC-089 havia retirado, agora sem custo de
+superfície); **sempre copia, nunca move** (a origem permanece; sem modificador
+de teclado destrutivo); **guarda de duplicidade da DEC-084 preservada** e válida
+**só no gesto** (RN-062 intocada); **`Ctrl+←`/`Ctrl+→`** como caminho sem mouse,
+equivalente parcial assumido (só dias adjacentes), sem wrap SEG↔DOM.
+
+Permanece desta task, vindo da DEC-089, a **remoção do controle antigo**
+(`Select` de dia + botão "Copiar") e a **reutilização do motor puro de clonagem**
+(`copiarViagemParaDias`), sem criar um segundo motor.
+
+**Spec alinhada (2026-07-28):** o responsável atualizou a **Spec 04 §8.3**, que
+agora traz os dois caminhos como itens distintos — "**Copiar viagem para dia ao
+lado**" (atalho de teclado) e "**Copiar viagem para dia de escolha do usuário**"
+(segurar e arrastar o mouse) —, ambos com mesmo `horario_saida`, mesmos offsets,
+**UUID nova** e a mesma guarda de horário já existente. As teclas concretas
+(`Ctrl+←`/`Ctrl+→`), a ausência de wrap SEG↔DOM e a affordance de arrasto ficam
+na DEC-092; a spec não os contradiz. A task está **liberada**.
 
 ## Fora de escopo
 
-- Operações de dia inteiro (TASK-110); demais gestos. Qualquer validação estrutural de unicidade no contrato (proibida — RN-062).
+- Alterar o efeito, os `data-testid` ou os `aria-label` das demais ações da
+  Viagem (X, ↻, controles de inserção relativa das TASK-107/TASK-113) — apenas
+  garantir que não regridam.
+- Operações de dia inteiro (TASK-110) e demais gestos da grade.
+- Qualquer validação estrutural de unicidade no contrato (proibida — RN-062).
+- Mover/apagar a Viagem de origem por arrasto (a DEC-092 exclui explicitamente o
+  gesto destrutivo).
+- Reordenar Viagens dentro do mesmo dia por arrasto (a ordenação segue por
+  `horario_saida` — Spec 04 §8.1).
+- Contrato JSON, PDF, Comparador e contagens.
 
 ## Specs fonte
 
-- Spec 04 §8.3 (copiar viagem para outro dia); Spec 02 §12
+- Spec 04 §8.3 (copiar viagem para outro dia) — **na redação atualizada pela
+  DEC-092**
+- Spec 04 §8.1 (grade Seções × dias SEG…DOM)
+- Spec 02 §12 (entidade nova → UUID nova)
 
 ## Regras envolvidas
 
-- RN-004, RN-061, RN-062 (não reintroduzir unicidade no contrato)
+- RN-004, RN-007 (cópia é entidade nova com UUID nova)
+- RN-061 (Viagem pertence a um único `dia_semana`)
+- RN-062 (não reintroduzir unicidade no contrato — guarda só no gesto)
+- RN-063/RN-067 (offsets transladados sem recálculo)
 
 ## Entidades afetadas
 
@@ -5554,43 +5590,75 @@ guarda vale **só no gesto**, sem reintroduzir validação de unicidade no contr
 
 ## Critérios de aceite
 
-- [ ] Seta → copia a Viagem para o dia seguinte (UUID nova); seta ← para o anterior. Botões surgem **no hover** (TASK-106).
-- [ ] Em **SEG**, a seta ← não aparece; em **DOM**, a seta → não aparece. A navegação não faz wrap SEG↔DOM (DEC-089).
-- [ ] Se o destino já tem Viagem com o mesmo `horario_saida` na mesma grade, **não copia** e avisa ("já tem horário").
-- [ ] Nenhuma validação de unicidade é adicionada a outros caminhos (RN-062 preservada — a guarda é só de UI).
-- [ ] O `Select` de dia e o botão antigo “Copiar” são removidos; o motor puro de clonagem é reutilizado/refatorado, sem lógica repetida (DEC-089).
+- [ ] Arrastar a Viagem selecionada e soltar sobre a coluna de **qualquer** dia
+      cria naquele dia uma cópia com **UUID nova**, mesmo `horario_saida` e
+      mesmos offsets; a Viagem de origem **permanece** inalterada.
+- [ ] Durante o arrasto há **affordance visível**: cursor de arrasto sobre a
+      Viagem selecionada e **realce da coluna de dia sob o cursor**.
+- [ ] Soltar fora de uma coluna de dia (ou na própria coluna de origem)
+      **cancela** o gesto, sem criar nem apagar nada.
+- [ ] **Nenhuma seta ←/→** é renderizada na superfície da Viagem.
+- [ ] `Ctrl+←` copia para o dia anterior e `Ctrl+→` para o dia seguinte, com a
+      mesma guarda; em **SEG** o `Ctrl+←` e em **DOM** o `Ctrl+→` não fazem nada
+      (sem wrap SEG↔DOM — DEC-089/DEC-092).
+- [ ] Se o dia destino já tem Viagem com o mesmo `horario_saida` na mesma grade
+      (comum/feriado/excepcional), **não copia**, preserva a Viagem destino e
+      avisa ("já tem horário").
+- [ ] Nenhuma validação de unicidade é adicionada a outros caminhos (RN-062
+      preservada — a guarda é só de UI).
+- [ ] O `Select` de dia e o botão antigo "Copiar" são removidos; o motor puro de
+      clonagem é reutilizado/refatorado, sem lógica repetida (DEC-089).
 
 ## Casos válidos
 
-- Viagem 08:00 em SEG, seta → cria 08:00 em TER (destino sem 08:00).
+- Viagem 08:00 em SEG, arrastada até a coluna de QUI (destino sem 08:00) → cria
+  08:00 em QUI, UUID nova, offsets idênticos; 08:00 permanece em SEG.
+- Viagem 08:00 em SEG com `Ctrl+→` → cria 08:00 em TER.
+- Viagem em grade de feriado arrastada para outro dia → cópia entra na mesma
+  grade do destino, com os discriminadores normalizados.
 
 ## Casos inválidos
 
-- Destino já tem 08:00 (mesma grade) → aviso "já tem horário", nada criado.
-- Tentar navegar antes de SEG ou depois de DOM → gesto inexistente; a seta correspondente não é renderizada.
+- Destino já tem 08:00 (mesma grade) → aviso "já tem horário", nada criado, UUID
+  do destino preservada.
+- Soltar fora de qualquer coluna de dia → nada acontece.
+- `Ctrl+←` em SEG / `Ctrl+→` em DOM → nada acontece (sem wrap).
 
 ## Testes esperados
 
-- Unitários: cópia p/ dia adjacente com UUID nova; detecção de duplicidade pelo critério da Q-062; resolução de vizinho sem wrap nas bordas SEG/DOM.
-- E2E: gesto, aviso, ausência de ← em SEG/→ em DOM e ausência do seletor/botão antigo (OSRM mockado).
+- Unitários: cópia para dia arbitrário com UUID nova e offsets preservados;
+  origem intacta; detecção de duplicidade pelo critério da DEC-084; resolução de
+  vizinho sem wrap nas bordas SEG/DOM.
+- E2E (OSRM mockado): arrasto de uma Viagem até outra coluna cria a cópia; realce
+  da coluna alvo durante o arrasto; soltar fora cancela; aviso de duplicidade;
+  atalhos `Ctrl+←`/`Ctrl+→`; ausência de setas ←/→ e do seletor/botão antigo.
 - Contrato: round-trip mantém RN-062 (duplicatas ainda aceitas em import).
 
 ## Arquivos prováveis
 
-- `src/formulario/viagens/acoes-grade.ts`, `copias-grade.ts`, `etapa-viagens.tsx`.
+- `src/formulario/viagens/etapa-viagens.tsx` (arrasto, realce de coluna,
+  atalhos), `copias-grade.ts` (motor único), `acoes-grade.ts`.
 
 ## Riscos
 
-- Risco de a guarda escorregar para validação de contrato/import — vedado por RN-062 (guarda só no gesto — DEC-084).
+- Risco de a guarda escorregar para validação de contrato/import — vedado por
+  RN-062 (guarda só no gesto — DEC-084/DEC-092).
 - Risco de duplicar o motor antigo em vez de reutilizá-lo; vedado pela DEC-089.
+- Risco de o arrasto conflitar com a seleção/hover da célula ou com o
+  `overflow-x-auto` da `Tabela` (mesma superfície tratada na TASK-114): o gesto
+  não pode disparar clique de seleção nem quebrar os controles das TASK-107/113.
+- Risco de gesto invisível: sem a affordance de cursor e realce de coluna, a
+  cópia unitária fica indescobrível — as setas eram o caminho descoberto.
 
 ## Dependências
 
-- TASK-106. Q-062 decidida (DEC-084). Q-067 decidida (DEC-089).
+- TASK-106. Q-062 decidida (DEC-084), Q-067 decidida (DEC-089), Q-070 decidida
+  (DEC-092). Spec 04 §8.3 atualizada pelo responsável em 2026-07-28 — sem
+  bloqueio pendente.
 
 ## Perguntas em aberto
 
-- Nenhuma — Q-062/DEC-084 e Q-067/DEC-089 decididas.
+- Nenhuma — Q-062/DEC-084, Q-067/DEC-089 e Q-070/DEC-092 decididas; Spec 04 §8.3 já alinhada.
 
 ---
 
@@ -5606,7 +5674,7 @@ Diálogo "Copiar para [vários dias]" que replica todas as Viagens de um dia par
 
 ## Fora de escopo
 
-- Cópia para dia adjacente unitária (TASK-109); demais gestos. Contrato/PDF/Comparador/contagens.
+- Cópia unitária de Viagem para outro dia por arrasto (TASK-109); demais gestos. Contrato/PDF/Comparador/contagens.
 
 ## Specs fonte
 
@@ -5650,11 +5718,11 @@ Diálogo "Copiar para [vários dias]" que replica todas as Viagens de um dia par
 
 ## Riscos
 
-- Reuso da guarda de duplicidade da TASK-109/DEC-084 sem duplicar lógica.
+- Reuso da guarda de duplicidade da TASK-109/DEC-084 (mantida pela DEC-092) sem duplicar lógica.
 
 ## Dependências
 
-- TASK-106; reusa a guarda da TASK-109 (DEC-084). Q-063 decidida (DEC-085).
+- TASK-106; reusa a guarda da TASK-109 (DEC-084, mantida pela DEC-092). Q-063 decidida (DEC-085).
 
 ## Perguntas em aberto
 
@@ -5829,8 +5897,9 @@ sentidos, com reset ao desmontar a etapa.
   UUID ou a recusa fora de 00:00–23:59 da TASK-107/DEC-082.
 - Unificar os valores das duas direções; criar preferências persistentes em
   servidor, navegador ou contrato JSON.
-- Geração em lote por headway (TASK-108), cópia para dias adjacentes
-  (TASK-109), demais ações da grade, PDF, Comparador e contagens.
+- Geração em lote por headway (TASK-108), cópia unitária de Viagem para outro
+  dia por arrasto (TASK-109), demais ações da grade, PDF, Comparador e
+  contagens.
 
 ## Specs fonte
 
