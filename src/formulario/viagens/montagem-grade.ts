@@ -26,6 +26,28 @@ export interface CoordenadaCelulaGrade {
 }
 
 /**
+ * Identidade lógica do campo de uma Viagem. Diferentemente da coordenada
+ * ordinal, permanece estável quando a grade reordena os blocos por horário
+ * ou quando há reforços no mesmo dia/horário (RN-062).
+ */
+export interface AlvoFocoCelulaGrade {
+  grade: string;
+  viagemUuid: string;
+  indiceSecao: number;
+  dia: DiaSemana;
+}
+
+/** Seletor do input que representa uma célula lógica de uma Viagem. */
+export function seletorAlvoFocoCelulaGrade(alvo: AlvoFocoCelulaGrade): string {
+  return (
+    `input[data-grade="${alvo.grade}"]` +
+    `[data-viagem-uuid="${alvo.viagemUuid}"]` +
+    `[data-secao-index="${alvo.indiceSecao}"]` +
+    `[data-dia="${alvo.dia}"]`
+  );
+}
+
+/**
  * Resolve a navegação explícita da TASK-106 sem criar retorno circular:
  * Tab avança um dia na mesma Seção; Enter desce uma Seção no mesmo dia. Ao
  * alcançar a última Seção, Enter continua na primeira Seção do bloco abaixo

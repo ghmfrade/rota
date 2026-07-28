@@ -135,4 +135,24 @@ describe("CampoHorarioGrade (TASK-106; RN-067)", () => {
     expect(aoNavegar).not.toHaveBeenCalled();
     desmontar();
   });
+
+  it("sincroniza valor externo sem remontar o input (TASK-115; RN-065/066)", () => {
+    const propriedades = {
+      rotuloAcessivel: "Horário de passagem",
+      aoConfirmar: () => true,
+    };
+    const { container, rerenderizar, desmontar } = renderizar(
+      <CampoHorarioGrade valor="08:45" {...propriedades} />,
+    );
+    const inputOriginal = container.querySelector("input") as HTMLInputElement;
+    act(() => inputOriginal.focus());
+
+    rerenderizar(<CampoHorarioGrade valor="08:40" {...propriedades} />);
+
+    const inputAtual = container.querySelector("input") as HTMLInputElement;
+    expect(inputAtual).toBe(inputOriginal);
+    expect(inputAtual.value).toBe("08:40");
+    expect(document.activeElement).toBe(inputOriginal);
+    desmontar();
+  });
 });

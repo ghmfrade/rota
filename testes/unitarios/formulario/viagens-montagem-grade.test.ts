@@ -6,6 +6,7 @@ import {
   linhasSecoes,
   montarBlocosDiasComuns,
   montarBlocosFeriados,
+  seletorAlvoFocoCelulaGrade,
 } from "@/formulario/viagens";
 
 // TASK-028 — montagem da grade de dias comuns (Spec 04 §8.1): linhas só de
@@ -202,5 +203,35 @@ describe("destinoNavegacaoGrade (TASK-106)", () => {
       indiceSecao: 0,
       dia: "segunda",
     });
+  });
+});
+
+describe("seletorAlvoFocoCelulaGrade (TASK-115; RN-061/062)", () => {
+  test("localiza a célula pela UUID da Viagem, sem depender do bloco ordinal", () => {
+    expect(
+      seletorAlvoFocoCelulaGrade({
+        grade: "comuns",
+        viagemUuid: "bbbbbbbb-0000-4000-8000-000000000002",
+        indiceSecao: 1,
+        dia: "segunda",
+      }),
+    ).toBe(
+      'input[data-grade="comuns"]' +
+        '[data-viagem-uuid="bbbbbbbb-0000-4000-8000-000000000002"]' +
+        '[data-secao-index="1"]' +
+        '[data-dia="segunda"]',
+    );
+  });
+
+  test("[reforço] UUIDs distintas no mesmo dia produzem alvos distintos (RN-062)", () => {
+    const base = {
+      grade: "feriados",
+      indiceSecao: 0,
+      dia: "terca" as const,
+    };
+    const alvoA = seletorAlvoFocoCelulaGrade({ ...base, viagemUuid: "viagem-a" });
+    const alvoB = seletorAlvoFocoCelulaGrade({ ...base, viagemUuid: "viagem-b" });
+
+    expect(alvoA).not.toBe(alvoB);
   });
 });

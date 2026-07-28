@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ROTULO_SEMANA_PADRAO } from "@/shared/contagens";
 import { DIAS_SEMANA, type Itinerario, type Parada, type Secao, type Servico } from "@/shared/contrato";
 import { Botao, Campo, Painel, Select, Tabela } from "@/shared/ui";
@@ -37,6 +37,8 @@ import {
   linhasSecoes,
   montarBlocosDiasComuns,
   montarBlocosFeriados,
+  seletorAlvoFocoCelulaGrade,
+  type AlvoFocoCelulaGrade,
   type BlocoGrade,
   type CoordenadaCelulaGrade,
   type DiaSemana,
@@ -84,6 +86,7 @@ interface PropsEtapaViagens {
 
 export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   const raizEtapaRef = useRef<HTMLDivElement>(null);
+  const alvoFocoPendenteRef = useRef<AlvoFocoCelulaGrade | null>(null);
   const temporizadorSaidaHoverRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [servicoSelecionadoUuid, definirServicoSelecionadoUuid] = useState<string | null>(null);
   const [sentidoSelecionado, definirSentidoSelecionado] = useState<Itinerario["sentido"] | null>(
@@ -112,6 +115,23 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
     },
     [],
   );
+
+  // Uma confirmação pode substituir a célula criável por uma existente ou
+  // reordenar os blocos. Reencontra o campo pela identidade da Viagem, antes
+  // da pintura, sem disputar foco em atualizações que não vieram da célula.
+  useLayoutEffect(() => {
+    const alvoPendente = alvoFocoPendenteRef.current;
+    if (!alvoPendente) return;
+    alvoFocoPendenteRef.current = null;
+
+    const campo = raizEtapaRef.current?.querySelector<HTMLInputElement>(
+      seletorAlvoFocoCelulaGrade(alvoPendente),
+    );
+    if (!campo) return;
+    campo.focus();
+    const fim = campo.value.length;
+    campo.setSelectionRange(fim, fim);
+  }, [sessao]);
 
   function cancelarSaidaHover() {
     if (!temporizadorSaidaHoverRef.current) return;
@@ -184,21 +204,37 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
     return proximas;
   }
 
-  function aoConfirmarCriacao(dia: DiaSemana, horaMinuto: string, feriado: boolean): boolean {
+  function aoConfirmarCriacao(
+    dia: DiaSemana,
+    horaMinuto: string,
+    feriado: boolean,
+    grade: string,
+  ): boolean {
     if (!itinerarioAtual || horaMinuto === "") return false;
     const viagemNova = criarViagemNaCelula(itinerarioAtual, dia, horaMinuto, feriado);
     if (!viagemNova) return false;
+    alvoFocoPendenteRef.current = {
+      grade,
+      viagemUuid: viagemNova.uuid,
+      indiceSecao: 0,
+      dia,
+    };
     aplicar({ ...itinerarioAtual, viagens: [...itinerarioAtual.viagens, viagemNova] });
     definirViagemSelecionadaUuid(viagemNova.uuid);
     return true;
   }
 
-  function aoConfirmarPartida(viagemUuid: string, horaMinuto: string): boolean {
+  function aoConfirmarPartida(
+    viagemUuid: string,
+    horaMinuto: string,
+    alvoFoco: AlvoFocoCelulaGrade,
+  ): boolean {
     if (!itinerarioAtual || horaMinuto === "") return false;
     const viagemOriginal = itinerarioAtual.viagens.find((v) => v.uuid === viagemUuid);
     if (!viagemOriginal) return false;
     const viagemAtualizada = atualizarHorarioSaida(viagemOriginal, horaMinuto);
     if (!viagemAtualizada) return false;
+    alvoFocoPendenteRef.current = alvoFoco;
     aplicar({
       ...itinerarioAtual,
       viagens: itinerarioAtual.viagens.map((v) => (v.uuid === viagemUuid ? viagemAtualizada : v)),
@@ -258,6 +294,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
     viagemUuid: string,
     paradaOrdem: number,
     horaMinuto: string,
+    alvoFoco: AlvoFocoCelulaGrade,
   ): boolean {
     if (!itinerarioAtual || horaMinuto === "") return false;
     const viagem = itinerarioAtual.viagens.find((v) => v.uuid === viagemUuid);
@@ -287,6 +324,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
       delete proximos[chave];
       return proximos;
     });
+    alvoFocoPendenteRef.current = alvoFoco;
     aplicar(
       {
         ...itinerarioAtual,
@@ -467,6 +505,13 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                   "data-bloco": indiceBloco,
                   "data-secao-index": indiceSecao,
                   "data-dia": dia,
+                  "data-viagem-uuid": celula.viagem.uuid,
+                };
+                const alvoFoco: AlvoFocoCelulaGrade = {
+                  grade,
+                  viagemUuid: celula.viagem.uuid,
+                  indiceSecao,
+                  dia,
                 };
                 const navegar = (tecla: TeclaNavegacaoGrade) =>
                   navegarNaGrade(
@@ -493,10 +538,11 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                       onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
                     >
                       <CampoHorarioGrade
-                        key={`${viagemUuid}-${horarioMostrar}`}
                         rotuloAcessivel={`Horário de partida — ${dia}, viagem ${indiceBloco + 1}`}
                         valor={horarioMostrar}
-                        aoConfirmar={(valor) => aoConfirmarPartida(viagemUuid, valor)}
+                        aoConfirmar={(valor) =>
+                          aoConfirmarPartida(viagemUuid, valor, alvoFoco)
+                        }
                         aoNavegar={navegar}
                         atributosNavegacao={atributosNavegacao}
                         aoSelecionar={() => definirViagemSelecionadaUuid(viagemUuid)}
@@ -608,12 +654,16 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                     onMouseEnter={() => mostrarAcoesDaViagem(celula.viagem.uuid)}
                   >
                     <CampoHorarioGrade
-                      key={`${celula.viagem.uuid}-${parada.ordem}-${horarioMostrar}`}
                       rotuloAcessivel={`Horário de passagem — ${nomeSecao}, ${dia}, viagem ${indiceBloco + 1}`}
                       valor={horarioMostrar}
                       erro={erro}
                       aoConfirmar={(valor) =>
-                        aoEditarPassante(celula.viagem.uuid, parada.ordem, valor)
+                        aoEditarPassante(
+                          celula.viagem.uuid,
+                          parada.ordem,
+                          valor,
+                          alvoFoco,
+                        )
                       }
                       aoNavegar={navegar}
                       atributosNavegacao={atributosNavegacao}
@@ -679,7 +729,9 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                     <CampoHorarioGrade
                       rotuloAcessivel={`Criar viagem — ${dia}`}
                       valor=""
-                      aoConfirmar={(valor) => aoConfirmarCriacao(dia, valor, feriado)}
+                      aoConfirmar={(valor) =>
+                        aoConfirmarCriacao(dia, valor, feriado, grade)
+                      }
                       aoNavegar={(tecla) =>
                         navegarNaGrade(
                           grade,

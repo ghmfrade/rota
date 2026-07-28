@@ -9,10 +9,12 @@ export {
 } from "./horario-relogio";
 export {
   destinoNavegacaoGrade,
+  seletorAlvoFocoCelulaGrade,
   linhasSecoes,
   montarBlocosDiasComuns,
   montarBlocosFeriados,
   horarioAbsolutoNaParada,
+  type AlvoFocoCelulaGrade,
   type DiaSemana,
   type EstadoCelulaGrade,
   type BlocoGrade,

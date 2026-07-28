@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Campo } from "@/shared/ui";
 import { normalizarEntradaHoraMinuto } from "./horario-relogio";
 import type { TeclaNavegacaoGrade } from "./montagem-grade";
@@ -33,6 +33,15 @@ export function CampoHorarioGrade({
   const [rascunho, definirRascunho] = useState(valor);
   const ultimoConfirmadoRef = useRef(valor);
   const ignorarProximoBlurRef = useRef(false);
+
+  // Redistribuição e "Restaurar sugestão" podem trocar o valor gravado sem
+  // remontar o input. Sincroniza apenas quando a prop realmente muda, para
+  // não apagar um rascunho parcial em renderizações alheias à célula.
+  useEffect(() => {
+    if (valor === ultimoConfirmadoRef.current) return;
+    ultimoConfirmadoRef.current = valor;
+    definirRascunho(valor);
+  }, [valor]);
 
   function confirmar(): boolean {
     const normalizado = normalizarEntradaHoraMinuto(rascunho);

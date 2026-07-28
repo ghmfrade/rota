@@ -203,6 +203,71 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     await expect(grade.getByLabel("Criar viagem — terca")).toBeVisible();
   });
 
+  test("TASK-115: foco acompanha a Viagem criada/reordenada e a redistribuição, sem Tab de recuperação", async ({
+    page,
+  }) => {
+    let chamouOsrm = false;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamouOsrm = true;
+      return rota.abort();
+    });
+
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+
+    // A nova Viagem sobe acima da partida das 08:00; o foco segue sua UUID.
+    await grade.getByLabel("Criar viagem — segunda").fill("0700");
+    const partidaCriada = grade.getByLabel("Horário de partida — segunda, viagem 1");
+    await expect(partidaCriada).toHaveValue("07:00");
+    await expect(partidaCriada).toBeFocused();
+    await expect
+      .poll(() =>
+        partidaCriada.evaluate((campo) => ({
+          inicio: (campo as HTMLInputElement).selectionStart,
+          fim: (campo as HTMLInputElement).selectionEnd,
+        })),
+      )
+      .toEqual({ inicio: 5, fim: 5 });
+    const viagemUuid = await partidaCriada.getAttribute("data-viagem-uuid");
+    expect(viagemUuid).toBeTruthy();
+
+    // Enter continua na Seção seguinte da mesma Viagem; Tab mantém o mapa da
+    // TASK-106 e não exige uma tecla intermediária para recuperar o foco.
+    await partidaCriada.press("Enter");
+    const passagemIntermediaria = grade.locator(
+      `input[data-viagem-uuid="${viagemUuid}"][data-secao-index="1"]`,
+    );
+    await expect(passagemIntermediaria).toBeFocused();
+    await partidaCriada.focus();
+    await partidaCriada.press("Tab");
+    await expect(grade.getByLabel("Criar viagem — terca")).toBeFocused();
+
+    const passagemFinal = grade.locator(
+      `input[data-viagem-uuid="${viagemUuid}"][data-secao-index="2"]`,
+    );
+    await passagemFinal.fill("07:50");
+    await expect(passagemFinal).toBeFocused();
+
+    // Fora-de-ordem não confirma, conserva o erro e o próprio campo em foco.
+    await passagemIntermediaria.fill("07:55");
+    await expect(passagemIntermediaria).toBeFocused();
+    await expect(passagemIntermediaria).toHaveValue("07:30");
+    await expect(passagemIntermediaria.locator("xpath=ancestor::td").getByTestId("erro-passante")).toBeVisible();
+
+    // Horário impossível não cria Viagem nem desloca o foco.
+    const criavelTerca = grade.getByLabel("Criar viagem — terca");
+    const partidasAntes = await grade.getByTestId("celula-partida").count();
+    await criavelTerca.fill("2575");
+    await expect(criavelTerca).toBeFocused();
+    await expect(grade.getByTestId("celula-partida")).toHaveCount(partidasAntes);
+
+    // A grade de feriados reutiliza exatamente o mesmo mecanismo.
+    const feriados = gradeFeriados(page);
+    await feriados.getByLabel("Criar viagem — terca").fill("0900");
+    await expect(feriados.getByLabel("Horário de partida — terca, viagem 1")).toBeFocused();
+    expect(chamouOsrm).toBe(false);
+  });
+
   test("reeditar a partida desloca todos os horários pelo mesmo delta, preservando os offsets (TASK-029)", async ({
     page,
   }) => {
