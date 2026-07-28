@@ -2,7 +2,9 @@ import { describe, expect, test } from "vitest";
 import { REGEX_UUID_V4, type Itinerario, type Viagem } from "@/shared/contrato";
 import {
   apagarViagem,
+  apagarViagensDoDia,
   clonarDiasComunsParaFeriado,
+  copiarDiaParaDiasComGuarda,
   copiarViagemParaDiaComGuarda,
   copiarViagemParaDias,
   diaAoLado,
@@ -219,5 +221,95 @@ describe("apagarViagem (Spec 04 §8.3)", () => {
     const a = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
     const it = itinerario([a]);
     expect(apagarViagem(it, "zzzzzzzz-0000-4000-8000-000000000009").viagens).toEqual([a]);
+  });
+});
+
+describe("operações de dia inteiro (DEC-085; RN-007/061/062)", () => {
+  test("copia todas as Viagens da coluna para vários destinos com UUIDs novas", () => {
+    const origem08 = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
+    const origem09 = viagem("bbbbbbbb-0000-4000-8000-000000000002", "segunda", "09:00:00");
+
+    const resultado = copiarDiaParaDiasComGuarda(
+      itinerario([origem08, origem09]),
+      "segunda",
+      ["sabado", "domingo"],
+      { viagem_feriado: false, tabela_excepcional_uuid: null },
+    );
+
+    expect(resultado.copias).toHaveLength(4);
+    expect(resultado.horariosIgnorados).toBe(0);
+    expect(resultado.itinerario.viagens).toHaveLength(6);
+    expect(resultado.copias.every((copia) => copia.uuid !== origem08.uuid && copia.uuid !== origem09.uuid)).toBe(true);
+    expect(new Set(resultado.copias.map((copia) => copia.uuid)).size).toBe(4);
+    expect(resultado.copias.map((copia) => `${copia.dia_semana}:${copia.horario_saida}`).sort()).toEqual([
+      "domingo:08:00:00",
+      "domingo:09:00:00",
+      "sabado:08:00:00",
+      "sabado:09:00:00",
+    ]);
+    expect(resultado.copias.every((copia) => copia.horarios_paradas[1].offset_horario === "00:07:00")).toBe(true);
+  });
+
+  test("mescla sem substituir e avisa as cópias bloqueadas pela guarda da mesma grade", () => {
+    const origem08 = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
+    const origem09 = viagem("bbbbbbbb-0000-4000-8000-000000000002", "segunda", "09:00:00");
+    const existente = viagem("cccccccc-0000-4000-8000-000000000003", "sabado", "08:00:00");
+    existente.horarios_paradas[1].offset_horario = "00:15:00";
+
+    const resultado = copiarDiaParaDiasComGuarda(
+      itinerario([origem08, origem09, existente]),
+      "segunda",
+      ["sabado"],
+      { viagem_feriado: false, tabela_excepcional_uuid: null },
+    );
+
+    expect(resultado.copias).toHaveLength(1);
+    expect(resultado.copias[0].horario_saida).toBe("09:00:00");
+    expect(resultado.horariosIgnorados).toBe(1);
+    expect(resultado.itinerario.viagens.find((item) => item.uuid === existente.uuid)).toEqual(existente);
+  });
+
+  test("[inválido] não copia para a origem, ignora lista vazia e não confunde outra grade", () => {
+    const comum = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
+    const feriado = viagem("bbbbbbbb-0000-4000-8000-000000000002", "terca", "08:00:00", true);
+    const it = itinerario([comum, feriado]);
+
+    expect(
+      copiarDiaParaDiasComGuarda(it, "segunda", [], {
+        viagem_feriado: false,
+        tabela_excepcional_uuid: null,
+      }),
+    ).toEqual({ itinerario: it, copias: [], horariosIgnorados: 0 });
+    const resultado = copiarDiaParaDiasComGuarda(it, "segunda", ["segunda", "terca"], {
+      viagem_feriado: false,
+      tabela_excepcional_uuid: null,
+    });
+    expect(resultado.copias).toHaveLength(1);
+    expect(resultado.horariosIgnorados).toBe(0);
+  });
+
+  test("apaga somente as Viagens do dia e da grade informados", () => {
+    const comumSeg = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
+    const comumTer = viagem("bbbbbbbb-0000-4000-8000-000000000002", "terca", "08:00:00");
+    const feriadoSeg = viagem("cccccccc-0000-4000-8000-000000000003", "segunda", "08:00:00", true);
+    const it = itinerario([comumSeg, comumTer, feriadoSeg]);
+
+    expect(
+      apagarViagensDoDia(it, "segunda", {
+        viagem_feriado: false,
+        tabela_excepcional_uuid: null,
+      }).viagens,
+    ).toEqual([comumTer, feriadoSeg]);
+  });
+
+  test("[inválido] apagar dia sem Viagens é um no-op", () => {
+    const comum = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
+    const it = itinerario([comum]);
+    expect(
+      apagarViagensDoDia(it, "domingo", {
+        viagem_feriado: false,
+        tabela_excepcional_uuid: null,
+      }).viagens,
+    ).toEqual([comum]);
   });
 });

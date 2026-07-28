@@ -775,6 +775,7 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     page.once("dialog", (dialogo) => dialogo.accept());
     await celulaDomingo.hover();
     await celulaDomingo.getByTestId("apagar-viagem").click();
+    await page.getByRole("button", { name: "Apagar esta Viagem" }).click();
     await expect(grade.getByLabel("Criar viagem — domingo")).toBeVisible();
     await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toHaveValue("08:00");
 
@@ -845,8 +846,55 @@ test.describe("Etapa Viagens — grade de feriados e cópias (TASK-030; Spec 04 
     page.on("dialog", (d) => d.accept());
     await grade.getByTestId("celula-partida").first().hover();
     await grade.getByLabel("Apagar viagem — segunda, viagem 1").click();
+    await page.getByRole("button", { name: "Apagar esta Viagem" }).click();
 
     // Sem Viagens: segunda volta a exibir a célula criável, sem partida existente.
+    await expect(grade.getByTestId("celula-partida")).toHaveCount(0);
+    await expect(grade.getByLabel("Criar viagem — segunda")).toBeVisible();
+  });
+
+  test("TASK-110: copia todas as Viagens de um dia para vários destinos", async ({ page }) => {
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+
+    await preencherEConfirmar(grade.getByLabel("Criar viagem — segunda"), "09:00");
+    await grade.getByLabel("Horário de partida — segunda, viagem 1").locator("xpath=ancestor::td").hover();
+    await grade
+      .getByLabel("Horário de partida — segunda, viagem 1")
+      .locator("xpath=ancestor::td")
+      .getByTestId("copiar-dia")
+      .click();
+
+    const dialogo = page.getByTestId("dialogo-copiar-dia");
+    await expect(dialogo).toBeVisible();
+    await dialogo.getByTestId("destino-copiar-dia-sabado").click();
+    await dialogo.getByTestId("destino-copiar-dia-domingo").click();
+    await dialogo.getByTestId("confirmar-copiar-dia").click();
+
+    await expect(grade.getByLabel("Horário de partida — sabado, viagem 1")).toHaveValue("08:00");
+    await expect(grade.getByLabel("Horário de partida — sabado, viagem 2")).toHaveValue("09:00");
+    await expect(grade.getByLabel("Horário de partida — domingo, viagem 1")).toHaveValue("08:00");
+    await expect(grade.getByLabel("Horário de partida — domingo, viagem 2")).toHaveValue("09:00");
+  });
+
+  test("TASK-110: cancelar preserva e confirmar apaga somente as Viagens do dia", async ({ page }) => {
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+
+    await preencherEConfirmar(grade.getByLabel("Criar viagem — segunda"), "09:00");
+    await grade.getByLabel("Horário de partida — segunda, viagem 1").locator("xpath=ancestor::td").hover();
+    await grade.getByLabel("Apagar viagem — segunda, viagem 1").click();
+    await page.getByRole("button", { name: "Apagar as Viagens do dia" }).click();
+    await page.getByTestId("dialogo-confirmar-apagar-dia").getByRole("button", { name: "Cancelar" }).click();
+
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toHaveValue("08:00");
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 2")).toHaveValue("09:00");
+
+    await grade.getByLabel("Horário de partida — segunda, viagem 1").locator("xpath=ancestor::td").hover();
+    await grade.getByLabel("Apagar viagem — segunda, viagem 1").click();
+    await page.getByRole("button", { name: "Apagar as Viagens do dia" }).click();
+    await page.getByTestId("confirmar-apagar-dia").click();
+
     await expect(grade.getByTestId("celula-partida")).toHaveCount(0);
     await expect(grade.getByLabel("Criar viagem — segunda")).toBeVisible();
   });

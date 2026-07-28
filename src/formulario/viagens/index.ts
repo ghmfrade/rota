@@ -24,11 +24,14 @@ export {
 export {
   copiarViagemParaDias,
   copiarViagemParaDiaComGuarda,
+  copiarDiaParaDiasComGuarda,
   diaAoLado,
   clonarDiasComunsParaFeriado,
   apagarViagem,
+  apagarViagensDoDia,
   type GradeDestinoViagem,
   type ResultadoCopiaViagem,
+  type ResultadoCopiaDia,
   type ModoCopiaFeriado,
 } from "./copias-grade";
 export {

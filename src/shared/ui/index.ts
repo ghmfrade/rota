@@ -13,6 +13,7 @@ export {
 export { Selo, type SeloProps, type TomSelo } from "./selo";
 export { Tabela, type TabelaProps } from "./tabela";
 export { Tooltip, type TooltipProps } from "./tooltip";
+export { Dialogo, type DialogoProps } from "./dialogo";
 export {
   MenuFlutuante,
   type MenuFlutuanteProps,

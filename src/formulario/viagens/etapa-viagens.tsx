@@ -10,7 +10,7 @@ import {
 } from "react";
 import { ROTULO_SEMANA_PADRAO } from "@/shared/contagens";
 import { DIAS_SEMANA, type Itinerario, type Parada, type Secao, type Servico } from "@/shared/contrato";
-import { Botao, Campo, Painel, Select, Tabela } from "@/shared/ui";
+import { Botao, Campo, Dialogo, Painel, Select, Tabela } from "@/shared/ui";
 import { nomeExibicaoSecao } from "@/formulario/secoes";
 import {
   ancorasHorarioDaSessao,
@@ -31,7 +31,9 @@ import {
 } from "./acoes-grade";
 import {
   apagarViagem,
+  apagarViagensDoDia,
   clonarDiasComunsParaFeriado,
+  copiarDiaParaDiasComGuarda,
   copiarViagemParaDiaComGuarda,
   diaAoLado,
 } from "./copias-grade";
@@ -125,6 +127,20 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
     {},
   );
   const [errosHeadway, definirErrosHeadway] = useState<Record<string, string>>({});
+  const [copiaDiaAberta, definirCopiaDiaAberta] = useState<{
+    dia: DiaSemana;
+    feriado: boolean;
+  } | null>(null);
+  const [diasDestinoCopia, definirDiasDestinoCopia] = useState<DiaSemana[]>([]);
+  const [opcoesApagarAbertas, definirOpcoesApagarAbertas] = useState<{
+    viagemUuid: string;
+    dia: DiaSemana;
+    feriado: boolean;
+  } | null>(null);
+  const [confirmacaoApagarDia, definirConfirmacaoApagarDia] = useState<{
+    dia: DiaSemana;
+    feriado: boolean;
+  } | null>(null);
 
   useEffect(
     () => () => {
@@ -526,6 +542,51 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
     aplicar(apagarViagem(itinerarioAtual, viagemUuid), ancorasSem([viagemUuid]));
   }
 
+  function aoCopiarDia() {
+    if (!itinerarioAtual || !copiaDiaAberta || diasDestinoCopia.length === 0) return;
+    const resultado = copiarDiaParaDiasComGuarda(
+      itinerarioAtual,
+      copiaDiaAberta.dia,
+      diasDestinoCopia,
+      { viagem_feriado: copiaDiaAberta.feriado, tabela_excepcional_uuid: null },
+    );
+    if (resultado.copias.length > 0) aplicar(resultado.itinerario);
+    if (resultado.horariosIgnorados > 0) {
+      definirAvisoCopia(
+        `${resultado.horariosIgnorados} horário(s) já existente(s) não foi(ram) copiado(s).`,
+      );
+    } else {
+      definirAvisoCopia(null);
+    }
+    definirCopiaDiaAberta(null);
+    definirDiasDestinoCopia([]);
+  }
+
+  function aoConfirmarApagarDia() {
+    if (!itinerarioAtual || !confirmacaoApagarDia) return;
+    const grade = {
+      viagem_feriado: confirmacaoApagarDia.feriado,
+      tabela_excepcional_uuid: null,
+    };
+    const removidas = itinerarioAtual.viagens
+      .filter(
+        (viagem) =>
+          viagem.dia_semana === confirmacaoApagarDia.dia &&
+          viagem.viagem_feriado === grade.viagem_feriado &&
+          viagem.tabela_excepcional_uuid === grade.tabela_excepcional_uuid,
+      )
+      .map((viagem) => viagem.uuid);
+    limparEstadoDeSessao(removidas);
+    if (viagemSelecionadaUuid && removidas.includes(viagemSelecionadaUuid)) {
+      definirViagemSelecionadaUuid(null);
+    }
+    aplicar(
+      apagarViagensDoDia(itinerarioAtual, confirmacaoApagarDia.dia, grade),
+      ancorasSem(removidas),
+    );
+    definirConfirmacaoApagarDia(null);
+  }
+
   // "Copiar dias comuns" para a grade de feriados (Spec 04 §8.4; RN-007/068).
   // Quando a grade de feriados já tem conteúdo, a confirmação é a escolha
   // explícita do modo (sobrescrever/mesclar) — dois botões distintos.
@@ -763,9 +824,28 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                             className="min-h-8 min-w-8"
                             data-testid="apagar-viagem"
                             aria-label={`Apagar viagem — ${dia}, viagem ${indiceBloco + 1}`}
-                            onClick={() => aoApagarViagem(viagemUuid)}
+                            onClick={() =>
+                              definirOpcoesApagarAbertas({
+                                viagemUuid,
+                                dia,
+                                feriado,
+                              })
+                            }
                           >
                             X
+                          </Botao>
+                          <Botao
+                            variante="secundario"
+                            tamanho="compacto"
+                            className="min-h-8 min-w-8"
+                            data-testid="copiar-dia"
+                            aria-label={`Copiar dia — ${dia}`}
+                            onClick={() => {
+                              definirCopiaDiaAberta({ dia, feriado });
+                              definirDiasDestinoCopia([]);
+                            }}
+                          >
+                            ⧉
                           </Botao>
                           <Botao
                             variante="primario"
@@ -1046,6 +1126,113 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
         <p role="alert" data-testid="aviso-copia-viagem" className="mt-2 text-sm text-alerta">
           {avisoCopia}
         </p>
+      )}
+
+      {copiaDiaAberta && (
+        <Dialogo
+          titulo={`Copiar ${ROTULO_DIA[copiaDiaAberta.dia]} para`}
+          data-testid="dialogo-copiar-dia"
+          aoFechar={() => {
+            definirCopiaDiaAberta(null);
+            definirDiasDestinoCopia([]);
+          }}
+        >
+          <fieldset className="flex flex-wrap gap-2">
+            <legend className="mb-2 text-sm text-cinza-700">Dias de destino</legend>
+            {DIAS_SEMANA.filter((dia) => dia !== copiaDiaAberta.dia).map((dia) => {
+              const selecionado = diasDestinoCopia.includes(dia);
+              return (
+                <Botao
+                  key={dia}
+                  variante={selecionado ? "primario" : "secundario"}
+                  tamanho="compacto"
+                  aria-pressed={selecionado}
+                  data-testid={`destino-copiar-dia-${dia}`}
+                  onClick={() =>
+                    definirDiasDestinoCopia((atuais) =>
+                      atuais.includes(dia)
+                        ? atuais.filter((atual) => atual !== dia)
+                        : [...atuais, dia],
+                    )
+                  }
+                >
+                  {ROTULO_DIA[dia]}
+                </Botao>
+              );
+            })}
+          </fieldset>
+          <div className="mt-4 flex justify-end gap-2">
+            <Botao
+              variante="secundario"
+              onClick={() => {
+                definirCopiaDiaAberta(null);
+                definirDiasDestinoCopia([]);
+              }}
+            >
+              Cancelar
+            </Botao>
+            <Botao
+              variante="primario"
+              data-testid="confirmar-copiar-dia"
+              disabled={diasDestinoCopia.length === 0}
+              onClick={aoCopiarDia}
+            >
+              OK
+            </Botao>
+          </div>
+        </Dialogo>
+      )}
+
+      {opcoesApagarAbertas && (
+        <Dialogo
+          titulo="Apagar Viagem"
+          data-testid="dialogo-opcoes-apagar"
+          aoFechar={() => definirOpcoesApagarAbertas(null)}
+        >
+          <p className="text-sm text-cinza-700">Escolha o que deseja apagar.</p>
+          <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <Botao
+              variante="secundario"
+              onClick={() => {
+                const { viagemUuid } = opcoesApagarAbertas;
+                definirOpcoesApagarAbertas(null);
+                aoApagarViagem(viagemUuid);
+              }}
+            >
+              Apagar esta Viagem
+            </Botao>
+            <Botao
+              variante="perigo"
+              onClick={() => {
+                definirConfirmacaoApagarDia({
+                  dia: opcoesApagarAbertas.dia,
+                  feriado: opcoesApagarAbertas.feriado,
+                });
+                definirOpcoesApagarAbertas(null);
+              }}
+            >
+              Apagar as Viagens do dia
+            </Botao>
+          </div>
+        </Dialogo>
+      )}
+
+      {confirmacaoApagarDia && (
+        <Dialogo
+          titulo={`Apagar as Viagens de ${ROTULO_DIA[confirmacaoApagarDia.dia]}?`}
+          data-testid="dialogo-confirmar-apagar-dia"
+          aoFechar={() => definirConfirmacaoApagarDia(null)}
+        >
+          <p className="text-sm text-cinza-700">Esta ação remove todas as Viagens deste dia.</p>
+          <div className="mt-4 flex justify-end gap-2">
+            <Botao variante="secundario" onClick={() => definirConfirmacaoApagarDia(null)}>
+              Cancelar
+            </Botao>
+            <Botao variante="perigo" data-testid="confirmar-apagar-dia" onClick={aoConfirmarApagarDia}>
+              OK
+            </Botao>
+          </div>
+        </Dialogo>
       )}
 
       {itinerarioAtual && (

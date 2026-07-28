@@ -21,6 +21,13 @@ export type ResultadoCopiaViagem =
   | { ok: true; copia: Viagem }
   | { ok: false; motivo: "origem-ausente" | "mesma-coluna" | "horario-existente" };
 
+/** Resultado da cópia de todas as Viagens de uma coluna para vários dias (DEC-085). */
+export interface ResultadoCopiaDia {
+  itinerario: Itinerario;
+  copias: Viagem[];
+  horariosIgnorados: number;
+}
+
 /** Retorna o dia imediatamente ao lado, sem circular entre SEG e DOM. */
 export function diaAoLado(dia: DiaSemana, direcao: -1 | 1): DiaSemana | null {
   const dias: readonly DiaSemana[] = [
@@ -132,4 +139,63 @@ export function copiarViagemParaDiaComGuarda(
 
   const [copia] = copiarViagemParaDias(origem, [diaDestino], gradeDestino);
   return { ok: true, copia };
+}
+
+/**
+ * Copia todas as Viagens de um dia para os dias escolhidos (DEC-085).
+ *
+ * A operação é uma mescla: Viagens já existentes no destino nunca são
+ * removidas. A guarda da DEC-084 é aplicada a cada cópia e continua limitada
+ * a este gesto; por isso, nenhum requisito de unicidade é imposto ao contrato
+ * (RN-062). A origem e os destinos pertencem sempre à mesma grade.
+ */
+export function copiarDiaParaDiasComGuarda(
+  itinerario: Itinerario,
+  diaOrigem: DiaSemana,
+  diasDestino: readonly DiaSemana[],
+  grade: GradeDestinoViagem,
+): ResultadoCopiaDia {
+  const origens = itinerario.viagens.filter(
+    (viagem) => viagem.dia_semana === diaOrigem && mesmaGrade(viagem, grade),
+  );
+  let resultado = itinerario;
+  const copias: Viagem[] = [];
+  let horariosIgnorados = 0;
+
+  for (const diaDestino of diasDestino) {
+    if (diaDestino === diaOrigem) continue;
+    for (const origem of origens) {
+      const copia = copiarViagemParaDiaComGuarda(
+        resultado,
+        origem.uuid,
+        diaDestino,
+        grade,
+      );
+      if (copia.ok) {
+        copias.push(copia.copia);
+        resultado = { ...resultado, viagens: [...resultado.viagens, copia.copia] };
+      } else if (copia.motivo === "horario-existente") {
+        horariosIgnorados += 1;
+      }
+    }
+  }
+
+  return { itinerario: resultado, copias, horariosIgnorados };
+}
+
+/**
+ * Apaga somente as Viagens da coluna informada na grade corrente (DEC-085).
+ * Dia/grade sem Viagens é um no-op, útil para a confirmação controlada pela UI.
+ */
+export function apagarViagensDoDia(
+  itinerario: Itinerario,
+  dia: DiaSemana,
+  grade: GradeDestinoViagem,
+): Itinerario {
+  return {
+    ...itinerario,
+    viagens: itinerario.viagens.filter(
+      (viagem) => viagem.dia_semana !== dia || !mesmaGrade(viagem, grade),
+    ),
+  };
 }
