@@ -79,3 +79,11 @@ Na implementação, use testes direcionados durante a edição, depois lint/type
 ## Limites do enforcement automático
 
 O hook de proteção cobre apenas Edit/Write diretos em `docs/specs/**`; edição via shell não é interceptada — a proibição continua valendo pelo protocolo `docs-dev/04`. Regras semânticas (não virar workflow, não inventar regra, escopo da task) **não são hookáveis**: são garantidas por revisão humana + `/revisar-aderencia`.
+
+## Edição dos derivados longos (`docs-dev/` 06, 10, 16, 19)
+
+Esses documentos repetem as mesmas fórmulas em dezenas de entradas (`**Status:** Aceita ·`, `**Impacto em implementação:**`, `**Exige alteração de spec antes do código**`, `## Fora de escopo`). Editar por script sem cuidado apaga entradas inteiras em silêncio — já ocorreu: um `str.index` com marcador genérico casou na DEC-087 em vez da DEC-092 e removeu quatro DEC de uma vez.
+
+- Ancore em trecho **comprovadamente único** (`assert count == 1`) ou em faixa de linhas com **verificação das bordas** antes de substituir. Nunca `index`/`replace` em marcador que se repete.
+- Prefira **append** (nova DEC, nova Q, nova task) a recorte de região.
+- Depois de editar, confira `git diff --numstat` e leia as linhas removidas: remoção não intencional → **restaurar do `HEAD`** e refazer, nunca remendar o arquivo corrompido.
