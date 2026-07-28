@@ -11,6 +11,38 @@ import type { DiaSemana } from "./montagem-grade";
 /** Modo de "Copiar dias comuns" quando a grade de feriados já tem conteúdo (Spec 04 §8.4). */
 export type ModoCopiaFeriado = "sobrescrever" | "mesclar";
 
+/** Discriminadores da grade que receberá a cópia (RN-061/RN-099). */
+export interface GradeDestinoViagem {
+  viagem_feriado: boolean;
+  tabela_excepcional_uuid: string | null;
+}
+
+export type ResultadoCopiaViagem =
+  | { ok: true; copia: Viagem }
+  | { ok: false; motivo: "origem-ausente" | "mesma-coluna" | "horario-existente" };
+
+/** Retorna o dia imediatamente ao lado, sem circular entre SEG e DOM. */
+export function diaAoLado(dia: DiaSemana, direcao: -1 | 1): DiaSemana | null {
+  const dias: readonly DiaSemana[] = [
+    "segunda",
+    "terca",
+    "quarta",
+    "quinta",
+    "sexta",
+    "sabado",
+    "domingo",
+  ];
+  const indice = dias.indexOf(dia);
+  return dias[indice + direcao] ?? null;
+}
+
+function mesmaGrade(viagem: Viagem, grade: GradeDestinoViagem): boolean {
+  return (
+    viagem.viagem_feriado === grade.viagem_feriado &&
+    viagem.tabela_excepcional_uuid === grade.tabela_excepcional_uuid
+  );
+}
+
 /**
  * Duplica uma Viagem para o(s) dia(s) escolhido(s) (Spec 04 §8.3; RN-007/061):
  * uma Viagem nova por dia, com **UUID nova**, mesmos `horario_saida`,
@@ -22,12 +54,14 @@ export type ModoCopiaFeriado = "sobrescrever" | "mesclar";
 export function copiarViagemParaDias(
   viagem: Viagem,
   dias: readonly DiaSemana[],
+  gradeDestino: GradeDestinoViagem = viagem,
 ): Viagem[] {
   return dias.map((dia) =>
     criarViagem({
       horario_saida: viagem.horario_saida,
       dia_semana: dia,
-      viagem_feriado: viagem.viagem_feriado,
+      viagem_feriado: gradeDestino.viagem_feriado,
+      tabela_excepcional_uuid: gradeDestino.tabela_excepcional_uuid,
       // Cópia defensiva dos offsets — a cópia é objeto independente da origem.
       horarios_paradas: viagem.horarios_paradas.map((h) => ({ ...h })),
     }),
@@ -68,4 +102,34 @@ export function clonarDiasComunsParaFeriado(
  */
 export function apagarViagem(itinerario: Itinerario, viagemUuid: string): Itinerario {
   return { ...itinerario, viagens: itinerario.viagens.filter((v) => v.uuid !== viagemUuid) };
+}
+
+/**
+ * Cópia unitária acionada pela grade (DEC-084/092). A guarda por horário é
+ * deliberadamente local a este gesto: o contrato continua aceitando reforços
+ * (RN-062). Offsets não participam da comparação.
+ */
+export function copiarViagemParaDiaComGuarda(
+  itinerario: Itinerario,
+  viagemUuid: string,
+  diaDestino: DiaSemana,
+  gradeDestino: GradeDestinoViagem,
+): ResultadoCopiaViagem {
+  const origem = itinerario.viagens.find((viagem) => viagem.uuid === viagemUuid);
+  if (!origem) return { ok: false, motivo: "origem-ausente" };
+
+  if (origem.dia_semana === diaDestino && mesmaGrade(origem, gradeDestino)) {
+    return { ok: false, motivo: "mesma-coluna" };
+  }
+
+  const jaExiste = itinerario.viagens.some(
+    (viagem) =>
+      viagem.dia_semana === diaDestino &&
+      viagem.horario_saida === origem.horario_saida &&
+      mesmaGrade(viagem, gradeDestino),
+  );
+  if (jaExiste) return { ok: false, motivo: "horario-existente" };
+
+  const [copia] = copiarViagemParaDias(origem, [diaDestino], gradeDestino);
+  return { ok: true, copia };
 }

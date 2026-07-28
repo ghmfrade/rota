@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type KeyboardEvent,
+} from "react";
 import { ROTULO_SEMANA_PADRAO } from "@/shared/contagens";
 import { DIAS_SEMANA, type Itinerario, type Parada, type Secao, type Servico } from "@/shared/contrato";
 import { Botao, Campo, Painel, Select, Tabela } from "@/shared/ui";
@@ -25,7 +32,8 @@ import {
 import {
   apagarViagem,
   clonarDiasComunsParaFeriado,
-  copiarViagemParaDias,
+  copiarViagemParaDiaComGuarda,
+  diaAoLado,
 } from "./copias-grade";
 import {
   horaMinutoParaHorarioRelogio,
@@ -97,10 +105,13 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   // Células passantes recusadas por fora-de-ordem (Spec 04 §8.2): não confirmam
   // e ficam em erro até uma edição válida. Estado de UI, por célula.
   const [errosCelula, definirErrosCelula] = useState<Record<string, string>>({});
-  // Dia-alvo escolhido em "Copiar viagem para outro dia", por Viagem (Spec 04 §8.3).
-  const [diaCopiaPorViagem, definirDiaCopiaPorViagem] = useState<Record<string, DiaSemana>>({});
   const [viagemSelecionadaUuid, definirViagemSelecionadaUuid] = useState<string | null>(null);
   const [viagemEmHoverUuid, definirViagemEmHoverUuid] = useState<string | null>(null);
+  const [colunaDestinoArrasto, definirColunaDestinoArrasto] = useState<{
+    grade: "comuns" | "feriados";
+    dia: DiaSemana;
+  } | null>(null);
+  const [avisoCopia, definirAvisoCopia] = useState<string | null>(null);
   // DEC-091: os últimos deslocamentos são uma conveniência da instância aberta
   // da etapa, compartilhada entre Viagens, grades, Serviços e sentidos.
   const [deslocamentoAnterior, definirDeslocamentoAnterior] = useState(DESLOCAMENTO_RELATIVO_PADRAO);
@@ -442,17 +453,67 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
     );
   }
 
-  // Copiar viagem para outro dia (Spec 04 §8.3; RN-007): a cópia nasce com UUID
-  // nova e sem âncoras de sessão (offsets copiados contam como derivados —
-  // DEC-049), preservando `viagem_feriado` da origem.
-  function aoCopiarViagem(viagemUuid: string) {
+  function aoCopiarViagemParaGrade(
+    viagemUuid: string,
+    dia: DiaSemana,
+    feriado: boolean,
+  ) {
     if (!itinerarioAtual) return;
-    const viagem = itinerarioAtual.viagens.find((v) => v.uuid === viagemUuid);
-    if (!viagem) return;
-    const dia = diaCopiaPorViagem[viagemUuid] ?? viagem.dia_semana;
-    const [copia] = copiarViagemParaDias(viagem, [dia]);
-    if (!copia) return;
-    aplicar({ ...itinerarioAtual, viagens: [...itinerarioAtual.viagens, copia] });
+    const resultado = copiarViagemParaDiaComGuarda(itinerarioAtual, viagemUuid, dia, {
+      viagem_feriado: feriado,
+      tabela_excepcional_uuid: null,
+    });
+    if (!resultado.ok) {
+      if (resultado.motivo === "horario-existente") {
+        definirAvisoCopia(`Já tem horário no dia ${ROTULO_DIA[dia]}.`);
+      }
+      return;
+    }
+    definirAvisoCopia(null);
+    aplicar({ ...itinerarioAtual, viagens: [...itinerarioAtual.viagens, resultado.copia] });
+  }
+
+  function aoAtalhoCopia(evento: KeyboardEvent<HTMLDivElement>) {
+    if (!evento.ctrlKey || !viagemSelecionadaUuid) return;
+    const direcao = evento.key === "ArrowLeft" ? -1 : evento.key === "ArrowRight" ? 1 : null;
+    if (direcao === null || !itinerarioAtual) return;
+    const origem = itinerarioAtual.viagens.find((viagem) => viagem.uuid === viagemSelecionadaUuid);
+    if (!origem) return;
+    const diaDestino = diaAoLado(origem.dia_semana, direcao);
+    evento.preventDefault();
+    if (!diaDestino) return;
+    aoCopiarViagemParaGrade(viagemSelecionadaUuid, diaDestino, origem.viagem_feriado);
+  }
+
+  function aoIniciarArrasto(evento: DragEvent<HTMLTableCellElement>, viagemUuid: string) {
+    if (viagemSelecionadaUuid !== viagemUuid) {
+      evento.preventDefault();
+      return;
+    }
+    evento.dataTransfer.effectAllowed = "copy";
+    evento.dataTransfer.setData("text/plain", viagemUuid);
+    definirAvisoCopia(null);
+  }
+
+  function aoSobreporColuna(
+    evento: DragEvent<HTMLTableCellElement>,
+    grade: "comuns" | "feriados",
+    dia: DiaSemana,
+  ) {
+    evento.preventDefault();
+    evento.dataTransfer.dropEffect = "copy";
+    definirColunaDestinoArrasto({ grade, dia });
+  }
+
+  function aoSoltarNaColuna(
+    evento: DragEvent<HTMLTableCellElement>,
+    grade: "comuns" | "feriados",
+    dia: DiaSemana,
+  ) {
+    evento.preventDefault();
+    const viagemUuid = evento.dataTransfer.getData("text/plain");
+    definirColunaDestinoArrasto(null);
+    if (viagemUuid) aoCopiarViagemParaGrade(viagemUuid, dia, grade === "feriados");
   }
 
   function aoApagarViagem(viagemUuid: string) {
@@ -572,6 +633,11 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
             </th>
             {DIAS_SEMANA.map((dia) => {
               const celula = bloco[dia];
+              const colunaEmArrasto =
+                colunaDestinoArrasto?.grade === grade && colunaDestinoArrasto.dia === dia;
+              const classeColunaDestino = colunaEmArrasto
+                ? "bg-azul-50 outline-2 outline-azul-300"
+                : "";
 
               if (celula.estado === "existente") {
                 const horarioHms = horarioAbsolutoNaParada(celula.viagem, parada.ordem);
@@ -596,6 +662,8 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                         posicaoNaSuperficie === "fim" ? "border-b-2" : "",
                       ].join(" ")
                     : "",
+                  classeColunaDestino,
+                  selecionada ? "cursor-grab active:cursor-grabbing" : "",
                 ]
                   .filter(Boolean)
                   .join(" ");
@@ -632,11 +700,16 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                       data-selecionada={selecionada ? "true" : undefined}
                       data-superficie-viagem={selecionada ? posicaoNaSuperficie : undefined}
                       className={classesCelula}
+                      draggable={selecionada}
                       onClick={() => definirViagemSelecionadaUuid(viagemUuid)}
                       onFocus={() => {
                         definirViagemSelecionadaUuid(viagemUuid);
                       }}
                       onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
+                      onDragStart={(evento) => aoIniciarArrasto(evento, viagemUuid)}
+                      onDragOver={(evento) => aoSobreporColuna(evento, grade, dia)}
+                      onDrop={(evento) => aoSoltarNaColuna(evento, grade, dia)}
+                      onDragEnd={() => definirColunaDestinoArrasto(null)}
                     >
                       <CampoHorarioGrade
                         rotuloAcessivel={`Horário de partida — ${dia}, viagem ${indiceBloco + 1}`}
@@ -716,35 +789,6 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                             ↪
                           </Botao>
                         </div>
-                        <div className="pointer-events-auto absolute left-1/2 top-full mt-1 flex -translate-x-1/2 items-center gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3">
-                          <Select
-                            densidade="compacta"
-                            data-testid="select-copia-dia"
-                            aria-label={`Copiar para o dia — ${dia}, viagem ${indiceBloco + 1}`}
-                            value={diaCopiaPorViagem[viagemUuid] ?? celula.viagem.dia_semana}
-                            onChange={(evento) =>
-                              definirDiaCopiaPorViagem((atuais) => ({
-                                ...atuais,
-                                [viagemUuid]: evento.target.value as DiaSemana,
-                              }))
-                            }
-                          >
-                            {DIAS_SEMANA.map((d) => (
-                              <option key={d} value={d}>
-                                {ROTULO_DIA[d]}
-                              </option>
-                            ))}
-                          </Select>
-                          <Botao
-                            variante="fantasma"
-                            tamanho="compacto"
-                            data-testid="copiar-viagem"
-                            aria-label={`Copiar viagem para outro dia — ${dia}, viagem ${indiceBloco + 1}`}
-                            onClick={() => aoCopiarViagem(viagemUuid)}
-                          >
-                            Copiar
-                          </Botao>
-                        </div>
                       </div>
                     </td>
                   );
@@ -759,11 +803,16 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                     data-selecionada={selecionada ? "true" : undefined}
                     data-superficie-viagem={selecionada ? posicaoNaSuperficie : undefined}
                     className={classesCelula}
+                    draggable={selecionada}
                     onClick={() => definirViagemSelecionadaUuid(celula.viagem.uuid)}
                     onFocus={() => {
                       definirViagemSelecionadaUuid(celula.viagem.uuid);
                     }}
                     onMouseEnter={() => mostrarAcoesDaViagem(celula.viagem.uuid)}
+                    onDragStart={(evento) => aoIniciarArrasto(evento, viagemUuid)}
+                    onDragOver={(evento) => aoSobreporColuna(evento, grade, dia)}
+                    onDrop={(evento) => aoSoltarNaColuna(evento, grade, dia)}
+                    onDragEnd={() => definirColunaDestinoArrasto(null)}
                   >
                     <CampoHorarioGrade
                       rotuloAcessivel={`Horário de passagem — ${nomeSecao}, ${dia}, viagem ${indiceBloco + 1}`}
@@ -882,7 +931,10 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                   <td
                     key={dia}
                     data-testid="celula-criavel"
+                    className={classeColunaDestino}
                     onMouseEnter={ocultarAcoesDaViagem}
+                    onDragOver={(evento) => aoSobreporColuna(evento, grade, dia)}
+                    onDrop={(evento) => aoSoltarNaColuna(evento, grade, dia)}
                   >
                     <CampoHorarioGrade
                       rotuloAcessivel={`Criar viagem — ${dia}`}
@@ -907,7 +959,10 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                 <td
                   key={dia}
                   data-testid="celula-vazia"
+                  className={classeColunaDestino}
                   onMouseEnter={ocultarAcoesDaViagem}
+                  onDragOver={(evento) => aoSobreporColuna(evento, grade, dia)}
+                  onDrop={(evento) => aoSoltarNaColuna(evento, grade, dia)}
                 >
                   —
                 </td>
@@ -919,13 +974,21 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
     });
   }
 
-  function cabecalhoGrade() {
+  function cabecalhoGrade(grade: "comuns" | "feriados") {
     return (
       <thead>
         <tr>
           <th scope="col">Seção</th>
           {DIAS_SEMANA.map((dia) => (
-            <th scope="col" key={dia}>
+            <th
+              scope="col"
+              key={dia}
+              className={
+                colunaDestinoArrasto?.grade === grade && colunaDestinoArrasto.dia === dia
+                  ? "bg-azul-50 outline-2 outline-azul-300"
+                  : undefined
+              }
+            >
               {ROTULO_DIA[dia]}
             </th>
           ))}
@@ -935,7 +998,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   }
 
   return (
-    <div ref={raizEtapaRef} data-testid="etapa-viagens">
+    <div ref={raizEtapaRef} data-testid="etapa-viagens" onKeyDown={aoAtalhoCopia}>
       <div className="flex flex-wrap gap-4">
         <Select
           rotulo="Serviço"
@@ -979,6 +1042,12 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
         )}
       </div>
 
+      {avisoCopia && (
+        <p role="alert" data-testid="aviso-copia-viagem" className="mt-2 text-sm text-alerta">
+          {avisoCopia}
+        </p>
+      )}
+
       {itinerarioAtual && (
         <>
           <section data-testid="grade-dias-comuns" className="mt-4">
@@ -992,7 +1061,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
               Restaurar sugestão (toda a grade)
             </Botao>
             <Tabela densidade="compacta" className="mt-4">
-              {cabecalhoGrade()}
+              {cabecalhoGrade("comuns")}
               <tbody onMouseEnter={cancelarSaidaHover} onMouseLeave={agendarSaidaHover}>
                 {corpoGrade(blocosComuns, false)}
               </tbody>
@@ -1034,7 +1103,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
               )}
             </div>
             <Tabela densidade="compacta" className="mt-4">
-              {cabecalhoGrade()}
+              {cabecalhoGrade("feriados")}
               <tbody onMouseEnter={cancelarSaidaHover} onMouseLeave={agendarSaidaHover}>
                 {corpoGrade(blocosFeriados, true)}
               </tbody>

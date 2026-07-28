@@ -851,17 +851,52 @@ test.describe("Etapa Viagens — grade de feriados e cópias (TASK-030; Spec 04 
     await expect(grade.getByLabel("Criar viagem — segunda")).toBeVisible();
   });
 
-  test("copiar viagem para outro dia cria Viagem no dia-alvo (RN-007/061)", async ({ page }) => {
+  test("TASK-109: arrastar a Viagem selecionada copia para qualquer dia e realça o destino", async ({ page }) => {
     await abrirEtapaViagens(page, structuredClone(multiServico));
     const grade = gradeComum(page);
+    const origem = grade.getByLabel("Horário de partida — segunda, viagem 1").locator("xpath=ancestor::td");
+    const destino = grade.getByLabel("Criar viagem — quinta").locator("xpath=ancestor::td");
 
-    await expect(grade.getByTestId("apagar-bloco")).toHaveCount(0);
+    await origem.click();
+    await destino.evaluate((element) =>
+      element.dispatchEvent(
+        new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: new DataTransfer() }),
+      ),
+    );
+    await expect(destino).toHaveClass(/bg-azul-50/);
+    await origem.dragTo(destino);
 
-    await grade.getByTestId("celula-partida").first().hover();
-    await grade.getByLabel("Copiar para o dia — segunda, viagem 1").selectOption({ label: "QUA" });
-    await grade.getByLabel("Copiar viagem para outro dia — segunda, viagem 1").click();
+    await expect(grade.getByLabel("Horário de partida — quinta, viagem 1")).toHaveValue("08:00");
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toHaveValue("08:00");
+    await expect(grade.getByTestId("select-copia-dia")).toHaveCount(0);
+    await expect(grade.getByTestId("copiar-viagem")).toHaveCount(0);
+  });
 
-    // quarta passa a ter a Viagem copiada, com o mesmo horário de partida.
-    await expect(grade.getByLabel("Horário de partida — quarta, viagem 1")).toHaveValue("08:00");
+  test("TASK-109: duplicidade avisa, soltar na origem cancela e Ctrl não faz wrap", async ({ page }) => {
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+    const origem = grade.getByLabel("Horário de partida — segunda, viagem 1").locator("xpath=ancestor::td");
+    const destino = grade.getByLabel("Criar viagem — terca").locator("xpath=ancestor::td");
+
+    await origem.click();
+    await origem.dragTo(destino);
+    await expect(grade.getByLabel("Horário de partida — terca, viagem 1")).toHaveValue("08:00");
+    await origem.dragTo(destino);
+    await expect(page.getByTestId("aviso-copia-viagem")).toContainText("Já tem horário");
+
+    await origem.dragTo(origem);
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 2")).toHaveCount(0);
+    await origem.press("Control+ArrowLeft");
+    await expect(grade.getByLabel("Horário de partida — domingo, viagem 1")).toHaveCount(0);
+  });
+
+  test("TASK-109: Ctrl+→ copia para o dia vizinho", async ({ page }) => {
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const comum = gradeComum(page);
+    const origem = comum.getByLabel("Horário de partida — segunda, viagem 1").locator("xpath=ancestor::td");
+
+    await origem.click();
+    await origem.press("Control+ArrowRight");
+    await expect(comum.getByLabel("Horário de partida — terca, viagem 1")).toHaveValue("08:00");
   });
 });

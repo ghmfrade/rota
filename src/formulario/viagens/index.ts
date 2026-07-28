@@ -23,8 +23,12 @@ export {
 } from "./montagem-grade";
 export {
   copiarViagemParaDias,
+  copiarViagemParaDiaComGuarda,
+  diaAoLado,
   clonarDiasComunsParaFeriado,
   apagarViagem,
+  type GradeDestinoViagem,
+  type ResultadoCopiaViagem,
   type ModoCopiaFeriado,
 } from "./copias-grade";
 export {

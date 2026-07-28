@@ -3,7 +3,9 @@ import { REGEX_UUID_V4, type Itinerario, type Viagem } from "@/shared/contrato";
 import {
   apagarViagem,
   clonarDiasComunsParaFeriado,
+  copiarViagemParaDiaComGuarda,
   copiarViagemParaDias,
+  diaAoLado,
 } from "@/formulario/viagens";
 
 // TASK-030 — cópias e remoções da grade (Spec 04 §8.3/§8.4): copiar viagem para
@@ -93,6 +95,62 @@ describe("copiarViagemParaDias (Spec 04 §8.3; RN-007/061)", () => {
   test("[inválido] lista de dias vazia → nenhuma Viagem", () => {
     const origem = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
     expect(copiarViagemParaDias(origem, [])).toEqual([]);
+  });
+});
+
+describe("cópia unitária com guarda (DEC-084/092; RN-062)", () => {
+  test("copia para dia arbitrário, preserva a origem e normaliza a grade destino", () => {
+    const origem = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
+    const resultado = copiarViagemParaDiaComGuarda(itinerario([origem]), origem.uuid, "quinta", {
+      viagem_feriado: true,
+      tabela_excepcional_uuid: null,
+    });
+
+    expect(resultado.ok).toBe(true);
+    if (!resultado.ok) return;
+    expect(resultado.copia.uuid).not.toBe(origem.uuid);
+    expect(resultado.copia.dia_semana).toBe("quinta");
+    expect(resultado.copia.viagem_feriado).toBe(true);
+    expect(resultado.copia.tabela_excepcional_uuid).toBeNull();
+    expect(resultado.copia.horarios_paradas).toEqual(origem.horarios_paradas);
+    expect(origem.dia_semana).toBe("segunda");
+  });
+
+  test("[inválido] recusa somente o gesto quando já há horário na mesma grade, ignorando offsets", () => {
+    const origem = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
+    const destino = viagem("bbbbbbbb-0000-4000-8000-000000000002", "terca", "08:00:00");
+    destino.horarios_paradas[1].offset_horario = "00:12:00";
+    const resultado = copiarViagemParaDiaComGuarda(itinerario([origem, destino]), origem.uuid, "terca", {
+      viagem_feriado: false,
+      tabela_excepcional_uuid: null,
+    });
+    expect(resultado).toEqual({ ok: false, motivo: "horario-existente" });
+    expect(destino.uuid).toBe("bbbbbbbb-0000-4000-8000-000000000002");
+  });
+
+  test("[inválido] própria coluna cancela; mesmo horário em outra grade não bloqueia", () => {
+    const origem = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
+    const feriado = viagem("bbbbbbbb-0000-4000-8000-000000000002", "terca", "08:00:00", true);
+    const it = itinerario([origem, feriado]);
+    expect(
+      copiarViagemParaDiaComGuarda(it, origem.uuid, "segunda", {
+        viagem_feriado: false,
+        tabela_excepcional_uuid: null,
+      }),
+    ).toEqual({ ok: false, motivo: "mesma-coluna" });
+    expect(
+      copiarViagemParaDiaComGuarda(it, origem.uuid, "terca", {
+        viagem_feriado: false,
+        tabela_excepcional_uuid: null,
+      }).ok,
+    ).toBe(true);
+  });
+
+  test("atalhos resolvem somente vizinhos, sem wrap SEG↔DOM", () => {
+    expect(diaAoLado("segunda", -1)).toBeNull();
+    expect(diaAoLado("domingo", 1)).toBeNull();
+    expect(diaAoLado("quarta", -1)).toBe("terca");
+    expect(diaAoLado("quarta", 1)).toBe("quinta");
   });
 });
 describe("clonarDiasComunsParaFeriado (Spec 04 §8.4; RN-007/068)", () => {
