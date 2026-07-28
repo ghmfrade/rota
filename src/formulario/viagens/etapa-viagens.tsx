@@ -429,14 +429,14 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                     { indiceBloco, indiceSecao, dia },
                     tecla,
                   );
+                const viagemUuid = celula.viagem.uuid;
+                const deslocamentoAnterior =
+                  deslocamentoAnteriorPorViagem[viagemUuid] ?? DESLOCAMENTO_RELATIVO_PADRAO;
+                const deslocamentoPosterior =
+                  deslocamentoPosteriorPorViagem[viagemUuid] ?? DESLOCAMENTO_RELATIVO_PADRAO;
+                const erroInsercaoRelativa = errosInsercaoRelativa[viagemUuid];
 
                 if (ehPrimeiraSecao) {
-                  const viagemUuid = celula.viagem.uuid;
-                  const deslocamentoAnterior =
-                    deslocamentoAnteriorPorViagem[viagemUuid] ?? DESLOCAMENTO_RELATIVO_PADRAO;
-                  const deslocamentoPosterior =
-                    deslocamentoPosteriorPorViagem[viagemUuid] ?? DESLOCAMENTO_RELATIVO_PADRAO;
-                  const erroInsercaoRelativa = errosInsercaoRelativa[viagemUuid];
                   return (
                     <td
                       key={dia}
@@ -452,58 +452,70 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                       }}
                       onMouseEnter={() => definirViagemEmHoverUuid(viagemUuid)}
                     >
-                      <div className="relative">
-                        <CampoHorarioGrade
-                          key={`${viagemUuid}-${horarioMostrar}`}
-                          rotuloAcessivel={`Horário de partida — ${dia}, viagem ${indiceBloco + 1}`}
-                          valor={horarioMostrar}
-                          aoConfirmar={(valor) => aoConfirmarPartida(viagemUuid, valor)}
-                          aoNavegar={navegar}
-                          atributosNavegacao={atributosNavegacao}
-                          aoSelecionar={() => definirViagemSelecionadaUuid(viagemUuid)}
+                      <CampoHorarioGrade
+                        key={`${viagemUuid}-${horarioMostrar}`}
+                        rotuloAcessivel={`Horário de partida — ${dia}, viagem ${indiceBloco + 1}`}
+                        valor={horarioMostrar}
+                        aoConfirmar={(valor) => aoConfirmarPartida(viagemUuid, valor)}
+                        aoNavegar={navegar}
+                        atributosNavegacao={atributosNavegacao}
+                        aoSelecionar={() => definirViagemSelecionadaUuid(viagemUuid)}
+                      />
+                      <div
+                        data-testid="acao-inserir-anterior"
+                        className={`absolute bottom-full left-1/2 z-20 mb-1 flex -translate-x-1/2 items-stretch gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3 [transition:opacity_var(--transicao-rapida)] ${
+                          emHover ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+                        }`}
+                      >
+                        <Campo
+                          densidade="compacta"
+                          className="min-w-20 text-center tabular-nums"
+                          aria-label={`Deslocamento anterior — ${dia}, viagem ${indiceBloco + 1}`}
+                          value={deslocamentoAnterior}
+                          onChange={(evento) =>
+                            definirDeslocamentoAnteriorPorViagem((atuais) => ({
+                              ...atuais,
+                              [viagemUuid]: evento.target.value,
+                            }))
+                          }
                         />
-                        <div
-                          data-testid="acao-inserir-anterior"
-                          className={`absolute bottom-full left-1/2 z-20 mb-1 flex -translate-x-1/2 items-center gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3 [transition:opacity_var(--transicao-rapida)] ${
-                            emHover ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
-                          }`}
+                        <Botao
+                          variante="primario"
+                          className="min-w-10"
+                          data-testid="inserir-viagem-anterior"
+                          aria-label={`Inserir viagem antes — ${dia}, viagem ${indiceBloco + 1}`}
+                          onClick={() => aoInserirViagemPorOffset(viagemUuid, -1)}
                         >
-                          <Campo
-                            densidade="compacta"
-                            aria-label={`Deslocamento anterior — ${dia}, viagem ${indiceBloco + 1}`}
-                            value={deslocamentoAnterior}
-                            onChange={(evento) =>
-                              definirDeslocamentoAnteriorPorViagem((atuais) => ({
-                                ...atuais,
-                                [viagemUuid]: evento.target.value,
-                              }))
-                            }
-                          />
-                          <Botao
-                            variante="fantasma"
-                            tamanho="compacto"
-                            data-testid="inserir-viagem-anterior"
-                            aria-label={`Inserir viagem antes — ${dia}, viagem ${indiceBloco + 1}`}
-                            onClick={() => aoInserirViagemPorOffset(viagemUuid, -1)}
-                          >
-                            ↑
-                          </Botao>
-                        </div>
-                        <div
-                          data-testid="acoes-viagem"
-                          className={`absolute left-1/2 top-full z-20 mt-1 flex -translate-x-1/2 items-center gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3 [transition:opacity_var(--transicao-rapida)] ${
-                            emHover ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
-                          }`}
+                          ↑
+                        </Botao>
+                      </div>
+                      <div
+                        data-testid="acoes-viagem"
+                        className={`pointer-events-none absolute inset-0 z-30 [transition:opacity_var(--transicao-rapida)] ${
+                          emHover ? "visible opacity-100" : "invisible opacity-0"
+                        }`}
+                      >
+                        <Botao
+                          variante="fantasma"
+                          tamanho="compacto"
+                          className="pointer-events-auto absolute right-full top-1/2 mr-1 -translate-y-1/2"
+                          data-testid="restaurar-viagem"
+                          aria-label={`Restaurar sugestão — ${dia}, viagem ${indiceBloco + 1}`}
+                          onClick={() => aoResetarViagem(viagemUuid)}
                         >
-                          <Botao
-                            variante="fantasma"
-                            tamanho="compacto"
-                            data-testid="restaurar-viagem"
-                            aria-label={`Restaurar sugestão — ${dia}, viagem ${indiceBloco + 1}`}
-                            onClick={() => aoResetarViagem(viagemUuid)}
-                          >
-                            Restaurar
-                          </Botao>
+                          ↻
+                        </Botao>
+                        <Botao
+                          variante="perigo"
+                          tamanho="compacto"
+                          className="pointer-events-auto absolute left-full top-1/2 ml-1 -translate-y-1/2"
+                          data-testid="apagar-viagem"
+                          aria-label={`Apagar viagem — ${dia}, viagem ${indiceBloco + 1}`}
+                          onClick={() => aoApagarViagem(viagemUuid)}
+                        >
+                          X
+                        </Botao>
+                        <div className="pointer-events-auto absolute left-1/2 top-full mt-1 flex -translate-x-1/2 items-center gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3">
                           <Select
                             densidade="compacta"
                             data-testid="select-copia-dia"
@@ -531,40 +543,6 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                           >
                             Copiar
                           </Botao>
-                          <Campo
-                            densidade="compacta"
-                            aria-label={`Deslocamento posterior — ${dia}, viagem ${indiceBloco + 1}`}
-                            value={deslocamentoPosterior}
-                            onChange={(evento) =>
-                              definirDeslocamentoPosteriorPorViagem((atuais) => ({
-                                ...atuais,
-                                [viagemUuid]: evento.target.value,
-                              }))
-                            }
-                          />
-                          <Botao
-                            variante="fantasma"
-                            tamanho="compacto"
-                            data-testid="inserir-viagem-posterior"
-                            aria-label={`Inserir viagem depois — ${dia}, viagem ${indiceBloco + 1}`}
-                            onClick={() => aoInserirViagemPorOffset(viagemUuid, 1)}
-                          >
-                            ↓
-                          </Botao>
-                          <Botao
-                            variante="perigo"
-                            tamanho="compacto"
-                            data-testid="apagar-viagem"
-                            aria-label={`Apagar viagem — ${dia}, viagem ${indiceBloco + 1}`}
-                            onClick={() => aoApagarViagem(viagemUuid)}
-                          >
-                            X
-                          </Botao>
-                          {erroInsercaoRelativa && (
-                            <span role="alert" data-testid="erro-insercao-relativa" className="text-xs text-erro">
-                              {erroInsercaoRelativa}
-                            </span>
-                          )}
                         </div>
                       </div>
                     </td>
@@ -603,6 +581,45 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                       <span role="alert" data-testid="erro-passante" className="text-xs text-erro">
                         {erro}
                       </span>
+                    )}
+                    {posicaoNaSuperficie === "fim" && (
+                      <div
+                        data-testid="acao-inserir-posterior"
+                        className={`absolute left-1/2 top-full z-20 mt-1 flex -translate-x-1/2 items-stretch gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3 [transition:opacity_var(--transicao-rapida)] ${
+                          emHover ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+                        }`}
+                      >
+                        <Campo
+                          densidade="compacta"
+                          className="min-w-20 text-center tabular-nums"
+                          aria-label={`Deslocamento posterior — ${dia}, viagem ${indiceBloco + 1}`}
+                          value={deslocamentoPosterior}
+                          onChange={(evento) =>
+                            definirDeslocamentoPosteriorPorViagem((atuais) => ({
+                              ...atuais,
+                              [viagemUuid]: evento.target.value,
+                            }))
+                          }
+                        />
+                        <Botao
+                          variante="primario"
+                          className="min-w-10"
+                          data-testid="inserir-viagem-posterior"
+                          aria-label={`Inserir viagem depois — ${dia}, viagem ${indiceBloco + 1}`}
+                          onClick={() => aoInserirViagemPorOffset(viagemUuid, 1)}
+                        >
+                          ↓
+                        </Botao>
+                        {erroInsercaoRelativa && (
+                          <span
+                            role="alert"
+                            data-testid="erro-insercao-relativa"
+                            className="absolute left-1/2 top-full mt-1 min-w-52 -translate-x-1/2 rounded-controle bg-white p-1 text-xs text-erro shadow-sombra-3"
+                          >
+                            {erroInsercaoRelativa}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </td>
                 );

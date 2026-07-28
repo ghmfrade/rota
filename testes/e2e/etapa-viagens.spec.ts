@@ -143,8 +143,8 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
       grade.getByLabel("Horário de partida — segunda, viagem 1"),
     ).toHaveValue("08:00");
     const linhas = grade.getByTestId("linha-grade");
-    await expect(linhas.nth(1).getByTestId("celula-passante").locator("input")).toHaveValue("08:40");
-    await expect(linhas.nth(2).getByTestId("celula-passante").locator("input")).toHaveValue("09:00");
+    await expect(linhas.nth(1).getByTestId("celula-passante").locator("input[data-grade]")).toHaveValue("08:40");
+    await expect(linhas.nth(2).getByTestId("celula-passante").locator("input[data-grade]")).toHaveValue("09:00");
 
     // terça (sem Viagem): 1ª Seção mostra a célula criável.
     await expect(grade.getByLabel("Criar viagem — terca")).toBeVisible();
@@ -167,10 +167,10 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     // terça é a 2ª coluna com Viagem na linha (segunda é a 1ª) → nth(1).
     const linhas = grade.getByTestId("linha-grade");
     await expect(
-      linhas.nth(1).getByTestId("celula-passante").nth(1).locator("input"),
+      linhas.nth(1).getByTestId("celula-passante").nth(1).locator("input[data-grade]"),
     ).toHaveValue("09:18");
     await expect(
-      linhas.nth(2).getByTestId("celula-passante").nth(1).locator("input"),
+      linhas.nth(2).getByTestId("celula-passante").nth(1).locator("input[data-grade]"),
     ).toHaveValue("09:30");
 
     // Uma nova célula criável surge para a próxima partida de terça.
@@ -190,8 +190,8 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
 
     await expect(partida).toHaveValue("10:00");
     const linhas = grade.getByTestId("linha-grade");
-    await expect(linhas.nth(1).getByTestId("celula-passante").locator("input")).toHaveValue("10:40");
-    await expect(linhas.nth(2).getByTestId("celula-passante").locator("input")).toHaveValue("11:00");
+    await expect(linhas.nth(1).getByTestId("celula-passante").locator("input[data-grade]")).toHaveValue("10:40");
+    await expect(linhas.nth(2).getByTestId("celula-passante").locator("input[data-grade]")).toHaveValue("11:00");
   });
 
   test("inserção relativa cria Viagem no mesmo dia, herda offsets e só aparece no hover (TASK-107)", async ({
@@ -207,24 +207,83 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     const grade = gradeComum(page);
     const partidaOrigem = grade.getByLabel("Horário de partida — segunda, viagem 1");
     const celulaOrigem = partidaOrigem.locator("xpath=ancestor::td");
+    const viagemUuid = await celulaOrigem.getAttribute("data-viagem-uuid");
+    expect(viagemUuid).toBeTruthy();
+    const celulaFinalOrigem = grade
+      .locator(`[data-testid="celula-passante"][data-viagem-uuid="${viagemUuid}"]`)
+      .last();
 
     await celulaOrigem.hover();
-    await expect(celulaOrigem.getByTestId("acao-inserir-anterior")).toHaveCSS("opacity", "1");
+    const acaoAnterior = celulaOrigem.getByTestId("acao-inserir-anterior");
+    const acaoPosterior = celulaFinalOrigem.getByTestId("acao-inserir-posterior");
+    await expect(acaoAnterior).toHaveCSS("opacity", "1");
+    await expect(acaoPosterior).toHaveCSS("opacity", "1");
     await expect(celulaOrigem.getByLabel("Deslocamento anterior — segunda, viagem 1")).toHaveValue(
       "00:10",
     );
-    await expect(celulaOrigem.getByLabel("Deslocamento posterior — segunda, viagem 1")).toHaveValue(
-      "00:10",
-    );
+    await expect(
+      celulaFinalOrigem.getByLabel("Deslocamento posterior — segunda, viagem 1"),
+    ).toHaveValue("00:10");
 
-    await celulaOrigem.getByLabel("Deslocamento posterior — segunda, viagem 1").fill("01:10");
-    await celulaOrigem.getByLabel("Inserir viagem depois — segunda, viagem 1").click();
+    const [
+      caixaOrigem,
+      caixaFinal,
+      caixaAcaoAnterior,
+      caixaAcaoPosterior,
+      caixaRestaurar,
+      caixaApagar,
+      caixaCampoAnterior,
+      caixaCampoPosterior,
+      caixaSetaAnterior,
+      caixaSetaPosterior,
+    ] = await Promise.all([
+      celulaOrigem.boundingBox(),
+      celulaFinalOrigem.boundingBox(),
+      acaoAnterior.boundingBox(),
+      acaoPosterior.boundingBox(),
+      celulaOrigem.getByTestId("restaurar-viagem").boundingBox(),
+      celulaOrigem.getByTestId("apagar-viagem").boundingBox(),
+      celulaOrigem.getByLabel("Deslocamento anterior — segunda, viagem 1").boundingBox(),
+      celulaFinalOrigem.getByLabel("Deslocamento posterior — segunda, viagem 1").boundingBox(),
+      celulaOrigem.getByTestId("inserir-viagem-anterior").boundingBox(),
+      celulaFinalOrigem.getByTestId("inserir-viagem-posterior").boundingBox(),
+    ]);
+    expect(caixaOrigem).not.toBeNull();
+    expect(caixaFinal).not.toBeNull();
+    expect(caixaAcaoAnterior).not.toBeNull();
+    expect(caixaAcaoPosterior).not.toBeNull();
+    expect(caixaRestaurar).not.toBeNull();
+    expect(caixaApagar).not.toBeNull();
+    expect(caixaCampoAnterior).not.toBeNull();
+    expect(caixaCampoPosterior).not.toBeNull();
+    expect(caixaSetaAnterior).not.toBeNull();
+    expect(caixaSetaPosterior).not.toBeNull();
+
+    expect(caixaAcaoAnterior!.y + caixaAcaoAnterior!.height).toBeLessThanOrEqual(
+      caixaOrigem!.y + 1,
+    );
+    expect(caixaAcaoPosterior!.y).toBeGreaterThanOrEqual(
+      caixaFinal!.y + caixaFinal!.height - 1,
+    );
+    expect(caixaRestaurar!.x + caixaRestaurar!.width / 2).toBeLessThan(
+      caixaOrigem!.x + caixaOrigem!.width / 2,
+    );
+    expect(caixaApagar!.x + caixaApagar!.width / 2).toBeGreaterThan(
+      caixaOrigem!.x + caixaOrigem!.width / 2,
+    );
+    expect(caixaCampoAnterior!.width).toBeGreaterThanOrEqual(80);
+    expect(caixaCampoPosterior!.width).toBeGreaterThanOrEqual(80);
+    expect(caixaSetaAnterior!.width).toBeGreaterThanOrEqual(40);
+    expect(caixaSetaPosterior!.width).toBeGreaterThanOrEqual(40);
+
+    await celulaFinalOrigem.getByLabel("Deslocamento posterior — segunda, viagem 1").fill("01:10");
+    await celulaFinalOrigem.getByLabel("Inserir viagem depois — segunda, viagem 1").click();
 
     await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toHaveValue("08:00");
     await expect(grade.getByLabel("Horário de partida — segunda, viagem 2")).toHaveValue("09:10");
     const linhas = grade.getByTestId("linha-grade");
-    await expect(linhas.nth(4).getByTestId("celula-passante").locator("input")).toHaveValue("09:50");
-    await expect(linhas.nth(5).getByTestId("celula-passante").locator("input")).toHaveValue("10:10");
+    await expect(linhas.nth(4).getByTestId("celula-passante").locator("input[data-grade]")).toHaveValue("09:50");
+    await expect(linhas.nth(5).getByTestId("celula-passante").locator("input[data-grade]")).toHaveValue("10:10");
 
     await grade.getByRole("columnheader", { name: "DOM" }).hover();
     await expect(celulaOrigem.getByTestId("acao-inserir-anterior")).toHaveCSS("opacity", "0");
@@ -243,19 +302,27 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     await abrirEtapaViagens(page, structuredClone(multiServico));
     const grade = gradeComum(page);
     const linhas = grade.getByTestId("linha-grade");
-    const passanteFinalOrigem = linhas.nth(2).getByTestId("celula-passante").locator("input");
+    const passanteFinalOrigem = linhas
+      .nth(2)
+      .getByTestId("celula-passante")
+      .locator("input[data-grade]");
     await passanteFinalOrigem.fill("08:50");
 
     const partidaOrigem = grade.getByLabel("Horário de partida — segunda, viagem 1");
     const celulaOrigem = partidaOrigem.locator("xpath=ancestor::td");
+    const viagemUuid = await celulaOrigem.getAttribute("data-viagem-uuid");
+    expect(viagemUuid).toBeTruthy();
+    const celulaFinalOrigem = grade
+      .locator(`[data-testid="celula-passante"][data-viagem-uuid="${viagemUuid}"]`)
+      .last();
     await celulaOrigem.hover();
-    await celulaOrigem.getByLabel("Inserir viagem depois — segunda, viagem 1").click();
+    await celulaFinalOrigem.getByLabel("Inserir viagem depois — segunda, viagem 1").click();
 
     const passanteIntermediarioCopia = grade
       .getByTestId("linha-grade")
       .nth(4)
       .getByTestId("celula-passante")
-      .locator("input");
+      .locator("input[data-grade]");
     await expect(passanteIntermediarioCopia).toHaveValue("08:40");
     await passanteIntermediarioCopia.fill("09:05");
     await expect(passanteIntermediarioCopia).toHaveValue("08:40");
@@ -264,7 +331,7 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     await partidaOrigem.fill("00:05");
     await celulaOrigem.hover();
     await celulaOrigem.getByLabel("Inserir viagem antes — segunda, viagem 1").click();
-    await expect(celulaOrigem.getByTestId("erro-insercao-relativa")).toContainText(
+    await expect(celulaFinalOrigem.getByTestId("erro-insercao-relativa")).toContainText(
       "00:00 e 23:59",
     );
     await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toHaveValue("00:05");
@@ -284,8 +351,14 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     await abrirEtapaViagens(page, structuredClone(multiServico));
     const grade = gradeComum(page);
     const linhas = grade.getByTestId("linha-grade");
-    const passanteVicente = linhas.nth(1).getByTestId("celula-passante").locator("input"); // ord2
-    const passantePraia = linhas.nth(2).getByTestId("celula-passante").locator("input"); // ord3
+    const passanteVicente = linhas
+      .nth(1)
+      .getByTestId("celula-passante")
+      .locator("input[data-grade]"); // ord2
+    const passantePraia = linhas
+      .nth(2)
+      .getByTestId("celula-passante")
+      .locator("input[data-grade]"); // ord3
 
     // Fixar a última Seção (Praia Grande) em 08:50 → âncora; a intermediária
     // (São Vicente) é reinterpolada proporcionalmente ao baseline (0/18/30):
@@ -336,17 +409,17 @@ test.describe("Etapa Viagens — grade de feriados e cópias (TASK-030; Spec 04 
       feriados.getByLabel("Horário de partida — segunda, viagem 1"),
     ).toHaveValue("08:00");
     const linhas = feriados.getByTestId("linha-grade");
-    await expect(linhas.nth(1).getByTestId("celula-passante").locator("input")).toHaveValue("08:40");
+    await expect(linhas.nth(1).getByTestId("celula-passante").locator("input[data-grade]")).toHaveValue("08:40");
 
     // Editar o passante da grade comum NÃO afeta a de feriado (grades independentes).
     const comumVicente = gradeComum(page)
       .getByTestId("linha-grade")
       .nth(1)
       .getByTestId("celula-passante")
-      .locator("input");
+      .locator("input[data-grade]");
     await comumVicente.fill("08:30");
     await expect(comumVicente).toHaveValue("08:30");
-    await expect(linhas.nth(1).getByTestId("celula-passante").locator("input")).toHaveValue("08:40");
+    await expect(linhas.nth(1).getByTestId("celula-passante").locator("input[data-grade]")).toHaveValue("08:40");
   });
 
   test("apagar viagem remove a coluna do dia na grade comum", async ({ page }) => {
