@@ -7,8 +7,9 @@ estão em posições erradas, os controles ±X são pequenos demais e a seta
 inferior não fica após o fim da seleção. O parecer
 `14-REVISOES/TASK-107-20260727.md` foi corrigido para **reprovado**. A task
 retorna ao Grupo H; pendentes: 15 → 16. A ação antiga “Copiar” também diverge
-da redação humana atual da Spec 04 §8.3 e deve sair; a confirmação formal para
-registro da decisão ficou pendente na **Q-067**. Antes nesta data — **TASK-106
+da redação humana atual da Spec 04 §8.3 e deve sair na TASK-109, sem bloquear a
+correção/reavaliação visual da TASK-107; a confirmação formal para registro da
+decisão ficou pendente na **Q-067**. Antes nesta data — **TASK-106
 concluída e aprovada**. A correção `75f2afa` fechou seleção contínua, Enter
 entre Viagens, Tab em células criáveis e retirou “Apagar bloco” conforme a
 **Q-066/DEC-088**. O commit `5e03efa` documentou as variantes públicas
@@ -249,7 +250,8 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 lista: a aprovação inicial foi substituída por **reprovação** após verificação
 manual contra a imagem-modelo. A correção permanece na própria TASK-107; a
 ação antiga “Copiar” deve sair conforme a Spec 04 §8.3 atual, e a Q-067 aguarda
-confirmação formal para virar DEC. Antes disso, a TASK-106 saiu da lista:
+confirmação formal para virar DEC; a remoção pode ficar para a TASK-109 e não
+bloqueia a reavaliação da 107. Antes disso, a TASK-106 saiu da lista:
 implementada em `c2db60a`, corrigida em `75f2afa` e **aprovada** no parecer
 final `14-REVISOES/TASK-106-20260727-final.md`, após `5e03efa` documentar a
 prop pública `densidade` de `Campo`/`Select` no design system. As três falhas
@@ -348,11 +350,11 @@ Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Servi
 
 ### Grupo H — Redesign da grade de horários (proposta 2026-07-27)
 
-Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). A **TASK-106 foi concluída e aprovada**: a entrega `c2db60a` foi reprovada, a correção `75f2afa` fechou seleção, Enter, Tab e retirou “Apagar bloco” conforme **Q-066/DEC-088**, e `5e03efa` documentou a densidade pública de `Campo`/`Select`, encerrando a ressalva da reavaliação. Parecer final em `14-REVISOES/TASK-106-20260727-final.md`. A **TASK-107 foi implementada, mas está reprovada** após verificação manual da composição visual; precisa corrigir a posição/tamanho dos controles e retirar a ação antiga “Copiar” conforme a redação humana atual da Spec 04 §8.3. A Q-067 aguarda apenas confirmação formal para virar DEC. As TASK-108..111 estão liberadas pela fundação aprovada, mas a ordem mantém a correção da 107 antes de avançar. A TASK-112 não depende da 106; continua condicionada ao motor da TASK-105. Botões de ação da Viagem surgem **no hover** (não na seleção — dobrado na TASK-106).
+Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). A **TASK-106 foi concluída e aprovada**: a entrega `c2db60a` foi reprovada, a correção `75f2afa` fechou seleção, Enter, Tab e retirou “Apagar bloco” conforme **Q-066/DEC-088**, e `5e03efa` documentou a densidade pública de `Campo`/`Select`, encerrando a ressalva da reavaliação. Parecer final em `14-REVISOES/TASK-106-20260727-final.md`. A **TASK-107 foi implementada, mas está reprovada** após verificação manual da composição visual; precisa corrigir a posição/tamanho dos controles conforme as quatro imagens-modelo. O restaurar é uma seta circular à esquerda do controle superior, não na quina esquerda. A ação antiga “Copiar” deve sair conforme a redação humana atual da Spec 04 §8.3, mas pode ser removida na TASK-109 e não bloqueia a reavaliação da 107. A Q-067 aguarda apenas confirmação formal para virar DEC. As TASK-108..111 estão liberadas pela fundação aprovada, mas a ordem mantém a correção da 107 antes de avançar. A TASK-112 não depende da 106; continua condicionada ao motor da TASK-105. Botões de ação da Viagem surgem **no hover** (não na seleção — dobrado na TASK-106).
 
 | # | Task | Complex. | Estado | Observação |
 |:---:|---|:---:|---|---|
-| 1 | **107** — Inserção de Viagem por offset relativo (±X min) | **2** | **Reprovada; corrigir e reavaliar** | Posição/tamanho dos controles; retirar “Copiar”; Q-067 aguarda formalização. |
+| 1 | **107** — Inserção de Viagem por offset relativo (±X min) | **2** | **Reprovada; corrigir e reavaliar** | Posição/tamanho conforme imagens 1–4; “Copiar” pode sair na 109. |
 | 2 | **108** — Cópia por headway até horário-limite (lote) | **3** | Desbloqueada (DEC-083; TASK-106 aprovada) | Limite inclusivo; para antes das 24h. |
 | 3 | **109** — Cópia p/ dia adjacente (setas ←/→) + guarda de duplicidade | **2** | Desbloqueada (DEC-084; TASK-106 aprovada) | Guarda só no gesto (RN-062 intacta). |
 | 4 | **110** — Operações de dia inteiro: copiar dia→dias e apagar Viagens do dia | **3** | Desbloqueada (DEC-085; TASK-106 aprovada) | Reusa a guarda da 109. |

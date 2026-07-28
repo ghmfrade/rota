@@ -695,6 +695,8 @@ unitária arbitrária em uma UI menos poluída.
 **Recomendação técnica:** B, por corresponder ao modelo visual solicitado e
 evitar três caminhos parcialmente sobrepostos. A alteração humana já presente
 na Spec 04 §8.3 aplica materialmente essa opção; falta confirmação literal
-“Q-067, opção B” para o registro formal via DEC.
+“Q-067, opção B” para o registro formal via DEC. O responsável esclareceu que
+a remoção do controle antigo pode ocorrer na TASK-109, sem bloquear a correção
+visual e a reavaliação da TASK-107.
 
 **Decisão:** Pendente de confirmação formal do responsável.
