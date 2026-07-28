@@ -121,7 +121,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 
 ## 3. Tasks executadas
 
-85 tasks concluídas. Agrupadas pela fase do backlog.
+86 tasks concluídas. Agrupadas pela fase do backlog.
 
 ### Fases 1–3 — Fundação, contrato JSON e validações de domínio
 
@@ -250,6 +250,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 106 | Redesign da grade de horários: layout tabular compacto, ordenação temporal, seleção contínua, ações no hover e navegação Tab/Enter — aprovada no parecer final `14-REVISOES/TASK-106-20260727-final.md` |
 | 107 | Inserção de Viagem por offset relativo (±X min), com offsets herdados, UUID nova e composição visual da DEC-090 — aprovada em `14-REVISOES/TASK-107-20260727.md` |
 | 113 | Últimos deslocamentos relativos independentes por direção e compartilhados na instância da etapa (DEC-091) — aprovada no parecer final `14-REVISOES/TASK-113-20260727-final.md` |
+| 114 | Ações “Restaurar sugestão” e “Apagar viagem” visíveis e clicáveis em domingo — aprovada em `14-REVISOES/TASK-114-20260728.md` |
 
 ---
 
@@ -264,7 +265,10 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 ## 5. Tasks a executar — ordem recomendada
 
-**Estado atual: 15 tasks pendentes.** Em 2026-07-27, a TASK-107 saiu da lista
+**Estado atual: 15 tasks pendentes.** Em 2026-07-28, a TASK-114 foi criada,
+implementada e aprovada entre atualizações deste status; por isso entra
+diretamente nas executadas sem alterar o total de pendentes previamente
+registrado. Em 2026-07-27, a TASK-107 saiu da lista
 após as correções `d23b30e`/`61b6d0a` e a reavaliação final aprovada. A
 posição deliberada do restaurar abaixo do X foi persistida na
 **Q-068/DEC-090**, eliminando a divergência aparente com a imagem-modelo. A
@@ -368,7 +372,7 @@ Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Servi
 
 ### Grupo H — Redesign da grade de horários (proposta 2026-07-27)
 
-Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). A **TASK-106 foi concluída e aprovada**: a entrega `c2db60a` foi reprovada, a correção `75f2afa` fechou seleção, Enter, Tab e retirou “Apagar bloco” conforme **Q-066/DEC-088**, e `5e03efa` documentou a densidade pública de `Campo`/`Select`, encerrando a ressalva da reavaliação. Parecer final em `14-REVISOES/TASK-106-20260727-final.md`. A **TASK-107 também foi concluída e aprovada** após `d23b30e` corrigir a composição/hover e `61b6d0a` separar foco de teclado do hover. O responsável confirmou como composição final o restaurar abaixo do X; a escolha foi persistida na **Q-068/DEC-090** e prevalece sobre esse detalhe da imagem-modelo. A **TASK-113 foi concluída e aprovada na reavaliação final**: `ccc2572` implementa os dois últimos deslocamentos da DEC-091, e `1c70bb3` corrige o E2E que havia motivado a reprovação inicial. Parecer final em `14-REVISOES/TASK-113-20260727-final.md`, com suíte canônica verde (1.282 unitários + 80 E2E). A ação antiga “Copiar” será removida/refatorada na TASK-109 conforme a **DEC-089**. A **TASK-109 foi reescrita pela Q-070/DEC-092 (2026-07-28)**: as setas ←/→ da DEC-084 são retiradas por poluírem a superfície da Viagem e a cópia unitária passa a ser por **arrasto da Viagem selecionada até a coluna de qualquer dia**, sempre copiando, com a guarda de duplicidade preservada e atalhos `Ctrl+←`/`Ctrl+→` para os dias adjacentes; o responsável **já atualizou a Spec 04 §8.3** em 2026-07-28, que agora descreve os dois caminhos (atalho de teclado para o dia ao lado e arrasto do mouse para o dia de escolha), ambos com UUID nova e a guarda de horário — a TASK-109 fica **liberada, sem bloqueio de spec**. As TASK-108, 110 e 111 também seguem liberadas; a ordem recomendada continua na 108. A TASK-112 não depende da 106; continua condicionada ao motor da TASK-105. Botões de ação da Viagem surgem **no hover** (não na seleção — dobrado na TASK-106).
+Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). A **TASK-106 foi concluída e aprovada**: a entrega `c2db60a` foi reprovada, a correção `75f2afa` fechou seleção, Enter, Tab e retirou “Apagar bloco” conforme **Q-066/DEC-088**, e `5e03efa` documentou a densidade pública de `Campo`/`Select`, encerrando a ressalva da reavaliação. Parecer final em `14-REVISOES/TASK-106-20260727-final.md`. A **TASK-107 também foi concluída e aprovada** após `d23b30e` corrigir a composição/hover e `61b6d0a` separar foco de teclado do hover. O responsável confirmou como composição final o restaurar abaixo do X; a escolha foi persistida na **Q-068/DEC-090** e prevalece sobre esse detalhe da imagem-modelo. A **TASK-113 foi concluída e aprovada na reavaliação final**: `ccc2572` implementa os dois últimos deslocamentos da DEC-091, e `1c70bb3` corrige o E2E que havia motivado a reprovação inicial. Parecer final em `14-REVISOES/TASK-113-20260727-final.md`, com suíte canônica verde (1.282 unitários + 80 E2E). A **TASK-114 foi concluída e aprovada** em 2026-07-28: o grupo de ações da Viagem passa a usar o lado interno em domingo, sem alterar segunda–sábado nem o `overflow-x-auto` de `Tabela`; parecer em `14-REVISOES/TASK-114-20260728.md`. A ação antiga “Copiar” será removida/refatorada na TASK-109 conforme a **DEC-089**. A **TASK-109 foi reescrita pela Q-070/DEC-092 (2026-07-28)**: as setas ←/→ da DEC-084 são retiradas por poluírem a superfície da Viagem e a cópia unitária passa a ser por **arrasto da Viagem selecionada até a coluna de qualquer dia**, sempre copiando, com a guarda de duplicidade preservada e atalhos `Ctrl+←`/`Ctrl+→` para os dias adjacentes; o responsável **já atualizou a Spec 04 §8.3** em 2026-07-28, que agora descreve os dois caminhos (atalho de teclado para o dia ao lado e arrasto do mouse para o dia de escolha), ambos com UUID nova e a guarda de horário — a TASK-109 fica **liberada, sem bloqueio de spec**. As TASK-108, 110 e 111 também seguem liberadas; a ordem recomendada continua na 108. A TASK-112 não depende da 106; continua condicionada ao motor da TASK-105. Botões de ação da Viagem surgem **no hover** (não na seleção — dobrado na TASK-106).
 
 | # | Task | Complex. | Estado | Observação |
 |:---:|---|:---:|---|---|
