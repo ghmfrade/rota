@@ -664,7 +664,7 @@ DEC-088.
 
 ## Q-067 — A ação antiga “Copiar uma Viagem para outro dia” permanece após as setas adjacentes e a cópia de dia inteiro?
 
-**Status:** Pendente
+**Status:** Decidida — DEC-089
 
 **Origem:** verificação manual da TASK-107 (2026-07-27)
 
@@ -694,9 +694,12 @@ unitária arbitrária em uma UI menos poluída.
 
 **Recomendação técnica:** B, por corresponder ao modelo visual solicitado e
 evitar três caminhos parcialmente sobrepostos. A alteração humana já presente
-na Spec 04 §8.3 aplica materialmente essa opção; falta confirmação literal
-“Q-067, opção B” para o registro formal via DEC. O responsável esclareceu que
-a remoção do controle antigo pode ocorrer na TASK-109, sem bloquear a correção
-visual e a reavaliação da TASK-107.
+na Spec 04 §8.3 aplica materialmente essa opção. O responsável confirmou a
+opção B e esclareceu que a remoção do controle antigo pode ocorrer na TASK-109,
+sem bloquear a correção visual e a reavaliação da TASK-107.
 
-**Decisão:** Pendente de confirmação formal do responsável.
+**Decisão:** **Decidida (DEC-089, 2026-07-27).** Opção B, por decisão explícita
+do responsável: retirar a ação unitária arbitrária; manter as setas de dia
+adjacente e a cópia de dia inteiro. A retirada/refatoração fica na TASK-109 e
+não bloqueia a correção visual/reavaliação da TASK-107. A Spec 04 §8.3 já foi
+alinhada pelo responsável. Ver DEC-089.

@@ -802,3 +802,42 @@ e handler de `apagarBloco` em `src/formulario/viagens/etapa-viagens.tsx`, o moto
 e export correspondente em `copias-grade.ts`/`index.ts` e seus testes exclusivos
 em `testes/unitarios/formulario/viagens-copias-grade.test.ts`; preservar
 `apagarViagem` e o escopo futuro da TASK-110.
+
+## DEC-089 — A cópia unitária arbitrária é substituída pelas setas adjacentes e pela cópia de dia inteiro
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, opção B da
+**Q-067**; Spec 04 §8.3 já alinhada pelo responsável; DEC-084/TASK-109;
+DEC-085/TASK-110 · **Data:** 2026-07-27
+
+**Decisão:** retirar da grade a ação antiga composta por seletor de dia + botão
+“Copiar”, que duplica uma única Viagem para um dia arbitrário. Permanecem como
+substitutas deliberadas:
+
+- setas ←/→ da **TASK-109**, que copiam uma Viagem para o dia
+  anterior/seguinte com a guarda de duplicidade da DEC-084;
+- cópia de **um dia inteiro para vários dias** da **TASK-110**, com a política
+  da DEC-085.
+
+A remoção do controle antigo e a refatoração do motor ficam na **TASK-109** e
+não bloqueiam a correção visual nem a reavaliação da TASK-107.
+
+**Motivo:** as três ações eram parcialmente sobrepostas e poluíam a superfície
+flutuante. O modelo visual escolhido usa as setas para a cópia unitária mais
+comum e reserva a seleção de múltiplos dias para a operação de dia inteiro. A
+retirada elimina o caminho arbitrário unitário de forma deliberada.
+
+**Consequências:** resolve a **Q-067** pela opção B. A Spec 04 §8.3 já foi
+atualizada pelo responsável para “Copiar viagem para dia ao lado”, com a guarda
+de horário existente. A TASK-109 absorve a retirada da UI antiga e deve
+reutilizar/refatorar `copiarViagemParaDias`, evitando dois motores de clonagem.
+A TASK-110 permanece com granularidade de coluna/dia inteiro. A correção da
+TASK-107 continua bloqueada somente pelos achados visuais do parecer, não pela
+remoção de “Copiar”.
+
+**Impacto em implementação:** nenhuma mudança no contrato JSON, Comparador,
+PDF, contagens ou texto de RN. **RN-004/RN-007/RN-061** continuam exigindo UUID
+nova e preservação de grade/offsets; **RN-062** continua permitindo duplicatas
+no contrato, com a guarda restrita ao gesto da DEC-084. Na TASK-109, remover
+`diaCopiaPorViagem`, o `Select`, o botão/handler `aoCopiarViagem` e os testes E2E
+da UI antiga; preservar e reutilizar o motor puro de cópia onde couber, sem
+duplicar lógica.

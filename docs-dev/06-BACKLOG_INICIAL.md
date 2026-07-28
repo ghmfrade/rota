@@ -5515,7 +5515,13 @@ Setas ←/→ na Viagem selecionada copiam-na para o dia anterior/seguinte; se j
 
 ## Contexto
 
-Copiar-para-dia já existe (§8.3); o novo é o gesto de um clique para o dia adjacente **e** a guarda de duplicidade. **Q-062 decidida (DEC-084):** guarda que não copia e avisa; critério = mesmo `horario_saida` na mesma grade; a guarda vale **só no gesto**, sem reintroduzir validação de unicidade no contrato (**RN-062 preservada**).
+A antiga cópia unitária por seletor de dia será **substituída** por este gesto
+(Q-067/**DEC-089**): a TASK-109 remove o `Select` + botão “Copiar” e reutiliza o
+motor de clonagem, sem manter dois caminhos equivalentes. O novo gesto de um
+clique opera no dia adjacente e aplica a guarda da **Q-062/DEC-084**: não copia
+e avisa quando já houver Viagem com o mesmo `horario_saida` na mesma grade; a
+guarda vale **só no gesto**, sem reintroduzir validação de unicidade no contrato
+(**RN-062 preservada**).
 
 ## Fora de escopo
 
@@ -5543,6 +5549,7 @@ Copiar-para-dia já existe (§8.3); o novo é o gesto de um clique para o dia ad
 - [ ] Seta → copia a Viagem para o dia seguinte (UUID nova); seta ← para o anterior. Botões surgem **no hover** (TASK-106).
 - [ ] Se o destino já tem Viagem com o mesmo `horario_saida` na mesma grade, **não copia** e avisa ("já tem horário").
 - [ ] Nenhuma validação de unicidade é adicionada a outros caminhos (RN-062 preservada — a guarda é só de UI).
+- [ ] O `Select` de dia e o botão antigo “Copiar” são removidos; o motor puro de clonagem é reutilizado/refatorado, sem lógica repetida (DEC-089).
 
 ## Casos válidos
 
@@ -5555,7 +5562,7 @@ Copiar-para-dia já existe (§8.3); o novo é o gesto de um clique para o dia ad
 ## Testes esperados
 
 - Unitários: cópia p/ dia adjacente com UUID nova; detecção de duplicidade pelo critério da Q-062.
-- E2E: gesto e aviso (OSRM mockado).
+- E2E: gesto, aviso e ausência do seletor/botão antigo (OSRM mockado).
 - Contrato: round-trip mantém RN-062 (duplicatas ainda aceitas em import).
 
 ## Arquivos prováveis
@@ -5565,14 +5572,15 @@ Copiar-para-dia já existe (§8.3); o novo é o gesto de um clique para o dia ad
 ## Riscos
 
 - Risco de a guarda escorregar para validação de contrato/import — vedado por RN-062 (guarda só no gesto — DEC-084).
+- Risco de duplicar o motor antigo em vez de reutilizá-lo; vedado pela DEC-089.
 
 ## Dependências
 
-- TASK-106. Q-062 decidida (DEC-084).
+- TASK-106. Q-062 decidida (DEC-084). Q-067 decidida (DEC-089).
 
 ## Perguntas em aberto
 
-- Nenhuma — Q-062 decidida (DEC-084).
+- Nenhuma — Q-062/DEC-084 e Q-067/DEC-089 decididas.
 
 ---
 
