@@ -367,14 +367,24 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     await expect(celulaFinalFeriado.getByLabel(/Deslocamento posterior/)).toHaveValue("00:25");
 
     await page.getByTestId("select-servico-viagens").selectOption({ label: "0001-2SU" });
+    await page.getByTestId("select-sentido-viagens").selectOption({ label: "Ida" });
     const celulaOutroServico = grade.getByTestId("celula-partida").first();
     await celulaOutroServico.hover();
     await expect(celulaOutroServico.getByLabel(/Deslocamento anterior/)).toHaveValue("00:07");
 
     await page.getByTestId("select-sentido-viagens").selectOption({ label: "Volta" });
     const celulaOutroSentido = grade.getByTestId("celula-partida").first();
+    const viagemOutroSentidoUuid = await celulaOutroSentido.getAttribute("data-viagem-uuid");
+    expect(viagemOutroSentidoUuid).toBeTruthy();
+    const celulaFinalOutroSentido = grade
+      .locator(
+        `[data-testid="celula-passante"][data-viagem-uuid="${viagemOutroSentidoUuid}"]`,
+      )
+      .last();
     await celulaOutroSentido.hover();
-    await expect(celulaOutroSentido.getByLabel(/Deslocamento posterior/)).toHaveValue("00:25");
+    await expect(celulaFinalOutroSentido.getByLabel(/Deslocamento posterior/)).toHaveValue(
+      "00:25",
+    );
 
     // Caso inválido: não cria Viagem e restaura o último valor válido apenas
     // da direção anterior; o posterior permanece independente.
