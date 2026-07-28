@@ -1,6 +1,13 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-07-27 (branch `redesign`) — **TASK-106
+**Atualização mais recente:** 2026-07-27 (branch `redesign`) — **TASK-107
+concluída e aprovada**. A implementação `1ce9b0a` acrescenta inserção unitária
+por deslocamento relativo ±X na grade, com default de 10 minutos, UUID nova,
+mesmo dia/grade, herança rígida dos offsets e recusa fora de 00:00–23:59.
+Parecer em `14-REVISOES/TASK-107-20260727.md`; evidência canônica verde
+(executor `Codex`, fingerprint `326276ad…`, identidade `498d7fa6…`). A
+TASK-107 sai do Grupo H; TASK-108..112 permanecem na ordem registrada.
+Pendentes: 16 → 15. Antes nesta data — **TASK-106
 concluída e aprovada**. A correção `75f2afa` fechou seleção contínua, Enter
 entre Viagens, Tab em células criáveis e retirou “Apagar bloco” conforme a
 **Q-066/DEC-088**. O commit `5e03efa` documentou as variantes públicas
@@ -152,6 +159,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 030 | Tabela de feriados e cópias |
 | 031 | Contagens e resumo operacional |
 | 103 | Contagens excluem operação excepcional da semana padrão (RN-069/RN-099) |
+| 107 | Inserção de Viagem por offset relativo (±X min) |
 | 032 | Revisão e validação final |
 
 ### Fase 12 — Qualidade e follow-ups
@@ -237,7 +245,10 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 ## 5. Tasks a executar — ordem recomendada
 
-**Estado atual: 16 tasks pendentes.** Em 2026-07-27, a TASK-106 saiu da lista:
+**Estado atual: 15 tasks pendentes.** Em 2026-07-27, a TASK-107 saiu da lista:
+implementada em `1ce9b0a` e aprovada em
+`14-REVISOES/TASK-107-20260727.md`; o Grupo H passa de 6 para 5 pendentes, sem
+alterar a ordem TASK-108..112. Antes disso, a TASK-106 saiu da lista:
 implementada em `c2db60a`, corrigida em `75f2afa` e **aprovada** no parecer
 final `14-REVISOES/TASK-106-20260727-final.md`, após `5e03efa` documentar a
 prop pública `densidade` de `Campo`/`Select` no design system. As três falhas
@@ -336,11 +347,10 @@ Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Servi
 
 ### Grupo H — Redesign da grade de horários (proposta 2026-07-27)
 
-Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). A **TASK-106 foi concluída e aprovada**: a entrega `c2db60a` foi reprovada, a correção `75f2afa` fechou seleção, Enter, Tab e retirou “Apagar bloco” conforme **Q-066/DEC-088**, e `5e03efa` documentou a densidade pública de `Campo`/`Select`, encerrando a ressalva da reavaliação. Parecer final em `14-REVISOES/TASK-106-20260727-final.md`. As TASK-107..111 estão liberadas pela fundação aprovada. A TASK-112 não depende da 106; continua condicionada ao motor da TASK-105. Botões de ação da Viagem surgem **no hover** (não na seleção — dobrado na TASK-106).
+Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). A **TASK-106 foi concluída e aprovada**: a entrega `c2db60a` foi reprovada, a correção `75f2afa` fechou seleção, Enter, Tab e retirou “Apagar bloco” conforme **Q-066/DEC-088**, e `5e03efa` documentou a densidade pública de `Campo`/`Select`, encerrando a ressalva da reavaliação. Parecer final em `14-REVISOES/TASK-106-20260727-final.md`. A **TASK-107 também foi concluída e aprovada**: inserção unitária por offset relativo implementada em `1ce9b0a`, com parecer em `14-REVISOES/TASK-107-20260727.md`. As TASK-108..111 estão liberadas pela fundação aprovada. A TASK-112 não depende da 106; continua condicionada ao motor da TASK-105. Botões de ação da Viagem surgem **no hover** (não na seleção — dobrado na TASK-106).
 
 | # | Task | Complex. | Estado | Observação |
 |:---:|---|:---:|---|---|
-| 1 | **107** — Inserção de Viagem por offset relativo (±X min) | **2** | Desbloqueada (DEC-082; TASK-106 aprovada) | Herda offsets; só o dia; default 10 min. |
 | 2 | **108** — Cópia por headway até horário-limite (lote) | **3** | Desbloqueada (DEC-083; TASK-106 aprovada) | Limite inclusivo; para antes das 24h. |
 | 3 | **109** — Cópia p/ dia adjacente (setas ←/→) + guarda de duplicidade | **2** | Desbloqueada (DEC-084; TASK-106 aprovada) | Guarda só no gesto (RN-062 intacta). |
 | 4 | **110** — Operações de dia inteiro: copiar dia→dias e apagar Viagens do dia | **3** | Desbloqueada (DEC-085; TASK-106 aprovada) | Reusa a guarda da 109. |
