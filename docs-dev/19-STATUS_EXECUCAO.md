@@ -1,6 +1,16 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-07-28 (branch `redesign`) — **TASK-108
+**Atualização mais recente:** 2026-07-28 (branch `redesign`) — **TASK-109
+implementada e aprovada com ressalvas**. A implementação `1174657` substituiu
+o seletor/botão antigo pelo arrasto até qualquer dia e por
+`Ctrl+←`/`Ctrl+→` sem wrap, reutilizando a guarda por horário e criando UUID
+nova. O parecer `14-REVISOES/TASK-109-20260728.md` confirmou código e suíte
+canônica verdes (1.306 unitários + 89 E2E; fingerprint `d934b59a…`;
+identidade `498d7fa6…`), mas registrou uma **condição de merge**: falta o E2E
+explícito de soltar fora de qualquer coluna e provar o cancelamento. Por isso a
+TASK-109 permanece na fila e a contagem continua em **16 tasks não concluídas:
+14 executáveis, a TASK-038 com bloqueio parcial e a TASK-040 bloqueada**.
+Antes nesta data, a **TASK-108
 concluída e aprovada**. A implementação `33fc68b` adicionou a geração em lote
 por headway até horário-limite inclusivo, preservando dia, grade e offsets e
 criando UUID nova para cada Viagem; parecer em
@@ -422,11 +432,11 @@ Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Servi
 
 ### Grupo H — Redesign da grade de horários (proposta 2026-07-27)
 
-Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). As **TASK-106, 107, 108, 113, 114, 115 e 116 estão concluídas e aprovadas**. A 106 consolidou seleção, Enter/Tab, retirada de “Apagar bloco” e densidade pública de `Campo`/`Select`; a 107 entregou inserção relativa e a composição da DEC-090; a 108 entregou a geração em lote por headway da DEC-083; a 113 preservou os dois últimos deslocamentos da DEC-091; a 114 manteve as ações inteiramente visíveis em domingo; a 115 fez o foco acompanhar a UUID da Viagem após criação/reordenação e redistribuição; e a 116 passou a confirmar horários somente por `Enter`/`Tab`, com rascunho local e normalização final. A entrega `92414d2` da TASK-116 foi corrigida em `213626d` e aprovada na reavaliação `14-REVISOES/TASK-116-20260728.md`; o E2E futuro da TASK-105 deve confirmar essa herança na grade excepcional ainda não renderizada. A ação antiga “Copiar” será removida/refatorada na TASK-109 conforme a **DEC-089**. A **TASK-109 foi reescrita pela Q-070/DEC-092 (2026-07-28)**: a cópia unitária passa a usar arrasto até qualquer dia e `Ctrl+←`/`Ctrl+→` nos dias adjacentes; a Spec 04 §8.3 já está alinhada. As TASK-109, 110 e 111 seguem liberadas, com a ordem recomendada iniciando pela **TASK-109**. A TASK-112 continua condicionada ao motor da TASK-105. Botões de ação da Viagem surgem **no hover**.
+Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). As **TASK-106, 107, 108, 113, 114, 115 e 116 estão concluídas e aprovadas**. A 106 consolidou seleção, Enter/Tab, retirada de “Apagar bloco” e densidade pública de `Campo`/`Select`; a 107 entregou inserção relativa e a composição da DEC-090; a 108 entregou a geração em lote por headway da DEC-083; a 113 preservou os dois últimos deslocamentos da DEC-091; a 114 manteve as ações inteiramente visíveis em domingo; a 115 fez o foco acompanhar a UUID da Viagem após criação/reordenação e redistribuição; e a 116 passou a confirmar horários somente por `Enter`/`Tab`, com rascunho local e normalização final. A entrega `92414d2` da TASK-116 foi corrigida em `213626d` e aprovada na reavaliação `14-REVISOES/TASK-116-20260728.md`; o E2E futuro da TASK-105 deve confirmar essa herança na grade excepcional ainda não renderizada. A **TASK-109 foi implementada em `1174657` e aprovada com ressalvas** no parecer `14-REVISOES/TASK-109-20260728.md`: arrasto e atalhos estão aderentes, mas falta a regressão E2E explícita de soltar fora de qualquer coluna. Ela permanece na fila até a condição de merge ser corrigida e reavaliada. A TASK-112 continua condicionada ao motor da TASK-105. Botões de ação da Viagem surgem **no hover**.
 
 | # | Task | Complex. | Estado | Observação |
 |:---:|---|:---:|---|---|
-| 1 | **109** — Cópia unitária entre dias por arrasto + atalhos para dias adjacentes | **2** | Desbloqueada (DEC-084/089/092; Spec 04 §8.3 alinhada) | Sempre copia; destino em qualquer dia por arrasto; `Ctrl+←`/`Ctrl+→` sem wrap; guarda de duplicidade preservada. |
+| 1 | **109** — Cópia unitária entre dias por arrasto + atalhos para dias adjacentes | **2** | Implementada; aprovada com ressalva impeditiva | Código e suíte verdes em `1174657`; falta E2E de drop fora de qualquer coluna e reavaliação antes do merge. |
 | 2 | **110** — Operações de dia inteiro: copiar dia→dias e apagar Viagens do dia | **3** | Desbloqueada (DEC-085; TASK-106 aprovada) | Reusa a guarda da 109. |
 | 3 | **111** — Modo compacto: ocultar Seções intermediárias e final | **2** | Desbloqueada (DEC-086; TASK-106 aprovada) | Versão simples do PDF é da TASK-034 (§13.2). |
 | 4 | **112** — "Copiar dias comuns" origem estendida + mescla = sincronização preservando UUID | **4** | Desbloqueada (DEC-087) | Spec 04 §8.4/§8.5 aplicada + carve-out RN-007 registrada. Reusa o motor de sincronização da 105. |
