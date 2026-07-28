@@ -96,12 +96,12 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   const [diaCopiaPorViagem, definirDiaCopiaPorViagem] = useState<Record<string, DiaSemana>>({});
   const [viagemSelecionadaUuid, definirViagemSelecionadaUuid] = useState<string | null>(null);
   const [viagemEmHoverUuid, definirViagemEmHoverUuid] = useState<string | null>(null);
-  const [deslocamentoAnteriorPorViagem, definirDeslocamentoAnteriorPorViagem] = useState<
-    Record<string, string>
-  >({});
-  const [deslocamentoPosteriorPorViagem, definirDeslocamentoPosteriorPorViagem] = useState<
-    Record<string, string>
-  >({});
+  // DEC-091: os últimos deslocamentos são uma conveniência da instância aberta
+  // da etapa, compartilhada entre Viagens, grades, Serviços e sentidos.
+  const [deslocamentoAnterior, definirDeslocamentoAnterior] = useState(DESLOCAMENTO_RELATIVO_PADRAO);
+  const [deslocamentoPosterior, definirDeslocamentoPosterior] = useState(DESLOCAMENTO_RELATIVO_PADRAO);
+  const ultimoDeslocamentoAnteriorValidoRef = useRef(DESLOCAMENTO_RELATIVO_PADRAO);
+  const ultimoDeslocamentoPosteriorValidoRef = useRef(DESLOCAMENTO_RELATIVO_PADRAO);
   const [errosInsercaoRelativa, definirErrosInsercaoRelativa] = useState<Record<string, string>>({});
 
   useEffect(
@@ -211,12 +211,18 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
     const viagem = itinerarioAtual.viagens.find((item) => item.uuid === viagemUuid);
     if (!viagem) return;
 
-    const entrada =
+    const entrada = direcao === -1 ? deslocamentoAnterior : deslocamentoPosterior;
+    const definirDeslocamento =
+      direcao === -1 ? definirDeslocamentoAnterior : definirDeslocamentoPosterior;
+    const ultimoDeslocamentoValidoRef =
       direcao === -1
-        ? (deslocamentoAnteriorPorViagem[viagemUuid] ?? DESLOCAMENTO_RELATIVO_PADRAO)
-        : (deslocamentoPosteriorPorViagem[viagemUuid] ?? DESLOCAMENTO_RELATIVO_PADRAO);
+        ? ultimoDeslocamentoAnteriorValidoRef
+        : ultimoDeslocamentoPosteriorValidoRef;
     const horario = horaMinutoParaHorarioRelogio(entrada);
     if (horario === null) {
+      // Uma entrada malformada não pode se propagar para os hovers seguintes
+      // (DEC-091); restaura o último valor válido da direção correspondente.
+      definirDeslocamento(ultimoDeslocamentoValidoRef.current);
       definirErrosInsercaoRelativa((atuais) => ({
         ...atuais,
         [viagemUuid]: "Informe o deslocamento no formato HH:MM.",
@@ -224,6 +230,9 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
       return;
     }
 
+    const deslocamentoNormalizado = horarioParaHoraMinuto(horario);
+    ultimoDeslocamentoValidoRef.current = deslocamentoNormalizado;
+    definirDeslocamento(deslocamentoNormalizado);
     const minutos = horarioParaSegundos(horario) / 60;
     const viagemNova = inserirViagemPorOffsetRelativo(viagem, direcao * minutos);
     if (!viagemNova) {
@@ -464,10 +473,6 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                     tecla,
                   );
                 const viagemUuid = celula.viagem.uuid;
-                const deslocamentoAnterior =
-                  deslocamentoAnteriorPorViagem[viagemUuid] ?? DESLOCAMENTO_RELATIVO_PADRAO;
-                const deslocamentoPosterior =
-                  deslocamentoPosteriorPorViagem[viagemUuid] ?? DESLOCAMENTO_RELATIVO_PADRAO;
                 const erroInsercaoRelativa = errosInsercaoRelativa[viagemUuid];
 
                 if (ehPrimeiraSecao) {
@@ -506,12 +511,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                           className="min-w-20 text-center tabular-nums"
                           aria-label={`Deslocamento anterior — ${dia}, viagem ${indiceBloco + 1}`}
                           value={deslocamentoAnterior}
-                          onChange={(evento) =>
-                            definirDeslocamentoAnteriorPorViagem((atuais) => ({
-                              ...atuais,
-                              [viagemUuid]: evento.target.value,
-                            }))
-                          }
+                          onChange={(evento) => definirDeslocamentoAnterior(evento.target.value)}
                         />
                         <Botao
                           variante="primario"
@@ -631,12 +631,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                           className="min-w-20 text-center tabular-nums"
                           aria-label={`Deslocamento posterior — ${dia}, viagem ${indiceBloco + 1}`}
                           value={deslocamentoPosterior}
-                          onChange={(evento) =>
-                            definirDeslocamentoPosteriorPorViagem((atuais) => ({
-                              ...atuais,
-                              [viagemUuid]: evento.target.value,
-                            }))
-                          }
+                          onChange={(evento) => definirDeslocamentoPosterior(evento.target.value)}
                         />
                         <Botao
                           variante="primario"

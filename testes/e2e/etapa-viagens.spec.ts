@@ -323,6 +323,94 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     expect(chamouOsrm).toBe(false);
   });
 
+  test("reutiliza os últimos deslocamentos válidos por direção na instância da etapa (TASK-113)", async ({
+    page,
+  }) => {
+    let chamouOsrm = false;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamouOsrm = true;
+      return rota.abort();
+    });
+
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+    const celulaOrigem = grade.getByTestId("celula-partida").first();
+    const viagemOrigemUuid = await celulaOrigem.getAttribute("data-viagem-uuid");
+    expect(viagemOrigemUuid).toBeTruthy();
+    const celulaFinalOrigem = grade
+      .locator(`[data-testid="celula-passante"][data-viagem-uuid="${viagemOrigemUuid}"]`)
+      .last();
+
+    await celulaOrigem.hover();
+    await celulaOrigem.getByLabel(/Deslocamento anterior/).fill("00:07");
+    await celulaOrigem.getByLabel(/Inserir viagem antes/).click();
+
+    await celulaOrigem.hover();
+    await celulaFinalOrigem.getByLabel(/Deslocamento posterior/).fill("00:25");
+    await celulaFinalOrigem.getByLabel(/Inserir viagem depois/).click();
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 3")).toHaveValue(
+      "08:25",
+    );
+
+    // A grade de feriados recebe novas Viagens, mas os dois deslocamentos são
+    // conveniência da mesma instância aberta da etapa (DEC-091).
+    const feriados = gradeFeriados(page);
+    await feriados.getByTestId("copiar-dias-comuns").click();
+    const celulaFeriado = feriados.getByTestId("celula-partida").first();
+    const viagemFeriadoUuid = await celulaFeriado.getAttribute("data-viagem-uuid");
+    expect(viagemFeriadoUuid).toBeTruthy();
+    const celulaFinalFeriado = feriados
+      .locator(`[data-testid="celula-passante"][data-viagem-uuid="${viagemFeriadoUuid}"]`)
+      .last();
+    await celulaFeriado.hover();
+    await expect(celulaFeriado.getByLabel(/Deslocamento anterior/)).toHaveValue("00:07");
+    await expect(celulaFinalFeriado.getByLabel(/Deslocamento posterior/)).toHaveValue("00:25");
+
+    await page.getByTestId("select-servico-viagens").selectOption({ label: "0001-2SU" });
+    const celulaOutroServico = grade.getByTestId("celula-partida").first();
+    await celulaOutroServico.hover();
+    await expect(celulaOutroServico.getByLabel(/Deslocamento anterior/)).toHaveValue("00:07");
+
+    await page.getByTestId("select-sentido-viagens").selectOption({ label: "Volta" });
+    const celulaOutroSentido = grade.getByTestId("celula-partida").first();
+    await celulaOutroSentido.hover();
+    await expect(celulaOutroSentido.getByLabel(/Deslocamento posterior/)).toHaveValue("00:25");
+
+    // Caso inválido: não cria Viagem e restaura o último valor válido apenas
+    // da direção anterior; o posterior permanece independente.
+    const totalAntes = await grade.getByTestId("celula-partida").count();
+    await celulaOutroSentido.getByLabel(/Deslocamento anterior/).fill("invalido");
+    await celulaOutroSentido.getByLabel(/Inserir viagem antes/).click();
+    await expect(page.getByTestId("erro-insercao-relativa")).toContainText(
+      "Informe o deslocamento no formato HH:MM.",
+    );
+    await expect(celulaOutroSentido.getByLabel(/Deslocamento anterior/)).toHaveValue("00:07");
+    await expect(
+      grade
+        .locator(`[data-testid="celula-passante"][data-viagem-uuid="${await celulaOutroSentido.getAttribute("data-viagem-uuid")}"]`)
+        .last()
+        .getByLabel(/Deslocamento posterior/),
+    ).toHaveValue("00:25");
+    await expect(grade.getByTestId("celula-partida")).toHaveCount(totalAntes);
+
+    // Sair da etapa a desmonta; ao reabri-la, ambas as direções voltam ao
+    // padrão decidido de dez minutos.
+    await page.getByTestId("etapa-botao").filter({ hasText: "Matrizes" }).click();
+    await page.getByTestId("etapa-botao").filter({ hasText: "Viagens e horários" }).click();
+    await page.getByTestId("select-servico-viagens").selectOption({ label: "0001-2SU" });
+    await page.getByTestId("select-sentido-viagens").selectOption({ label: "Volta" });
+    const celulaReaberta = grade.getByTestId("celula-partida").first();
+    await celulaReaberta.hover();
+    await expect(celulaReaberta.getByLabel(/Deslocamento anterior/)).toHaveValue("00:10");
+    await expect(
+      grade
+        .locator(`[data-testid="celula-passante"][data-viagem-uuid="${await celulaReaberta.getAttribute("data-viagem-uuid")}"]`)
+        .last()
+        .getByLabel(/Deslocamento posterior/),
+    ).toHaveValue("00:10");
+    expect(chamouOsrm).toBe(false);
+  });
+
   test("inserção relativa herda a âncora manual e recusa resultado fora do dia (TASK-107)", async ({
     page,
   }) => {
