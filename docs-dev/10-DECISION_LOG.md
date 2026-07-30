@@ -1089,3 +1089,89 @@ Viagens; **RN-062** permanece aceitando reforços no documento;
 `src/formulario/viagens/copias-grade.ts`,
 `src/formulario/viagens/etapa-viagens.tsx` e testes da etapa.
 **Task:** TASK-118.
+
+## DEC-095 — Destaque somente nas Viagens de reforço com partida coincidente
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, opção A
+da **Q-073**, com refinamento explícito de destacar somente a segunda Viagem e
+as posteriores do grupo; Spec 04 §8.1/§11; Spec 02 §11/§14; RN-061/RN-062/
+RN-078; TASK-119; DEC-050 · **Data:** 2026-07-30
+
+**Decisão:** uma partida coincidente é detectada somente dentro do mesmo
+itinerário (mesmo Serviço e sentido) e da mesma grade. O agrupamento usa
+`dia_semana + horario_saida` e ignora integralmente os `offset_horario` e os
+demais horários de passagem. Ida e Volta não são comparadas entre si; grades
+comum, de feriado e excepcional também não são misturadas.
+
+Em cada grupo com duas ou mais Viagens, a **primeira Viagem na ordem em que é
+exibida na grade é a viagem-base e mantém a aparência normal**. Somente a
+segunda Viagem e as posteriores são Viagens de reforço e recebem o destaque
+laranja claro em toda a sua superfície visível. Portanto, duas partidas
+`08:00` destacam apenas a segunda; três partidas `08:00` destacam a segunda e a
+terceira. A seleção azul tem precedência visual temporária sobre o laranja, que
+reaparece quando a Viagem deixa de estar selecionada.
+
+O Formulário emite um alerta não bloqueante por Serviço que tenha ao menos um
+grupo coincidente, com quantidade de grupos e navegação para o primeiro:
+**“O Serviço {numero_n} possui partidas coincidentes no mesmo dia e horário.
+As Viagens destacadas em laranja são reforços válidos; confirme se o cadastro
+é intencional.”**
+
+**Motivo:** o destaque deve diferenciar a partida original do reforço
+subsequente, sem sugerir que ambas são anômalas. Restringir a comparação ao
+mesmo itinerário e à mesma grade segue a definição de reforço da RN-062 e evita
+falsos positivos entre sentidos opostos ou regimes operacionais independentes.
+
+**Consequências:** resolve a **Q-073** e **desbloqueia a TASK-119**. Reforços
+continuam válidos e exportáveis; o alerta apenas exige ciência e não altera,
+remove ou mescla Viagens. O destaque e a pendência são derivados do documento
+atual e nunca persistidos no JSON.
+
+**Impacto em implementação:** nenhuma alteração de texto é necessária em
+`docs-dev/01-RULE_INDEX.md` ou `docs-dev/03-TRACEABILITY_MATRIX.md`.
+**RN-061/RN-062** definem o escopo e a validade do reforço; **RN-078** mantém o
+alerta não bloqueante; **RN-096/NEG-004** mantêm alerta e destaque efêmeros.
+**Módulos:** `src/formulario/pendencias/`, `src/formulario/revisao/`,
+`src/formulario/layout/painel-pendencias.tsx`,
+`src/formulario/viagens/etapa-viagens.tsx`, detector puro compartilhado e
+testes. O laranja claro deve ser token/contrato visual explícito do design
+system, sem `style=` inline nem sobreposição conflitante de classes.
+**Task:** TASK-119.
+
+## DEC-096 — Segundo clique na mesma Viagem desfaz a seleção
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, opção A
+da **Q-074**; Spec 04 §8.1–§8.3; TASK-106; DEC-082/DEC-083/DEC-092/DEC-095;
+TASK-119; DEC-050 · **Data:** 2026-07-30
+
+**Decisão:** a seleção da Viagem funciona como toggle por `uuid`. O primeiro
+clique em qualquer célula de uma Viagem seleciona toda a sua superfície; um
+novo clique em qualquer célula da mesma Viagem limpa a seleção. Clicar numa
+Viagem diferente transfere a seleção diretamente para ela.
+
+Desselecionar é exclusivamente visual e efêmero: não altera foco, horário,
+UUID, âncoras nem qualquer dado do documento. A superfície volta ao estado
+derivado subjacente — aparência normal numa Viagem comum ou destaque laranja
+numa Viagem de reforço da DEC-095. Foco e navegação por Tab/Enter continuam
+selecionando a Viagem alcançada, como hoje. Não se acrescentam desmarcação por
+`Escape`, clique fora da grade, perda de foco ou `blur`.
+
+**Motivo:** exigir a seleção de outra Viagem para retirar o azul cria um estado
+visual sem gesto de encerramento na própria entidade e incomoda durante a
+edição. O toggle é o comportamento solicitado e permite conferir corretamente
+o retorno do reforço ao laranja sem ampliar a mudança para foco ou navegação.
+
+**Consequências:** resolve a **Q-074** e **desbloqueia a TASK-119**. Supera na
+TASK-106 somente a expressão “mantém a seleção persistente” no sentido de
+persistência indefinida: a superfície contínua, a persistência após o primeiro
+clique e todos os demais comportamentos da task permanecem válidos. As ações de
+inserção, headway e arrasto continuam usando a Viagem enquanto ela estiver
+selecionada.
+
+**Impacto em implementação:** nenhuma RN, spec, contrato JSON, PDF, Comparador
+ou contagem precisa ser alterada. **RN-096** continua fundamentando o estado
+efêmero. **Módulos:** `src/formulario/viagens/etapa-viagens.tsx` e testes de
+componente/E2E da grade. O handler deve impedir que `onFocus`/`aoSelecionar` do
+campo reative no mesmo gesto o `uuid` que o toggle acabou de limpar e deve
+preservar os comportamentos de foco das TASK-115/TASK-116.
+**Tasks:** TASK-106 (critério superado em parte) e TASK-119.

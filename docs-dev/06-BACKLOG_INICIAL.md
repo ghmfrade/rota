@@ -5329,7 +5329,10 @@ decidida pela Q-066/**DEC-088**; a Spec 04 §8.3 já foi alinhada pelo responsá
 - [ ] Dentro de cada dia, as Viagens aparecem em **ordem temporal** (mais cedo em cima); blocos ordenados pelo menor horário de início entre os dias (§8.1).
 - [ ] Células **sem ícone de relógio**; densidade tabular compacta conforme design system.
 - [ ] Digitar horário na 1ª Seção de um bloco/dia **cria a Viagem** (comportamento §8.2 preservado).
-- [ ] Selecionar uma Viagem (clique) evidencia **uma única superfície visual contínua** envolvendo todas as suas células e mantém a seleção persistente; não desenhar um contorno completo independente em cada célula.
+- [ ] Selecionar uma Viagem (clique) evidencia **uma única superfície visual
+      contínua** envolvendo todas as suas células e mantém a seleção até um
+      segundo clique na mesma Viagem ou a seleção de outra (DEC-096); não
+      desenhar um contorno completo independente em cada célula.
 - [ ] Os **botões de ação flutuantes** da Viagem (apagar; e, nas TASK-107..110, inserir ±X / headway / copiar p/ dia adjacente) aparecem **no hover** (mouse sobre a Viagem) e **somem ao tirar o mouse**, ficando só a seleção — para poluir menos e deixar os demais horários visíveis durante a digitação (DEC-082..085 assumem este modelo de superfície).
 - [ ] "X" apaga **aquela Viagem** (a coluna do bloco naquele dia); a variante "apagar as Viagens do dia inteiro" fica na TASK-110 (Q-063).
 - [ ] **Tab** move o foco de digitação para a **mesma Seção no dia seguinte**, inclusive no percurso `vazio → vazio`; **Enter** percorre as Seções de cima para baixo e, após a última Seção, continua na primeira Seção da Viagem de baixo, até alcançar a célula vazia que cria a próxima Viagem.
@@ -6800,3 +6803,224 @@ a cópia unitária entre dias; estendê-la ao headway depende da Q-072.
 - Nenhuma — Q-072 decidida (DEC-094).
 
 ---
+
+## TASK-119 — Destacar e alertar sobre Viagens com partida coincidente — **desbloqueada (DEC-095/DEC-096)**
+
+## Objetivo
+
+Identificar Viagens que começam no mesmo dia e horário, destacar em laranja
+claro somente a segunda e as posteriores de cada grupo — as Viagens de reforço
+— e apresentar um alerta não bloqueante para que o usuário confirme se o
+cadastro foi intencional. Permitir que um segundo clique encerre a seleção azul
+e restaure a aparência normal ou laranja subjacente, conforme a DEC-096.
+
+## Contexto
+
+A RN-062 permite reforços: duas ou mais Viagens podem compartilhar
+`dia_semana` e `horario_saida`, sem que isso torne o documento inválido. O novo
+comportamento é exclusivamente informativo e deve ignorar diferenças entre os
+`offset_horario` das Seções. A TASK-118 trata somente da guarda local do gesto
+de geração por headway e exclui validação ou realce de reforços criados por
+outros caminhos; por isso esta funcionalidade exige task própria.
+
+A DEC-095 fixou a comparação no mesmo itinerário e na mesma grade, o alerta por
+Serviço e a precedência temporária da seleção azul. Fixou também que a primeira
+Viagem exibida em cada grupo coincidente é a viagem-base e não recebe laranja;
+somente a segunda e as posteriores são destacadas como reforço.
+
+A DEC-096 fixou o gesto que encerra essa precedência: um segundo clique na
+mesma Viagem desfaz a seleção, superando apenas a persistência indefinida da
+TASK-106. A possibilidade de desseleção cabe nesta task porque é necessária
+para uma Viagem de reforço voltar do azul para o laranja.
+
+## Fora de escopo
+
+- Proibir, remover, mesclar ou alterar Viagens coincidentes; transformar
+  reforço em erro bloqueante; alterar a RN-062 ou o schema/importação.
+- Reutilizar a guarda dos gestos de cópia/headway para impedir criação manual,
+  ou alterar o comportamento das TASK-109/TASK-110/TASK-118.
+- Comparar horários absolutos de passagem nas Seções; os `offset_horario` não
+  participam da detecção.
+- Alterar UUIDs, ordenação, contagens, PDF, Comparador, Ingestor ou contrato
+  JSON.
+- Persistir o alerta no JSON ou criar estado de workflow/ciência.
+- Desmarcar por `Escape`, clique fora, perda de foco ou navegação; alterar as
+  regras de Tab/Enter e preservação de foco (DEC-096).
+- Alterar as ações que exigem Viagem selecionada, o arrasto ou os controles de
+  inserção/headway.
+- Introduzir cor hexadecimal, `style=` inline ou sobreposição de utilitários
+  que contradiga o design system.
+
+## Specs fonte
+
+- Spec 04 §8.1 (grade de Viagens por Serviço × sentido e por grade)
+- Spec 04 §11 (alertas não bloqueantes, ciência e navegação para a origem)
+- Spec 02 §11/§14 (Viagem e validade dos reforços de horário)
+
+## Regras envolvidas
+
+- RN-061 (cada Viagem pertence a um dia e exatamente uma grade)
+- RN-062 (reforço de horário é válido)
+- RN-078 (alertas não bloqueiam exportação)
+- RN-096/NEG-004 (pendência recalculada em sessão, nunca persistida no JSON)
+
+## Entidades afetadas
+
+- Serviço
+- Itinerário
+- Viagem
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] A detecção agrupa todas as Viagens coincidentes pelo critério definido na
+      DEC-095 e considera grupo somente quando houver pelo menos duas entidades
+      distintas.
+- [ ] A igualdade usa `dia_semana` e `horario_saida` e ignora integralmente
+      `horarios_paradas`/`offset_horario`.
+- [ ] A primeira Viagem na ordem exibida de cada grupo coincidente permanece
+      com aparência normal; todas as células visíveis somente da segunda e das
+      posteriores recebem destaque laranja claro, semelhante à superfície azul
+      da seleção, usando tokens/variantes do design system.
+- [ ] Seleção, hover, foco, erro e destino de arrasto preservam contraste e
+      seguem a precedência visual da DEC-095; o destaque reaparece ao
+      terminar o estado transitório.
+- [ ] Conforme a DEC-096, um segundo clique em qualquer célula da mesma Viagem
+      selecionada limpa `viagemSelecionadaUuid`; clicar numa Viagem diferente
+      transfere a seleção diretamente, sem estado intermediário.
+- [ ] Desselecionar não altera foco, valores, UUIDs ou o documento: uma Viagem
+      comum volta à aparência normal e uma Viagem de reforço volta ao laranja
+      da DEC-095.
+- [ ] O painel de Alertas e a tela de Revisão exibem o alerta não bloqueante,
+      agregado conforme a DEC-095, com o texto: “O Serviço {numero_n} possui
+      partidas coincidentes no mesmo dia e horário. As Viagens destacadas em
+      laranja são reforços válidos; confirme se o cadastro é intencional.”
+- [ ] Clicar no alerta navega para a etapa Viagens e posiciona Serviço,
+      sentido, grade e primeira ocorrência conforme a DEC-095.
+- [ ] Corrigir a coincidência por edição ou remoção recalcula e remove
+      imediatamente o destaque e o alerta; criar/importar uma coincidência os
+      faz aparecer sem persistir estado auxiliar.
+- [ ] O alerta não bloqueia geração de JSON/PDF e nenhuma informação nova é
+      gravada no contrato.
+
+## Casos válidos
+
+- No mesmo itinerário e grade, duas Viagens SEG `08:00:00`, uma com passante
+  `08:20` e outra com passante `08:35` → a primeira permanece normal, somente a
+  segunda é destacada e o alerta é gerado, pois os offsets não importam.
+- Três Viagens QUA `17:30:00` no mesmo grupo → a primeira permanece normal; a
+  segunda e a terceira são destacadas, formando um único grupo para a
+  agregação do alerta.
+- Uma Viagem SEG `08:00:00` e outra SEG `08:01:00` → nenhuma coincidência.
+- Após alterar uma das duas partidas de SEG `08:00:00` para `08:10:00`, o grupo
+  deixa de existir e o alerta/destaque são removidos.
+- Viagem comum selecionada em azul: clicar novamente em qualquer uma de suas
+  células → seleção removida e superfície normal restaurada.
+- Viagem de reforço laranja selecionada em azul: clicar novamente em qualquer
+  uma de suas células → seleção removida e superfície laranja restaurada.
+- Viagem A selecionada: clicar uma vez na Viagem B → A é desmarcada e B fica
+  selecionada no mesmo gesto.
+
+## Casos inválidos
+
+- Tratar a coincidência como erro estrutural ou impedir exportação → manter o
+  documento válido e o alerta estritamente não bloqueante (RN-062/RN-078).
+- Considerar dois horários iguais apenas porque passantes absolutos coincidem →
+  não alertar; a chave usa somente a partida.
+- Misturar sentidos ou grades fora do escopo decidido na DEC-095 → não formar
+  grupo.
+- Uma única Viagem em um horário → não destacar nem alertar.
+- Pintar de laranja a primeira Viagem do grupo → manter a viagem-base com
+  aparência normal e destacar somente os reforços posteriores.
+- Segundo clique na mesma Viagem continuar mantendo `data-selecionada="true"`
+  → limpar a seleção conforme a DEC-096.
+- Desselecionar uma Viagem editar/confirmar o horário, remover foco ou alterar
+  qualquer dado → o toggle é exclusivamente visual e efêmero.
+- Recarregar um JSON sem coincidências e reaproveitar alerta da sessão anterior
+  → recalcular do documento atual e zerar o estado derivado.
+
+## Testes esperados
+
+- Unitários: detector puro com zero/uma/duas/três Viagens; igualdade ignora
+  offsets e UUIDs; separação por dia, horário, itinerário e grade; primeira
+  ocorrência excluída do conjunto de reforços; segunda e posteriores incluídas;
+  agregação por Serviço; imutabilidade da entrada.
+- Integração/componente: grade mantém normal toda a superfície da primeira
+  Viagem e destaca toda a superfície somente das posteriores; seleção e estados
+  vizinhos respeitam precedência/contraste; edição e remoção eliminam o
+  destaque em tempo real.
+- Integração/componente: primeiro clique seleciona; segundo clique em célula de
+  partida ou passante da mesma Viagem desmarca; clique em outra transfere;
+  desseleção restaura normal ou laranja sem disparar confirmação de horário e
+  sem perder o foco.
+- Integração do painel/Revisão: texto, severidade `alerta`, contagem,
+  navegação para a origem e ausência de bloqueio no gate de exportação.
+- E2E (OSRM mockado): criar duas partidas SEG `08:00`, confirmar que apenas a
+  segunda está laranja e que o alerta existe, clicar no alerta, alterar o
+  reforço para `08:10` e confirmar a remoção de ambos; comprovar que exportação
+  continua liberada sem outros bloqueantes.
+- E2E (OSRM mockado): selecionar a viagem-base e desmarcar no segundo clique;
+  selecionar o reforço laranja, vê-lo azul e desmarcar para comprovar o retorno
+  ao laranja.
+- Snapshot/contrato JSON: round-trip preserva as duas Viagens e não inclui
+  campo de alerta/destaque.
+- PDF: n/a.
+
+## Arquivos prováveis
+
+- `src/formulario/pendencias/pendencias.ts`
+- `src/formulario/pendencias/index.ts`
+- `src/formulario/layout/painel-pendencias.tsx`
+- `src/formulario/revisao/tela-revisao.tsx`
+- `src/formulario/viagens/etapa-viagens.tsx`
+- `src/formulario/viagens/montagem-grade.ts`
+- `src/formulario/viagens/index.ts`
+- `src/app/globals.css` e `docs-dev/18-DESIGN_SYSTEM.md` (token/contrato visual
+  de alerta suave, se ainda inexistente)
+- `testes/unitarios/formulario/pendencias.test.ts`
+- `testes/unitarios/formulario/tela-revisao.test.tsx`
+- `testes/unitarios/formulario/viagens-montagem-grade.test.ts`
+- `testes/e2e/etapa-viagens.spec.ts`
+
+## Riscos
+
+- Confundir reforço válido com duplicata inválida e bloquear a exportação.
+- Comparar no escopo errado e gerar falsos positivos entre Ida/Volta ou entre
+  grades comum, de feriado e excepcional.
+- Destacar somente a célula de partida, deixando a superfície da Viagem
+  ambígua nas linhas de Seções passantes.
+- Marcar também a primeira ocorrência e apagar visualmente a distinção entre
+  viagem-base e reforço.
+- O laranja mascarar seleção, foco, erro ou destino de arrasto e reduzir
+  contraste/acessibilidade.
+- O `onFocus`/`aoSelecionar` do campo reativar imediatamente a seleção que o
+  `onClick` da célula acabou de limpar, tornando o toggle inoperante.
+- O segundo clique confirmar acidentalmente um rascunho de horário ou quebrar
+  a preservação de foco/navegação entregue pelas TASK-115/TASK-116.
+- Duplicar a regra entre grade, painel e Revisão, produzindo resultados
+  divergentes; o detector deve ser puro e compartilhado.
+- Acoplar o alerta à TASK-118 e deixar de detectar reforços importados,
+  digitados ou criados por outros gestos.
+
+## Dependências
+
+- Q-073 decidida pela opção A, com refinamento do destaque (DEC-095).
+- Q-074 decidida pela opção A (DEC-096), superando somente a persistência
+  indefinida da TASK-106.
+- TASK-118 não é dependência funcional; as duas tasks devem apenas ser
+  executadas sequencialmente por alterarem a mesma superfície da grade.
+
+## Perguntas em aberto
+
+- Nenhuma — Q-073/Q-074 decididas (DEC-095/DEC-096).
+
+---
+
+**Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.

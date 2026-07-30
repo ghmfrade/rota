@@ -952,3 +952,118 @@ coincidentes e torna a repetição integral um no-op. Aprovado também o aviso n
 bloqueante com a quantidade de horários ignorados.
 
 ---
+
+## Q-073 — Escopo do destaque e do alerta para Viagens com partida coincidente
+
+**Status:** Decidida — DEC-095
+
+**Origem:** solicitação do responsável pelo domínio para destacar em laranja e
+informar no painel de Alertas as Viagens que começam no mesmo dia e horário
+(2026-07-30)
+
+**Contexto:** a RN-062 permite que duas ou mais Viagens do mesmo itinerário
+tenham o mesmo `dia_semana` e `horario_saida`: são reforços válidos, não erro de
+contrato. O pedido não pretende proibir nem remover esses reforços; pretende
+torná-los visíveis na grade, com destaque laranja semelhante ao da seleção, e
+incluir um alerta não bloqueante para confirmação de que o cadastro foi
+intencional. Os `offset_horario` das Seções não participam da coincidência.
+
+A unidade exata da comparação, porém, não está fechada. A grade da Spec 04 §8
+é exibida por Serviço × sentido × grade, enquanto o texto solicitado nomeia o
+Serviço. Comparar o Serviço inteiro poderia marcar como coincidentes partidas
+simultâneas de Ida e Volta, embora pertençam a itinerários distintos; comparar
+grades diferentes poderia ainda misturar operações comum, de feriado e
+excepcional, que são independentes pela RN-061. Também é preciso fixar a
+agregação/navegação do alerta e a precedência visual quando uma Viagem
+coincidente estiver selecionada.
+
+**Spec relacionada:** Spec 04 §8.1 (grade por Serviço × sentido e por grade),
+§11 (alertas não bloqueantes, ciência e navegação para a origem); Spec 02
+§11/§14 (Viagem e reforços válidos); RN-061/RN-062/RN-078; DEC-050 e
+`docs-dev/18-DESIGN_SYSTEM.md`.
+
+**Impacto se não decidir:** implementar diretamente escolheria, sem regra de
+origem, se partidas de sentidos ou grades diferentes são coincidências e como
+um alerta agregado leva à origem. Uma comparação ampla demais produziria
+falsos positivos; uma estreita demais poderia omitir o caso pretendido.
+
+**Opções:** A — considerar coincidência somente dentro do mesmo itinerário
+(mesmo Serviço e sentido) e da mesma grade, agrupando por
+`dia_semana + horario_saida`, sem comparar offsets; emitir um alerta por
+Serviço que tenha ao menos um grupo, com quantidade de grupos e navegação para
+o primeiro, e destacar em laranja todas as células das Viagens envolvidas; a
+seleção azul tem precedência visual temporária, sem retirar o alerta. B —
+comparar o Serviço inteiro dentro da mesma grade, juntando Ida e Volta; alerta
+e destaque podem, portanto, abranger ambos os sentidos. C — comparar o Serviço
+inteiro sem separar sentido nem grade, marcando também coincidências entre
+operação comum, de feriado e excepcional.
+
+**Recomendação técnica:** A. É a extensão estritamente informativa da RN-062,
+cujo próprio texto define o reforço como duas Viagens do **mesmo itinerário**,
+e respeita a independência das grades da RN-061. Evita acusar como repetição
+duas partidas legítimas em sentidos opostos ou em regimes operacionais
+distintos. Texto sugerido do alerta: **“O Serviço {numero_n} possui partidas
+coincidentes no mesmo dia e horário. As Viagens destacadas em laranja são
+reforços válidos; confirme se o cadastro é intencional.”** Habilita a
+**TASK-119**.
+
+**Decisão:** **Decidida (DEC-095, 2026-07-30).** Opção A, por decisão explícita
+do responsável pelo domínio, com o seguinte refinamento vinculante: dentro de
+cada grupo coincidente, a primeira Viagem na ordem exibida pela grade permanece
+com aparência normal; somente a segunda e as posteriores são consideradas
+Viagens de reforço e recebem o destaque laranja. Com duas partidas `08:00`,
+somente a segunda é destacada; com três, a segunda e a terceira. Permanecem o
+alerta por Serviço, a navegação para o primeiro grupo e a precedência visual
+temporária da seleção azul.
+
+---
+
+## Q-074 — Segundo clique na Viagem selecionada deve desfazer a seleção?
+
+**Status:** Decidida — DEC-096
+
+**Origem:** incômodo relatado pelo responsável ao usar a seleção persistente da
+grade de horários (2026-07-30)
+
+**Contexto:** a TASK-106 determinou que clicar numa Viagem cria uma superfície
+azul contínua e “mantém a seleção persistente”. A implementação atual atribui o
+`uuid` da Viagem tanto no `onClick` da célula quanto no foco do campo; clicar
+novamente na mesma Viagem conserva a seleção, e o único modo de retirar o azul
+é selecionar outra Viagem. O responsável considera esse comportamento um
+antipadrão e solicitou um toggle: o segundo clique na mesma Viagem deve
+desmarcá-la. A DEC-095 tornou o término da seleção ainda mais observável, pois
+uma Viagem de reforço deve voltar do azul para o laranja quando for
+desselecionada.
+
+**Spec relacionada:** Spec 04 §8.1–§8.3 (grade, edição e ações de Viagem);
+TASK-106 (seleção persistente e superfície contínua); DEC-082/DEC-083/DEC-092
+(ações que usam a Viagem selecionada); DEC-095/TASK-119 (precedência azul sobre
+o destaque laranja); DEC-050 e `docs-dev/18-DESIGN_SYSTEM.md`.
+
+**Impacto se não decidir:** implementar o toggle contraria literalmente o
+critério de seleção persistente da TASK-106; manter o comportamento atual
+contraria a nova orientação do responsável e deixa a precedência visual da
+DEC-095 sem um gesto de encerramento na própria Viagem.
+
+**Opções:** A — o clique funciona como toggle por `uuid`: primeiro clique
+seleciona; novo clique em qualquer célula da mesma Viagem limpa a seleção;
+clicar em outra Viagem transfere a seleção diretamente. Desselecionar não muda
+foco, horário ou qualquer dado; a superfície volta ao estado derivado
+subjacente (normal ou laranja de reforço). Foco/navegação por Tab/Enter
+continuam selecionando a Viagem alcançada, como hoje; não se acrescentam
+`Escape`, clique fora ou desmarcação por `blur`. B — manter a seleção
+persistente da TASK-106, exigindo selecionar outra Viagem. C — além do toggle
+da opção A, também desmarcar por `Escape`, clique fora da grade e perda de foco.
+
+**Recomendação técnica:** A. É exatamente o gesto solicitado, supera somente a
+persistência indefinida da TASK-106 e preserva foco, digitação, navegação e as
+ações dependentes de seleção. O escopo cabe na **TASK-119**, que já precisa
+compor o azul selecionado com o laranja do reforço; criar uma task separada
+duplicaria testes e edição na mesma superfície.
+
+**Decisão:** **Decidida (DEC-096, 2026-07-30).** Opção A, por decisão explícita
+do responsável pelo domínio: primeiro clique seleciona; segundo clique em
+qualquer célula da mesma Viagem desmarca; clicar em outra Viagem transfere a
+seleção. A desseleção não altera foco nem dados e restaura a aparência normal
+ou o laranja de reforço. Não se acrescentam `Escape`, clique fora, `blur` ou
+mudança na navegação por Tab/Enter.
