@@ -10,7 +10,12 @@
 
 import type { ButtonHTMLAttributes, ComponentProps } from "react";
 
-export type VarianteBotao = "primario" | "secundario" | "perigo" | "fantasma";
+export type VarianteBotao =
+  | "primario"
+  | "secundario"
+  | "perigo"
+  | "fantasma"
+  | "alternador";
 export type TamanhoBotao = "padrao" | "compacto";
 
 export interface BotaoProps extends ComponentProps<"button"> {
@@ -34,6 +39,8 @@ const CLASSES_POR_VARIANTE: Record<VarianteBotao, string> = {
     "hover:bg-cinza-50",
   perigo: "bg-erro text-white shadow-sombra-1 hover:shadow-sombra-2",
   fantasma: "border-0 bg-transparent text-cinza-700 hover:bg-cinza-100",
+  alternador:
+    "border border-azul-300 bg-azul-100 text-azul-900 shadow-sombra-1 hover:bg-azul-50 hover:shadow-sombra-2",
 };
 
 const CLASSES_POR_TAMANHO: Record<TamanhoBotao, string> = {

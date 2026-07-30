@@ -1,9 +1,11 @@
 export { sugerirOffsetsIniciais } from "./sugestao-inicial-offsets";
 export {
+  atualizarRascunhoHoraMinuto,
   formatarHms,
   horaMinutoParaHorarioRelogio,
   horarioParaHoraMinuto,
   horarioParaSegundos,
+  mascararRascunhoHoraMinuto,
   normalizarEntradaHoraMinuto,
   somarHorarios,
 } from "./horario-relogio";

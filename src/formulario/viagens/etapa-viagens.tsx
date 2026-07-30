@@ -1,16 +1,18 @@
 "use client";
 
 import {
+  Fragment,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
   type DragEvent,
   type KeyboardEvent,
+  type MouseEvent,
 } from "react";
 import { ROTULO_SEMANA_PADRAO } from "@/shared/contagens";
 import { DIAS_SEMANA, type Itinerario, type Parada, type Secao, type Servico } from "@/shared/contrato";
-import { Botao, Campo, Dialogo, Painel, Select, Tabela } from "@/shared/ui";
+import { Botao, Campo, Dialogo, MenuFlutuante, Painel, Select, Tabela } from "@/shared/ui";
 import { nomeExibicaoSecao } from "@/formulario/secoes";
 import {
   ancorasHorarioDaSessao,
@@ -39,8 +41,10 @@ import {
 } from "./copias-grade";
 import {
   horaMinutoParaHorarioRelogio,
+  atualizarRascunhoHoraMinuto,
   horarioParaHoraMinuto,
   horarioParaSegundos,
+  mascararRascunhoHoraMinuto,
 } from "./horario-relogio";
 import {
   destinoNavegacaoGrade,
@@ -80,6 +84,21 @@ const ROTULO_DIA: Record<DiaSemana, string> = {
 };
 
 const DESLOCAMENTO_RELATIVO_PADRAO = "00:10";
+
+function entradasHeadwaySaoValidas(
+  horarioOrigem: string,
+  rascunhoHeadway: string,
+  rascunhoLimite: string,
+): boolean {
+  const headway = horaMinutoParaHorarioRelogio(mascararRascunhoHoraMinuto(rascunhoHeadway));
+  const limite = horaMinutoParaHorarioRelogio(mascararRascunhoHoraMinuto(rascunhoLimite));
+  return (
+    headway !== null &&
+    horarioParaSegundos(headway) > 0 &&
+    limite !== null &&
+    horarioParaSegundos(limite) >= horarioParaSegundos(horarioOrigem)
+  );
+}
 
 function secaoDaParada(parada: Parada, secoes: readonly Secao[]): Secao | undefined {
   return secoes.find((s) => s.uuid === parada.secao_uuid);
@@ -131,12 +150,15 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
     dia: DiaSemana;
     feriado: boolean;
   } | null>(null);
-  const [diasDestinoCopia, definirDiasDestinoCopia] = useState<DiaSemana[]>([]);
-  const [opcoesApagarAbertas, definirOpcoesApagarAbertas] = useState<{
-    viagemUuid: string;
+  const [menuDiaAberto, definirMenuDiaAberto] = useState<{
     dia: DiaSemana;
     feriado: boolean;
+    ancora: { x: number; y: number };
   } | null>(null);
+  const [confirmacaoApagarViagemUuid, definirConfirmacaoApagarViagemUuid] = useState<
+    string | null
+  >(null);
+  const [diasDestinoCopia, definirDiasDestinoCopia] = useState<DiaSemana[]>([]);
   const [confirmacaoApagarDia, definirConfirmacaoApagarDia] = useState<{
     dia: DiaSemana;
     feriado: boolean;
@@ -357,8 +379,8 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
 
     const resultado = gerarViagensPorHeadway(
       viagem,
-      headwayPorViagem[viagemUuid] ?? "",
-      limiteHeadwayPorViagem[viagemUuid] ?? "",
+      mascararRascunhoHoraMinuto(headwayPorViagem[viagemUuid] ?? ""),
+      mascararRascunhoHoraMinuto(limiteHeadwayPorViagem[viagemUuid] ?? ""),
       itinerarioAtual.viagens,
     );
     if (!resultado.ok) {
@@ -550,6 +572,19 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
     aplicar(apagarViagem(itinerarioAtual, viagemUuid), ancorasSem([viagemUuid]));
   }
 
+  function aoAbrirMenuDia(
+    evento: MouseEvent<HTMLButtonElement>,
+    dia: DiaSemana,
+    feriado: boolean,
+  ) {
+    const caixa = evento.currentTarget.getBoundingClientRect();
+    definirMenuDiaAberto({
+      dia,
+      feriado,
+      ancora: { x: caixa.left, y: caixa.bottom },
+    });
+  }
+
   function aoCopiarDia() {
     if (!itinerarioAtual || !copiaDiaAberta || diasDestinoCopia.length === 0) return;
     const resultado = copiarDiaParaDiasComGuarda(
@@ -687,7 +722,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
         const secao = secaoDaParada(parada, todasAsSecoes);
         const nomeSecao = secao ? nomeExibicaoSecao(secao) : "";
         const ehPrimeiraSecao = indiceSecao === 0;
-        return (
+        const linhaGrade = (
           <tr
             key={`${indiceBloco}-${parada.ordem}`}
             data-testid="linha-grade"
@@ -758,7 +793,6 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                 const viagemUuid = celula.viagem.uuid;
                 const erroInsercaoRelativa = errosInsercaoRelativa[viagemUuid];
                 const modoHeadway = modoHeadwayPorViagem[viagemUuid] ?? false;
-                const erroHeadway = errosHeadway[viagemUuid];
 
                 if (ehPrimeiraSecao) {
                   return (
@@ -832,28 +866,9 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                             className="min-h-8 min-w-8"
                             data-testid="apagar-viagem"
                             aria-label={`Apagar viagem — ${dia}, viagem ${indiceBloco + 1}`}
-                            onClick={() =>
-                              definirOpcoesApagarAbertas({
-                                viagemUuid,
-                                dia,
-                                feriado,
-                              })
-                            }
+                            onClick={() => definirConfirmacaoApagarViagemUuid(viagemUuid)}
                           >
                             X
-                          </Botao>
-                          <Botao
-                            variante="secundario"
-                            tamanho="compacto"
-                            className="min-h-8 min-w-8"
-                            data-testid="copiar-dia"
-                            aria-label={`Copiar dia — ${dia}`}
-                            onClick={() => {
-                              definirCopiaDiaAberta({ dia, feriado });
-                              definirDiasDestinoCopia([]);
-                            }}
-                          >
-                            ⧉
                           </Botao>
                           <Botao
                             variante="primario"
@@ -866,7 +881,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                             ↻
                           </Botao>
                           <Botao
-                            variante={modoHeadway ? "primario" : "fantasma"}
+                            variante={modoHeadway ? "primario" : "alternador"}
                             tamanho="compacto"
                             className="min-h-8 min-w-8"
                             data-testid="alternar-modo-headway"
@@ -923,83 +938,43 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                         {erro}
                       </span>
                     )}
-                    {posicaoNaSuperficie === "fim" && (
-                      <div
-                        data-testid="acao-inserir-posterior"
-                        className={`absolute top-full z-40 flex items-stretch gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3 [transition:opacity_var(--transicao-rapida)] ${
-                          ehUltimoDia ? "right-0" : "left-1/2 -translate-x-1/2"
-                        } ${
-                          emHover ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
-                        }`}
+                    {posicaoNaSuperficie === "fim" && !modoHeadway && (
+                        <div
+                          data-testid="acao-inserir-posterior"
+                          className={`absolute top-full z-40 flex items-stretch gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3 [transition:opacity_var(--transicao-rapida)] ${
+                            ehUltimoDia ? "right-0" : "left-1/2 -translate-x-1/2"
+                          } ${
+                            emHover
+                              ? "pointer-events-auto opacity-100"
+                              : "pointer-events-none opacity-0"
+                          }`}
                         onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
                       >
-                        {modoHeadway ? (
-                          <>
-                            <Campo
-                              densidade="compacta"
-                              className="min-w-20 text-center tabular-nums"
-                              aria-label={`Headway — ${dia}, viagem ${indiceBloco + 1}`}
-                              placeholder="HH:MM"
-                              value={headwayPorViagem[viagemUuid] ?? ""}
-                              onChange={(evento) =>
-                                definirHeadwayPorViagem((atuais) => ({
-                                  ...atuais,
-                                  [viagemUuid]: evento.target.value,
-                                }))
-                              }
-                            />
-                            <Campo
-                              densidade="compacta"
-                              className="min-w-20 text-center tabular-nums"
-                              aria-label={`Horário-limite — ${dia}, viagem ${indiceBloco + 1}`}
-                              placeholder="HH:MM"
-                              value={limiteHeadwayPorViagem[viagemUuid] ?? ""}
-                              onChange={(evento) =>
-                                definirLimiteHeadwayPorViagem((atuais) => ({
-                                  ...atuais,
-                                  [viagemUuid]: evento.target.value,
-                                }))
-                              }
-                            />
-                            <Botao
-                              variante="primario"
-                              className="min-w-10"
-                              data-testid="gerar-viagens-headway"
-                              aria-label={`Gerar viagens por headway — ${dia}, viagem ${indiceBloco + 1}`}
-                              onClick={() => aoGerarViagensPorHeadway(viagemUuid)}
-                            >
-                              ↓
-                            </Botao>
-                          </>
-                        ) : (
-                          <>
-                            <Campo
-                              densidade="compacta"
-                              className="min-w-20 text-center tabular-nums"
-                              aria-label={`Deslocamento posterior — ${dia}, viagem ${indiceBloco + 1}`}
-                              value={deslocamentoPosterior}
-                              onChange={(evento) =>
-                                definirDeslocamentoPosterior(evento.target.value)
-                              }
-                            />
-                            <Botao
-                              variante="primario"
-                              className="min-w-10"
-                              data-testid="inserir-viagem-posterior"
-                              aria-label={`Inserir viagem depois — ${dia}, viagem ${indiceBloco + 1}`}
-                              onClick={() => aoInserirViagemPorOffset(viagemUuid, 1)}
-                            >
-                              ↓
-                            </Botao>
-                          </>
-                        )}
-                        {(modoHeadway ? erroHeadway : erroInsercaoRelativa) && (
+                        <Campo
+                          densidade="compacta"
+                          className="min-w-20 text-center tabular-nums"
+                          aria-label={`Deslocamento posterior — ${dia}, viagem ${indiceBloco + 1}`}
+                          value={deslocamentoPosterior}
+                          onChange={(evento) =>
+                            definirDeslocamentoPosterior(evento.target.value)
+                          }
+                        />
+                        <Botao
+                          variante="primario"
+                          className="min-w-10"
+                          data-testid="inserir-viagem-posterior"
+                          aria-label={`Inserir viagem depois — ${dia}, viagem ${indiceBloco + 1}`}
+                          onClick={() => aoInserirViagemPorOffset(viagemUuid, 1)}
+                        >
+                          ↓
+                        </Botao>
+                        {erroInsercaoRelativa && (
                           <span
                             role="alert"
-                            data-testid={modoHeadway ? "erro-headway" : "erro-insercao-relativa"}
+                            data-testid="erro-insercao-relativa"
                             className="absolute left-1/2 top-full mt-1 min-w-52 -translate-x-1/2 rounded-controle bg-white p-1 text-xs text-erro shadow-sombra-3"
                           >
-                            {modoHeadway ? erroHeadway : erroInsercaoRelativa}
+                            {erroInsercaoRelativa}
                           </span>
                         )}
                       </div>
@@ -1058,6 +1033,116 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
             })}
           </tr>
         );
+
+        if (indiceSecao !== secoesDaGrade.length - 1) {
+          return linhaGrade;
+        }
+
+        const temHeadwayNoBloco = DIAS_SEMANA.some((dia) => {
+          const celula = bloco[dia];
+          return (
+            celula.estado === "existente" &&
+            (modoHeadwayPorViagem[celula.viagem.uuid] ?? false)
+          );
+        });
+
+        return (
+          <Fragment key={`${indiceBloco}-${parada.ordem}`}>
+            {linhaGrade}
+            {temHeadwayNoBloco && (
+              <tr data-testid="linha-headway" className="border-b-2 border-cinza-400 bg-azul-50">
+                <th scope="row" className="whitespace-nowrap font-semibold">
+                  Headway
+                </th>
+                {DIAS_SEMANA.map((dia) => {
+                  const celula = bloco[dia];
+                  if (
+                    celula.estado !== "existente" ||
+                    !(modoHeadwayPorViagem[celula.viagem.uuid] ?? false)
+                  ) {
+                    return <td key={dia} />;
+                  }
+
+                  const viagemUuid = celula.viagem.uuid;
+                  const rascunhoHeadway = headwayPorViagem[viagemUuid] ?? "";
+                  const rascunhoLimiteHeadway = limiteHeadwayPorViagem[viagemUuid] ?? "";
+                  const headwayValido = entradasHeadwaySaoValidas(
+                    celula.viagem.horario_saida,
+                    rascunhoHeadway,
+                    rascunhoLimiteHeadway,
+                  );
+                  const erroHeadway = errosHeadway[viagemUuid];
+
+                  return (
+                    <td
+                      key={dia}
+                      data-testid="celula-headway"
+                      data-viagem-uuid={viagemUuid}
+                      className="align-top"
+                      onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
+                    >
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-x-1 gap-y-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-1">
+                        <Campo
+                          rotulo="a cada"
+                          densidade="compacta"
+                          className="min-w-20 text-center tabular-nums"
+                          aria-label={`Headway — ${dia}, viagem ${indiceBloco + 1}`}
+                          placeholder="HH:MM"
+                          value={mascararRascunhoHoraMinuto(rascunhoHeadway)}
+                          onChange={(evento) =>
+                            definirHeadwayPorViagem((atuais) => ({
+                              ...atuais,
+                              [viagemUuid]: atualizarRascunhoHoraMinuto(
+                                atuais[viagemUuid] ?? "",
+                                evento.target.value,
+                              ),
+                            }))
+                          }
+                        />
+                        <Campo
+                          rotulo="até"
+                          densidade="compacta"
+                          className="row-start-2 min-w-20 text-center tabular-nums"
+                          aria-label={`Horário-limite — ${dia}, viagem ${indiceBloco + 1}`}
+                          placeholder="HH:MM"
+                          value={mascararRascunhoHoraMinuto(rascunhoLimiteHeadway)}
+                          onChange={(evento) =>
+                            definirLimiteHeadwayPorViagem((atuais) => ({
+                              ...atuais,
+                              [viagemUuid]: atualizarRascunhoHoraMinuto(
+                                atuais[viagemUuid] ?? "",
+                                evento.target.value,
+                              ),
+                            }))
+                          }
+                        />
+                        <Botao
+                          variante="primario"
+                          className="col-start-2 row-span-2 row-start-1 min-w-10 self-stretch"
+                          data-testid="gerar-viagens-headway"
+                          aria-label={`Gerar viagens por headway — ${dia}, viagem ${indiceBloco + 1}`}
+                          disabled={!headwayValido}
+                          onClick={() => aoGerarViagensPorHeadway(viagemUuid)}
+                        >
+                          ↓
+                        </Botao>
+                        {erroHeadway && (
+                          <span
+                            role="alert"
+                            data-testid="erro-headway"
+                            className="col-span-2 text-xs text-erro"
+                          >
+                            {erroHeadway}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            )}
+          </Fragment>
+        );
       });
     });
   }
@@ -1077,7 +1162,20 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                   : undefined
               }
             >
-              {ROTULO_DIA[dia]}
+              <Botao
+                variante="fantasma"
+                tamanho="compacto"
+                className="w-full font-semibold"
+                data-testid={`operacoes-dia-${grade}-${dia}`}
+                aria-label={`Operações do dia — ${ROTULO_DIA[dia]}`}
+                aria-haspopup="menu"
+                aria-expanded={
+                  menuDiaAberto?.dia === dia && menuDiaAberto.feriado === (grade === "feriados")
+                }
+                onClick={(evento) => aoAbrirMenuDia(evento, dia, grade === "feriados")}
+              >
+                {ROTULO_DIA[dia]}
+              </Botao>
             </th>
           ))}
         </tr>
@@ -1191,35 +1289,58 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
         </Dialogo>
       )}
 
-      {opcoesApagarAbertas && (
+      {menuDiaAberto && (
+        <MenuFlutuante
+          ancora={menuDiaAberto.ancora}
+          data-testid="menu-operacoes-dia"
+          rotuloAcessivel={`Operações de ${ROTULO_DIA[menuDiaAberto.dia]}`}
+          aoFechar={() => definirMenuDiaAberto(null)}
+          opcoes={[
+            {
+              id: "copiar-dia",
+              rotulo: "Copiar para outro dia",
+              aoSelecionar: () => {
+                definirCopiaDiaAberta({
+                  dia: menuDiaAberto.dia,
+                  feriado: menuDiaAberto.feriado,
+                });
+                definirDiasDestinoCopia([]);
+              },
+            },
+            {
+              id: "apagar-dia",
+              rotulo: "Apagar o dia",
+              aoSelecionar: () => definirConfirmacaoApagarDia(menuDiaAberto),
+            },
+          ]}
+        />
+      )}
+
+      {confirmacaoApagarViagemUuid && (
         <Dialogo
           titulo="Apagar Viagem"
           data-testid="dialogo-opcoes-apagar"
-          aoFechar={() => definirOpcoesApagarAbertas(null)}
+          aoFechar={() => definirConfirmacaoApagarViagemUuid(null)}
         >
-          <p className="text-sm text-cinza-700">Escolha o que deseja apagar.</p>
-          <div className="mt-4 flex flex-wrap justify-end gap-2">
+          <p className="text-sm text-cinza-700">
+            Esta ação remove somente esta Viagem.
+          </p>
+          <div className="mt-4 flex justify-end gap-2">
             <Botao
               variante="secundario"
-              onClick={() => {
-                const { viagemUuid } = opcoesApagarAbertas;
-                definirOpcoesApagarAbertas(null);
-                aoApagarViagem(viagemUuid);
-              }}
+              onClick={() => definirConfirmacaoApagarViagemUuid(null)}
             >
-              Apagar esta Viagem
+              Cancelar
             </Botao>
             <Botao
               variante="perigo"
               onClick={() => {
-                definirConfirmacaoApagarDia({
-                  dia: opcoesApagarAbertas.dia,
-                  feriado: opcoesApagarAbertas.feriado,
-                });
-                definirOpcoesApagarAbertas(null);
+                const viagemUuid = confirmacaoApagarViagemUuid;
+                definirConfirmacaoApagarViagemUuid(null);
+                aoApagarViagem(viagemUuid);
               }}
             >
-              Apagar as Viagens do dia
+              Apagar esta Viagem
             </Botao>
           </div>
         </Dialogo>

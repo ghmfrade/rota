@@ -479,7 +479,7 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     expect(chamouOsrm).toBe(false);
   });
 
-  test("modo headway gera lote até limite inclusivo e recusa entrada inválida (TASK-108)", async ({
+  test("TASK-117: modo headway mascara campos, desabilita inválidos e gera lote inclusivo", async ({
     page,
   }) => {
     let chamouOsrm = false;
@@ -494,41 +494,66 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     const celulaOrigem = partidaOrigem.locator("xpath=ancestor::td");
     const viagemUuid = await celulaOrigem.getAttribute("data-viagem-uuid");
     expect(viagemUuid).toBeTruthy();
-    const celulaFinalOrigem = grade
-      .locator(`[data-testid="celula-passante"][data-viagem-uuid="${viagemUuid}"]`)
-      .last();
-
     await celulaOrigem.hover();
     const alternarModo = celulaOrigem.getByTestId("alternar-modo-headway");
     await expect(alternarModo).toHaveAttribute("aria-pressed", "false");
+    await expect(alternarModo).toHaveClass(/bg-azul-100/);
+    await expect(alternarModo).toHaveClass(/border-azul-300/);
     await alternarModo.click();
     await expect(alternarModo).toHaveAttribute("aria-pressed", "true");
+    await expect(alternarModo).toHaveClass(/bg-azul-600/);
+    await expect(alternarModo).not.toHaveClass(/bg-azul-100/);
+    const celulaHeadwayOrigem = grade.locator(
+      `[data-testid="celula-headway"][data-viagem-uuid="${viagemUuid}"]`,
+    );
 
     // A ação superior continua sendo a inserção unitária regressiva; apenas o
     // controle inferior troca +X pela geração futura em lote.
     await expect(celulaOrigem.getByLabel(/Deslocamento anterior/)).toBeVisible();
-    await expect(celulaFinalOrigem.getByLabel(/Deslocamento posterior/)).toHaveCount(0);
-    const campoHeadway = celulaFinalOrigem.getByRole("textbox", {
+    await expect(
+      grade
+        .locator(`[data-testid="celula-passante"][data-viagem-uuid="${viagemUuid}"]`)
+        .last()
+        .getByLabel(/Deslocamento posterior/),
+    ).toHaveCount(0);
+    const campoHeadway = celulaHeadwayOrigem.getByRole("textbox", {
       name: "Headway — segunda, viagem 1",
       exact: true,
     });
-    const campoLimite = celulaFinalOrigem.getByLabel("Horário-limite — segunda, viagem 1");
+    const campoLimite = celulaHeadwayOrigem.getByLabel("Horário-limite — segunda, viagem 1");
     await expect(campoHeadway).toBeVisible();
     await expect(campoLimite).toBeVisible();
-
-    // Entrada inválida é atômica: mostra aviso e não cria nenhuma Viagem.
-    await campoHeadway.fill("00:00");
-    await campoLimite.fill("10:00");
-    await celulaFinalOrigem.getByTestId("gerar-viagens-headway").click();
-    await expect(celulaFinalOrigem.getByTestId("erro-headway")).toContainText(
-      "maior que 00:00",
+    const gerar = celulaHeadwayOrigem.getByTestId("gerar-viagens-headway");
+    await expect(gerar).toBeDisabled();
+    const [caixaHeadway, caixaLimite, caixaGerar] = await Promise.all([
+      campoHeadway.boundingBox(),
+      campoLimite.boundingBox(),
+      gerar.boundingBox(),
+    ]);
+    expect(caixaHeadway).not.toBeNull();
+    expect(caixaLimite).not.toBeNull();
+    expect(caixaGerar).not.toBeNull();
+    expect(caixaHeadway!.y).toBeLessThan(caixaLimite!.y);
+    expect(caixaGerar!.y).toBeLessThanOrEqual(caixaHeadway!.y);
+    expect(caixaGerar!.y + caixaGerar!.height).toBeGreaterThanOrEqual(
+      caixaLimite!.y + caixaLimite!.height,
     );
+
+    await campoHeadway.fill("1");
+    await expect(campoHeadway).toHaveValue("00:01");
+    await campoHeadway.fill("123");
+    await expect(campoHeadway).toHaveValue("01:23");
+    await campoHeadway.fill("9875");
+    await expect(campoHeadway).toHaveValue("98:75");
+    await campoLimite.fill("10:00");
+    await expect(gerar).toBeDisabled();
     await expect(grade.getByLabel(/Horário de partida — segunda/)).toHaveCount(1);
 
     // 08:00 + 01:00 até 10:00 inclui a partida exatamente no limite.
     await campoHeadway.fill("01:00");
     await campoLimite.fill("10:00");
-    await celulaFinalOrigem.getByTestId("gerar-viagens-headway").click();
+    await expect(gerar).toBeEnabled();
+    await gerar.click();
     await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toHaveValue("08:00");
     await expect(grade.getByLabel("Horário de partida — segunda, viagem 2")).toHaveValue("09:00");
     await expect(grade.getByLabel("Horário de partida — segunda, viagem 3")).toHaveValue("10:00");
@@ -840,7 +865,14 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     page.once("dialog", (dialogo) => dialogo.accept());
     await celulaDomingo.hover();
     await celulaDomingo.getByTestId("apagar-viagem").click();
-    await page.getByRole("button", { name: "Apagar esta Viagem" }).click();
+    const dialogoApagarViagem = page.getByTestId("dialogo-opcoes-apagar");
+    await expect(dialogoApagarViagem).toBeVisible();
+    await expect(
+      dialogoApagarViagem.getByRole("button", { name: "Apagar o dia" }),
+    ).toHaveCount(0);
+    await dialogoApagarViagem
+      .getByRole("button", { name: "Apagar esta Viagem" })
+      .click();
     await expect(grade.getByLabel("Criar viagem — domingo")).toBeVisible();
     await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toHaveValue("08:00");
 
@@ -907,28 +939,71 @@ test.describe("Etapa Viagens — grade de feriados e cópias (TASK-030; Spec 04 
   test("apagar viagem remove a coluna do dia na grade comum", async ({ page }) => {
     await abrirEtapaViagens(page, structuredClone(multiServico));
     const grade = gradeComum(page);
+    const apagarViagem = grade.getByLabel("Apagar viagem — segunda, viagem 1");
 
     page.on("dialog", (d) => d.accept());
     await grade.getByTestId("celula-partida").first().hover();
-    await grade.getByLabel("Apagar viagem — segunda, viagem 1").click();
-    await page.getByRole("button", { name: "Apagar esta Viagem" }).click();
+    await apagarViagem.click();
+    const dialogo = page.getByTestId("dialogo-opcoes-apagar");
+    await expect(dialogo).toBeVisible();
+    await expect(dialogo.getByRole("button", { name: "Apagar o dia" })).toHaveCount(0);
+    await dialogo.getByRole("button", { name: "Cancelar" }).click();
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toBeVisible();
+
+    await grade.getByTestId("celula-partida").first().hover();
+    await apagarViagem.click();
+    await page
+      .getByTestId("dialogo-opcoes-apagar")
+      .getByRole("button", { name: "Apagar esta Viagem" })
+      .click();
 
     // Sem Viagens: segunda volta a exibir a célula criável, sem partida existente.
     await expect(grade.getByTestId("celula-partida")).toHaveCount(0);
     await expect(grade.getByLabel("Criar viagem — segunda")).toBeVisible();
   });
 
-  test("TASK-110: copia todas as Viagens de um dia para vários destinos", async ({ page }) => {
+  test("TASK-117: cabeçalho apaga somente o dia da grade de feriados", async ({
+    page,
+  }) => {
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const comuns = gradeComum(page);
+    const feriados = gradeFeriados(page);
+
+    await preencherEConfirmar(comuns.getByLabel("Criar viagem — terca"), "08:10");
+    await preencherEConfirmar(feriados.getByLabel("Criar viagem — terca"), "09:10");
+
+    await feriados.getByTestId("operacoes-dia-feriados-terca").click();
+    const menu = page.getByTestId("menu-operacoes-dia");
+    await expect(menu.getByRole("menuitem")).toHaveCount(2);
+    await menu.getByRole("menuitem", { name: "Apagar o dia" }).click();
+    await page.getByTestId("confirmar-apagar-dia").click();
+
+    await expect(feriados.getByLabel("Criar viagem — terca")).toBeVisible();
+    await expect(
+      feriados.getByLabel("Horário de partida — terca, viagem 1"),
+    ).toHaveCount(0);
+    await expect(
+      comuns.getByLabel("Horário de partida — terca, viagem 1"),
+    ).toHaveValue("08:10");
+    await expect(
+      comuns.getByLabel("Horário de partida — segunda, viagem 1"),
+    ).toHaveValue("08:00");
+  });
+
+  test("TASK-117: cabeçalho copia todas as Viagens de um dia para vários destinos", async ({ page }) => {
     await abrirEtapaViagens(page, structuredClone(multiServico));
     const grade = gradeComum(page);
 
     await preencherEConfirmar(grade.getByLabel("Criar viagem — segunda"), "09:00");
-    await grade.getByLabel("Horário de partida — segunda, viagem 1").locator("xpath=ancestor::td").hover();
-    await grade
+    const celulaSegunda = grade
       .getByLabel("Horário de partida — segunda, viagem 1")
-      .locator("xpath=ancestor::td")
-      .getByTestId("copiar-dia")
-      .click();
+      .locator("xpath=ancestor::td");
+    await celulaSegunda.hover();
+    await expect(celulaSegunda.getByTestId("copiar-dia")).toHaveCount(0);
+    await grade.getByTestId("operacoes-dia-comuns-segunda").click();
+    const menu = page.getByTestId("menu-operacoes-dia");
+    await expect(menu.getByRole("menuitem")).toHaveCount(2);
+    await menu.getByRole("menuitem", { name: "Copiar para outro dia" }).click();
 
     const dialogo = page.getByTestId("dialogo-copiar-dia");
     await expect(dialogo).toBeVisible();
@@ -960,14 +1035,10 @@ test.describe("Etapa Viagens — grade de feriados e cópias (TASK-030; Spec 04 
     await abrirEtapaViagens(page, documentoComReforco);
     const grade = gradeComum(page);
 
-    await grade
-      .getByLabel("Horário de partida — segunda, viagem 1")
-      .locator("xpath=ancestor::td")
-      .hover();
-    await grade
-      .getByLabel("Horário de partida — segunda, viagem 1")
-      .locator("xpath=ancestor::td")
-      .getByTestId("copiar-dia")
+    await grade.getByTestId("operacoes-dia-comuns-segunda").click();
+    await page
+      .getByTestId("menu-operacoes-dia")
+      .getByRole("menuitem", { name: "Copiar para outro dia" })
       .click();
     const dialogo = page.getByTestId("dialogo-copiar-dia");
     await dialogo.getByTestId("destino-copiar-dia-sabado").click();
@@ -977,22 +1048,20 @@ test.describe("Etapa Viagens — grade de feriados e cópias (TASK-030; Spec 04 
     await expect(grade.getByLabel("Horário de partida — sabado, viagem 2")).toHaveValue("08:00");
   });
 
-  test("TASK-110: cancelar preserva e confirmar apaga somente as Viagens do dia", async ({ page }) => {
+  test("TASK-117: cancelar preserva e confirmar apaga somente as Viagens do dia", async ({ page }) => {
     await abrirEtapaViagens(page, structuredClone(multiServico));
     const grade = gradeComum(page);
 
     await preencherEConfirmar(grade.getByLabel("Criar viagem — segunda"), "09:00");
-    await grade.getByLabel("Horário de partida — segunda, viagem 1").locator("xpath=ancestor::td").hover();
-    await grade.getByLabel("Apagar viagem — segunda, viagem 1").click();
-    await page.getByRole("button", { name: "Apagar as Viagens do dia" }).click();
+    await grade.getByTestId("operacoes-dia-comuns-segunda").click();
+    await page.getByTestId("menu-operacoes-dia").getByRole("menuitem", { name: "Apagar o dia" }).click();
     await page.getByTestId("dialogo-confirmar-apagar-dia").getByRole("button", { name: "Cancelar" }).click();
 
     await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toHaveValue("08:00");
     await expect(grade.getByLabel("Horário de partida — segunda, viagem 2")).toHaveValue("09:00");
 
-    await grade.getByLabel("Horário de partida — segunda, viagem 1").locator("xpath=ancestor::td").hover();
-    await grade.getByLabel("Apagar viagem — segunda, viagem 1").click();
-    await page.getByRole("button", { name: "Apagar as Viagens do dia" }).click();
+    await grade.getByTestId("operacoes-dia-comuns-segunda").click();
+    await page.getByTestId("menu-operacoes-dia").getByRole("menuitem", { name: "Apagar o dia" }).click();
     await page.getByTestId("confirmar-apagar-dia").click();
 
     await expect(grade.getByTestId("celula-partida")).toHaveCount(0);

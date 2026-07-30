@@ -7,6 +7,40 @@ const REGEX_HORA_MINUTO = /^([01]\d|2[0-3]):[0-5]\d$/;
 const REGEX_HORA_MINUTO_COM_SEPARADOR = /^(\d{1,2}):(\d{2})$/;
 const REGEX_HORA_MINUTO_SEM_SEPARADOR = /^(\d{1,2})(\d{2})$/;
 
+/**
+ * Máscara efêmera para campos temporais de apoio (DEC-093). Mantém no máximo
+ * quatro algarismos e apenas apresenta-os como HH:MM: não valida nem corrige
+ * horas/minutos impossíveis.
+ */
+export function mascararRascunhoHoraMinuto(rascunho: string): string {
+  const algarismos = rascunho.replace(/\D/g, "").slice(0, 4);
+  if (algarismos.length === 0) return "";
+  const preenchido = algarismos.padStart(4, "0");
+  return `${preenchido.slice(0, 2)}:${preenchido.slice(2)}`;
+}
+
+/**
+ * Atualiza o rascunho numérico de uma máscara já exibida. Ao digitar no fim de
+ * "00:01", por exemplo, o novo algarismo substitui o zero de preenchimento,
+ * permitindo a sequência 1 → 00:01, 12 → 00:12 e 123 → 01:23.
+ */
+export function atualizarRascunhoHoraMinuto(rascunhoAtual: string, entrada: string): string {
+  const atual = rascunhoAtual.replace(/\D/g, "").slice(0, 4);
+  const exibicaoAtual = mascararRascunhoHoraMinuto(atual);
+
+  if (entrada.startsWith(exibicaoAtual)) {
+    const acrescentado = entrada.slice(exibicaoAtual.length).replace(/\D/g, "");
+    return `${atual}${acrescentado}`.slice(0, 4);
+  }
+
+  if (exibicaoAtual.startsWith(entrada)) {
+    const quantidadeRemovida = exibicaoAtual.length - entrada.length;
+    return atual.slice(0, Math.max(0, atual.length - quantidadeRemovida));
+  }
+
+  return entrada.replace(/\D/g, "").slice(0, 4);
+}
+
 /** Converte "HH:MM:SS" (horário de relógio ou offset) em total de segundos. */
 export function horarioParaSegundos(horarioHms: string): number {
   const [horas, minutos, segundos] = horarioHms.split(":").map(Number);

@@ -41,6 +41,16 @@ describe("Botao", () => {
     desmontar();
   });
 
+  it("aplica a variante alternador azul-clara da DEC-093", () => {
+    const { container, desmontar } = renderizar(
+      <Botao variante="alternador">Headway</Botao>,
+    );
+    const botao = container.querySelector("button")!;
+    expect(botao.className).toContain("bg-azul-100");
+    expect(botao.className).toContain("border-azul-300");
+    desmontar();
+  });
+
   it("repassa data-testid e demais props nativas", () => {
     const { container, desmontar } = renderizar(
       <Botao data-testid="botao-salvar" aria-label="Salvar formulário">

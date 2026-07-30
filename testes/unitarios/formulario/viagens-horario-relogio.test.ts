@@ -1,8 +1,10 @@
 import { describe, expect, test } from "vitest";
 import {
+  atualizarRascunhoHoraMinuto,
   formatarHms,
   horaMinutoParaHorarioRelogio,
   horarioParaHoraMinuto,
+  mascararRascunhoHoraMinuto,
   normalizarEntradaHoraMinuto,
   somarHorarios,
 } from "@/formulario/viagens";
@@ -27,6 +29,28 @@ describe("normalizarEntradaHoraMinuto (TASK-106; RN-067)", () => {
       expect(normalizarEntradaHoraMinuto(entrada)).toBeNull();
     },
   );
+});
+
+describe("máscara de rascunho temporal (TASK-117; DEC-093)", () => {
+  test.each([
+    ["1", "00:01"],
+    ["123", "01:23"],
+    ["9875", "98:75"],
+    ["12345", "12:34"],
+  ])("exibe %s como %s sem corrigir o valor", (rascunho, esperado) => {
+    expect(mascararRascunhoHoraMinuto(rascunho)).toBe(esperado);
+  });
+
+  test("acompanha digitação e exclusão sobre o valor já mascarado", () => {
+    let rascunho = "";
+    rascunho = atualizarRascunhoHoraMinuto(rascunho, "1");
+    rascunho = atualizarRascunhoHoraMinuto(rascunho, "00:012");
+    rascunho = atualizarRascunhoHoraMinuto(rascunho, "00:123");
+    expect(mascararRascunhoHoraMinuto(rascunho)).toBe("01:23");
+
+    rascunho = atualizarRascunhoHoraMinuto(rascunho, "01:2");
+    expect(mascararRascunhoHoraMinuto(rascunho)).toBe("00:12");
+  });
 });
 
 describe("horaMinutoParaHorarioRelogio (RN-067)", () => {
