@@ -98,10 +98,12 @@ const DESLOCAMENTO_RELATIVO_PADRAO = "00:10";
 interface GradeDaTela {
   id: string;
   destino: GradeDestinoViagem;
+  rotulo: string;
 }
 
 const GRADE_COMUM: GradeDaTela = {
   id: "comuns",
+  rotulo: "Dias comuns",
   destino: {
     viagem_feriado: false,
     tabela_excepcional_uuid: null,
@@ -110,15 +112,20 @@ const GRADE_COMUM: GradeDaTela = {
 
 const GRADE_FERIADOS: GradeDaTela = {
   id: "feriados",
+  rotulo: "Feriados",
   destino: {
     viagem_feriado: true,
     tabela_excepcional_uuid: null,
   },
 };
 
-function gradeTabelaExcepcional(tabelaUuid: string): GradeDaTela {
+function gradeTabelaExcepcional(
+  tabelaUuid: string,
+  rotulo: string,
+): GradeDaTela {
   return {
     id: `excepcional-${tabelaUuid}`,
+    rotulo,
     destino: {
       viagem_feriado: false,
       tabela_excepcional_uuid: tabelaUuid,
@@ -222,6 +229,11 @@ export function EtapaViagens({
     dia: DiaSemana;
     grade: GradeDaTela;
   } | null>(null);
+  // TASK-112/DEC-087: preferência efêmera de origem, isolada por
+  // Serviço × sentido × grade destino. A grade comum é o default compatível
+  // com a ação preexistente "Copiar dias comuns".
+  const [origemSemeaduraPorDestino, definirOrigemSemeaduraPorDestino] =
+    useState<Record<string, string>>({});
 
   useEffect(
     () => () => {
@@ -304,6 +316,54 @@ export function EtapaViagens({
       : false;
   const todasAsSecoes = secoesDaSessao(sessao);
   const ancoras = ancorasHorarioDaSessao(sessao);
+  const gradesDisponiveis: GradeDaTela[] = [
+    GRADE_COMUM,
+    GRADE_FERIADOS,
+    ...(servicoAtual?.tabelas_excepcionais ?? []).map((tabela) =>
+      gradeTabelaExcepcional(
+        tabela.uuid,
+        rotuloTabelaExcepcional(tabela),
+      ),
+    ),
+  ];
+
+  function chaveOrigemSemeadura(gradeDestino: GradeDaTela): string | null {
+    if (!servicoAtual || !itinerarioAtual) return null;
+    return `${servicoAtual.uuid}:${itinerarioAtual.sentido}:${gradeDestino.id}`;
+  }
+
+  function origensDaSemeadura(
+    gradeDestino: GradeDaTela,
+  ): GradeDaTela[] {
+    return gradesDisponiveis.filter((grade) => grade.id !== gradeDestino.id);
+  }
+
+  function origemSelecionadaDaSemeadura(
+    gradeDestino: GradeDaTela,
+  ): GradeDaTela {
+    const origens = origensDaSemeadura(gradeDestino);
+    const chave = chaveOrigemSemeadura(gradeDestino);
+    const origemSelecionadaId = chave
+      ? origemSemeaduraPorDestino[chave]
+      : undefined;
+    return (
+      origens.find((grade) => grade.id === origemSelecionadaId) ??
+      origens.find((grade) => grade.id === GRADE_COMUM.id) ??
+      origens[0]
+    );
+  }
+
+  function definirOrigemDaSemeadura(
+    gradeDestino: GradeDaTela,
+    gradeOrigemId: string,
+  ) {
+    const chave = chaveOrigemSemeadura(gradeDestino);
+    if (!chave) return;
+    definirOrigemSemeaduraPorDestino((atual) => ({
+      ...atual,
+      [chave]: gradeOrigemId,
+    }));
+  }
 
   // DEC-097: o clique no alerta escolhe Serviço/sentido e, na pintura
   // seguinte, posiciona a primeira ocorrência na grade correta. O alvo é
@@ -767,8 +827,10 @@ export function EtapaViagens({
     definirConfirmacaoApagarDia(null);
   }
 
-  // Semeadura da grade a partir dos dias comuns (Spec 04 §8.4/§8.5; DEC-087).
-  function aoCopiarDiasComuns(
+  // Semeadura entre grades do mesmo Serviço/sentido (Spec 04 §8.4/§8.5;
+  // TASK-112/DEC-087).
+  function aoSemearGrade(
+    gradeOrigem: GradeDaTela,
     gradeDestino: GradeDaTela,
     modo: "sobrescrever" | "mesclar",
   ) {
@@ -781,7 +843,7 @@ export function EtapaViagens({
         const confirmado =
           typeof window === "undefined" ||
           window.confirm(
-            "Sobrescrever esta grade com os dias comuns? As Viagens atuais serão descartadas.",
+            `Sobrescrever esta grade com ${gradeOrigem.rotulo}? As Viagens atuais serão descartadas.`,
           );
         if (!confirmado) return;
       }
@@ -790,7 +852,7 @@ export function EtapaViagens({
     limparEstadoDeSessao(uuidsDestinoAtuais);
     const itinerarioAtualizado = semearGradeAPartirDeOutra(
       itinerarioAtual,
-      GRADE_COMUM.destino,
+      gradeOrigem.destino,
       gradeDestino.destino,
       modo,
     );
@@ -1599,25 +1661,51 @@ export function EtapaViagens({
               {ROTULO_SEMANA_PADRAO}.
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
+              <Select
+                rotulo="Origem da semeadura"
+                densidade="compacta"
+                data-testid="origem-semeadura-feriados"
+                value={origemSelecionadaDaSemeadura(GRADE_FERIADOS).id}
+                onChange={(evento) =>
+                  definirOrigemDaSemeadura(
+                    GRADE_FERIADOS,
+                    evento.currentTarget.value,
+                  )
+                }
+              >
+                {origensDaSemeadura(GRADE_FERIADOS).map((origem) => (
+                  <option key={origem.id} value={origem.id}>
+                    {origem.rotulo}
+                  </option>
+                ))}
+              </Select>
               {temFeriado ? (
                 <>
                   <Botao
                     variante="secundario"
                     data-testid="copiar-dias-comuns-sobrescrever"
                     onClick={() =>
-                      aoCopiarDiasComuns(GRADE_FERIADOS, "sobrescrever")
+                      aoSemearGrade(
+                        origemSelecionadaDaSemeadura(GRADE_FERIADOS),
+                        GRADE_FERIADOS,
+                        "sobrescrever",
+                      )
                     }
                   >
-                    Copiar dias comuns (sobrescrever)
+                    Copiar origem (sobrescrever)
                   </Botao>
                   <Botao
                     variante="secundario"
                     data-testid="copiar-dias-comuns-mesclar"
                     onClick={() =>
-                      aoCopiarDiasComuns(GRADE_FERIADOS, "mesclar")
+                      aoSemearGrade(
+                        origemSelecionadaDaSemeadura(GRADE_FERIADOS),
+                        GRADE_FERIADOS,
+                        "mesclar",
+                      )
                     }
                   >
-                    Copiar dias comuns (mesclar)
+                    Copiar origem (mesclar)
                   </Botao>
                 </>
               ) : (
@@ -1625,10 +1713,14 @@ export function EtapaViagens({
                   variante="secundario"
                   data-testid="copiar-dias-comuns"
                   onClick={() =>
-                    aoCopiarDiasComuns(GRADE_FERIADOS, "sobrescrever")
+                    aoSemearGrade(
+                      origemSelecionadaDaSemeadura(GRADE_FERIADOS),
+                      GRADE_FERIADOS,
+                      "sobrescrever",
+                    )
                   }
                 >
-                  Copiar dias comuns
+                  Copiar origem
                 </Botao>
               )}
             </div>
@@ -1641,7 +1733,10 @@ export function EtapaViagens({
           </section>
 
           {(servicoAtual?.tabelas_excepcionais ?? []).map((tabela) => {
-            const grade = gradeTabelaExcepcional(tabela.uuid);
+            const grade = gradeTabelaExcepcional(
+              tabela.uuid,
+              rotuloTabelaExcepcional(tabela),
+            );
             const blocos = montarBlocosGrade(
               itinerarioAtual.viagens,
               grade.destino,
@@ -1668,23 +1763,51 @@ export function EtapaViagens({
                   {ROTULO_SEMANA_PADRAO}.
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
+                  <Select
+                    rotulo="Origem da semeadura"
+                    densidade="compacta"
+                    data-testid="origem-semeadura-excepcional"
+                    value={origemSelecionadaDaSemeadura(grade).id}
+                    onChange={(evento) =>
+                      definirOrigemDaSemeadura(
+                        grade,
+                        evento.currentTarget.value,
+                      )
+                    }
+                  >
+                    {origensDaSemeadura(grade).map((origem) => (
+                      <option key={origem.id} value={origem.id}>
+                        {origem.rotulo}
+                      </option>
+                    ))}
+                  </Select>
                   {temConteudo ? (
                     <>
                       <Botao
                         variante="secundario"
                         data-testid="copiar-dias-comuns-excepcional-sobrescrever"
                         onClick={() =>
-                          aoCopiarDiasComuns(grade, "sobrescrever")
+                          aoSemearGrade(
+                            origemSelecionadaDaSemeadura(grade),
+                            grade,
+                            "sobrescrever",
+                          )
                         }
                       >
-                        Copiar dias comuns (sobrescrever)
+                        Copiar origem (sobrescrever)
                       </Botao>
                       <Botao
                         variante="secundario"
                         data-testid="copiar-dias-comuns-excepcional-mesclar"
-                        onClick={() => aoCopiarDiasComuns(grade, "mesclar")}
+                        onClick={() =>
+                          aoSemearGrade(
+                            origemSelecionadaDaSemeadura(grade),
+                            grade,
+                            "mesclar",
+                          )
+                        }
                       >
-                        Copiar dias comuns (mesclar)
+                        Copiar origem (mesclar)
                       </Botao>
                     </>
                   ) : (
@@ -1692,10 +1815,14 @@ export function EtapaViagens({
                       variante="secundario"
                       data-testid="copiar-dias-comuns-excepcional"
                       onClick={() =>
-                        aoCopiarDiasComuns(grade, "sobrescrever")
+                        aoSemearGrade(
+                          origemSelecionadaDaSemeadura(grade),
+                          grade,
+                          "sobrescrever",
+                        )
                       }
                     >
-                      Copiar dias comuns
+                      Copiar origem
                     </Botao>
                   )}
                 </div>

@@ -1311,6 +1311,166 @@ test.describe("TASK-105 — grade de horários da Tabela excepcional", () => {
   });
 });
 
+test.describe("TASK-112 — origem estendida da semeadura", () => {
+  test("semeia entre feriados e Tabelas excepcionais, mescla identidades e exclui o próprio destino", async ({
+    page,
+  }) => {
+    let chamadasOsrm = 0;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamadasOsrm += 1;
+      return rota.abort();
+    });
+
+    const documento = structuredClone(
+      multiServico,
+    ) as unknown as DocumentoOperacao;
+    documento.versao_schema = "1.1";
+    for (const servico of documento.autos.servicos) {
+      servico.tabelas_excepcionais = [];
+      for (const itinerario of servico.itinerarios) {
+        for (const viagem of itinerario.viagens) {
+          viagem.tabela_excepcional_uuid = null;
+        }
+      }
+    }
+    const servicoAlvo = documento.autos.servicos.find(
+      (servico) => servico.numero_n === "0001-1SU",
+    )!;
+    const tabelaVeraoUuid = "10000000-0000-4000-8000-000000000001";
+    const tabelaInvernoUuid = "20000000-0000-4000-8000-000000000002";
+    servicoAlvo.tabelas_excepcionais = [
+      { uuid: tabelaVeraoUuid, tipo: "ferias_verao" },
+      { uuid: tabelaInvernoUuid, tipo: "ferias_inverno" },
+    ];
+    const itinerarioAlvo = servicoAlvo.itinerarios.find(
+      (itinerario) => itinerario.sentido === "ida",
+    )!;
+    const modelo = itinerarioAlvo.viagens[0];
+    const feriado = structuredClone(modelo);
+    feriado.uuid = "30000000-0000-4000-8000-000000000003";
+    feriado.horario_saida = "06:30:00";
+    feriado.viagem_feriado = true;
+    feriado.tabela_excepcional_uuid = null;
+    feriado.horarios_paradas[1].offset_horario = "00:15:00";
+    feriado.horarios_paradas[2].offset_horario = "00:30:00";
+    const veraoCasada = structuredClone(modelo);
+    veraoCasada.uuid = "40000000-0000-4000-8000-000000000004";
+    veraoCasada.horario_saida = "06:30:00";
+    veraoCasada.viagem_feriado = false;
+    veraoCasada.tabela_excepcional_uuid = tabelaVeraoUuid;
+    veraoCasada.horarios_paradas[1].offset_horario = "00:25:00";
+    veraoCasada.horarios_paradas[2].offset_horario = "00:40:00";
+    const veraoNova = structuredClone(modelo);
+    veraoNova.uuid = "50000000-0000-4000-8000-000000000005";
+    veraoNova.dia_semana = "terca";
+    veraoNova.horario_saida = "07:30:00";
+    veraoNova.viagem_feriado = false;
+    veraoNova.tabela_excepcional_uuid = tabelaVeraoUuid;
+    itinerarioAlvo.viagens.push(feriado, veraoCasada, veraoNova);
+
+    await abrirEtapaViagens(page, documento);
+    const feriados = gradeFeriados(page);
+    const verao = page
+      .getByTestId("grade-tabela-excepcional")
+      .filter({
+        has: page.getByRole("heading", {
+          name: "Férias de verão",
+          exact: true,
+        }),
+      });
+    const inverno = page
+      .getByTestId("grade-tabela-excepcional")
+      .filter({
+        has: page.getByRole("heading", {
+          name: "Férias de inverno",
+          exact: true,
+        }),
+      });
+    const origemInverno = inverno.getByTestId(
+      "origem-semeadura-excepcional",
+    );
+
+    await expect(origemInverno).toHaveValue("comuns");
+    await expect(origemInverno.locator("option")).toHaveText([
+      "Dias comuns",
+      "Feriados",
+      "Férias de verão",
+    ]);
+    await expect(
+      origemInverno.locator("option", { hasText: "Férias de inverno" }),
+    ).toHaveCount(0);
+
+    await origemInverno.selectOption({ label: "Feriados" });
+    await inverno
+      .getByTestId("copiar-dias-comuns-excepcional")
+      .click();
+    const partidaInverno = inverno.getByLabel(
+      "Horário de partida — segunda, viagem 1",
+    );
+    await expect(partidaInverno).toHaveValue("06:30");
+    const celulaInverno = partidaInverno.locator("xpath=ancestor::td");
+    const uuidInverno = await celulaInverno.getAttribute(
+      "data-viagem-uuid",
+    );
+    expect(uuidInverno).not.toBe(feriado.uuid);
+    await expect(
+      inverno
+        .getByTestId("linha-grade")
+        .nth(1)
+        .getByTestId("celula-passante")
+        .locator("input[data-grade]"),
+    ).toHaveValue("06:45");
+
+    await origemInverno.selectOption({ label: "Férias de verão" });
+    await inverno
+      .getByTestId("copiar-dias-comuns-excepcional-mesclar")
+      .click();
+    await expect(celulaInverno).toHaveAttribute(
+      "data-viagem-uuid",
+      uuidInverno!,
+    );
+    await expect(
+      inverno
+        .getByTestId("linha-grade")
+        .nth(1)
+        .getByTestId("celula-passante")
+        .locator("input[data-grade]")
+        .first(),
+    ).toHaveValue("06:55");
+    await expect(
+      inverno.getByLabel("Horário de partida — terca, viagem 1"),
+    ).toHaveValue("07:30");
+    await expect(
+      verao.getByLabel("Horário de partida — segunda, viagem 1"),
+    ).toHaveValue("06:30");
+
+    const origemFeriados = feriados.getByTestId(
+      "origem-semeadura-feriados",
+    );
+    await expect(
+      origemFeriados.locator("option", { hasText: "Feriados" }),
+    ).toHaveCount(0);
+    await origemFeriados.selectOption({ label: "Férias de inverno" });
+    page.once("dialog", (dialogo) => dialogo.accept());
+    await feriados
+      .getByTestId("copiar-dias-comuns-sobrescrever")
+      .click();
+    await expect(
+      feriados.getByLabel("Horário de partida — segunda, viagem 1"),
+    ).toHaveValue("06:30");
+    await expect(
+      feriados.getByLabel("Horário de partida — terca, viagem 1"),
+    ).toHaveValue("07:30");
+    const uuidFeriadoSobrescrito = await feriados
+      .getByLabel("Horário de partida — segunda, viagem 1")
+      .locator("xpath=ancestor::td")
+      .getAttribute("data-viagem-uuid");
+    expect(uuidFeriadoSobrescrito).not.toBe(feriado.uuid);
+    expect(uuidFeriadoSobrescrito).not.toBe(uuidInverno);
+    expect(chamadasOsrm).toBe(0);
+  });
+});
+
 test.describe("TASK-119 — partidas coincidentes e toggle de seleção", () => {
   test("destaca só o reforço, alerta/navega, desfaz seleção e recalcula sem bloquear exportação", async ({
     page,

@@ -447,6 +447,241 @@ describe("semearGradeAPartirDeOutra (TASK-105; Spec 04 §8.5; DEC-087)", () => {
     expect(uuidsDepois).toEqual(uuidsAntes);
   });
 });
+
+describe("TASK-112 — origem estendida e normalização entre grades", () => {
+  const tabelaAUuid = "dddddddd-0000-4000-8000-000000000004";
+  const tabelaBUuid = "eeeeeeee-0000-4000-8000-000000000005";
+  const feriados = { viagem_feriado: true, tabela_excepcional_uuid: null };
+  const excepcionalA = {
+    viagem_feriado: false,
+    tabela_excepcional_uuid: tabelaAUuid,
+  };
+  const excepcionalB = {
+    viagem_feriado: false,
+    tabela_excepcional_uuid: tabelaBUuid,
+  };
+
+  test.each([
+    {
+      nome: "feriados → excepcional",
+      origem: feriados,
+      destino: excepcionalA,
+      viagemFeriadoOrigem: true,
+      tabelaOrigem: null,
+      viagemFeriadoDestino: false,
+      tabelaDestino: tabelaAUuid,
+    },
+    {
+      nome: "excepcional → feriados",
+      origem: excepcionalA,
+      destino: feriados,
+      viagemFeriadoOrigem: false,
+      tabelaOrigem: tabelaAUuid,
+      viagemFeriadoDestino: true,
+      tabelaDestino: null,
+    },
+    {
+      nome: "excepcional A → excepcional B",
+      origem: excepcionalA,
+      destino: excepcionalB,
+      viagemFeriadoOrigem: false,
+      tabelaOrigem: tabelaAUuid,
+      viagemFeriadoDestino: false,
+      tabelaDestino: tabelaBUuid,
+    },
+  ])(
+    "$nome normaliza os discriminadores e cria UUID nova no destino vazio",
+    ({
+      origem,
+      destino,
+      viagemFeriadoOrigem,
+      tabelaOrigem,
+      viagemFeriadoDestino,
+      tabelaDestino,
+    }) => {
+      const viagemOrigem = viagem(
+        "aaaaaaaa-0000-4000-8000-000000000001",
+        "segunda",
+        "08:00:00",
+        viagemFeriadoOrigem,
+      );
+      viagemOrigem.tabela_excepcional_uuid = tabelaOrigem;
+
+      const resultado = semearGradeAPartirDeOutra(
+        itinerario([viagemOrigem]),
+        origem,
+        destino,
+        "sobrescrever",
+      );
+      const copia = resultado.viagens.find(
+        (item) =>
+          item.uuid !== viagemOrigem.uuid &&
+          item.viagem_feriado === viagemFeriadoDestino &&
+          (item.tabela_excepcional_uuid ?? null) === tabelaDestino,
+      );
+
+      expect(copia).toBeDefined();
+      expect(copia!.uuid).toMatch(REGEX_UUID_V4);
+      expect(copia!.uuid).not.toBe(viagemOrigem.uuid);
+      expect(copia!.horarios_paradas).toEqual(
+        viagemOrigem.horarios_paradas,
+      );
+      expect(
+        resultado.viagens.some(
+          (item) =>
+            item.tabela_excepcional_uuid !== null &&
+            item.viagem_feriado,
+        ),
+      ).toBe(false);
+    },
+  );
+
+  test("mescla excepcional → feriados preserva UUID casada, atualiza offsets e mantém grades alheias", () => {
+    const origemCasada = viagem(
+      "aaaaaaaa-0000-4000-8000-000000000001",
+      "segunda",
+      "08:00:00",
+    );
+    origemCasada.tabela_excepcional_uuid = tabelaAUuid;
+    origemCasada.horarios_paradas[1].offset_horario = "00:19:00";
+    const origemNova = viagem(
+      "bbbbbbbb-0000-4000-8000-000000000002",
+      "terca",
+      "09:00:00",
+    );
+    origemNova.tabela_excepcional_uuid = tabelaAUuid;
+    const feriadoCasado = viagem(
+      "cccccccc-0000-4000-8000-000000000003",
+      "segunda",
+      "08:00:00",
+      true,
+    );
+    const feriadoAusente = viagem(
+      "dddddddd-0000-4000-8000-000000000006",
+      "domingo",
+      "07:00:00",
+      true,
+    );
+    const comumIntacta = viagem(
+      "eeeeeeee-0000-4000-8000-000000000007",
+      "quarta",
+      "10:00:00",
+    );
+
+    const resultado = semearGradeAPartirDeOutra(
+      itinerario([
+        origemCasada,
+        origemNova,
+        feriadoCasado,
+        feriadoAusente,
+        comumIntacta,
+      ]),
+      excepcionalA,
+      feriados,
+      "mesclar",
+    );
+    const destino = resultado.viagens.filter(
+      (item) => item.viagem_feriado,
+    );
+    const casada = destino.find(
+      (item) => item.horario_saida === "08:00:00",
+    )!;
+    const nova = destino.find(
+      (item) => item.horario_saida === "09:00:00",
+    )!;
+
+    expect(destino).toHaveLength(2);
+    expect(casada.uuid).toBe(feriadoCasado.uuid);
+    expect(casada.horarios_paradas).toEqual(
+      origemCasada.horarios_paradas,
+    );
+    expect(destino.some((item) => item.uuid === feriadoAusente.uuid)).toBe(
+      false,
+    );
+    expect(nova.uuid).toMatch(REGEX_UUID_V4);
+    expect(nova.uuid).not.toBe(origemNova.uuid);
+    expect(resultado.viagens).toContain(comumIntacta);
+    expect(resultado.viagens).toContain(origemCasada);
+    expect(resultado.viagens).toContain(origemNova);
+  });
+
+  test("[inválido] sobrescrever nunca reutiliza UUID da origem nem do destino anterior", () => {
+    const origem = viagem(
+      "aaaaaaaa-0000-4000-8000-000000000001",
+      "segunda",
+      "08:00:00",
+      true,
+    );
+    const destinoAnterior = viagem(
+      "bbbbbbbb-0000-4000-8000-000000000002",
+      "terca",
+      "09:00:00",
+    );
+    destinoAnterior.tabela_excepcional_uuid = tabelaAUuid;
+
+    const resultado = semearGradeAPartirDeOutra(
+      itinerario([origem, destinoAnterior]),
+      feriados,
+      excepcionalA,
+      "sobrescrever",
+    );
+    const [copia] = resultado.viagens.filter(
+      (item) => item.tabela_excepcional_uuid === tabelaAUuid,
+    );
+
+    expect(copia.uuid).toMatch(REGEX_UUID_V4);
+    expect(copia.uuid).not.toBe(origem.uuid);
+    expect(copia.uuid).not.toBe(destinoAnterior.uuid);
+  });
+
+  test("round-trip preserva identidade casada e o invariante RN-099", () => {
+    const documento = documentoExemploMinimo();
+    documento.versao_schema = "1.1";
+    const servico = documento.autos.servicos[0];
+    servico.tabelas_excepcionais = [
+      { uuid: tabelaAUuid, tipo: "ferias_verao" },
+    ];
+    const itinerarioAlvo = servico.itinerarios[0];
+    const origem = itinerarioAlvo.viagens[0];
+    origem.viagem_feriado = true;
+    origem.tabela_excepcional_uuid = null;
+    const destinoCasado = {
+      ...origem,
+      uuid: "ffffffff-0000-4000-8000-000000000008",
+      viagem_feriado: false,
+      tabela_excepcional_uuid: tabelaAUuid,
+      horarios_paradas: origem.horarios_paradas.map((horario) => ({
+        ...horario,
+      })),
+    };
+    itinerarioAlvo.viagens = [origem, destinoCasado];
+    servico.itinerarios[0] = semearGradeAPartirDeOutra(
+      itinerarioAlvo,
+      feriados,
+      excepcionalA,
+      "mesclar",
+    );
+
+    const reimportado = esquemaDocumentoOperacao.parse(
+      JSON.parse(JSON.stringify(documento)),
+    );
+    const viagensReimportadas =
+      reimportado.autos.servicos[0].itinerarios[0].viagens;
+    const excepcionalReimportada = viagensReimportadas.find(
+      (item) => item.tabela_excepcional_uuid === tabelaAUuid,
+    )!;
+
+    expect(excepcionalReimportada.uuid).toBe(destinoCasado.uuid);
+    expect(excepcionalReimportada.viagem_feriado).toBe(false);
+    expect(
+      viagensReimportadas.some(
+        (item) =>
+          item.tabela_excepcional_uuid !== null && item.viagem_feriado,
+      ),
+    ).toBe(false);
+  });
+});
+
 describe("apagarViagem (Spec 04 §8.3)", () => {
   test("remove só a Viagem de uuid dado", () => {
     const a = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
