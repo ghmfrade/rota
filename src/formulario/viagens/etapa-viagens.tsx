@@ -359,6 +359,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
       viagem,
       headwayPorViagem[viagemUuid] ?? "",
       limiteHeadwayPorViagem[viagemUuid] ?? "",
+      itinerarioAtual.viagens,
     );
     if (!resultado.ok) {
       const mensagemPorMotivo = {
@@ -378,6 +379,13 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
       delete proximos[viagemUuid];
       return proximos;
     });
+    if (resultado.horariosIgnorados > 0) {
+      definirAvisoCopia(
+        `${resultado.horariosIgnorados} horário(s) já existente(s) foi(ram) ignorado(s) na geração por headway.`,
+      );
+    } else {
+      definirAvisoCopia(null);
+    }
     if (resultado.viagens.length === 0) return;
 
     const ancorasAtualizadas = { ...ancoras };

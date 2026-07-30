@@ -536,6 +536,71 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     expect(chamouOsrm).toBe(false);
   });
 
+  test("TASK-118: headway ignora horários existentes, mescla os ausentes e é idempotente", async ({
+    page,
+  }) => {
+    let chamouOsrm = false;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamouOsrm = true;
+      return rota.abort();
+    });
+
+    const documentoCom09 = structuredClone(multiServico);
+    const viagens = documentoCom09.autos.servicos[0].itinerarios[0].viagens;
+    const uuidExistente09 = "91919191-0000-4000-8000-000000000009";
+    viagens.push({
+      ...structuredClone(viagens[0]),
+      uuid: uuidExistente09,
+      horario_saida: "09:00:00",
+      horarios_paradas: viagens[0].horarios_paradas.map((horario) =>
+        horario.parada_ordem === 2
+          ? { ...horario, offset_horario: "00:55:00" }
+          : { ...horario },
+      ),
+    });
+
+    await abrirEtapaViagens(page, documentoCom09);
+    const grade = gradeComum(page);
+    const partidaOrigem = grade.getByLabel("Horário de partida — segunda, viagem 1");
+    const celulaOrigem = partidaOrigem.locator("xpath=ancestor::td");
+    const viagemUuid = await celulaOrigem.getAttribute("data-viagem-uuid");
+    await celulaOrigem.hover();
+    await celulaOrigem.getByTestId("alternar-modo-headway").click();
+    await grade
+      .getByRole("textbox", { name: "Headway — segunda, viagem 1", exact: true })
+      .fill("01:00");
+    await grade.getByLabel("Horário-limite — segunda, viagem 1").fill("10:00");
+
+    const gerar = grade.getByTestId("gerar-viagens-headway");
+    await gerar.click();
+
+    await expect(grade.getByLabel(/Horário de partida — segunda/)).toHaveCount(3);
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 2")).toHaveValue("09:00");
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 3")).toHaveValue("10:00");
+    await expect(
+      grade
+        .getByLabel("Horário de partida — segunda, viagem 2")
+        .locator("xpath=ancestor::td"),
+    ).toHaveAttribute("data-viagem-uuid", uuidExistente09);
+    await expect(
+      grade
+        .locator(`[data-testid="celula-passante"][data-viagem-uuid="${uuidExistente09}"]`)
+        .first()
+        .locator("input[data-grade]"),
+    ).toHaveValue("09:55");
+    await expect(page.getByTestId("aviso-copia-viagem")).toContainText(
+      "1 horário(s) já existente(s)",
+    );
+
+    await gerar.click();
+
+    await expect(grade.getByLabel(/Horário de partida — segunda/)).toHaveCount(3);
+    await expect(page.getByTestId("aviso-copia-viagem")).toContainText(
+      "2 horário(s) já existente(s)",
+    );
+    expect(chamouOsrm).toBe(false);
+  });
+
   test("reutiliza os últimos deslocamentos válidos por direção na instância da etapa (TASK-113)", async ({
     page,
   }) => {

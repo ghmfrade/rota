@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { REGEX_UUID_V4 } from "@/shared/contrato";
 import {
   atualizarHorarioSaida,
@@ -133,7 +133,7 @@ describe("gerarViagensPorHeadway (TASK-108; DEC-083)", () => {
       ),
     };
 
-    const resultado = gerarViagensPorHeadway(origem, "01:10", "17:00");
+    const resultado = gerarViagensPorHeadway(origem, "01:10", "17:00", [origem]);
 
     expect(resultado.ok).toBe(true);
     if (!resultado.ok) return;
@@ -166,34 +166,113 @@ describe("gerarViagensPorHeadway (TASK-108; DEC-083)", () => {
       { ...origem, horario_saida: "08:00:00" },
       "01:00",
       "10:00",
+      [],
     );
     const fimDoDia = gerarViagensPorHeadway(
       { ...origem, horario_saida: "22:30:00" },
       "00:45",
       "23:59",
+      [],
     );
 
     expect(inclusivo).toMatchObject({
       ok: true,
       viagens: [{ horario_saida: "09:00:00" }, { horario_saida: "10:00:00" }],
+      horariosIgnorados: 0,
     });
     expect(fimDoDia).toMatchObject({
       ok: true,
       viagens: [{ horario_saida: "23:15:00" }],
+      horariosIgnorados: 0,
     });
   });
 
   test("limite igual à origem ou headway maior que a janela produz lote vazio", () => {
     const origem = itinerarioDaFixture().viagens[0];
 
-    expect(gerarViagensPorHeadway(origem, "00:10", "08:00")).toEqual({
+    expect(gerarViagensPorHeadway(origem, "00:10", "08:00", [origem])).toEqual({
       ok: true,
       viagens: [],
+      horariosIgnorados: 0,
     });
-    expect(gerarViagensPorHeadway(origem, "10:00", "09:00")).toEqual({
+    expect(gerarViagensPorHeadway(origem, "10:00", "09:00", [origem])).toEqual({
       ok: true,
       viagens: [],
+      horariosIgnorados: 0,
     });
+  });
+
+  test("DEC-094: mescla lote parcialmente coincidente e preserva integralmente as existentes", () => {
+    const origem = {
+      ...structuredClone(itinerarioDaFixture().viagens[0]),
+      horario_saida: "08:00:00",
+    };
+    const existente09 = {
+      ...structuredClone(origem),
+      uuid: "11111111-1111-4111-8111-111111111111",
+      horario_saida: "09:00:00",
+      horarios_paradas: origem.horarios_paradas.map((horario, indice) =>
+        indice === 1 ? { ...horario, offset_horario: "00:55:00" } : horario,
+      ),
+    };
+    const feriado10 = {
+      ...structuredClone(origem),
+      uuid: "22222222-2222-4222-8222-222222222222",
+      horario_saida: "10:00:00",
+      viagem_feriado: true,
+    };
+    const outroDia11 = {
+      ...structuredClone(origem),
+      uuid: "33333333-3333-4333-8333-333333333333",
+      horario_saida: "11:00:00",
+      dia_semana: "terca" as const,
+    };
+    const existentes = [origem, existente09, feriado10, outroDia11];
+    const antes = structuredClone(existentes);
+
+    const resultado = gerarViagensPorHeadway(origem, "01:00", "11:00", existentes);
+
+    expect(resultado).toMatchObject({
+      ok: true,
+      horariosIgnorados: 1,
+      viagens: [{ horario_saida: "10:00:00" }, { horario_saida: "11:00:00" }],
+    });
+    expect(existentes).toEqual(antes);
+    if (!resultado.ok) return;
+    expect(resultado.viagens.every((viagem) => viagem.viagem_feriado === false)).toBe(true);
+    expect(resultado.viagens.every((viagem) => viagem.dia_semana === origem.dia_semana)).toBe(true);
+  });
+
+  test("DEC-094: colisão total é no-op e não gera UUIDs antes de filtrar", () => {
+    const origem = {
+      ...structuredClone(itinerarioDaFixture().viagens[0]),
+      horario_saida: "08:00:00",
+    };
+    const existentes = [
+      origem,
+      {
+        ...structuredClone(origem),
+        uuid: "11111111-1111-4111-8111-111111111111",
+        horario_saida: "09:00:00",
+      },
+      {
+        ...structuredClone(origem),
+        uuid: "22222222-2222-4222-8222-222222222222",
+        horario_saida: "10:00:00",
+      },
+    ];
+    const gerarUuid = vi.spyOn(globalThis.crypto, "randomUUID");
+
+    try {
+      expect(gerarViagensPorHeadway(origem, "01:00", "10:00", existentes)).toEqual({
+        ok: true,
+        viagens: [],
+        horariosIgnorados: 2,
+      });
+      expect(gerarUuid).not.toHaveBeenCalled();
+    } finally {
+      gerarUuid.mockRestore();
+    }
   });
 
   test.each([
@@ -209,6 +288,7 @@ describe("gerarViagensPorHeadway (TASK-108; DEC-083)", () => {
         itinerarioDaFixture().viagens[0],
         headway,
         limite,
+        itinerarioDaFixture().viagens,
       );
       expect(resultado).toEqual({ ok: false, motivo });
     },

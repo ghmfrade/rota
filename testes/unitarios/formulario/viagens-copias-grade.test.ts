@@ -8,6 +8,7 @@ import {
   copiarViagemParaDiaComGuarda,
   copiarViagemParaDias,
   diaAoLado,
+  existeViagemNoHorarioDaGrade,
 } from "@/formulario/viagens";
 
 // TASK-030 — cópias e remoções da grade (Spec 04 §8.3/§8.4): copiar viagem para
@@ -101,6 +102,43 @@ describe("copiarViagemParaDias (Spec 04 §8.3; RN-007/061)", () => {
 });
 
 describe("cópia unitária com guarda (DEC-084/092; RN-062)", () => {
+  test("DEC-084/094: critério compartilhado compara dia, horário e a grade excepcional exata", () => {
+    const tabelaA = "11111111-1111-4111-8111-111111111111";
+    const tabelaB = "22222222-2222-4222-8222-222222222222";
+    const existente = viagem(
+      "aaaaaaaa-0000-4000-8000-000000000001",
+      "segunda",
+      "08:00:00",
+    );
+    existente.tabela_excepcional_uuid = tabelaA;
+    existente.horarios_paradas[1].offset_horario = "00:59:00";
+
+    expect(
+      existeViagemNoHorarioDaGrade([existente], "segunda", "08:00:00", {
+        viagem_feriado: false,
+        tabela_excepcional_uuid: tabelaA,
+      }),
+    ).toBe(true);
+    expect(
+      existeViagemNoHorarioDaGrade([existente], "terca", "08:00:00", {
+        viagem_feriado: false,
+        tabela_excepcional_uuid: tabelaA,
+      }),
+    ).toBe(false);
+    expect(
+      existeViagemNoHorarioDaGrade([existente], "segunda", "08:00:00", {
+        viagem_feriado: false,
+        tabela_excepcional_uuid: tabelaB,
+      }),
+    ).toBe(false);
+    expect(
+      existeViagemNoHorarioDaGrade([existente], "segunda", "08:00:00", {
+        viagem_feriado: true,
+        tabela_excepcional_uuid: null,
+      }),
+    ).toBe(false);
+  });
+
   test("copia para dia arbitrário, preserva a origem e normaliza a grade destino", () => {
     const origem = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
     const resultado = copiarViagemParaDiaComGuarda(itinerario([origem]), origem.uuid, "quinta", {

@@ -25,6 +25,7 @@ export {
   copiarViagemParaDias,
   copiarViagemParaDiaComGuarda,
   copiarDiaParaDiasComGuarda,
+  existeViagemNoHorarioDaGrade,
   diaAoLado,
   clonarDiasComunsParaFeriado,
   apagarViagem,

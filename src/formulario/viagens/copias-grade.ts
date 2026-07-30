@@ -51,6 +51,27 @@ function mesmaGrade(viagem: Viagem, grade: GradeDestinoViagem): boolean {
 }
 
 /**
+ * Verifica a existência de uma partida no mesmo dia, horário e grade.
+ *
+ * O critério é compartilhado pelas guardas locais de cópia e de geração por
+ * headway (DEC-084/DEC-094). Os offsets não participam da igualdade e a função
+ * não cria uma validação estrutural: reforços continuam válidos (RN-062).
+ */
+export function existeViagemNoHorarioDaGrade(
+  viagens: readonly Viagem[],
+  diaSemana: Viagem["dia_semana"],
+  horarioSaida: string,
+  grade: GradeDestinoViagem,
+): boolean {
+  return viagens.some(
+    (viagem) =>
+      viagem.dia_semana === diaSemana &&
+      viagem.horario_saida === horarioSaida &&
+      mesmaGrade(viagem, grade),
+  );
+}
+
+/**
  * Duplica uma Viagem para o(s) dia(s) escolhido(s) (Spec 04 §8.3; RN-007/061):
  * uma Viagem nova por dia, com **UUID nova**, mesmos `horario_saida`,
  * `horarios_paradas` (offsets preservados — RN-063) e `viagem_feriado` (a ação
@@ -129,11 +150,11 @@ export function copiarViagemParaDiaComGuarda(
     return { ok: false, motivo: "mesma-coluna" };
   }
 
-  const jaExiste = itinerario.viagens.some(
-    (viagem) =>
-      viagem.dia_semana === diaDestino &&
-      viagem.horario_saida === origem.horario_saida &&
-      mesmaGrade(viagem, gradeDestino),
+  const jaExiste = existeViagemNoHorarioDaGrade(
+    itinerario.viagens,
+    diaDestino,
+    origem.horario_saida,
+    gradeDestino,
   );
   if (jaExiste) return { ok: false, motivo: "horario-existente" };
 

@@ -9,6 +9,7 @@ import {
   recomputarOffsetsComAncoras,
 } from "./redistribuicao-offsets";
 import { sugerirOffsetsIniciais } from "./sugestao-inicial-offsets";
+import { existeViagemNoHorarioDaGrade } from "./copias-grade";
 
 type ItinerarioParaSugestao = Pick<Itinerario, "paradas" | "rota">;
 
@@ -83,7 +84,7 @@ export function inserirViagemPorOffsetRelativo(
 }
 
 export type ResultadoGeracaoHeadway =
-  | { ok: true; viagens: Viagem[] }
+  | { ok: true; viagens: Viagem[]; horariosIgnorados: number }
   | {
       ok: false;
       motivo: "headway-invalido" | "limite-invalido" | "limite-anterior";
@@ -97,11 +98,14 @@ export type ResultadoGeracaoHeadway =
  * `origem + k × headway`, para `k >= 1`. Cada cópia permanece no mesmo dia e na
  * mesma grade, herda os offsets confirmados e recebe UUID nova. A validação
  * ocorre antes da criação para que entradas inválidas não produzam lote parcial.
+ * Horários preexistentes no mesmo dia e grade são ignorados antes da geração da
+ * UUID (DEC-094); os offsets não participam do critério (RN-062).
  */
 export function gerarViagensPorHeadway(
   viagem: Viagem,
   headwayHoraMinuto: string,
   limiteHoraMinuto: string,
+  viagensExistentes: readonly Viagem[],
 ): ResultadoGeracaoHeadway {
   const headway = horaMinutoParaHorarioRelogio(headwayHoraMinuto);
   if (headway === null) return { ok: false, motivo: "headway-invalido" };
@@ -119,14 +123,32 @@ export function gerarViagensPorHeadway(
   }
 
   const viagens: Viagem[] = [];
+  let horariosIgnorados = 0;
+  const grade = {
+    viagem_feriado: viagem.viagem_feriado,
+    tabela_excepcional_uuid: viagem.tabela_excepcional_uuid,
+  };
   for (
     let horarioSegundos = origemSegundos + headwaySegundos;
     horarioSegundos <= limiteSegundos && horarioSegundos < 24 * 60 * 60;
     horarioSegundos += headwaySegundos
   ) {
+    const horarioSaida = formatarHms(horarioSegundos);
+    if (
+      existeViagemNoHorarioDaGrade(
+        viagensExistentes,
+        viagem.dia_semana,
+        horarioSaida,
+        grade,
+      )
+    ) {
+      horariosIgnorados += 1;
+      continue;
+    }
+
     viagens.push(
       criarViagem({
-        horario_saida: formatarHms(horarioSegundos),
+        horario_saida: horarioSaida,
         dia_semana: viagem.dia_semana,
         viagem_feriado: viagem.viagem_feriado,
         tabela_excepcional_uuid: viagem.tabela_excepcional_uuid,
@@ -135,7 +157,7 @@ export function gerarViagensPorHeadway(
     );
   }
 
-  return { ok: true, viagens };
+  return { ok: true, viagens, horariosIgnorados };
 }
 
 /** Resultado de editar um horário passante (Spec 04 §8.2). */
