@@ -96,8 +96,8 @@
 | RN-095 | Spec 01 §1/§3 | Zero gestão | F/C/I | (ausência de código) | CONTRATO negativo + revisão | **Alta** |
 | RN-096 | Spec 01 §5; 04 §2.1 | Sem persistência | F | (ausência de backend) | revisão + E2E (sem chamadas de escrita) | Alta |
 | RN-097 | Spec 01 §2 | Desacoplamento | F/C/I | separação de módulos/rotas | revisão de arquitetura | Alta |
-| RN-098 | Spec 02 §6.1/§14; 04 §8.5; DEC-081 | TabelaExcepcional (`servico.tabelas_excepcionais[]`) | F/C/I | schema (zod strict) + validador (cardinalidade, `descricao` condicional, sem sobreposição) + migração 1.0→1.1 | U + CONTRATO (negativo: 2ª verão, descricao ausente em personalizado) | Alta |
-| RN-099 | Spec 02 §11/§6.1; 03 §9.1/§9.2; 04 §8.5; 05 §10.4/§12.3; DEC-081 | Grade excepcional da Viagem (referência, invariante, precedência, contagens, cópia, diff) | F/C/I | schema (referência + invariante) + grade no Formulário + contagens + diff por `uuid` da tabela | U + CONTRATO + INT (copiar dias comuns) | Alta |
+| RN-098 | Spec 02 §6.1/§14; 04 §8.5; DEC-081; DEC-098 | TabelaExcepcional (`servico.tabelas_excepcionais[]`) | F/C/I | schema (zod strict) + validador (cardinalidade, `descricao` condicional, sem sobreposição) + migração 1.0→1.1 + CRUD no Formulário com remoção somente quando vazia | U + CONTRATO + E2E (negativos: 2ª verão, descricao ausente em personalizado, remoção referenciada bloqueada com quantidade) | Alta |
+| RN-099 | Spec 02 §11/§6.1; 03 §9.1/§9.2; 04 §8.5; 05 §10.4/§12.3; DEC-081; DEC-098 | Grade excepcional da Viagem (referência, invariante, integridade na remoção, precedência, contagens, cópia, diff) | F/C/I | schema (referência + invariante) + bloqueio de remoção sem cascata/conversão + grade no Formulário + contagens + diff por `uuid` da tabela | U + CONTRATO + INT + E2E (remoção preserva tabela e Viagens associadas; copiar dias comuns) | Alta |
 
 ---
 

@@ -5149,7 +5149,7 @@ Spec 04 §8.5 define a UX; a entidade já existe no contrato após a TASK-102. �
 
 ## Regras envolvidas
 
-- RN-098 (cardinalidade canônica única, `descricao` só em `personalizado`, sem sobreposição), RN-004 (UUID nova na criação, preservada na edição)
+- RN-098 (cardinalidade canônica única, `descricao` só em `personalizado`, sem sobreposição e remoção conforme DEC-098), RN-099 (integridade da referência na remoção), RN-004 (UUID nova na criação, preservada na edição)
 
 ## Entidades afetadas
 
@@ -5165,6 +5165,7 @@ Spec 04 §8.5 define a UX; a entidade já existe no contrato após a TASK-102. �
 - [ ] Criar tabela escolhendo o tipo; `personalizado` exige `descricao` (nome), verão/inverno não.
 - [ ] Tentar criar 2ª "Férias de verão" (ou inverno) no mesmo Serviço é impedido com mensagem; `personalizado` pode repetir.
 - [ ] Remover uma tabela; filtro/busca por tipo (verão/inverno) e por texto (`descricao`).
+- [ ] Remover tabela com Viagens associadas é bloqueado com a quantidade, sem cascata nem conversão para a grade comum (DEC-098).
 - [ ] Nova tabela recebe UUID nova; editar `descricao` preserva a UUID.
 
 ## Casos válidos
@@ -5177,8 +5178,8 @@ Spec 04 §8.5 define a UX; a entidade já existe no contrato após a TASK-102. �
 
 ## Testes esperados
 
-- Unitários: reducers de CRUD + cardinalidade + `descricao` condicional.
-- E2E: criar/filtrar/remover uma tabela.
+- Unitários: reducers de CRUD + cardinalidade + `descricao` condicional + remoção vazia/referenciada sem cascata.
+- E2E: criar/filtrar/remover uma tabela e bloquear remoção com Viagens associadas.
 
 ## Arquivos prováveis
 
@@ -5186,16 +5187,16 @@ Spec 04 §8.5 define a UX; a entidade já existe no contrato após a TASK-102. �
 
 ## Riscos
 
-- **Remoção de uma tabela que já tem Viagens associadas** — a Spec 04 §8.5 não fixa o comportamento (bloquear × remover em cascata as Viagens). Resolver na `/analisar-task`; **se a spec não bastar, abrir Q-xxx antes de implementar** (não decidir por conta própria — `docs-dev/04` princípio 2).
+- **Remoção de uma tabela que já tem Viagens associadas — resolvido pela Q-076/DEC-098:** bloquear, informar a quantidade e exigir remoção prévia na grade excepcional; sem cascata nem conversão para a grade comum.
 - Integração com a etapa Viagens/Serviços redesenhada.
 
 ## Dependências
 
-- TASK-102; etapa Viagens (TASK-028 / TASK-056).
+- TASK-102; etapa Viagens (TASK-028 / TASK-056); Q-076 decidida pela DEC-098.
 
 ## Perguntas em aberto
 
-- Possível Q-xxx sobre remoção de tabela com Viagens associadas (avaliar na análise).
+- Nenhuma. A Q-076 foi decidida pela DEC-098.
 
 ---
 
