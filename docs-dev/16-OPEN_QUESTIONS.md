@@ -1067,3 +1067,96 @@ qualquer célula da mesma Viagem desmarca; clicar em outra Viagem transfere a
 seleção. A desseleção não altera foco nem dados e restaura a aparência normal
 ou o laranja de reforço. Não se acrescentam `Escape`, clique fora, `blur` ou
 mudança na navegação por Tab/Enter.
+
+---
+
+## Q-075 — Como a TASK-119 navega para coincidências em grades excepcionais?
+
+**Status:** Decidida — DEC-097
+
+**Origem:** análise prévia da TASK-119, após constatar que a detecção da
+DEC-095 abrange grades excepcionais, mas essa superfície ainda pertence à
+TASK-105 (2026-07-30)
+
+**Contexto:** a DEC-095 exige detectar partidas coincidentes dentro do mesmo
+itinerário e da mesma grade, sem misturar operação comum, de feriado ou
+excepcional. Também exige um alerta agregado por Serviço, com quantidade de
+grupos e navegação para o primeiro grupo. A implementação atual da etapa
+Viagens renderiza somente as grades comum e de feriado; a grade excepcional,
+necessária para destacar e posicionar uma ocorrência excepcional, é escopo da
+TASK-105. Sem essa superfície, um reforço excepcional importado pode ser
+detectado, mas o clique no alerta não consegue selecionar a grade nem levar à
+primeira ocorrência.
+
+Além disso, “primeiro grupo” não fixava a prioridade entre sentidos e grades,
+e o texto literal decidido na DEC-095 não contém a quantidade de grupos.
+
+**Spec relacionada:** Spec 04 §8.1/§8.5 (grades por Serviço, sentido e regime),
+§11 (alerta não bloqueante e navegação para a origem); Spec 02 §6.1/§11
+(tabela excepcional e pertencimento da Viagem); RN-061/RN-062/RN-078/RN-099;
+DEC-095; TASK-105; TASK-119.
+
+**Impacto se não decidir:** implementar a TASK-119 antes da TASK-105 obrigaria
+a ignorar reforços excepcionais, navegar apenas até a etapa sem posicionar a
+origem ou absorver indevidamente a construção da grade excepcional. Também
+deixaria a escolha do primeiro grupo e a apresentação da quantidade a cargo da
+implementação, sem regra explícita.
+
+**Opções:** A — tornar a TASK-105 pré-requisito da TASK-119; depois dela,
+ordenar a navegação pela ordem dos itinerários no documento, pela ordem visual
+das grades, por `DIAS_SEMANA`, `horario_saida` e ordem exibida; manter o texto
+literal da DEC-095 e apresentar a quantidade de grupos em um `Selo` associado.
+B — implementar agora somente para grades comum e de feriado e completar a
+grade excepcional na TASK-105, alterando explicitamente os critérios da
+TASK-119. C — detectar a coincidência excepcional agora, mas navegar apenas
+para a etapa Viagens, sem posicionar grade ou ocorrência.
+
+**Recomendação técnica:** A. É a única opção que atende integralmente à
+DEC-095 e à navegação da Spec 04 §11 sem duplicar ou absorver o escopo da
+TASK-105. Também preserva o texto vinculante do alerta e torna determinística
+a escolha da primeira origem.
+
+**Decisão:** **Decidida (DEC-097, 2026-07-30).** Opção A, por decisão explícita
+do responsável pelo domínio: a TASK-119 passa a depender da conclusão e
+aprovação da TASK-105. Depois dessa dependência, a primeira origem segue a
+ordem dos itinerários no documento, a ordem visual das grades,
+`DIAS_SEMANA`, `horario_saida` e a ordem exibida; a quantidade de grupos é
+mostrada em um `Selo` associado, sem alterar o texto literal da DEC-095.
+
+## Q-076 — O que ocorre ao remover uma Tabela excepcional referenciada por Viagens?
+
+**Status:** Decidida — DEC-098
+
+**Origem:** análise da TASK-104 (2026-07-30)
+
+**Contexto:** a TASK-104 exige remover Tabelas excepcionais. A Spec 02
+§11/§14 e a RN-099 proíbem que uma Viagem mantenha
+`tabela_excepcional_uuid` apontando para uma tabela inexistente. Nenhuma spec
+ou decisão anterior determinava se a remoção deveria ser recusada ou se também
+deveria apagar as Viagens associadas. Transformá-las em Viagens comuns
+alteraria silenciosamente sua semântica e não é uma alternativa prevista.
+
+**Spec relacionada:** Spec 02 §6.1/§11/§14; Spec 04 §8.5;
+RN-061/RN-098/RN-099; TASK-104/TASK-105.
+
+**Impacto se não decidir:** bloquear por conta própria poderia impedir uma
+remoção esperada; aplicar cascata poderia apagar Viagens sem autorização
+normativa. Remover apenas a tabela produziria documento estruturalmente
+inválido.
+
+**Opções possíveis:** A — bloquear a remoção enquanto houver Viagens
+associadas, informar a quantidade e exigir que elas sejam removidas previamente
+na grade excepcional. B — após confirmação explícita, remover a tabela e todas
+as Viagens associadas, em todos os itinerários do Serviço. C — oferecer no
+diálogo a escolha entre cancelar ou remover em cascata, sempre exibindo a
+quantidade de Viagens afetadas.
+
+**Recomendação técnica:** A — evita perda implícita de dados e mantém a
+TASK-104 restrita ao CRUD da entidade. Como a grade excepcional pertence à
+TASK-105, a remoção das Viagens associadas permanece naquela superfície.
+
+**Decisão:** **Decidida (DEC-098, 2026-07-30).** Opção A, por decisão explícita
+do responsável pelo domínio: a remoção de uma Tabela excepcional é bloqueada
+enquanto houver Viagens associadas a ela. A interface informa a quantidade de
+Viagens que ainda a referenciam e orienta removê-las previamente na grade
+excepcional. Não há remoção em cascata nem conversão para a grade comum.

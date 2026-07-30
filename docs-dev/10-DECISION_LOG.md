@@ -1175,3 +1175,81 @@ componente/E2E da grade. O handler deve impedir que `onFocus`/`aoSelecionar` do
 campo reative no mesmo gesto o `uuid` que o toggle acabou de limpar e deve
 preservar os comportamentos de foco das TASK-115/TASK-116.
 **Tasks:** TASK-106 (critério superado em parte) e TASK-119.
+
+## DEC-097 — TASK-119 depende da grade excepcional da TASK-105
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, opção A
+da **Q-075**; Spec 04 §8.1/§8.5/§11; Spec 02 §6.1/§11; RN-061/RN-062/RN-078/
+RN-099; DEC-095; TASK-105; TASK-119 · **Data:** 2026-07-30
+
+**Decisão:** a **TASK-105 é pré-requisito funcional da TASK-119**. A TASK-119
+só pode ser implementada depois de a grade excepcional da TASK-105 estar
+concluída e aprovada, porque a detecção da DEC-095 deve destacar e navegar
+também para coincidências pertencentes a tabelas excepcionais.
+
+Depois dessa dependência, o “primeiro grupo” do alerta agregado por Serviço é
+determinado pela ordem dos itinerários no documento, seguida da ordem visual
+das grades, da ordem canônica de `DIAS_SEMANA`, de `horario_saida` e, nos
+empates, da ordem em que as Viagens são exibidas na grade. O texto do alerta
+permanece literalmente o fixado na DEC-095; a quantidade de grupos é
+apresentada em um `Selo` associado ao item, sem ser interpolada na mensagem.
+
+**Motivo:** a etapa Viagens atual renderiza somente as grades comum e de
+feriado. Implementar a TASK-119 antes da TASK-105 permitiria detectar um
+reforço excepcional importado, mas não destacar sua superfície nem posicionar
+Serviço, sentido, grade e primeira ocorrência ao clicar no alerta. Absorver a
+grade excepcional na TASK-119 duplicaria o escopo da TASK-105; ignorá-la ou
+navegar apenas até a etapa entregaria parcialmente a DEC-095 e a Spec 04 §11.
+
+**Consequências:** resolve a **Q-075** e **bloqueia a TASK-119 até a conclusão
+e aprovação da TASK-105**. As DEC-095 e DEC-096 permanecem válidas quanto à
+detecção, ao destaque dos reforços, ao alerta e ao toggle de seleção; muda
+somente a ordem de execução e ficam explícitas a ordenação da primeira origem
+e a apresentação da quantidade. A TASK-105 não absorve a detecção, o alerta ou
+o destaque da TASK-119: ela apenas entrega a superfície excepcional da qual a
+TASK-119 passa a depender.
+
+**Impacto em implementação:** nenhuma alteração de spec, RN, contrato JSON,
+importação, PDF, Comparador, Ingestor ou contagens. `01-RULE_INDEX.md` e
+`03-TRACEABILITY_MATRIX.md` não precisam de edição. **Módulos futuros da
+TASK-119:** detector puro compartilhado, `src/formulario/pendencias/`,
+`src/formulario/revisao/`, `src/formulario/layout/painel-pendencias.tsx` e
+`src/formulario/viagens/etapa-viagens.tsx`, já com a grade excepcional
+entregue pela TASK-105.
+**Tasks:** TASK-105 e TASK-119.
+
+## DEC-098 — Remoção de Tabela excepcional é bloqueada enquanto houver Viagens associadas
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, opção A
+da Q-076; Spec 02 §6.1/§11/§14; Spec 04 §8.5 · **Data:** 2026-07-30
+
+**Decisão:** a remoção de uma Tabela excepcional é **bloqueada enquanto houver
+qualquer Viagem do mesmo Serviço com `tabela_excepcional_uuid` igual à UUID da
+tabela**. A interface informa quantas Viagens ainda estão associadas e orienta
+o usuário a removê-las previamente na grade excepcional. Somente uma tabela
+sem Viagens associadas pode ser removida pela TASK-104. Não há remoção em
+cascata e as Viagens não são convertidas para a grade comum.
+
+**Motivo:** a opção A evita perda implícita de dados operacionais e preserva a
+integridade referencial da RN-099 sem ampliar o CRUD da TASK-104 para manipular
+o conteúdo das grades, que pertence à TASK-105. Também impede que uma remoção
+transforme silenciosamente uma Viagem excepcional em comum.
+
+**Consequências:** resolve a **Q-076** e desbloqueia a **TASK-104**. O CRUD pode
+criar, editar, filtrar e remover Tabelas excepcionais vazias; ao encontrar
+Viagens associadas, recusa a remoção com mensagem operacional e a respectiva
+quantidade. A remoção prévia dessas Viagens será possível na grade excepcional
+da TASK-105. A decisão não altera a cardinalidade, a descrição condicional, a
+semântica das grades ou a preservação de UUID.
+
+**Impacto em implementação:** a TASK-104 deve consultar todos os itinerários do
+Serviço selecionado antes de remover a tabela, contando as Viagens cuja
+`tabela_excepcional_uuid` corresponda à UUID alvo. Contagem maior que zero
+produz bloqueio sem mutação da sessão; contagem zero permite retirar somente a
+entrada de `servico.tabelas_excepcionais[]`. Testes unitários e E2E devem cobrir
+os dois caminhos, inclusive a ausência de cascata e de conversão para a grade
+comum. **RN afetadas:** RN-098 e RN-099; suas entradas no
+`01-RULE_INDEX.md` e a rastreabilidade correspondente em
+`03-TRACEABILITY_MATRIX.md` precisam incorporar a política quando os derivados
+forem atualizados. Não há campo novo nem alteração do contrato JSON.
+**Tasks:** TASK-104 e TASK-105.

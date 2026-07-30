@@ -6804,7 +6804,7 @@ a cópia unitária entre dias; estendê-la ao headway depende da Q-072.
 
 ---
 
-## TASK-119 — Destacar e alertar sobre Viagens com partida coincidente — **desbloqueada (DEC-095/DEC-096)**
+## TASK-119 — Destacar e alertar sobre Viagens com partida coincidente — **bloqueada (DEC-097; depende da TASK-105)**
 
 ## Objetivo
 
@@ -6832,6 +6832,14 @@ A DEC-096 fixou o gesto que encerra essa precedência: um segundo clique na
 mesma Viagem desfaz a seleção, superando apenas a persistência indefinida da
 TASK-106. A possibilidade de desseleção cabe nesta task porque é necessária
 para uma Viagem de reforço voltar do azul para o laranja.
+
+A DEC-097 tornou a TASK-105 pré-requisito funcional: a TASK-119 também deve
+destacar e navegar para coincidências em grades excepcionais, cuja superfície
+ainda pertence à TASK-105. Depois dessa dependência, a primeira origem segue a
+ordem dos itinerários no documento, a ordem visual das grades,
+`DIAS_SEMANA`, `horario_saida` e a ordem exibida; a quantidade de grupos é
+mostrada em `Selo` associado ao alerta, sem alterar o texto literal da
+DEC-095.
 
 ## Fora de escopo
 
@@ -7014,6 +7022,8 @@ para uma Viagem de reforço voltar do azul para o laranja.
 - Q-073 decidida pela opção A, com refinamento do destaque (DEC-095).
 - Q-074 decidida pela opção A (DEC-096), superando somente a persistência
   indefinida da TASK-106.
+- Q-075 decidida pela opção A (DEC-097): a TASK-105 deve estar concluída e
+  aprovada antes da implementação desta task.
 - TASK-118 não é dependência funcional; as duas tasks devem apenas ser
   executadas sequencialmente por alterarem a mesma superfície da grade.
 
