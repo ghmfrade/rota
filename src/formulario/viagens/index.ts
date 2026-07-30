@@ -15,6 +15,7 @@ export {
   linhasSecoes,
   montarBlocosDiasComuns,
   montarBlocosFeriados,
+  montarBlocosGrade,
   horarioAbsolutoNaParada,
   type AlvoFocoCelulaGrade,
   type DiaSemana,
@@ -30,12 +31,14 @@ export {
   existeViagemNoHorarioDaGrade,
   diaAoLado,
   clonarDiasComunsParaFeriado,
+  semearGradeAPartirDeOutra,
+  viagemPertenceAGrade,
   apagarViagem,
   apagarViagensDoDia,
   type GradeDestinoViagem,
   type ResultadoCopiaViagem,
   type ResultadoCopiaDia,
-  type ModoCopiaFeriado,
+  type ModoSemeaduraGrade,
 } from "./copias-grade";
 export {
   criarViagemNaCelula,

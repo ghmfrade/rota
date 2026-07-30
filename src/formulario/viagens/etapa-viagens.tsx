@@ -34,10 +34,12 @@ import {
 import {
   apagarViagem,
   apagarViagensDoDia,
-  clonarDiasComunsParaFeriado,
   copiarDiaParaDiasComGuarda,
   copiarViagemParaDiaComGuarda,
   diaAoLado,
+  semearGradeAPartirDeOutra,
+  viagemPertenceAGrade,
+  type GradeDestinoViagem,
 } from "./copias-grade";
 import {
   horaMinutoParaHorarioRelogio,
@@ -52,6 +54,7 @@ import {
   linhasSecoes,
   montarBlocosDiasComuns,
   montarBlocosFeriados,
+  montarBlocosGrade,
   seletorAlvoFocoCelulaGrade,
   type AlvoFocoCelulaGrade,
   type BlocoGrade,
@@ -61,9 +64,10 @@ import {
 } from "./montagem-grade";
 import { CampoHorarioGrade } from "./campo-horario-grade";
 import { PainelTabelasExcepcionais } from "./painel-tabelas-excepcionais";
+import { rotuloTabelaExcepcional } from "./tabelas-excepcionais";
 
-// Etapa "Viagens e horários" (TASK-028/029/030; Spec 04 §8) — duas grades por
-// Serviço × sentido: dias comuns e feriados (RN-068, grades independentes).
+// Etapa "Viagens e horários" (TASK-028/029/030/105; Spec 04 §8) — grades por
+// Serviço × sentido: dias comuns, feriados e uma por Tabela excepcional.
 // Preencher a 1ª Seção de um bloco cria a Viagem (RN-061/064/067); alterar um
 // horário passante torna a parada âncora e redistribui as derivadas (RN-065),
 // com bloqueio de fora-de-ordem; "Restaurar sugestão" (por Viagem e em lote)
@@ -85,6 +89,37 @@ const ROTULO_DIA: Record<DiaSemana, string> = {
 };
 
 const DESLOCAMENTO_RELATIVO_PADRAO = "00:10";
+
+interface GradeDaTela {
+  id: string;
+  destino: GradeDestinoViagem;
+}
+
+const GRADE_COMUM: GradeDaTela = {
+  id: "comuns",
+  destino: {
+    viagem_feriado: false,
+    tabela_excepcional_uuid: null,
+  },
+};
+
+const GRADE_FERIADOS: GradeDaTela = {
+  id: "feriados",
+  destino: {
+    viagem_feriado: true,
+    tabela_excepcional_uuid: null,
+  },
+};
+
+function gradeTabelaExcepcional(tabelaUuid: string): GradeDaTela {
+  return {
+    id: `excepcional-${tabelaUuid}`,
+    destino: {
+      viagem_feriado: false,
+      tabela_excepcional_uuid: tabelaUuid,
+    },
+  };
+}
 
 function entradasHeadwaySaoValidas(
   horarioOrigem: string,
@@ -130,7 +165,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   const [viagemSelecionadaUuid, definirViagemSelecionadaUuid] = useState<string | null>(null);
   const [viagemEmHoverUuid, definirViagemEmHoverUuid] = useState<string | null>(null);
   const [colunaDestinoArrasto, definirColunaDestinoArrasto] = useState<{
-    grade: "comuns" | "feriados";
+    gradeId: string;
     dia: DiaSemana;
   } | null>(null);
   const [avisoCopia, definirAvisoCopia] = useState<string | null>(null);
@@ -149,11 +184,11 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   const [errosHeadway, definirErrosHeadway] = useState<Record<string, string>>({});
   const [copiaDiaAberta, definirCopiaDiaAberta] = useState<{
     dia: DiaSemana;
-    feriado: boolean;
+    grade: GradeDaTela;
   } | null>(null);
   const [menuDiaAberto, definirMenuDiaAberto] = useState<{
     dia: DiaSemana;
-    feriado: boolean;
+    grade: GradeDaTela;
     ancora: { x: number; y: number };
   } | null>(null);
   const [confirmacaoApagarViagemUuid, definirConfirmacaoApagarViagemUuid] = useState<
@@ -162,7 +197,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   const [diasDestinoCopia, definirDiasDestinoCopia] = useState<DiaSemana[]>([]);
   const [confirmacaoApagarDia, definirConfirmacaoApagarDia] = useState<{
     dia: DiaSemana;
-    feriado: boolean;
+    grade: GradeDaTela;
   } | null>(null);
 
   useEffect(
@@ -278,14 +313,18 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   function aoConfirmarCriacao(
     dia: DiaSemana,
     horaMinuto: string,
-    feriado: boolean,
-    grade: string,
+    grade: GradeDaTela,
   ): boolean {
     if (!itinerarioAtual || horaMinuto === "") return false;
-    const viagemNova = criarViagemNaCelula(itinerarioAtual, dia, horaMinuto, feriado);
+    const viagemNova = criarViagemNaCelula(
+      itinerarioAtual,
+      dia,
+      horaMinuto,
+      grade.destino,
+    );
     if (!viagemNova) return false;
     alvoFocoPendenteRef.current = {
-      grade,
+      grade: grade.id,
       viagemUuid: viagemNova.uuid,
       indiceSecao: 0,
       dia,
@@ -510,12 +549,11 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   function aoCopiarViagemParaGrade(
     viagemUuid: string,
     dia: DiaSemana,
-    feriado: boolean,
+    gradeDestino: GradeDestinoViagem,
   ) {
     if (!itinerarioAtual) return;
     const resultado = copiarViagemParaDiaComGuarda(itinerarioAtual, viagemUuid, dia, {
-      viagem_feriado: feriado,
-      tabela_excepcional_uuid: null,
+      ...gradeDestino,
     });
     if (!resultado.ok) {
       if (resultado.motivo === "horario-existente") {
@@ -536,7 +574,10 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
     const diaDestino = diaAoLado(origem.dia_semana, direcao);
     evento.preventDefault();
     if (!diaDestino) return;
-    aoCopiarViagemParaGrade(viagemSelecionadaUuid, diaDestino, origem.viagem_feriado);
+    aoCopiarViagemParaGrade(viagemSelecionadaUuid, diaDestino, {
+      viagem_feriado: origem.viagem_feriado,
+      tabela_excepcional_uuid: origem.tabela_excepcional_uuid,
+    });
   }
 
   function aoIniciarArrasto(evento: DragEvent<HTMLTableCellElement>, viagemUuid: string) {
@@ -551,23 +592,25 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
 
   function aoSobreporColuna(
     evento: DragEvent<HTMLTableCellElement>,
-    grade: "comuns" | "feriados",
+    grade: GradeDaTela,
     dia: DiaSemana,
   ) {
     evento.preventDefault();
     evento.dataTransfer.dropEffect = "copy";
-    definirColunaDestinoArrasto({ grade, dia });
+    definirColunaDestinoArrasto({ gradeId: grade.id, dia });
   }
 
   function aoSoltarNaColuna(
     evento: DragEvent<HTMLTableCellElement>,
-    grade: "comuns" | "feriados",
+    grade: GradeDaTela,
     dia: DiaSemana,
   ) {
     evento.preventDefault();
     const viagemUuid = evento.dataTransfer.getData("text/plain");
     definirColunaDestinoArrasto(null);
-    if (viagemUuid) aoCopiarViagemParaGrade(viagemUuid, dia, grade === "feriados");
+    if (viagemUuid) {
+      aoCopiarViagemParaGrade(viagemUuid, dia, grade.destino);
+    }
   }
 
   function aoApagarViagem(viagemUuid: string) {
@@ -583,12 +626,12 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   function aoAbrirMenuDia(
     evento: MouseEvent<HTMLButtonElement>,
     dia: DiaSemana,
-    feriado: boolean,
+    grade: GradeDaTela,
   ) {
     const caixa = evento.currentTarget.getBoundingClientRect();
     definirMenuDiaAberto({
       dia,
-      feriado,
+      grade,
       ancora: { x: caixa.left, y: caixa.bottom },
     });
   }
@@ -599,7 +642,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
       itinerarioAtual,
       copiaDiaAberta.dia,
       diasDestinoCopia,
-      { viagem_feriado: copiaDiaAberta.feriado, tabela_excepcional_uuid: null },
+      copiaDiaAberta.grade.destino,
     );
     if (resultado.copias.length > 0) aplicar(resultado.itinerario);
     if (resultado.horariosIgnorados > 0) {
@@ -615,16 +658,12 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
 
   function aoConfirmarApagarDia() {
     if (!itinerarioAtual || !confirmacaoApagarDia) return;
-    const grade = {
-      viagem_feriado: confirmacaoApagarDia.feriado,
-      tabela_excepcional_uuid: null,
-    };
+    const grade = confirmacaoApagarDia.grade.destino;
     const removidas = itinerarioAtual.viagens
       .filter(
         (viagem) =>
           viagem.dia_semana === confirmacaoApagarDia.dia &&
-          viagem.viagem_feriado === grade.viagem_feriado &&
-          viagem.tabela_excepcional_uuid === grade.tabela_excepcional_uuid,
+          viagemPertenceAGrade(viagem, grade),
       )
       .map((viagem) => viagem.uuid);
     limparEstadoDeSessao(removidas);
@@ -638,29 +677,43 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
     definirConfirmacaoApagarDia(null);
   }
 
-  // "Copiar dias comuns" para a grade de feriados (Spec 04 §8.4; RN-007/068).
-  // Quando a grade de feriados já tem conteúdo, a confirmação é a escolha
-  // explícita do modo (sobrescrever/mesclar) — dois botões distintos.
-  function aoCopiarDiasComuns(modo: "sobrescrever" | "mesclar") {
+  // Semeadura da grade a partir dos dias comuns (Spec 04 §8.4/§8.5; DEC-087).
+  function aoCopiarDiasComuns(
+    gradeDestino: GradeDaTela,
+    modo: "sobrescrever" | "mesclar",
+  ) {
     if (!itinerarioAtual) return;
+    const viagensDestinoAtuais = itinerarioAtual.viagens.filter((viagem) =>
+      viagemPertenceAGrade(viagem, gradeDestino.destino),
+    );
     if (modo === "sobrescrever") {
-      const feriadoAtual = itinerarioAtual.viagens.filter((v) => v.viagem_feriado);
-      if (feriadoAtual.length > 0) {
+      if (viagensDestinoAtuais.length > 0) {
         const confirmado =
           typeof window === "undefined" ||
           window.confirm(
-            "Sobrescrever a grade de feriados com os dias comuns? As viagens de feriado atuais serão descartadas.",
+            "Sobrescrever esta grade com os dias comuns? As Viagens atuais serão descartadas.",
           );
         if (!confirmado) return;
-        limparEstadoDeSessao(feriadoAtual.map((v) => v.uuid));
-        aplicar(
-          clonarDiasComunsParaFeriado(itinerarioAtual, "sobrescrever"),
-          ancorasSem(feriadoAtual.map((v) => v.uuid)),
-        );
-        return;
       }
     }
-    aplicar(clonarDiasComunsParaFeriado(itinerarioAtual, modo));
+    const uuidsDestinoAtuais = viagensDestinoAtuais.map((viagem) => viagem.uuid);
+    limparEstadoDeSessao(uuidsDestinoAtuais);
+    const itinerarioAtualizado = semearGradeAPartirDeOutra(
+      itinerarioAtual,
+      GRADE_COMUM.destino,
+      gradeDestino.destino,
+      modo,
+    );
+    if (
+      viagemSelecionadaUuid &&
+      uuidsDestinoAtuais.includes(viagemSelecionadaUuid) &&
+      !itinerarioAtualizado.viagens.some(
+        (viagem) => viagem.uuid === viagemSelecionadaUuid,
+      )
+    ) {
+      definirViagemSelecionadaUuid(null);
+    }
+    aplicar(itinerarioAtualizado, ancorasSem(uuidsDestinoAtuais));
   }
 
   if (servicos.length === 0) {
@@ -680,14 +733,14 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   const temFeriado = itinerarioAtual?.viagens.some((v) => v.viagem_feriado) ?? false;
 
   function navegarNaGrade(
-    grade: "comuns" | "feriados",
+    grade: GradeDaTela,
     origem: CoordenadaCelulaGrade,
     tecla: TeclaNavegacaoGrade,
   ): boolean {
     const destino = destinoNavegacaoGrade(origem, tecla, secoesDaGrade.length);
     if (!destino) return false;
     const seletor =
-      `input[data-grade="${grade}"]` +
+      `input[data-grade="${grade.id}"]` +
       `[data-bloco="${destino.indiceBloco}"]` +
       `[data-secao-index="${destino.indiceSecao}"]` +
       `[data-dia="${destino.dia}"]`;
@@ -721,10 +774,9 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
     return true;
   }
 
-  // Corpo de uma grade (dias comuns ou feriados). `feriado` propaga para a
-  // criação de Viagem na grade correta.
-  function corpoGrade(blocos: BlocoGrade[], feriado: boolean) {
-    const grade = feriado ? "feriados" : "comuns";
+  // Corpo compartilhado por todas as grades. Os dois discriminadores seguem
+  // juntos em toda criação/cópia para preservar a exclusividade da RN-061.
+  function corpoGrade(blocos: BlocoGrade[], grade: GradeDaTela) {
     return blocos.map((bloco, indiceBloco) => {
       return secoesDaGrade.map((parada, indiceSecao) => {
         const secao = secaoDaParada(parada, todasAsSecoes);
@@ -746,7 +798,8 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
             {DIAS_SEMANA.map((dia) => {
               const celula = bloco[dia];
               const colunaEmArrasto =
-                colunaDestinoArrasto?.grade === grade && colunaDestinoArrasto.dia === dia;
+                colunaDestinoArrasto?.gradeId === grade.id &&
+                colunaDestinoArrasto.dia === dia;
               const classeColunaDestino = colunaEmArrasto
                 ? "bg-azul-50 outline-2 outline-azul-300"
                 : "";
@@ -780,14 +833,14 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                   .filter(Boolean)
                   .join(" ");
                 const atributosNavegacao = {
-                  "data-grade": grade,
+                  "data-grade": grade.id,
                   "data-bloco": indiceBloco,
                   "data-secao-index": indiceSecao,
                   "data-dia": dia,
                   "data-viagem-uuid": celula.viagem.uuid,
                 };
                 const alvoFoco: AlvoFocoCelulaGrade = {
-                  grade,
+                  grade: grade.id,
                   viagemUuid: celula.viagem.uuid,
                   indiceSecao,
                   dia,
@@ -993,7 +1046,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
 
               if (celula.estado === "criavel" && ehPrimeiraSecao) {
                 const atributosNavegacao = {
-                  "data-grade": grade,
+                  "data-grade": grade.id,
                   "data-bloco": indiceBloco,
                   "data-secao-index": indiceSecao,
                   "data-dia": dia,
@@ -1011,7 +1064,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                       rotuloAcessivel={`Criar viagem — ${dia}`}
                       valor=""
                       aoConfirmar={(valor) =>
-                        aoConfirmarCriacao(dia, valor, feriado, grade)
+                        aoConfirmarCriacao(dia, valor, grade)
                       }
                       aoNavegar={(tecla) =>
                         navegarNaGrade(
@@ -1155,7 +1208,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
     });
   }
 
-  function cabecalhoGrade(grade: "comuns" | "feriados") {
+  function cabecalhoGrade(grade: GradeDaTela) {
     return (
       <thead>
         <tr>
@@ -1165,7 +1218,8 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
               scope="col"
               key={dia}
               className={
-                colunaDestinoArrasto?.grade === grade && colunaDestinoArrasto.dia === dia
+                colunaDestinoArrasto?.gradeId === grade.id &&
+                colunaDestinoArrasto.dia === dia
                   ? "bg-azul-50 outline-2 outline-azul-300"
                   : undefined
               }
@@ -1174,13 +1228,14 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                 variante="fantasma"
                 tamanho="compacto"
                 className="w-full font-semibold"
-                data-testid={`operacoes-dia-${grade}-${dia}`}
+                data-testid={`operacoes-dia-${grade.id}-${dia}`}
                 aria-label={`Operações do dia — ${ROTULO_DIA[dia]}`}
                 aria-haspopup="menu"
                 aria-expanded={
-                  menuDiaAberto?.dia === dia && menuDiaAberto.feriado === (grade === "feriados")
+                  menuDiaAberto?.dia === dia &&
+                  menuDiaAberto.grade.id === grade.id
                 }
-                onClick={(evento) => aoAbrirMenuDia(evento, dia, grade === "feriados")}
+                onClick={(evento) => aoAbrirMenuDia(evento, dia, grade)}
               >
                 {ROTULO_DIA[dia]}
               </Botao>
@@ -1310,7 +1365,7 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
               aoSelecionar: () => {
                 definirCopiaDiaAberta({
                   dia: menuDiaAberto.dia,
-                  feriado: menuDiaAberto.feriado,
+                  grade: menuDiaAberto.grade,
                 });
                 definirDiasDestinoCopia([]);
               },
@@ -1385,9 +1440,9 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
               Restaurar sugestão (toda a grade)
             </Botao>
             <Tabela densidade="compacta" className="mt-4">
-              {cabecalhoGrade("comuns")}
+              {cabecalhoGrade(GRADE_COMUM)}
               <tbody onMouseEnter={cancelarSaidaHover} onMouseLeave={agendarSaidaHover}>
-                {corpoGrade(blocosComuns, false)}
+                {corpoGrade(blocosComuns, GRADE_COMUM)}
               </tbody>
             </Tabela>
           </section>
@@ -1404,14 +1459,18 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                   <Botao
                     variante="secundario"
                     data-testid="copiar-dias-comuns-sobrescrever"
-                    onClick={() => aoCopiarDiasComuns("sobrescrever")}
+                    onClick={() =>
+                      aoCopiarDiasComuns(GRADE_FERIADOS, "sobrescrever")
+                    }
                   >
                     Copiar dias comuns (sobrescrever)
                   </Botao>
                   <Botao
                     variante="secundario"
                     data-testid="copiar-dias-comuns-mesclar"
-                    onClick={() => aoCopiarDiasComuns("mesclar")}
+                    onClick={() =>
+                      aoCopiarDiasComuns(GRADE_FERIADOS, "mesclar")
+                    }
                   >
                     Copiar dias comuns (mesclar)
                   </Botao>
@@ -1420,19 +1479,93 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                 <Botao
                   variante="secundario"
                   data-testid="copiar-dias-comuns"
-                  onClick={() => aoCopiarDiasComuns("sobrescrever")}
+                  onClick={() =>
+                    aoCopiarDiasComuns(GRADE_FERIADOS, "sobrescrever")
+                  }
                 >
                   Copiar dias comuns
                 </Botao>
               )}
             </div>
             <Tabela densidade="compacta" className="mt-4">
-              {cabecalhoGrade("feriados")}
+              {cabecalhoGrade(GRADE_FERIADOS)}
               <tbody onMouseEnter={cancelarSaidaHover} onMouseLeave={agendarSaidaHover}>
-                {corpoGrade(blocosFeriados, true)}
+                {corpoGrade(blocosFeriados, GRADE_FERIADOS)}
               </tbody>
             </Tabela>
           </section>
+
+          {(servicoAtual?.tabelas_excepcionais ?? []).map((tabela) => {
+            const grade = gradeTabelaExcepcional(tabela.uuid);
+            const blocos = montarBlocosGrade(
+              itinerarioAtual.viagens,
+              grade.destino,
+            );
+            const temConteudo = itinerarioAtual.viagens.some((viagem) =>
+              viagemPertenceAGrade(viagem, grade.destino),
+            );
+
+            return (
+              <section
+                key={tabela.uuid}
+                data-testid="grade-tabela-excepcional"
+                data-tabela-excepcional-uuid={tabela.uuid}
+                className="mt-6"
+              >
+                <h3 className="text-lg font-semibold text-cinza-900">
+                  {rotuloTabelaExcepcional(tabela)}
+                </h3>
+                <p
+                  data-testid="legenda-tabela-excepcional"
+                  className="text-sm text-cinza-500"
+                >
+                  Esta grade não entra nas contagens da semana padrão —{" "}
+                  {ROTULO_SEMANA_PADRAO}.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {temConteudo ? (
+                    <>
+                      <Botao
+                        variante="secundario"
+                        data-testid="copiar-dias-comuns-excepcional-sobrescrever"
+                        onClick={() =>
+                          aoCopiarDiasComuns(grade, "sobrescrever")
+                        }
+                      >
+                        Copiar dias comuns (sobrescrever)
+                      </Botao>
+                      <Botao
+                        variante="secundario"
+                        data-testid="copiar-dias-comuns-excepcional-mesclar"
+                        onClick={() => aoCopiarDiasComuns(grade, "mesclar")}
+                      >
+                        Copiar dias comuns (mesclar)
+                      </Botao>
+                    </>
+                  ) : (
+                    <Botao
+                      variante="secundario"
+                      data-testid="copiar-dias-comuns-excepcional"
+                      onClick={() =>
+                        aoCopiarDiasComuns(grade, "sobrescrever")
+                      }
+                    >
+                      Copiar dias comuns
+                    </Botao>
+                  )}
+                </div>
+                <Tabela densidade="compacta" className="mt-4">
+                  {cabecalhoGrade(grade)}
+                  <tbody
+                    onMouseEnter={cancelarSaidaHover}
+                    onMouseLeave={agendarSaidaHover}
+                  >
+                    {corpoGrade(blocos, grade)}
+                  </tbody>
+                </Tabela>
+              </section>
+            );
+          })}
         </>
       )}
 

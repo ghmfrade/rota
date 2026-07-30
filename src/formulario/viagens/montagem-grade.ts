@@ -1,5 +1,6 @@
 import { DIAS_SEMANA, type Parada, type Viagem } from "@/shared/contrato";
 import { somarHorarios } from "./horario-relogio";
+import type { GradeDestinoViagem } from "./copias-grade";
 
 export type DiaSemana = Viagem["dia_semana"];
 
@@ -85,7 +86,10 @@ export function linhasSecoes(paradas: readonly Parada[]): Parada[] {
  * `viagem_feriado=false`. Ver `montarBlocosPorFeriado`.
  */
 export function montarBlocosDiasComuns(viagens: readonly Viagem[]): BlocoGrade[] {
-  return montarBlocosPorFeriado(viagens, false);
+  return montarBlocosGrade(viagens, {
+    viagem_feriado: false,
+    tabela_excepcional_uuid: null,
+  });
 }
 
 /**
@@ -94,22 +98,34 @@ export function montarBlocosDiasComuns(viagens: readonly Viagem[]): BlocoGrade[]
  * ou nenhuma viagem (RN-071). Mesma montagem por posição ordinal.
  */
 export function montarBlocosFeriados(viagens: readonly Viagem[]): BlocoGrade[] {
-  return montarBlocosPorFeriado(viagens, true);
+  return montarBlocosGrade(viagens, {
+    viagem_feriado: true,
+    tabela_excepcional_uuid: null,
+  });
 }
 
 /**
  * Núcleo de montagem da grade (Spec 04 §8.1): agrupa as Viagens do escopo
- * (`viagem_feriado === feriado`) por `dia_semana`, ordena cada dia por
+ * (discriminadores da grade) por `dia_semana`, ordena cada dia por
  * `horario_saida` (RN-062 tolera reforço — desempate por `uuid` para
  * determinismo) e alinha pela posição ordinal (a n-ésima partida do dia).
  * Cada dia ganha exatamente UMA célula "criável", logo após sua última
  * Viagem. O total de blocos é o maior número de Viagens entre os dias + 1,
  * para que o(s) dia(s) mais cheio(s) também tenham sua célula criável.
  */
-function montarBlocosPorFeriado(viagens: readonly Viagem[], feriado: boolean): BlocoGrade[] {
+export function montarBlocosGrade(
+  viagens: readonly Viagem[],
+  grade: GradeDestinoViagem,
+): BlocoGrade[] {
   const porDia = new Map<DiaSemana, Viagem[]>(DIAS_SEMANA.map((dia) => [dia, []]));
   for (const viagem of viagens) {
-    if (viagem.viagem_feriado !== feriado) continue;
+    if (
+      viagem.viagem_feriado !== grade.viagem_feriado ||
+      (viagem.tabela_excepcional_uuid ?? null) !==
+        grade.tabela_excepcional_uuid
+    ) {
+      continue;
+    }
     porDia.get(viagem.dia_semana)?.push(viagem);
   }
   for (const lista of porDia.values()) {

@@ -6,6 +6,7 @@ import {
   linhasSecoes,
   montarBlocosDiasComuns,
   montarBlocosFeriados,
+  montarBlocosGrade,
   seletorAlvoFocoCelulaGrade,
 } from "@/formulario/viagens";
 
@@ -204,6 +205,18 @@ describe("destinoNavegacaoGrade (TASK-106)", () => {
       dia: "segunda",
     });
   });
+
+  test("[inválido] Viagem excepcional não entra na grade comum (RN-061/099)", () => {
+    const comum = viagem("a1", "segunda", "08:00:00");
+    const excepcional = viagem("a2", "segunda", "09:00:00");
+    excepcional.tabela_excepcional_uuid =
+      "aaaaaaaa-0000-4000-8000-000000000001";
+
+    const blocos = montarBlocosDiasComuns([comum, excepcional]);
+
+    expect(blocos).toHaveLength(2);
+    expect(blocos[0].segunda).toEqual({ estado: "existente", viagem: comum });
+  });
 });
 
 describe("seletorAlvoFocoCelulaGrade (TASK-115; RN-061/062)", () => {
@@ -233,5 +246,29 @@ describe("seletorAlvoFocoCelulaGrade (TASK-115; RN-061/062)", () => {
     const alvoB = seletorAlvoFocoCelulaGrade({ ...base, viagemUuid: "viagem-b" });
 
     expect(alvoA).not.toBe(alvoB);
+  });
+});
+
+describe("montarBlocosGrade — Tabela excepcional (TASK-105; RN-099)", () => {
+  test("monta somente as Viagens da Tabela excepcional informada", () => {
+    const tabelaA = "aaaaaaaa-0000-4000-8000-000000000001";
+    const tabelaB = "bbbbbbbb-0000-4000-8000-000000000002";
+    const comum = viagem("a1", "segunda", "07:00:00");
+    const excepcionalA = viagem("a2", "segunda", "08:00:00");
+    excepcionalA.tabela_excepcional_uuid = tabelaA;
+    const excepcionalB = viagem("a3", "segunda", "09:00:00");
+    excepcionalB.tabela_excepcional_uuid = tabelaB;
+
+    const blocos = montarBlocosGrade(
+      [comum, excepcionalA, excepcionalB],
+      { viagem_feriado: false, tabela_excepcional_uuid: tabelaA },
+    );
+
+    expect(blocos).toHaveLength(2);
+    expect(blocos[0].segunda).toEqual({
+      estado: "existente",
+      viagem: excepcionalA,
+    });
+    expect(blocos[1].segunda).toEqual({ estado: "criavel" });
   });
 });

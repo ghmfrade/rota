@@ -2,14 +2,15 @@ import { criarViagem, type Itinerario, type Viagem } from "@/shared/contrato";
 import type { DiaSemana } from "./montagem-grade";
 
 // Ações de cópia e remoção da grade (Spec 04 §8.3/§8.4; RN-007/061/068/071).
-// Toda cópia cria entidade nova pela fábrica `criarViagem` — UUID nova, jamais
-// reutilizada da origem (RN-007/005). Nada aqui recalcula offsets: a cópia
-// preserva `horarios_paradas` tal como está, mantendo a invariante de RN-063.
+// Cópias legítimas criam entidade nova pela fábrica `criarViagem` — UUID nova,
+// jamais reutilizada da origem (RN-007/005). A exceção é a sincronização da
+// DEC-087, que preserva a UUID do destino casado e substitui só seus offsets.
+// Nada aqui recalcula offsets: a cópia preserva `horarios_paradas` tal como está.
 // Funções puras (sem UI e sem estado de sessão) — a sincronia das âncoras
 // efêmeras (DEC-049) e as confirmações são responsabilidade do chamador.
 
-/** Modo de "Copiar dias comuns" quando a grade de feriados já tem conteúdo (Spec 04 §8.4). */
-export type ModoCopiaFeriado = "sobrescrever" | "mesclar";
+/** Modo de semeadura quando a grade de destino já tem conteúdo (Spec 04 §8.5). */
+export type ModoSemeaduraGrade = "sobrescrever" | "mesclar";
 
 /** Discriminadores da grade que receberá a cópia (RN-061/RN-099). */
 export interface GradeDestinoViagem {
@@ -43,10 +44,14 @@ export function diaAoLado(dia: DiaSemana, direcao: -1 | 1): DiaSemana | null {
   return dias[indice + direcao] ?? null;
 }
 
-function mesmaGrade(viagem: Viagem, grade: GradeDestinoViagem): boolean {
+export function viagemPertenceAGrade(
+  viagem: Viagem,
+  grade: GradeDestinoViagem,
+): boolean {
   return (
     viagem.viagem_feriado === grade.viagem_feriado &&
-    viagem.tabela_excepcional_uuid === grade.tabela_excepcional_uuid
+    (viagem.tabela_excepcional_uuid ?? null) ===
+      (grade.tabela_excepcional_uuid ?? null)
   );
 }
 
@@ -67,7 +72,7 @@ export function existeViagemNoHorarioDaGrade(
     (viagem) =>
       viagem.dia_semana === diaSemana &&
       viagem.horario_saida === horarioSaida &&
-      mesmaGrade(viagem, grade),
+      viagemPertenceAGrade(viagem, grade),
   );
 }
 
@@ -96,32 +101,104 @@ export function copiarViagemParaDias(
   );
 }
 
+function chaveCasamentoSemeadura(viagem: Viagem): string {
+  return `${viagem.dia_semana}\u0000${viagem.horario_saida}`;
+}
+
+function clonarParaGrade(
+  viagem: Viagem,
+  gradeDestino: GradeDestinoViagem,
+): Viagem {
+  return criarViagem({
+    horario_saida: viagem.horario_saida,
+    dia_semana: viagem.dia_semana,
+    viagem_feriado: gradeDestino.viagem_feriado,
+    tabela_excepcional_uuid: gradeDestino.tabela_excepcional_uuid,
+    horarios_paradas: viagem.horarios_paradas.map((horario) => ({
+      ...horario,
+    })),
+  });
+}
+
 /**
- * "Copiar dias comuns" (Spec 04 §8.4; RN-007/061/068): clona todas as Viagens
- * comuns (`viagem_feriado=false`) do itinerário como Viagens de feriado
- * (`viagem_feriado=true`), com **UUIDs novas** e offsets preservados. As
- * comuns permanecem intocadas (grades independentes — RN-068).
- * - `sobrescrever`: descarta as Viagens de feriado existentes antes de inserir os clones.
- * - `mesclar`: mantém as de feriado existentes e adiciona os clones (duplicatas são reforço válido — RN-062).
- * Grade comum vazia → nenhum clone criado (`mesclar` preserva o que houver;
- * `sobrescrever` esvazia a grade de feriados — RN-071).
+ * Semeia uma grade a partir de outra (Spec 04 §8.5; DEC-087).
+ *
+ * `sobrescrever` substitui integralmente o destino por clones com UUIDs novas.
+ * `mesclar` é sincronização: por `dia_semana + horario_saida`, preserva por
+ * contagem as UUIDs do destino que permanecem, atualiza seus offsets, remove o
+ * excedente e cria o que falta. A ordem estável dos arrays resolve somente o
+ * pareamento interno entre reforços semanticamente equivalentes (RN-062).
  */
+export function semearGradeAPartirDeOutra(
+  itinerario: Itinerario,
+  gradeOrigem: GradeDestinoViagem,
+  gradeDestino: GradeDestinoViagem,
+  modo: ModoSemeaduraGrade,
+): Itinerario {
+  const origem = itinerario.viagens.filter((viagem) =>
+    viagemPertenceAGrade(viagem, gradeOrigem),
+  );
+  const foraDoDestino = itinerario.viagens.filter(
+    (viagem) => !viagemPertenceAGrade(viagem, gradeDestino),
+  );
+
+  if (modo === "sobrescrever") {
+    return {
+      ...itinerario,
+      viagens: [
+        ...foraDoDestino,
+        ...origem.map((viagem) => clonarParaGrade(viagem, gradeDestino)),
+      ],
+    };
+  }
+
+  const destinoPorChave = new Map<string, Viagem[]>();
+  for (const viagem of itinerario.viagens) {
+    if (!viagemPertenceAGrade(viagem, gradeDestino)) continue;
+    const chave = chaveCasamentoSemeadura(viagem);
+    const grupo = destinoPorChave.get(chave) ?? [];
+    grupo.push(viagem);
+    destinoPorChave.set(chave, grupo);
+  }
+
+  const usadosPorChave = new Map<string, number>();
+  const destinoSincronizado = origem.map((viagemOrigem) => {
+    const chave = chaveCasamentoSemeadura(viagemOrigem);
+    const indice = usadosPorChave.get(chave) ?? 0;
+    usadosPorChave.set(chave, indice + 1);
+    const viagemDestino = destinoPorChave.get(chave)?.[indice];
+
+    if (!viagemDestino) {
+      return clonarParaGrade(viagemOrigem, gradeDestino);
+    }
+
+    return {
+      ...viagemDestino,
+      viagem_feriado: gradeDestino.viagem_feriado,
+      tabela_excepcional_uuid: gradeDestino.tabela_excepcional_uuid,
+      horarios_paradas: viagemOrigem.horarios_paradas.map((horario) => ({
+        ...horario,
+      })),
+    };
+  });
+
+  return {
+    ...itinerario,
+    viagens: [...foraDoDestino, ...destinoSincronizado],
+  };
+}
+
+/** Compatibilidade da ação existente da grade de feriados. */
 export function clonarDiasComunsParaFeriado(
   itinerario: Itinerario,
-  modo: ModoCopiaFeriado,
+  modo: ModoSemeaduraGrade,
 ): Itinerario {
-  const comuns = itinerario.viagens.filter((v) => !v.viagem_feriado);
-  const feriadoExistente = itinerario.viagens.filter((v) => v.viagem_feriado);
-  const clones = comuns.map((v) =>
-    criarViagem({
-      horario_saida: v.horario_saida,
-      dia_semana: v.dia_semana,
-      viagem_feriado: true,
-      horarios_paradas: v.horarios_paradas.map((h) => ({ ...h })),
-    }),
+  return semearGradeAPartirDeOutra(
+    itinerario,
+    { viagem_feriado: false, tabela_excepcional_uuid: null },
+    { viagem_feriado: true, tabela_excepcional_uuid: null },
+    modo,
   );
-  const feriadoFinal = modo === "sobrescrever" ? clones : [...feriadoExistente, ...clones];
-  return { ...itinerario, viagens: [...comuns, ...feriadoFinal] };
 }
 
 /**
@@ -146,7 +223,10 @@ export function copiarViagemParaDiaComGuarda(
   const origem = itinerario.viagens.find((viagem) => viagem.uuid === viagemUuid);
   if (!origem) return { ok: false, motivo: "origem-ausente" };
 
-  if (origem.dia_semana === diaDestino && mesmaGrade(origem, gradeDestino)) {
+  if (
+    origem.dia_semana === diaDestino &&
+    viagemPertenceAGrade(origem, gradeDestino)
+  ) {
     return { ok: false, motivo: "mesma-coluna" };
   }
 
@@ -177,7 +257,9 @@ export function copiarDiaParaDiasComGuarda(
   grade: GradeDestinoViagem,
 ): ResultadoCopiaDia {
   const origens = itinerario.viagens.filter(
-    (viagem) => viagem.dia_semana === diaOrigem && mesmaGrade(viagem, grade),
+    (viagem) =>
+      viagem.dia_semana === diaOrigem &&
+      viagemPertenceAGrade(viagem, grade),
   );
   let resultado = itinerario;
   const copias: Viagem[] = [];
@@ -189,7 +271,8 @@ export function copiarDiaParaDiasComGuarda(
       itinerario.viagens
         .filter(
           (viagem) =>
-            viagem.dia_semana === diaDestino && mesmaGrade(viagem, grade),
+            viagem.dia_semana === diaDestino &&
+            viagemPertenceAGrade(viagem, grade),
         )
         .map((viagem) => viagem.horario_saida),
     );
@@ -221,7 +304,9 @@ export function apagarViagensDoDia(
   return {
     ...itinerario,
     viagens: itinerario.viagens.filter(
-      (viagem) => viagem.dia_semana !== dia || !mesmaGrade(viagem, grade),
+      (viagem) =>
+        viagem.dia_semana !== dia ||
+        !viagemPertenceAGrade(viagem, grade),
     ),
   };
 }

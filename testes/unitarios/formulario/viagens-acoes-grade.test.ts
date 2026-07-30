@@ -104,6 +104,20 @@ describe("inserirViagemPorOffsetRelativo (TASK-107; DEC-082)", () => {
     expect(copia!.horarios_paradas[1]).not.toBe(origem.horarios_paradas[1]);
   });
 
+  test("cria Viagem na Tabela excepcional correta com viagem_feriado=false (RN-099)", () => {
+    const itinerario = itinerarioDaFixture();
+    const tabelaUuid = "aaaaaaaa-0000-4000-8000-000000000001";
+
+    const viagem = criarViagemNaCelula(itinerario, "sabado", "10:30", {
+      viagem_feriado: false,
+      tabela_excepcional_uuid: tabelaUuid,
+    });
+
+    expect(viagem).not.toBeNull();
+    expect(viagem!.tabela_excepcional_uuid).toBe(tabelaUuid);
+    expect(viagem!.viagem_feriado).toBe(false);
+  });
+
   test("aceita limites do dia e reforço de horário", () => {
     const origem = itinerarioDaFixture().viagens[0];
     expect(inserirViagemPorOffsetRelativo({ ...origem, horario_saida: "00:10:00" }, -10)?.horario_saida).toBe(

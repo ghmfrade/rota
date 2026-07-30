@@ -1,5 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { REGEX_UUID_V4, type Itinerario, type Viagem } from "@/shared/contrato";
+import {
+  esquemaDocumentoOperacao,
+  REGEX_UUID_V4,
+  type Itinerario,
+  type Viagem,
+} from "@/shared/contrato";
 import {
   apagarViagem,
   apagarViagensDoDia,
@@ -9,7 +14,9 @@ import {
   copiarViagemParaDias,
   diaAoLado,
   existeViagemNoHorarioDaGrade,
+  semearGradeAPartirDeOutra,
 } from "@/formulario/viagens";
+import { documentoExemploMinimo } from "../../fixtures";
 
 // TASK-030 — cópias e remoções da grade (Spec 04 §8.3/§8.4): copiar viagem para
 // outro dia e "copiar dias comuns" criam entidades novas com UUIDs novas
@@ -227,7 +234,7 @@ describe("clonarDiasComunsParaFeriado (Spec 04 §8.4; RN-007/068)", () => {
     expect(feriados[0].dia_semana).toBe("segunda"); // clone da comum, não o antigo
   });
 
-  test("mesclar mantém as de feriado existentes e adiciona os clones (reforço válido — RN-062)", () => {
+  test("mesclar sincroniza a grade: remove ausentes e cria faltantes (DEC-087)", () => {
     const comum = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
     const feriadoAntigo = viagem("cccccccc-0000-4000-8000-000000000003", "domingo", "07:00:00", true);
     const it = itinerario([comum, feriadoAntigo]);
@@ -235,16 +242,209 @@ describe("clonarDiasComunsParaFeriado (Spec 04 §8.4; RN-007/068)", () => {
     const resultado = clonarDiasComunsParaFeriado(it, "mesclar");
 
     const feriados = resultado.viagens.filter((v) => v.viagem_feriado);
-    expect(feriados).toHaveLength(2);
-    expect(feriados.some((f) => f.uuid === feriadoAntigo.uuid)).toBe(true); // antigo preservado
+    expect(feriados).toHaveLength(1);
+    expect(feriados[0].dia_semana).toBe("segunda");
+    expect(feriados[0].uuid).not.toBe(feriadoAntigo.uuid);
   });
 
-  test("grade comum vazia: sobrescrever esvazia os feriados; mesclar preserva o que houver (RN-071)", () => {
+  test("grade comum vazia: sobrescrever e mesclar esvaziam o destino (DEC-087/RN-071)", () => {
     const feriadoAntigo = viagem("cccccccc-0000-4000-8000-000000000003", "domingo", "07:00:00", true);
     const it = itinerario([feriadoAntigo]);
 
     expect(clonarDiasComunsParaFeriado(it, "sobrescrever").viagens).toEqual([]);
-    expect(clonarDiasComunsParaFeriado(it, "mesclar").viagens).toEqual([feriadoAntigo]);
+    expect(clonarDiasComunsParaFeriado(it, "mesclar").viagens).toEqual([]);
+  });
+});
+
+describe("semearGradeAPartirDeOutra (TASK-105; Spec 04 §8.5; DEC-087)", () => {
+  const tabelaUuid = "dddddddd-0000-4000-8000-000000000004";
+  const comum = { viagem_feriado: false, tabela_excepcional_uuid: null };
+  const excepcional = {
+    viagem_feriado: false,
+    tabela_excepcional_uuid: tabelaUuid,
+  };
+
+  test("destino vazio cria Viagens excepcionais independentes com UUIDs novas", () => {
+    const origem = viagem(
+      "aaaaaaaa-0000-4000-8000-000000000001",
+      "segunda",
+      "08:00:00",
+    );
+
+    const resultado = semearGradeAPartirDeOutra(
+      itinerario([origem]),
+      comum,
+      excepcional,
+      "sobrescrever",
+    );
+    const [copia] = resultado.viagens.filter(
+      (item) => item.tabela_excepcional_uuid === tabelaUuid,
+    );
+
+    expect(copia.uuid).toMatch(REGEX_UUID_V4);
+    expect(copia.uuid).not.toBe(origem.uuid);
+    expect(copia.viagem_feriado).toBe(false);
+    expect(copia.horarios_paradas).toEqual(origem.horarios_paradas);
+    expect(resultado.viagens).toContain(origem);
+  });
+
+  test("mesclar preserva UUID casada, atualiza offsets, remove ausente e cria faltante", () => {
+    const origemCasada = viagem(
+      "aaaaaaaa-0000-4000-8000-000000000001",
+      "segunda",
+      "08:00:00",
+    );
+    origemCasada.horarios_paradas[1].offset_horario = "00:12:00";
+    const origemNova = viagem(
+      "bbbbbbbb-0000-4000-8000-000000000002",
+      "terca",
+      "09:00:00",
+    );
+    const destinoCasado = viagem(
+      "cccccccc-0000-4000-8000-000000000003",
+      "segunda",
+      "08:00:00",
+    );
+    destinoCasado.tabela_excepcional_uuid = tabelaUuid;
+    const destinoAusente = viagem(
+      "dddddddd-0000-4000-8000-000000000005",
+      "domingo",
+      "07:00:00",
+    );
+    destinoAusente.tabela_excepcional_uuid = tabelaUuid;
+
+    const resultado = semearGradeAPartirDeOutra(
+      itinerario([
+        origemCasada,
+        origemNova,
+        destinoCasado,
+        destinoAusente,
+      ]),
+      comum,
+      excepcional,
+      "mesclar",
+    );
+    const destino = resultado.viagens.filter(
+      (item) => item.tabela_excepcional_uuid === tabelaUuid,
+    );
+
+    expect(destino).toHaveLength(2);
+    const casada = destino.find((item) => item.horario_saida === "08:00:00")!;
+    const nova = destino.find((item) => item.horario_saida === "09:00:00")!;
+    expect(casada.uuid).toBe(destinoCasado.uuid);
+    expect(casada.horarios_paradas).toEqual(origemCasada.horarios_paradas);
+    expect(destino.some((item) => item.uuid === destinoAusente.uuid)).toBe(false);
+    expect(nova.uuid).not.toBe(origemNova.uuid);
+    expect(nova.uuid).toMatch(REGEX_UUID_V4);
+  });
+
+  test("RN-062: reforços são casados por contagem e preservam tantas UUIDs quanto coincidirem", () => {
+    const origemA = viagem(
+      "aaaaaaaa-0000-4000-8000-000000000001",
+      "segunda",
+      "08:00:00",
+    );
+    const origemB = viagem(
+      "bbbbbbbb-0000-4000-8000-000000000002",
+      "segunda",
+      "08:00:00",
+    );
+    origemB.horarios_paradas[1].offset_horario = "00:15:00";
+    const destinoExistente = viagem(
+      "cccccccc-0000-4000-8000-000000000003",
+      "segunda",
+      "08:00:00",
+    );
+    destinoExistente.tabela_excepcional_uuid = tabelaUuid;
+
+    const resultado = semearGradeAPartirDeOutra(
+      itinerario([origemA, origemB, destinoExistente]),
+      comum,
+      excepcional,
+      "mesclar",
+    );
+    const destino = resultado.viagens.filter(
+      (item) => item.tabela_excepcional_uuid === tabelaUuid,
+    );
+
+    expect(destino).toHaveLength(2);
+    expect(destino.filter((item) => item.uuid === destinoExistente.uuid)).toHaveLength(1);
+    expect(new Set(destino.map((item) => item.uuid)).size).toBe(2);
+    expect(
+      destino
+        .map((item) => item.horarios_paradas[1].offset_horario)
+        .sort(),
+    ).toEqual(["00:07:00", "00:15:00"]);
+  });
+
+  test("[inválido] não mistura outra Tabela excepcional nem a grade de feriados", () => {
+    const outraTabelaUuid = "eeeeeeee-0000-4000-8000-000000000005";
+    const origem = viagem(
+      "aaaaaaaa-0000-4000-8000-000000000001",
+      "segunda",
+      "08:00:00",
+    );
+    const outraExcepcional = viagem(
+      "bbbbbbbb-0000-4000-8000-000000000002",
+      "terca",
+      "09:00:00",
+    );
+    outraExcepcional.tabela_excepcional_uuid = outraTabelaUuid;
+    const feriado = viagem(
+      "cccccccc-0000-4000-8000-000000000003",
+      "quarta",
+      "10:00:00",
+      true,
+    );
+
+    const resultado = semearGradeAPartirDeOutra(
+      itinerario([origem, outraExcepcional, feriado]),
+      comum,
+      excepcional,
+      "sobrescrever",
+    );
+
+    expect(resultado.viagens).toContain(outraExcepcional);
+    expect(resultado.viagens).toContain(feriado);
+    expect(
+      resultado.viagens.filter(
+        (item) => item.tabela_excepcional_uuid === tabelaUuid,
+      ),
+    ).toHaveLength(1);
+  });
+
+  test("round-trip do contrato preserva as UUIDs resultantes da cópia (RN-004/007)", () => {
+    const documento = documentoExemploMinimo();
+    documento.versao_schema = "1.1";
+    const servico = documento.autos.servicos[0];
+    servico.tabelas_excepcionais = [
+      { uuid: tabelaUuid, tipo: "ferias_verao" },
+    ];
+    const itinerarioOrigem = servico.itinerarios[0];
+    itinerarioOrigem.viagens = itinerarioOrigem.viagens.map((item) => ({
+      ...item,
+      tabela_excepcional_uuid: null,
+    }));
+    servico.itinerarios[0] = semearGradeAPartirDeOutra(
+      itinerarioOrigem,
+      comum,
+      excepcional,
+      "sobrescrever",
+    );
+    const uuidsAntes = servico.itinerarios[0].viagens
+      .filter((item) => item.tabela_excepcional_uuid === tabelaUuid)
+      .map((item) => item.uuid)
+      .sort();
+
+    const reimportado = esquemaDocumentoOperacao.parse(
+      JSON.parse(JSON.stringify(documento)),
+    );
+    const uuidsDepois = reimportado.autos.servicos[0].itinerarios[0].viagens
+      .filter((item) => item.tabela_excepcional_uuid === tabelaUuid)
+      .map((item) => item.uuid)
+      .sort();
+
+    expect(uuidsDepois).toEqual(uuidsAntes);
   });
 });
 describe("apagarViagem (Spec 04 §8.3)", () => {

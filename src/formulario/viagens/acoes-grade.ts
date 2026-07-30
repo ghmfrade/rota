@@ -9,7 +9,10 @@ import {
   recomputarOffsetsComAncoras,
 } from "./redistribuicao-offsets";
 import { sugerirOffsetsIniciais } from "./sugestao-inicial-offsets";
-import { existeViagemNoHorarioDaGrade } from "./copias-grade";
+import {
+  existeViagemNoHorarioDaGrade,
+  type GradeDestinoViagem,
+} from "./copias-grade";
 
 type ItinerarioParaSugestao = Pick<Itinerario, "paradas" | "rota">;
 
@@ -17,22 +20,26 @@ type ItinerarioParaSugestao = Pick<Itinerario, "paradas" | "rota">;
  * Cria a Viagem de um dia ao preencher a 1ª Seção de um bloco vazio da grade
  * (Spec 04 §8.2/§8.4; RN-061/064/067): converte o horário de relógio digitado
  * em `horario_saida`, deriva `horarios_paradas[]` completo pela sugestão inicial
- * (Spec 03 §8.1). `feriado` define em qual grade a Viagem nasce — comum
- * (`false`, padrão) ou de feriado (`true`, Spec 04 §8.4). `null` se o horário
- * digitado for inválido — a grade não cria Viagem a partir de dado ruim.
+ * (Spec 03 §8.1). `grade` define em qual grade a Viagem nasce — comum por
+ * padrão, de feriado ou de uma Tabela excepcional. `null` se o horário digitado
+ * for inválido — a grade não cria Viagem a partir de dado ruim.
  */
 export function criarViagemNaCelula(
   itinerario: ItinerarioParaSugestao,
   diaSemana: Viagem["dia_semana"],
   horaMinuto: string,
-  feriado = false,
+  grade: GradeDestinoViagem = {
+    viagem_feriado: false,
+    tabela_excepcional_uuid: null,
+  },
 ): Viagem | null {
   const horarioSaida = horaMinutoParaHorarioRelogio(horaMinuto);
   if (horarioSaida === null) return null;
   return criarViagem({
     horario_saida: horarioSaida,
     dia_semana: diaSemana,
-    viagem_feriado: feriado,
+    viagem_feriado: grade.viagem_feriado,
+    tabela_excepcional_uuid: grade.tabela_excepcional_uuid,
     horarios_paradas: sugerirOffsetsIniciais(itinerario.paradas, itinerario.rota.trechos),
   });
 }

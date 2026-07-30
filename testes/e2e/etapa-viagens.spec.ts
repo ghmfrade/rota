@@ -1119,6 +1119,103 @@ test.describe("Etapa Viagens — grade de feriados e cópias (TASK-030; Spec 04 
   });
 });
 
+test.describe("TASK-105 — grade de horários da Tabela excepcional", () => {
+  test("preenche, confirma por Tab e sincroniza os dias comuns sem misturar grades", async ({
+    page,
+  }) => {
+    let chamadasOsrm = 0;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamadasOsrm += 1;
+      return rota.abort();
+    });
+
+    const documento = structuredClone(
+      multiServico,
+    ) as unknown as DocumentoOperacao;
+    documento.versao_schema = "1.1";
+    for (const servico of documento.autos.servicos) {
+      servico.tabelas_excepcionais = [];
+      for (const itinerario of servico.itinerarios) {
+        for (const viagem of itinerario.viagens) {
+          viagem.tabela_excepcional_uuid = null;
+        }
+      }
+    }
+    const servicoAlvo = documento.autos.servicos.find(
+      (servico) => servico.numero_n === "0001-1SU",
+    )!;
+    const tabelaUuid = "10000000-0000-4000-8000-000000000001";
+    servicoAlvo.tabelas_excepcionais = [
+      { uuid: tabelaUuid, tipo: "ferias_verao" },
+    ];
+
+    await abrirEtapaViagens(page, documento);
+    const excepcional = page
+      .getByTestId("grade-tabela-excepcional")
+      .filter({ hasText: "Férias de verão" });
+    const comum = gradeComum(page);
+
+    await expect(excepcional).toBeVisible();
+    await expect(excepcional.getByTestId("legenda-tabela-excepcional")).toContainText(
+      "não entra nas contagens da semana padrão",
+    );
+    await expect(excepcional.getByTestId("celula-partida")).toHaveCount(0);
+
+    const criavelTerca = excepcional.getByLabel("Criar viagem — terca");
+    await criavelTerca.fill("10:32");
+    await criavelTerca.press("Tab");
+    await expect(
+      excepcional.getByLabel("Horário de partida — terca, viagem 1"),
+    ).toHaveValue("10:32");
+    await expect(excepcional.getByLabel("Criar viagem — quarta")).toBeFocused();
+    await expect(comum.getByLabel("Criar viagem — terca")).toBeVisible();
+
+    const uuidCriada = await excepcional
+      .getByLabel("Horário de partida — terca, viagem 1")
+      .locator("xpath=ancestor::td")
+      .getAttribute("data-viagem-uuid");
+
+    page.once("dialog", (dialogo) => dialogo.accept());
+    await excepcional
+      .getByTestId("copiar-dias-comuns-excepcional-sobrescrever")
+      .click();
+
+    const partidaCopiada = excepcional.getByLabel(
+      "Horário de partida — segunda, viagem 1",
+    );
+    await expect(partidaCopiada).toHaveValue("08:00");
+    await expect(
+      excepcional.getByLabel("Horário de partida — terca, viagem 1"),
+    ).toHaveCount(0);
+    const celulaCopiada = partidaCopiada.locator("xpath=ancestor::td");
+    const uuidCopiada = await celulaCopiada.getAttribute("data-viagem-uuid");
+    expect(uuidCopiada).not.toBe(uuidCriada);
+
+    const passanteExcepcional = excepcional
+      .getByTestId("linha-grade")
+      .nth(1)
+      .getByTestId("celula-passante")
+      .locator("input[data-grade]");
+    await preencherEConfirmar(passanteExcepcional, "08:50");
+    await expect(passanteExcepcional).toHaveValue("08:50");
+
+    await excepcional
+      .getByTestId("copiar-dias-comuns-excepcional-mesclar")
+      .click();
+    await expect(celulaCopiada).toHaveAttribute("data-viagem-uuid", uuidCopiada!);
+    await expect(passanteExcepcional).toHaveValue("08:40");
+    await expect(
+      comum
+        .getByTestId("linha-grade")
+        .nth(1)
+        .getByTestId("celula-passante")
+        .locator("input[data-grade]"),
+    ).toHaveValue("08:40");
+    await expect(gradeFeriados(page).getByTestId("celula-partida")).toHaveCount(0);
+    expect(chamadasOsrm).toBe(0);
+  });
+});
+
 test.describe("TASK-104 — CRUD e filtro de Tabelas excepcionais", () => {
   test("cria, valida, filtra, edita e remove tabelas vazias sem chamar OSRM", async ({
     page,
