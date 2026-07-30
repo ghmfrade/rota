@@ -1,10 +1,21 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-07-30 (branch `redesign`) — **TASK-104
-concluída e aprovada, sem ressalvas remanescentes**. A implementação `9adf7d9`
-entrega CRUD, filtro, cardinalidade, descrição condicional, preservação de UUID
-e remoção sem cascata; `a1d96b1` versiona Q-076/DEC-098, e `bd679d1` incorpora
-a política de remoção à task, RN-098/RN-099 e matriz `03`. O parecer
+**Atualização mais recente:** 2026-07-30 (branch `redesign`) — **TASK-105
+concluída e aprovada, sem ressalvas**. A implementação `2a8da0c` entrega uma
+grade por Tabela excepcional, criação com os discriminadores RN-099 e a
+semeadura dos dias comuns com sobrescrita por UUIDs novas ou mescla por
+multiconjunto preservando as UUIDs casadas. O parecer
+`14-REVISOES/TASK-105-20260730.md` reutiliza a suíte verde (1.342 unitários +
+97 E2E; fingerprint `ec337f4d…`; identidade `498d7fa6…`). A TASK-105 sai da
+fila, satisfaz a dependência da TASK-112 e desbloqueia a TASK-119 pela DEC-097;
+restam **14 tasks não concluídas: 12 executáveis, a TASK-038 com bloqueio
+parcial e a TASK-040 bloqueada**.
+
+**Histórico anterior (2026-07-30):** **TASK-104 concluída e aprovada, sem
+ressalvas remanescentes**. A implementação `9adf7d9` entrega CRUD, filtro,
+cardinalidade, descrição condicional, preservação de UUID e remoção sem
+cascata; `a1d96b1` versiona Q-076/DEC-098, e `bd679d1` incorpora a política de
+remoção à task, RN-098/RN-099 e matriz `03`. O parecer
 `14-REVISOES/TASK-104-20260730.md` reutiliza a suíte verde (1.334 unitários +
 96 E2E; fingerprint `2f4af731…`; identidade `498d7fa6…`). A TASK-104 sai da
 fila e desbloqueia a TASK-105; restam **15 tasks não concluídas: 12
@@ -249,7 +260,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 
 ## 3. Tasks executadas
 
-98 tasks concluídas. Agrupadas pela fase do backlog.
+99 tasks concluídas. Agrupadas pela fase do backlog.
 
 ### Fases 1–3 — Fundação, contrato JSON e validações de domínio
 
@@ -306,6 +317,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 031 | Contagens e resumo operacional |
 | 103 | Contagens excluem operação excepcional da semana padrão (RN-069/RN-099) |
 | 104 | CRUD e filtro das Tabelas excepcionais por Serviço (RN-098/RN-099) |
+| 105 | Grade de horários da Tabela excepcional + semeadura dos dias comuns (RN-007/RN-099) |
 | 032 | Revisão e validação final |
 
 ### Fase 12 — Qualidade e follow-ups
@@ -400,9 +412,12 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 ## 5. Tasks a executar — ordem recomendada
 
-**Estado atual: 15 tasks não concluídas: 12 executáveis, a TASK-038 com bloqueio
-parcial e as TASK-040/TASK-119 bloqueadas.** Em 2026-07-30, a **TASK-104 saiu
-da fila**: implementada em `9adf7d9`, regularizada documentalmente em
+**Estado atual: 14 tasks não concluídas: 12 executáveis, a TASK-038 com bloqueio
+parcial e a TASK-040 bloqueada.** Em 2026-07-30, a **TASK-105 saiu da fila**:
+implementada em `2a8da0c` e aprovada sem ressalvas em
+`14-REVISOES/TASK-105-20260730.md`; a TASK-112 tem sua dependência satisfeita e
+a TASK-119 fica desbloqueada pela DEC-097. Também em 2026-07-30, a **TASK-104
+saiu da fila**: implementada em `9adf7d9`, regularizada documentalmente em
 `a1d96b1`/`bd679d1` e aprovada sem ressalvas remanescentes em
 `14-REVISOES/TASK-104-20260730.md`; a TASK-105 fica desbloqueada. Também em
 2026-07-30, a **TASK-117 saiu da fila**:
@@ -521,24 +536,20 @@ Independentes do ramo do mapa: nada aqui bloqueia ou é bloqueado por ele.
 
 ### Grupo G — Operação excepcional (DEC-081 / Q-059)
 
-Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Serviço — férias de verão/inverno/personalizado, categoria **textual**, sem datas). Specs 02/03/04/05 já atualizadas (contrato v1.1); RN-098/RN-099 criadas, RN-061/062/068/069 ajustadas. As **TASK-102, TASK-103 e TASK-104 estão concluídas e aprovadas**. A TASK-104 foi implementada em `9adf7d9`, regularizada em `a1d96b1`/`bd679d1` e aprovada sem ressalvas em `14-REVISOES/TASK-104-20260730.md`. A **TASK-105 está desbloqueada** e é a próxima pendente do grupo; sua aprovação também desbloqueará a TASK-119 conforme DEC-097.
-
-| # | Task | Complex. | Observação |
-|:---:|---|:---:|---|
-| 1 | **105** — Formulário: grade excepcional + "copiar dias comuns" | **3** | Desbloqueada após aprovação da TASK-104; reusa as grades da TASK-028/030 (concluídas) e, quando aprovada, desbloqueia a TASK-119 (DEC-097). |
+Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Serviço — férias de verão/inverno/personalizado, categoria **textual**, sem datas). Specs 02/03/04/05 já atualizadas (contrato v1.1); RN-098/RN-099 criadas, RN-061/062/068/069 ajustadas. As **TASK-102, TASK-103, TASK-104 e TASK-105 estão concluídas e aprovadas**. A TASK-104 foi implementada em `9adf7d9`, regularizada em `a1d96b1`/`bd679d1` e aprovada sem ressalvas em `14-REVISOES/TASK-104-20260730.md`. A TASK-105 foi implementada em `2a8da0c` e aprovada sem ressalvas em `14-REVISOES/TASK-105-20260730.md`; o grupo base está concluído, a dependência da TASK-112 foi satisfeita e a TASK-119 ficou desbloqueada conforme DEC-097.
 
 **Superfícies pendentes alteradas pela DEC-081 (não viram task nova — anotadas no backlog):** **TASK-034** (PDF: tabelas excepcionais + rótulo), **TASK-033** (rótulo/`versao_schema`), **TASK-036** (diff: casar tabela por `uuid` + mudança de grade), **TASK-037** (telas: grades excepcionais separadas + rótulo), **TASK-039** (PDF comparativo). Cobertas ao construí-las, lendo as specs já atualizadas — evita task paralela sobre superfície não construída (lição §6.2). Nenhuma task pendente foi **anulada**.
 
 ### Grupo H — Redesign da grade de horários (proposta 2026-07-27)
 
-Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). As **TASK-106, 107, 108, 110, 113, 114, 115, 116, 117 e 118 estão concluídas e aprovadas**. A 106 consolidou seleção, Enter/Tab, retirada de “Apagar bloco” e densidade pública de `Campo`/`Select`; a 107 entregou inserção relativa e a composição da DEC-090; a 108 entregou a geração em lote por headway da DEC-083; a 110 entregou cópia e remoção de dia inteiro; a 113 preservou os dois últimos deslocamentos da DEC-091; a 114 manteve as ações inteiramente visíveis em domingo; a 115 fez o foco acompanhar a UUID da Viagem após criação/reordenação e redistribuição; a 116 passou a confirmar horários somente por `Enter`/`Tab`, com rascunho local e normalização final; a 117 reancorou as operações de dia nos cabeçalhos e recompôs o headway conforme a DEC-093; e a 118 tornou o headway idempotente pela DEC-094. A entrega `8cc8908` da TASK-110 foi corrigida em `d594034` e aprovada na reavaliação `14-REVISOES/TASK-110-20260729.md`: a cópia preserva reforços da origem e o `Dialogo` contém, estabiliza e restaura o foco. A entrega `92414d2` da TASK-116 foi corrigida em `213626d` e aprovada na reavaliação `14-REVISOES/TASK-116-20260728.md`; o E2E futuro da TASK-105 deve confirmar essa herança na grade excepcional ainda não renderizada. A **TASK-117 foi aprovada na reavaliação final** `14-REVISOES/TASK-117-20260730-reavaliacao.md` após `bf98389` encerrar a ressalva documental. A **TASK-118 foi aprovada na reavaliação final** `14-REVISOES/TASK-118-20260730-reavaliacao.md` após `2a72bd1` versionar TASK-118/Q-072/DEC-094 e encerrar a única ressalva documental. A **TASK-119 permanece independente da guarda da TASK-118, mas está bloqueada pela TASK-105 (DEC-097)**: a grade excepcional precisa existir antes que detecção, destaque, alerta e navegação cubram integralmente todos os regimes da DEC-095. A **TASK-109 foi implementada em `1174657` e aprovada com ressalvas** no parecer `14-REVISOES/TASK-109-20260728.md`: arrasto e atalhos estão aderentes, mas falta a regressão E2E explícita de soltar fora de qualquer coluna. Ela permanece na fila até a condição de merge ser corrigida e reavaliada. A TASK-112 continua condicionada ao motor da TASK-105. Botões de ação da Viagem surgem **no hover**.
+Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). As **TASK-106, 107, 108, 110, 113, 114, 115, 116, 117 e 118 estão concluídas e aprovadas**. A 106 consolidou seleção, Enter/Tab, retirada de “Apagar bloco” e densidade pública de `Campo`/`Select`; a 107 entregou inserção relativa e a composição da DEC-090; a 108 entregou a geração em lote por headway da DEC-083; a 110 entregou cópia e remoção de dia inteiro; a 113 preservou os dois últimos deslocamentos da DEC-091; a 114 manteve as ações inteiramente visíveis em domingo; a 115 fez o foco acompanhar a UUID da Viagem após criação/reordenação e redistribuição; a 116 passou a confirmar horários somente por `Enter`/`Tab`, com rascunho local e normalização final; a 117 reancorou as operações de dia nos cabeçalhos e recompôs o headway conforme a DEC-093; e a 118 tornou o headway idempotente pela DEC-094. A entrega `8cc8908` da TASK-110 foi corrigida em `d594034` e aprovada na reavaliação `14-REVISOES/TASK-110-20260729.md`: a cópia preserva reforços da origem e o `Dialogo` contém, estabiliza e restaura o foco. A entrega `92414d2` da TASK-116 foi corrigida em `213626d` e aprovada na reavaliação `14-REVISOES/TASK-116-20260728.md`; o E2E da TASK-105 confirmou a herança na grade excepcional. A **TASK-117 foi aprovada na reavaliação final** `14-REVISOES/TASK-117-20260730-reavaliacao.md` após `bf98389` encerrar a ressalva documental. A **TASK-118 foi aprovada na reavaliação final** `14-REVISOES/TASK-118-20260730-reavaliacao.md` após `2a72bd1` versionar TASK-118/Q-072/DEC-094 e encerrar a única ressalva documental. A **TASK-119 está desbloqueada pela aprovação da TASK-105 (DEC-097)** e permanece independente da guarda da TASK-118. A **TASK-109 foi implementada em `1174657` e aprovada com ressalvas** no parecer `14-REVISOES/TASK-109-20260728.md`: arrasto e atalhos estão aderentes, mas falta a regressão E2E explícita de soltar fora de qualquer coluna. Ela permanece na fila até a condição de merge ser corrigida e reavaliada. A TASK-112 já pode reutilizar o motor de sincronização entregue pela TASK-105. Botões de ação da Viagem surgem **no hover**.
 
 | # | Task | Complex. | Estado | Observação |
 |:---:|---|:---:|---|---|
-| 1 | **119** — Destaque e alerta de partidas coincidentes | **3** | **Bloqueada (DEC-097)** | Depende da TASK-105 concluída e aprovada para destacar e navegar também nas grades excepcionais; permanece independente da guarda da TASK-118. |
+| 1 | **119** — Destaque e alerta de partidas coincidentes | **3** | **Desbloqueada (DEC-097 satisfeita)** | A TASK-105 foi concluída e aprovada; deve destacar e navegar também nas grades excepcionais e permanece independente da guarda da TASK-118. |
 | 2 | **109** — Cópia unitária entre dias por arrasto + atalhos para dias adjacentes | **2** | Implementada; aprovada com ressalva impeditiva | Código e suíte verdes em `1174657`; falta E2E de drop fora de qualquer coluna e reavaliação antes do merge. |
 | 3 | **111** — Modo compacto: ocultar Seções intermediárias e final | **2** | Desbloqueada (DEC-086; TASK-106 aprovada) | Versão simples do PDF é da TASK-034 (§13.2). |
-| 4 | **112** — "Copiar dias comuns" origem estendida + mescla = sincronização preservando UUID | **4** | Desbloqueada (DEC-087) | Spec 04 §8.4/§8.5 aplicada + carve-out RN-007 registrada. Reusa o motor de sincronização da 105. |
+| 4 | **112** — "Copiar dias comuns" origem estendida + mescla = sincronização preservando UUID | **4** | Desbloqueada (DEC-087; dependência 105 satisfeita) | Spec 04 §8.4/§8.5 aplicada + carve-out RN-007 registrada. Reusa o motor de sincronização entregue pela 105. |
 
 **Ação de spec (DEC-087) — concluída:** a **Spec 04 §8.4/§8.5** foi atualizada (origem selecionável; "mesclar" = sincronização preservando UUID; "sobrescrever" = UUIDs novas) e a **carve-out da RN-007** foi registrada no `01-RULE_INDEX.md` e `03-TRACEABILITY_MATRIX.md`. O casamento sob duplicatas (RN-062) ficou resolvido na spec (§8.5, "por contagem").
 
