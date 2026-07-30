@@ -1,15 +1,24 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-07-30 (branch `redesign`) — **TASK-117
-concluída e aprovada, sem ressalvas remanescentes**. A implementação `feb82b2`
-atende às operações de dia no cabeçalho e à recomposição do headway; o commit
-`bf98389` versiona isoladamente TASK-117, Q-071/DEC-093 e a variante
-`alternador`, encerrando a condição documental do parecer anterior. A
-reavaliação final `14-REVISOES/TASK-117-20260730-reavaliacao.md` reutiliza a
-suíte canônica verde (1.326 unitários + 93 E2E; fingerprint `de9a38e3…`;
-identidade `498d7fa6…`). A TASK-117 sai da fila; restam **16 tasks não
-concluídas: 14 executáveis, a TASK-038 com bloqueio parcial e a TASK-040
-bloqueada**.
+**Atualização mais recente:** 2026-07-30 (branch `redesign`) — **TASK-104
+implementada em `9adf7d9` e aprovada com ressalvas impeditivas de merge**. O
+parecer `14-REVISOES/TASK-104-20260730.md` confirma CRUD, filtro,
+cardinalidade, descrição condicional, preservação de UUID e remoção sem cascata
+com suíte verde (1.334 unitários + 96 E2E; fingerprint `2f4af731…`;
+identidade `498d7fa6…`). Q-076/DEC-098 ainda não estão versionadas e a política
+de remoção ainda precisa entrar em RN-098/RN-099 e na matriz `03`. A TASK-104
+permanece na fila até regularização documental e reavaliação; continuam **16
+tasks não concluídas**.
+
+**Histórico anterior (2026-07-30):** **TASK-117 concluída e aprovada, sem
+ressalvas remanescentes**. A implementação `feb82b2` atende às operações de dia
+no cabeçalho e à recomposição do headway; o commit `bf98389` versiona
+isoladamente TASK-117, Q-071/DEC-093 e a variante `alternador`, encerrando a
+condição documental do parecer anterior. A reavaliação final
+`14-REVISOES/TASK-117-20260730-reavaliacao.md` reutiliza a suíte canônica verde
+(1.326 unitários + 93 E2E; fingerprint `de9a38e3…`; identidade `498d7fa6…`).
+A TASK-117 sai da fila; restam **16 tasks não concluídas: 14 executáveis, a
+TASK-038 com bloqueio parcial e a TASK-040 bloqueada**.
 
 **Histórico anterior (2026-07-30):** **TASK-118 concluída e aprovada, sem
 ressalvas remanescentes**. A implementação `7ac010f` torna a geração por
@@ -506,11 +515,11 @@ Independentes do ramo do mapa: nada aqui bloqueia ou é bloqueado por ele.
 
 ### Grupo G — Operação excepcional (DEC-081 / Q-059)
 
-Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Serviço — férias de verão/inverno/personalizado, categoria **textual**, sem datas). Specs 02/03/04/05 já atualizadas (contrato v1.1); RN-098/RN-099 criadas, RN-061/062/068/069 ajustadas. As **TASK-102 e TASK-103 foram concluídas e aprovadas** em 2026-07-27; ordem pendente recomendada: **104 → 105**.
+Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Serviço — férias de verão/inverno/personalizado, categoria **textual**, sem datas). Specs 02/03/04/05 já atualizadas (contrato v1.1); RN-098/RN-099 criadas, RN-061/062/068/069 ajustadas. As **TASK-102 e TASK-103 foram concluídas e aprovadas** em 2026-07-27. A **TASK-104 foi implementada em `9adf7d9` e aprovada com ressalvas impeditivas** em `14-REVISOES/TASK-104-20260730.md`: o código e a suíte estão verdes, mas Q-076/DEC-098 precisam ser versionadas e a política de remoção precisa ser incorporada ao índice RN e à matriz `03`. Ordem pendente recomendada: regularizar/reavaliar **104 → 105**.
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 1 | **104** — Formulário: CRUD + filtro das tabelas excepcionais por Serviço | **3** | Dependência 102 cumprida. **Atenção:** remoção de tabela com Viagens associadas pode virar Q-xxx na `/analisar-task` (Spec 04 §8.5 não fixa). |
+| 1 | **104** — Formulário: CRUD + filtro das tabelas excepcionais por Serviço | **3** | Implementada em `9adf7d9`; aprovada com ressalvas impeditivas. Regularizar Q-076/DEC-098, RN-098/RN-099 e matriz `03`, depois reavaliar. |
 | 2 | **105** — Formulário: grade excepcional + "copiar dias comuns" | **3** | Depois de 104; dependência 102 cumprida; reusa as grades da TASK-028/030 (concluídas). |
 
 **Superfícies pendentes alteradas pela DEC-081 (não viram task nova — anotadas no backlog):** **TASK-034** (PDF: tabelas excepcionais + rótulo), **TASK-033** (rótulo/`versao_schema`), **TASK-036** (diff: casar tabela por `uuid` + mudança de grade), **TASK-037** (telas: grades excepcionais separadas + rótulo), **TASK-039** (PDF comparativo). Cobertas ao construí-las, lendo as specs já atualizadas — evita task paralela sobre superfície não construída (lição §6.2). Nenhuma task pendente foi **anulada**.
