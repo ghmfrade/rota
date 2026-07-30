@@ -173,6 +173,11 @@ export function EtapaViagens({
   const [sentidoSelecionado, definirSentidoSelecionado] = useState<
     Itinerario["sentido"] | null
   >(origemPartidasPendente?.sentido ?? null);
+  // DEC-086: preferência visual efêmera e independente por Serviço × sentido.
+  // Não integra a sessão nem o contrato JSON.
+  const [modoCompactoPorSentido, definirModoCompactoPorSentido] = useState<
+    Record<string, boolean>
+  >({});
   // Células passantes recusadas por fora-de-ordem (Spec 04 §8.2): não confirmam
   // e ficam em erro até uma edição válida. Estado de UI, por célula.
   const [errosCelula, definirErrosCelula] = useState<Record<string, string>>({});
@@ -289,6 +294,14 @@ export function EtapaViagens({
   const servicoAtual = servicos.find((s) => s.uuid === servicoSelecionadoUuid) ?? null;
   const itinerarioAtual =
     servicoAtual?.itinerarios.find((it) => it.sentido === sentidoSelecionado) ?? null;
+  const chaveModoCompacto =
+    servicoAtual && itinerarioAtual
+      ? `${servicoAtual.uuid}:${itinerarioAtual.sentido}`
+      : null;
+  const modoCompacto =
+    chaveModoCompacto !== null
+      ? (modoCompactoPorSentido[chaveModoCompacto] ?? false)
+      : false;
   const todasAsSecoes = secoesDaSessao(sessao);
   const ancoras = ancorasHorarioDaSessao(sessao);
 
@@ -804,7 +817,9 @@ export function EtapaViagens({
     );
   }
 
-  const secoesDaGrade = itinerarioAtual ? linhasSecoes(itinerarioAtual.paradas) : [];
+  const secoesDaGrade = itinerarioAtual
+    ? linhasSecoes(itinerarioAtual.paradas, modoCompacto)
+    : [];
   const blocosComuns = itinerarioAtual ? montarBlocosDiasComuns(itinerarioAtual.viagens) : [];
   const blocosFeriados = itinerarioAtual ? montarBlocosFeriados(itinerarioAtual.viagens) : [];
   const temFeriado = itinerarioAtual?.viagens.some((v) => v.viagem_feriado) ?? false;
@@ -1398,6 +1413,26 @@ export function EtapaViagens({
               </option>
             ))}
           </Select>
+        )}
+
+        {itinerarioAtual && chaveModoCompacto && (
+          <div className="flex items-end">
+            <Botao
+              variante={modoCompacto ? "primario" : "alternador"}
+              data-testid="alternar-modo-compacto"
+              aria-pressed={modoCompacto}
+              onClick={() =>
+                definirModoCompactoPorSentido((atuais) => ({
+                  ...atuais,
+                  [chaveModoCompacto]: !modoCompacto,
+                }))
+              }
+            >
+              {modoCompacto
+                ? "Exibir todas as Seções"
+                : "Exibir somente partidas"}
+            </Botao>
+          </div>
         )}
       </div>
 

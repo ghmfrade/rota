@@ -17,6 +17,8 @@ import {
 
 const SECAO_A = "11111111-1111-4111-8111-111111111111";
 const SECAO_B = "22222222-2222-4222-8222-222222222222";
+const SECAO_C = "44444444-4444-4444-8444-444444444444";
+const SECAO_D = "55555555-5555-4555-8555-555555555555";
 const LOCAL_X = "33333333-3333-4333-8333-333333333333";
 
 const PARADAS: Parada[] = [
@@ -55,6 +57,26 @@ describe("linhasSecoes (Spec 04 §8.1)", () => {
   test("preserva a ordem do itinerário mesmo com entrada fora de ordem", () => {
     const embaralhadas = [...PARADAS].reverse();
     expect(linhasSecoes(embaralhadas).map((p) => p.ordem)).toEqual([1, 3]);
+  });
+
+  test("TASK-111: modo compacto mantém somente a Seção de partida sem alterar as Paradas", () => {
+    const quatroSecoes: Parada[] = [
+      { ordem: 1, secao_uuid: SECAO_A },
+      { ordem: 2, secao_uuid: SECAO_B },
+      { ordem: 3, secao_uuid: SECAO_C },
+      { ordem: 4, secao_uuid: SECAO_D },
+    ];
+    const original = structuredClone(quatroSecoes);
+
+    expect(linhasSecoes(quatroSecoes)).toHaveLength(4);
+    expect(linhasSecoes(quatroSecoes, true).map((p) => p.ordem)).toEqual([1]);
+    expect(quatroSecoes).toEqual(original);
+  });
+
+  test("[inválido] modo compacto sem Seção não inventa linha visível", () => {
+    expect(
+      linhasSecoes([{ ordem: 1, local_uuid: LOCAL_X }], true),
+    ).toEqual([]);
   });
 });
 
@@ -200,6 +222,14 @@ describe("destinoNavegacaoGrade (TASK-106)", () => {
     expect(
       destinoNavegacaoGrade({ ...origem, indiceSecao: 2 }, "Enter", 3),
     ).toEqual({
+      indiceBloco: 2,
+      indiceSecao: 0,
+      dia: "segunda",
+    });
+  });
+
+  test("TASK-111: Enter com uma única Seção visível avança para a partida seguinte", () => {
+    expect(destinoNavegacaoGrade(origem, "Enter", 1)).toEqual({
       indiceBloco: 2,
       indiceSecao: 0,
       dia: "segunda",

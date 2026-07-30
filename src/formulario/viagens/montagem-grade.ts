@@ -82,13 +82,19 @@ export function destinoNavegacaoGrade(
 }
 
 /**
- * Linhas da grade (Spec 04 §8.1): só as Paradas que são Seção, na ordem do
- * itinerário — Locais comuns não aparecem na grade principal (§2.5/§7.2).
+ * Linhas visíveis da grade (Spec 04 §8.1; TASK-111/DEC-086): só as Paradas
+ * que são Seção, na ordem do itinerário — Locais comuns não aparecem na grade
+ * principal (§2.5/§7.2). No modo compacto, mantém apenas a Seção de partida;
+ * as demais Paradas e seus horários continuam intactos no Itinerário.
  */
-export function linhasSecoes(paradas: readonly Parada[]): Parada[] {
-  return [...paradas]
+export function linhasSecoes(
+  paradas: readonly Parada[],
+  modoCompacto = false,
+): Parada[] {
+  const secoes = [...paradas]
     .sort((a, b) => a.ordem - b.ordem)
     .filter((parada) => parada.secao_uuid !== undefined);
+  return modoCompacto ? secoes.slice(0, 1) : secoes;
 }
 
 /**

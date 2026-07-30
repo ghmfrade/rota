@@ -1153,6 +1153,67 @@ test.describe("Etapa Viagens — grade de feriados e cópias (TASK-030; Spec 04 
   });
 });
 
+test.describe("TASK-111 — modo compacto da grade", () => {
+  test("oculta passantes, mantém cópia/inserção e faz Enter avançar entre partidas", async ({
+    page,
+  }) => {
+    let chamadasOsrm = 0;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamadasOsrm += 1;
+      return rota.abort();
+    });
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+    const alternador = page.getByTestId("alternar-modo-compacto");
+
+    await expect(alternador).toHaveAttribute("aria-pressed", "false");
+    await expect(grade.getByTestId("linha-grade")).toHaveCount(6);
+    await alternador.click();
+
+    await expect(alternador).toHaveAttribute("aria-pressed", "true");
+    await expect(alternador).toContainText("Exibir todas as Seções");
+    await expect(grade.getByTestId("linha-grade")).toHaveCount(2);
+    await expect(grade.getByTestId("celula-passante")).toHaveCount(0);
+
+    const partidaSegunda = grade.getByLabel(
+      "Horário de partida — segunda, viagem 1",
+    );
+    const uuidOrigem = await partidaSegunda.getAttribute("data-viagem-uuid");
+    await partidaSegunda.click();
+    await partidaSegunda.press("Control+ArrowRight");
+
+    const partidaTerca = grade.getByLabel(
+      "Horário de partida — terca, viagem 1",
+    );
+    await expect(partidaTerca).toHaveValue("08:00");
+    await expect(partidaTerca).not.toHaveAttribute(
+      "data-viagem-uuid",
+      uuidOrigem!,
+    );
+
+    await partidaSegunda.press("Enter");
+    await expect(grade.getByLabel("Criar viagem — segunda")).toBeFocused();
+
+    const criavelQuarta = grade.getByLabel("Criar viagem — quarta");
+    await preencherEConfirmar(criavelQuarta, "09:10");
+    await expect(
+      grade.getByLabel("Horário de partida — quarta, viagem 1"),
+    ).toHaveValue("09:10");
+
+    await alternador.click();
+    await expect(alternador).toHaveAttribute("aria-pressed", "false");
+    await expect(grade.getByTestId("linha-grade")).toHaveCount(6);
+    await expect(grade.getByTestId("celula-passante")).toHaveCount(6);
+    await expect(
+      grade
+        .locator(
+          `input[data-viagem-uuid="${uuidOrigem}"][data-secao-index="2"]`,
+        ),
+    ).toHaveValue("09:00");
+    expect(chamadasOsrm).toBe(0);
+  });
+});
+
 test.describe("TASK-105 — grade de horários da Tabela excepcional", () => {
   test("preenche, confirma por Tab e sincroniza os dias comuns sem misturar grades", async ({
     page,
