@@ -6669,3 +6669,134 @@ entrada decidida na DEC-093.
 - Nenhuma — Q-071 decidida (DEC-093).
 
 ---
+
+## TASK-118 — Impedir duplicatas acidentais na geração de Viagens por headway — **desbloqueada (DEC-094)**
+
+## Objetivo
+
+Tornar a geração em lote por headway idempotente em relação às Viagens que já
+existem no mesmo dia e grade: criar somente os horários ausentes e preservar
+intactas as Viagens preexistentes.
+
+## Contexto
+
+A TASK-108/DEC-083 entregou a geração de partidas posteriores por headway até
+um limite inclusivo, mas o motor não recebe nem consulta as Viagens existentes.
+Assim, repetir a ação ou gerar uma sequência que coincida parcialmente com a
+grade cria reforços involuntários. A guarda da DEC-084 usa o critério
+`horario_saida` + grade, ignorando offsets, mas foi fixada exclusivamente para
+a cópia unitária entre dias; estendê-la ao headway depende da Q-072.
+
+## Fora de escopo
+
+- Proibir reforços de horário no contrato, schema, importação, edição manual ou
+  outros gestos; alterar a RN-062.
+- Alterar cálculo do headway, limite inclusivo, corte às 23:59, herança de
+  offsets, UUIDs das Viagens genuinamente novas ou escopo de dia/grade da
+  DEC-083.
+- Alterar inserção por offset relativo, cópia entre dias, cópia de dia inteiro,
+  semeadura de grades, ordenação, máscara ou composição visual do modo headway.
+- Alterar JSON, PDF, Comparador, Ingestor, contagens ou chamar OSRM.
+
+## Specs fonte
+
+- Spec 04 §8.2–§8.3 (criação e ações da Viagem na grade)
+- Spec 02 §11/§12/§14 (Viagem, identidade de cópias e duplicatas válidas)
+
+## Regras envolvidas
+
+- RN-004/RN-007 (Viagens genuinamente novas recebem UUID nova; existentes
+  preservam identidade)
+- RN-061 (a guarda compara o mesmo dia e a mesma grade)
+- RN-062 (reforços continuam válidos no contrato; guarda apenas no gesto)
+- RN-063/RN-067 (offsets herdados e entradas de relógio preservados)
+
+## Entidades afetadas
+
+- Viagem
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Para cada partida calculada pelo headway, uma Viagem com o mesmo
+      `horario_saida`, `dia_semana` e grade já existente é preservada e nenhuma
+      cópia é criada naquele horário, independentemente dos offsets.
+- [ ] Partidas ausentes do mesmo lote continuam sendo criadas com UUIDs novas,
+      offsets herdados e todas as regras da DEC-083.
+- [ ] Repetir a geração com os mesmos headway e limite não altera o itinerário
+      nem cria UUIDs adicionais.
+- [ ] Um lote parcialmente coincidente é uma mescla: pula somente os horários
+      existentes e cria os ausentes.
+- [ ] A guarda não é aplicada ao schema/importação nem transforma reforço de
+      horário em documento inválido (RN-062).
+- [ ] A reação visual aos horários ignorados segue a decisão da Q-072, sem
+      chamar OSRM.
+
+## Casos válidos
+
+- Origem SEG 08:00, Viagem SEG 09:00 já existente, headway 01:00 até 10:00 →
+  preserva a 09:00 existente e cria somente 10:00.
+- Origem SEG 08:00, Viagens SEG 09:00 e 10:00 já existentes, repetir headway
+  01:00 até 10:00 → nenhuma Viagem criada e nenhum UUID/dado existente alterado.
+- A grade comum tem SEG 09:00, mas a geração ocorre na grade de feriados →
+  09:00 de feriado pode ser criada, pois as grades são distintas.
+
+## Casos inválidos
+
+- Tentar tratar uma Viagem de outra grade ou de outro dia como duplicata →
+  não bloquear a criação.
+- Viagem existente no mesmo dia/grade/horário com offsets diferentes → não
+  substituir, mesclar dados nem criar quase-duplicata; manter a existente.
+- Headway `00:00`, limite inválido ou anterior à origem → manter a recusa
+  atômica existente, sem criar Viagens.
+
+## Testes esperados
+
+- Unitários: lote sem colisão; colisão parcial; colisão total/repetição
+  idempotente; igualdade ignora offsets; separação por dia e por grade; UUID e
+  offsets das novas; preservação integral das existentes; entradas inválidas.
+- Integração/componente: o handler consulta o itinerário atual, acrescenta
+  somente as Viagens ausentes, mantém as âncoras efêmeras das existentes e
+  segue a reação visual decidida na Q-072.
+- E2E (OSRM mockado): gerar 09:00/10:00 com 09:00 preexistente; repetir o clique
+  e comprovar que a contagem não cresce; comprovar ausência de chamada ao OSRM.
+- Snapshot/contrato JSON: regressão da RN-062 permanece aceitando documento
+  importado com reforços; nenhum campo novo.
+- PDF: n/a.
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/acoes-grade.ts`
+- `src/formulario/viagens/copias-grade.ts` (reuso/extração do critério comum)
+- `src/formulario/viagens/etapa-viagens.tsx`
+- `src/formulario/viagens/index.ts`
+- `testes/unitarios/formulario/viagens-acoes-grade.test.ts`
+- `testes/unitarios/formulario/viagens-copias-grade.test.ts`
+- `testes/e2e/etapa-viagens.spec.ts`
+
+## Riscos
+
+- A guarda escorregar para validação estrutural/importação e violar a RN-062.
+- Comparar só horário e misturar dia ou grade comum/feriado/excepcional.
+- Gerar UUIDs antes de filtrar colisões, dificultando a idempotência observável.
+- Apagar ou substituir offsets, UUID/âncoras da Viagem preexistente.
+- Duplicar o critério da DEC-084 e permitir divergência futura entre gestos.
+
+## Dependências
+
+- TASK-108 concluída; reuso conceitual da guarda entregue pelas
+  TASK-109/TASK-110.
+- Q-072 decidida e registrada como DEC-094.
+
+## Perguntas em aberto
+
+- Nenhuma — Q-072 decidida (DEC-094).
+
+---

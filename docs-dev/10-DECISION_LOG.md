@@ -1046,3 +1046,46 @@ offsets e entradas temporais; **RN-096** fundamenta os estados efêmeros.
 da etapa e do design system. A nova aparência do `Botao` deve ser variante
 explícita documentada em `docs-dev/18-DESIGN_SYSTEM.md`, nunca sobreposição de
 cores por `className`.
+
+## DEC-094 — Guarda de duplicidade na geração de Viagens por headway
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, opção B da
+**Q-072**, com aprovação explícita do aviso não bloqueante; Spec 04 §8.2–§8.3;
+Spec 02 §11/§12/§14; DEC-083/DEC-084/DEC-085; TASK-118 ·
+**Data:** 2026-07-30
+
+**Decisão:** a guarda de duplicidade passa a valer também, e somente, no gesto
+de geração de Viagens por headway. Para cada horário calculado, se já existir
+uma Viagem com o mesmo `horario_saida`, no mesmo `dia_semana` e na mesma grade,
+a Viagem preexistente é mantida integralmente e nenhuma nova Viagem é criada
+naquele horário. Os offsets não participam do critério de igualdade. Horários
+ausentes do mesmo lote continuam sendo criados normalmente; se todos já
+existirem, a geração inteira é um no-op.
+
+Após a geração, a interface apresenta um **aviso não bloqueante** com a
+quantidade de horários ignorados. A guarda é uma conveniência local desse gesto:
+não torna `(dia_semana, horario_saida, grade)` único no contrato, na importação,
+na edição manual nem em outros caminhos.
+
+**Motivo:** a geração por headway deve ser idempotente diante de repetição ou
+duplo clique acidental, inclusive quando o lote coincide apenas parcialmente
+com a grade existente. Reutilizar o critério da DEC-084 evita definições
+divergentes de horário já existente e preserva a permissão de reforços da
+RN-062 fora desse gesto.
+
+**Consequências:** resolve a **Q-072** e **desbloqueia a TASK-118**. As Viagens
+preexistentes preservam UUID, offsets e todos os demais dados; somente as
+Viagens correspondentes a horários ausentes recebem UUIDs novas e os offsets
+previstos pela DEC-083. O aviso informa quantas partidas calculadas foram
+ignoradas sem bloquear a continuidade do uso.
+
+**Impacto em implementação:** nenhuma mudança no texto das RN existentes, no
+contrato JSON, na importação, no Comparador, no PDF ou nas contagens.
+**RN-004/RN-007/RN-061** continuam governando identidade e pertencimento das
+Viagens; **RN-062** permanece aceitando reforços no documento;
+**RN-063/RN-067** continuam governando horários e offsets.
+`01-RULE_INDEX.md` e `03-TRACEABILITY_MATRIX.md` não precisam de edição.
+**Módulos:** `src/formulario/viagens/acoes-grade.ts`,
+`src/formulario/viagens/copias-grade.ts`,
+`src/formulario/viagens/etapa-viagens.tsx` e testes da etapa.
+**Task:** TASK-118.

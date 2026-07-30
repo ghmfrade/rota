@@ -903,3 +903,52 @@ do responsável pelo domínio, incluindo a máscara `1` → `00:01`, `123` →
 desabilitado enquanto os campos não forem válidos.
 
 ---
+
+## Q-072 — Guarda de duplicidade na geração de Viagens por headway
+
+**Status:** Decidida — DEC-094
+
+**Origem:** problema constatado pelo responsável ao usar a geração por headway
+da TASK-108 (2026-07-29)
+
+**Contexto:** a geração por headway da DEC-083/TASK-108 cria todas as partidas
+calculadas entre a Viagem-origem e o horário-limite, sem consultar as Viagens
+que já existem no mesmo dia e grade. Por isso, repetir o gesto — inclusive por
+duplo clique acidental — cria novas Viagens nos mesmos horários. A DEC-084
+definiu uma guarda por `horario_saida`/grade para a cópia unitária entre dias,
+mas determinou expressamente que ela valia exclusivamente naquele gesto; a
+DEC-085 depois estendeu a mesma política à cópia de dia inteiro por decisão
+própria. A RN-062 continua permitindo reforços de horário no contrato.
+
+**Spec relacionada:** Spec 04 §8.2–§8.3 (ações e criação de Viagem na grade);
+Spec 02 §11/§12/§14 (Viagem, identidade de cópias e duplicatas válidas);
+RN-004/RN-007/RN-061/RN-062/RN-063/RN-067; DEC-083/DEC-084/DEC-085;
+TASK-108/TASK-109/TASK-110.
+
+**Impacto se não decidir:** aplicar a guarda ao headway superaria a
+exclusividade fixada pela DEC-084. Também falta uma decisão documental sobre a
+reação quando apenas parte do lote coincide com horários existentes e sobre o
+aviso ao usuário. Implementar diretamente inventaria essa extensão de regra.
+
+**Opções:** A — manter a geração atual, criando todas as Viagens calculadas,
+inclusive reforços. B — aplicar a guarda somente ao gesto de headway: para cada
+horário calculado, manter intacta a Viagem que já existir no mesmo dia e grade,
+ignorar offsets no critério de igualdade, pular apenas a cópia coincidente e
+continuar criando os demais horários ausentes; uma repetição integral vira
+no-op. C — tornar `(dia_semana, horario_saida, grade)` único em todos os
+caminhos, inclusive importação e edição.
+
+**Recomendação técnica:** B. É a leitura direta do problema relatado e torna o
+gesto idempotente sem contrariar a RN-062: a guarda permanece comportamento
+local de conveniência, não validação do documento. Reutilizar o mesmo critério
+da DEC-084 evita duas definições de “horário já existente”. Recomenda-se aviso
+não bloqueante com a quantidade de horários ignorados; as Viagens preexistentes
+preservam integralmente UUID, offsets e demais dados. Habilita a **TASK-118**.
+
+**Decisão:** **Decidida (DEC-094, 2026-07-30).** Opção B, por decisão explícita
+do responsável pelo domínio: a guarda fica restrita ao gesto de headway,
+preserva integralmente as Viagens preexistentes, mescla lotes parcialmente
+coincidentes e torna a repetição integral um no-op. Aprovado também o aviso não
+bloqueante com a quantidade de horários ignorados.
+
+---
