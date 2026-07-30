@@ -1,14 +1,15 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
 **Atualização mais recente:** 2026-07-30 (branch `redesign`) — **TASK-104
-implementada em `9adf7d9` e aprovada com ressalvas impeditivas de merge**. O
-parecer `14-REVISOES/TASK-104-20260730.md` confirma CRUD, filtro,
-cardinalidade, descrição condicional, preservação de UUID e remoção sem cascata
-com suíte verde (1.334 unitários + 96 E2E; fingerprint `2f4af731…`;
-identidade `498d7fa6…`). Q-076/DEC-098 ainda não estão versionadas e a política
-de remoção ainda precisa entrar em RN-098/RN-099 e na matriz `03`. A TASK-104
-permanece na fila até regularização documental e reavaliação; continuam **16
-tasks não concluídas**.
+concluída e aprovada, sem ressalvas remanescentes**. A implementação `9adf7d9`
+entrega CRUD, filtro, cardinalidade, descrição condicional, preservação de UUID
+e remoção sem cascata; `a1d96b1` versiona Q-076/DEC-098, e `bd679d1` incorpora
+a política de remoção à task, RN-098/RN-099 e matriz `03`. O parecer
+`14-REVISOES/TASK-104-20260730.md` reutiliza a suíte verde (1.334 unitários +
+96 E2E; fingerprint `2f4af731…`; identidade `498d7fa6…`). A TASK-104 sai da
+fila e desbloqueia a TASK-105; restam **15 tasks não concluídas: 12
+executáveis, a TASK-038 com bloqueio parcial e as TASK-040/TASK-119
+bloqueadas**.
 
 **Histórico anterior (2026-07-30):** **TASK-117 concluída e aprovada, sem
 ressalvas remanescentes**. A implementação `feb82b2` atende às operações de dia
@@ -248,7 +249,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 
 ## 3. Tasks executadas
 
-97 tasks concluídas. Agrupadas pela fase do backlog.
+98 tasks concluídas. Agrupadas pela fase do backlog.
 
 ### Fases 1–3 — Fundação, contrato JSON e validações de domínio
 
@@ -304,6 +305,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 030 | Tabela de feriados e cópias |
 | 031 | Contagens e resumo operacional |
 | 103 | Contagens excluem operação excepcional da semana padrão (RN-069/RN-099) |
+| 104 | CRUD e filtro das Tabelas excepcionais por Serviço (RN-098/RN-099) |
 | 032 | Revisão e validação final |
 
 ### Fase 12 — Qualidade e follow-ups
@@ -398,8 +400,12 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 ## 5. Tasks a executar — ordem recomendada
 
-**Estado atual: 16 tasks não concluídas: 14 executáveis, a TASK-038 com bloqueio
-parcial e a TASK-040 bloqueada.** Em 2026-07-30, a **TASK-117 saiu da fila**:
+**Estado atual: 15 tasks não concluídas: 12 executáveis, a TASK-038 com bloqueio
+parcial e as TASK-040/TASK-119 bloqueadas.** Em 2026-07-30, a **TASK-104 saiu
+da fila**: implementada em `9adf7d9`, regularizada documentalmente em
+`a1d96b1`/`bd679d1` e aprovada sem ressalvas remanescentes em
+`14-REVISOES/TASK-104-20260730.md`; a TASK-105 fica desbloqueada. Também em
+2026-07-30, a **TASK-117 saiu da fila**:
 implementada em `feb82b2`, regularizada documentalmente em `bf98389` e aprovada
 na reavaliação final
 `14-REVISOES/TASK-117-20260730-reavaliacao.md`. Em 2026-07-29, a **TASK-110
@@ -515,12 +521,11 @@ Independentes do ramo do mapa: nada aqui bloqueia ou é bloqueado por ele.
 
 ### Grupo G — Operação excepcional (DEC-081 / Q-059)
 
-Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Serviço — férias de verão/inverno/personalizado, categoria **textual**, sem datas). Specs 02/03/04/05 já atualizadas (contrato v1.1); RN-098/RN-099 criadas, RN-061/062/068/069 ajustadas. As **TASK-102 e TASK-103 foram concluídas e aprovadas** em 2026-07-27. A **TASK-104 foi implementada em `9adf7d9` e aprovada com ressalvas impeditivas** em `14-REVISOES/TASK-104-20260730.md`: o código e a suíte estão verdes, mas Q-076/DEC-098 precisam ser versionadas e a política de remoção precisa ser incorporada ao índice RN e à matriz `03`. Ordem pendente recomendada: regularizar/reavaliar **104 → 105**.
+Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Serviço — férias de verão/inverno/personalizado, categoria **textual**, sem datas). Specs 02/03/04/05 já atualizadas (contrato v1.1); RN-098/RN-099 criadas, RN-061/062/068/069 ajustadas. As **TASK-102, TASK-103 e TASK-104 estão concluídas e aprovadas**. A TASK-104 foi implementada em `9adf7d9`, regularizada em `a1d96b1`/`bd679d1` e aprovada sem ressalvas em `14-REVISOES/TASK-104-20260730.md`. A **TASK-105 está desbloqueada** e é a próxima pendente do grupo; sua aprovação também desbloqueará a TASK-119 conforme DEC-097.
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 1 | **104** — Formulário: CRUD + filtro das tabelas excepcionais por Serviço | **3** | Implementada em `9adf7d9`; aprovada com ressalvas impeditivas. Regularizar Q-076/DEC-098, RN-098/RN-099 e matriz `03`, depois reavaliar. |
-| 2 | **105** — Formulário: grade excepcional + "copiar dias comuns" | **3** | Depois de 104; dependência 102 cumprida; reusa as grades da TASK-028/030 (concluídas). |
+| 1 | **105** — Formulário: grade excepcional + "copiar dias comuns" | **3** | Desbloqueada após aprovação da TASK-104; reusa as grades da TASK-028/030 (concluídas) e, quando aprovada, desbloqueia a TASK-119 (DEC-097). |
 
 **Superfícies pendentes alteradas pela DEC-081 (não viram task nova — anotadas no backlog):** **TASK-034** (PDF: tabelas excepcionais + rótulo), **TASK-033** (rótulo/`versao_schema`), **TASK-036** (diff: casar tabela por `uuid` + mudança de grade), **TASK-037** (telas: grades excepcionais separadas + rótulo), **TASK-039** (PDF comparativo). Cobertas ao construí-las, lendo as specs já atualizadas — evita task paralela sobre superfície não construída (lição §6.2). Nenhuma task pendente foi **anulada**.
 
