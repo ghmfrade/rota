@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { identidadeDaSessao, type SessaoFormulario } from "@/formulario/sessao";
-import { coletarPendencias } from "@/formulario/pendencias";
+import { coletarPendencias, type Pendencia } from "@/formulario/pendencias";
 import { EtapaIdentificacao } from "@/formulario/identificacao";
 import { EtapaServicos } from "@/formulario/servicos";
 import { EtapaItinerarios, itinerariosAoVivoDaSessao } from "@/formulario/itinerarios";
 import { EtapaMatrizes } from "@/formulario/matrizes";
-import { EtapaViagens } from "@/formulario/viagens";
+import {
+  EtapaViagens,
+  type OrigemPartidasCoincidentes,
+} from "@/formulario/viagens";
 import { TelaRevisao } from "@/formulario/revisao";
 import { TelaExportacao, avaliarGateExportacao } from "@/formulario/exportacao";
 import { Painel, Selo, Tooltip, Carimbo } from "@/shared/ui";
@@ -81,6 +84,23 @@ export function LayoutFormulario({
   aoAtualizarSessao,
 }: PropsLayoutFormulario) {
   const [etapaAtual, definirEtapa] = useState<IdEtapa>("identificacao");
+  const [origemPartidasPendente, definirOrigemPartidasPendente] =
+    useState<OrigemPartidasCoincidentes | null>(null);
+  const [versaoNavegacaoViagens, definirVersaoNavegacaoViagens] =
+    useState(0);
+
+  const navegarParaPendencia = useCallback((pendencia: Pendencia) => {
+    const origem = pendencia.origemPartidasCoincidentes ?? null;
+    definirOrigemPartidasPendente(origem);
+    if (origem) {
+      definirVersaoNavegacaoViagens((versao) => versao + 1);
+    }
+    definirEtapa(pendencia.etapaAlvo);
+  }, []);
+
+  const consumirOrigemPartidas = useCallback(() => {
+    definirOrigemPartidasPendente(null);
+  }, []);
 
   // Pendências recomputadas a cada render a partir da sessão (NEG-004: nada
   // persiste). `itinerariosAoVivoDaSessao` (TASK-019, obrigação de fiação da
@@ -198,7 +218,10 @@ export function LayoutFormulario({
 
         <div className="min-h-0 flex-1 overflow-y-auto bg-cinza-50">
           <div className="mx-auto max-w-6xl px-6 pt-4">
-            <PainelPendencias pendencias={pendencias} aoNavegar={definirEtapa} />
+            <PainelPendencias
+              pendencias={pendencias}
+              aoNavegar={navegarParaPendencia}
+            />
           </div>
           <section
               data-testid="conteudo-etapa"
@@ -219,14 +242,20 @@ export function LayoutFormulario({
               ) : etapaAtual === "secoes-locais-itinerarios" ? (
                 <EtapaItinerarios sessao={sessao} aoAtualizarSessao={aoAtualizarSessao} />
               ) : etapaAtual === "viagens-horarios" ? (
-                <EtapaViagens sessao={sessao} aoAtualizarSessao={aoAtualizarSessao} />
+                <EtapaViagens
+                  key={`viagens-${versaoNavegacaoViagens}`}
+                  sessao={sessao}
+                  aoAtualizarSessao={aoAtualizarSessao}
+                  origemPartidasPendente={origemPartidasPendente}
+                  aoConsumirOrigemPartidas={consumirOrigemPartidas}
+                />
               ) : etapaAtual === "matrizes" ? (
                 <EtapaMatrizes sessao={sessao} aoAtualizarSessao={aoAtualizarSessao} />
               ) : etapaAtual === "revisao" ? (
                 <TelaRevisao
                   sessao={sessao}
                   pendencias={pendencias}
-                  aoNavegar={definirEtapa}
+                  aoNavegar={navegarParaPendencia}
                 />
               ) : (
                 <TelaExportacao

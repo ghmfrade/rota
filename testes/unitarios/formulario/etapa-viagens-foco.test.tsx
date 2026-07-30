@@ -39,10 +39,14 @@ function selecionar(select: HTMLSelectElement, valor: string) {
   });
 }
 
-function montarEtapa() {
+function montarEtapa(
+  documento: DocumentoOperacao = structuredClone(
+    multiServico,
+  ) as unknown as DocumentoOperacao,
+) {
   const sessaoInicial: SessaoFormulario = {
     modo: "carregado",
-    documento: structuredClone(multiServico) as unknown as DocumentoOperacao,
+    documento,
     alertasImportacao: [],
   };
 
@@ -158,6 +162,83 @@ describe("EtapaViagens — foco lógico da célula (TASK-115)", () => {
         '[data-testid="grade-feriados"] input[data-grade="feriados"][data-secao-index="1"][data-dia="terca"]',
       ),
     );
+    desmontar();
+  });
+});
+
+describe("EtapaViagens — reforço e toggle de seleção (TASK-119; DEC-095/096)", () => {
+  it("destaca somente o reforço inteiro e restaura o laranja após o segundo clique", () => {
+    const documento = structuredClone(
+      multiServico,
+    ) as unknown as DocumentoOperacao;
+    const servico = documento.autos.servicos.find(
+      (item) => item.numero_n === "0001-1SU",
+    )!;
+    const itinerario = servico.itinerarios.find(
+      (item) => item.sentido === "ida",
+    )!;
+    const primeira = itinerario.viagens[0];
+    primeira.uuid = "10000000-0000-4000-8000-000000000001";
+    primeira.dia_semana = "segunda";
+    primeira.horario_saida = "08:00:00";
+    primeira.viagem_feriado = false;
+    primeira.tabela_excepcional_uuid = null;
+    const reforco = structuredClone(primeira);
+    reforco.uuid = "20000000-0000-4000-8000-000000000002";
+    itinerario.viagens = [primeira, reforco];
+    const { container, desmontar } = montarEtapa(documento);
+
+    const celulasBase = container.querySelectorAll(
+      `[data-viagem-uuid="${primeira.uuid}"][data-testid^="celula-"]`,
+    );
+    const celulasReforco = container.querySelectorAll(
+      `[data-viagem-uuid="${reforco.uuid}"][data-testid^="celula-"]`,
+    );
+    expect(celulasBase.length).toBeGreaterThan(0);
+    expect([...celulasBase].every((celula) => !celula.hasAttribute("data-reforco"))).toBe(true);
+    expect(celulasReforco.length).toBe(celulasBase.length);
+    expect([...celulasReforco].every((celula) => celula.getAttribute("data-reforco") === "true")).toBe(true);
+
+    const partidaReforco = celulasReforco[0] as HTMLTableCellElement;
+    act(() => partidaReforco.click());
+    expect(partidaReforco.getAttribute("data-selecionada")).toBe("true");
+    expect(partidaReforco.className).toContain("bg-azul-100");
+    expect(partidaReforco.className).not.toContain("bg-alerta/15");
+
+    act(() => partidaReforco.click());
+    expect(partidaReforco.hasAttribute("data-selecionada")).toBe(false);
+    expect(partidaReforco.className).toContain("bg-alerta/15");
+    desmontar();
+  });
+
+  it("segundo clique no campo passante desmarca sem confirmar valor nem perder foco", () => {
+    const documento = structuredClone(
+      multiServico,
+    ) as unknown as DocumentoOperacao;
+    const servico = documento.autos.servicos.find(
+      (item) => item.numero_n === "0001-1SU",
+    )!;
+    const itinerario = servico.itinerarios.find(
+      (item) => item.sentido === "ida",
+    )!;
+    const viagem = itinerario.viagens[0];
+    const valorOriginal = viagem.horario_saida;
+    const { container, desmontar } = montarEtapa(documento);
+    const campo = container.querySelector(
+      `input[data-viagem-uuid="${viagem.uuid}"][data-secao-index="1"]`,
+    ) as HTMLInputElement;
+    const celula = campo.closest("td")!;
+
+    act(() => {
+      campo.focus();
+      campo.click();
+    });
+    expect(celula.getAttribute("data-selecionada")).toBe("true");
+
+    act(() => campo.click());
+    expect(celula.hasAttribute("data-selecionada")).toBe(false);
+    expect(document.activeElement).toBe(campo);
+    expect(viagem.horario_saida).toBe(valorOriginal);
     desmontar();
   });
 });

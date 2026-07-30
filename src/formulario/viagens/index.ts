@@ -25,6 +25,14 @@ export {
   type TeclaNavegacaoGrade,
 } from "./montagem-grade";
 export {
+  detectarPartidasCoincidentes,
+  type AlertaPartidasCoincidentes,
+  type DeteccaoPartidasCoincidentes,
+  type GrupoPartidasCoincidentes,
+  type IdGradeViagens,
+  type OrigemPartidasCoincidentes,
+} from "./partidas-coincidentes";
+export {
   copiarViagemParaDias,
   copiarViagemParaDiaComGuarda,
   copiarDiaParaDiasComGuarda,

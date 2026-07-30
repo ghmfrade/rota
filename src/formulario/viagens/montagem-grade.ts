@@ -38,6 +38,16 @@ export interface AlvoFocoCelulaGrade {
   dia: DiaSemana;
 }
 
+/**
+ * Ordem de exibição de Viagens dentro de um dia/grade (Spec 04 §8.1).
+ * O desempate por UUID já era usado pela montagem; fica público para que
+ * detectores derivados da superfície visual, como o da TASK-119, escolham a
+ * mesma viagem-base sem duplicar o critério.
+ */
+export function compararViagensNaGrade(a: Viagem, b: Viagem): number {
+  return a.horario_saida.localeCompare(b.horario_saida) || a.uuid.localeCompare(b.uuid);
+}
+
 /** Seletor do input que representa uma célula lógica de uma Viagem. */
 export function seletorAlvoFocoCelulaGrade(alvo: AlvoFocoCelulaGrade): string {
   return (
@@ -129,9 +139,7 @@ export function montarBlocosGrade(
     porDia.get(viagem.dia_semana)?.push(viagem);
   }
   for (const lista of porDia.values()) {
-    lista.sort(
-      (a, b) => a.horario_saida.localeCompare(b.horario_saida) || a.uuid.localeCompare(b.uuid),
-    );
+    lista.sort(compararViagensNaGrade);
   }
 
   const maiorContagem = Math.max(0, ...[...porDia.values()].map((lista) => lista.length));

@@ -1,6 +1,5 @@
 import { Selo } from "@/shared/ui";
 import type { Pendencia } from "@/formulario/pendencias";
-import type { IdEtapa } from "./etapas";
 
 // Painel de pendências (Spec 04 §4/§11; doc 18 §5): lista viva, colapsável, de
 // erros bloqueantes × alertas; cada item é clicável e leva à etapa de origem
@@ -17,7 +16,7 @@ import type { IdEtapa } from "./etapas";
 interface PropsPainelPendencias {
   pendencias: Pendencia[];
   /** Navega para a etapa de origem da pendência clicada (Spec 04 §11). */
-  aoNavegar: (etapa: IdEtapa) => void;
+  aoNavegar: (pendencia: Pendencia) => void;
 }
 
 export function PainelPendencias({
@@ -97,7 +96,7 @@ function SecaoPendencia({
   titulo: string;
   corTitulo: string;
   itens: Pendencia[];
-  aoNavegar: (etapa: IdEtapa) => void;
+  aoNavegar: (pendencia: Pendencia) => void;
   className?: string;
 }) {
   return (
@@ -119,7 +118,7 @@ function ItemPendencia({
   aoNavegar,
 }: {
   pendencia: Pendencia;
-  aoNavegar: (etapa: IdEtapa) => void;
+  aoNavegar: (pendencia: Pendencia) => void;
 }) {
   const cor = pendencia.severidade === "bloqueante" ? "text-erro" : "text-alerta";
   return (
@@ -128,13 +127,18 @@ function ItemPendencia({
       data-testid="pendencia-item"
       data-severidade={pendencia.severidade}
       data-etapa-alvo={pendencia.etapaAlvo}
-      onClick={() => aoNavegar(pendencia.etapaAlvo)}
+      onClick={() => aoNavegar(pendencia)}
       className={
         "block w-full rounded-controle px-2 py-1 text-left text-sm hover:bg-cinza-100 " +
         cor
       }
     >
-      {pendencia.mensagem}
+      <span>{pendencia.mensagem}</span>
+      {pendencia.quantidade !== undefined && (
+        <Selo tom="alerta" className="ml-2">
+          {pendencia.quantidade}
+        </Selo>
+      )}
     </button>
   );
 }

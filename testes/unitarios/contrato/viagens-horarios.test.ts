@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   documentoDaFixture,
   esperarInvalido,
@@ -43,10 +43,25 @@ describe("viagens (RN-061/RN-062)", () => {
   it("rn062: aceita reforço de horário — duas viagens no mesmo dia e horário", () => {
     const doc = documentoDaFixture();
     const viagens = doc.autos.servicos[0].itinerarios[0].viagens;
+    const quantidadeOriginal = viagens.length;
     const reforco = structuredClone(viagens[0]);
     reforco.uuid = "2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f";
     viagens.push(reforco);
     esperarValido(doc);
+
+    const recarregado = JSON.parse(JSON.stringify(doc));
+    esperarValido(recarregado);
+    expect(recarregado.autos.servicos[0].itinerarios[0].viagens).toHaveLength(
+      quantidadeOriginal + 1,
+    );
+    expect(
+      recarregado.autos.servicos[0].itinerarios[0].viagens.map(
+        (viagem: { uuid: string }) => viagem.uuid,
+      ),
+    ).toEqual(viagens.map((viagem: { uuid: string }) => viagem.uuid));
+    expect(Object.keys(recarregado.autos.servicos[0].itinerarios[0].viagens[1])).toEqual(
+      Object.keys(viagens[1]),
+    );
   });
 });
 

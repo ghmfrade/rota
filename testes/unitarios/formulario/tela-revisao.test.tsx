@@ -132,8 +132,33 @@ describe("TelaRevisao — com pendências (RN-078)", () => {
     ) as HTMLButtonElement;
     botao.click();
 
-    expect(aoNavegar).toHaveBeenCalledWith("secoes-locais-itinerarios");
+    expect(aoNavegar).toHaveBeenCalledWith(PENDENCIAS[0]);
 
+    desmontar();
+  });
+
+  it("exibe a quantidade de grupos em Selo sem alterar a mensagem da DEC-095", () => {
+    const alerta: Pendencia = {
+      id: "partidas-coincidentes-servico",
+      severidade: "alerta",
+      mensagem:
+        "O Serviço 0000-1CR possui partidas coincidentes no mesmo dia e horário. As Viagens destacadas em laranja são reforços válidos; confirme se o cadastro é intencional.",
+      etapaAlvo: "viagens-horarios",
+      quantidade: 2,
+    };
+    const { container, desmontar } = renderizar(
+      <TelaRevisao
+        sessao={SESSAO_CARREGADA}
+        pendencias={[alerta]}
+        aoNavegar={vi.fn()}
+      />,
+    );
+
+    const item = container.querySelector(
+      '[data-testid="revisao-item-alerta"]',
+    ) as HTMLButtonElement;
+    expect(item.textContent).toContain(alerta.mensagem);
+    expect(item.querySelectorAll("span")[1]?.textContent).toBe("2");
     desmontar();
   });
 });

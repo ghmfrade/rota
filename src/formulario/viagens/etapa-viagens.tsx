@@ -4,6 +4,7 @@ import {
   Fragment,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type DragEvent,
@@ -65,6 +66,10 @@ import {
 import { CampoHorarioGrade } from "./campo-horario-grade";
 import { PainelTabelasExcepcionais } from "./painel-tabelas-excepcionais";
 import { rotuloTabelaExcepcional } from "./tabelas-excepcionais";
+import {
+  detectarPartidasCoincidentes,
+  type OrigemPartidasCoincidentes,
+} from "./partidas-coincidentes";
 
 // Etapa "Viagens e horários" (TASK-028/029/030/105; Spec 04 §8) — grades por
 // Serviço × sentido: dias comuns, feriados e uma por Tabela excepcional.
@@ -148,21 +153,34 @@ function chaveCelula(viagemUuid: string, paradaOrdem: number): string {
 interface PropsEtapaViagens {
   sessao: SessaoFormulario;
   aoAtualizarSessao: (sessao: SessaoFormulario) => void;
+  origemPartidasPendente?: OrigemPartidasCoincidentes | null;
+  aoConsumirOrigemPartidas?: () => void;
 }
 
-export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
+export function EtapaViagens({
+  sessao,
+  aoAtualizarSessao,
+  origemPartidasPendente = null,
+  aoConsumirOrigemPartidas,
+}: PropsEtapaViagens) {
   const raizEtapaRef = useRef<HTMLDivElement>(null);
   const alvoFocoPendenteRef = useRef<AlvoFocoCelulaGrade | null>(null);
   const seletorNavegacaoPendenteRef = useRef<string | null>(null);
   const temporizadorSaidaHoverRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [servicoSelecionadoUuid, definirServicoSelecionadoUuid] = useState<string | null>(null);
-  const [sentidoSelecionado, definirSentidoSelecionado] = useState<Itinerario["sentido"] | null>(
-    null,
-  );
+  const [servicoSelecionadoUuid, definirServicoSelecionadoUuid] = useState<
+    string | null
+  >(origemPartidasPendente?.servicoUuid ?? null);
+  const [sentidoSelecionado, definirSentidoSelecionado] = useState<
+    Itinerario["sentido"] | null
+  >(origemPartidasPendente?.sentido ?? null);
   // Células passantes recusadas por fora-de-ordem (Spec 04 §8.2): não confirmam
   // e ficam em erro até uma edição válida. Estado de UI, por célula.
   const [errosCelula, definirErrosCelula] = useState<Record<string, string>>({});
   const [viagemSelecionadaUuid, definirViagemSelecionadaUuid] = useState<string | null>(null);
+  const inicioCliqueCelulaRef = useRef<{
+    viagemUuid: string;
+    estavaSelecionada: boolean;
+  } | null>(null);
   const [viagemEmHoverUuid, definirViagemEmHoverUuid] = useState<string | null>(null);
   const [colunaDestinoArrasto, definirColunaDestinoArrasto] = useState<{
     gradeId: string;
@@ -264,11 +282,70 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
   }
 
   const servicos: Servico[] = servicosDaSessao(sessao);
+  const deteccaoPartidasCoincidentes = useMemo(
+    () => detectarPartidasCoincidentes(servicos),
+    [servicos],
+  );
   const servicoAtual = servicos.find((s) => s.uuid === servicoSelecionadoUuid) ?? null;
   const itinerarioAtual =
     servicoAtual?.itinerarios.find((it) => it.sentido === sentidoSelecionado) ?? null;
   const todasAsSecoes = secoesDaSessao(sessao);
   const ancoras = ancorasHorarioDaSessao(sessao);
+
+  // DEC-097: o clique no alerta escolhe Serviço/sentido e, na pintura
+  // seguinte, posiciona a primeira ocorrência na grade correta. O alvo é
+  // estado efêmero da casca e é consumido após o posicionamento.
+  useLayoutEffect(() => {
+    if (
+      !origemPartidasPendente ||
+      servicoSelecionadoUuid !== origemPartidasPendente.servicoUuid ||
+      sentidoSelecionado !== origemPartidasPendente.sentido
+    ) {
+      return;
+    }
+    const seletor = seletorAlvoFocoCelulaGrade({
+      grade: origemPartidasPendente.gradeId,
+      viagemUuid: origemPartidasPendente.viagemBaseUuid,
+      indiceSecao: 0,
+      dia: origemPartidasPendente.diaSemana,
+    });
+    const campo = raizEtapaRef.current?.querySelector<HTMLInputElement>(seletor);
+    campo?.closest("td")?.scrollIntoView?.({
+      block: "center",
+      inline: "center",
+    });
+    aoConsumirOrigemPartidas?.();
+  }, [
+    aoConsumirOrigemPartidas,
+    origemPartidasPendente,
+    sentidoSelecionado,
+    servicoSelecionadoUuid,
+  ]);
+
+  function registrarInicioCliqueCelula(
+    evento: MouseEvent<HTMLTableCellElement>,
+    viagemUuid: string,
+  ) {
+    if ((evento.target as HTMLElement).closest("button")) return;
+    inicioCliqueCelulaRef.current = {
+      viagemUuid,
+      estavaSelecionada: viagemSelecionadaUuid === viagemUuid,
+    };
+  }
+
+  function alternarSelecaoPorClique(
+    evento: MouseEvent<HTMLTableCellElement>,
+    viagemUuid: string,
+  ) {
+    if ((evento.target as HTMLElement).closest("button")) return;
+    const inicio = inicioCliqueCelulaRef.current;
+    inicioCliqueCelulaRef.current = null;
+    const estavaSelecionada =
+      inicio?.viagemUuid === viagemUuid
+        ? inicio.estavaSelecionada
+        : viagemSelecionadaUuid === viagemUuid;
+    definirViagemSelecionadaUuid(estavaSelecionada ? null : viagemUuid);
+  }
 
   // Grava o itinerário atualizado pelo caminho unificado de Serviços (DEC-053;
   // TASK-061 — `comServicosDaSessao`: documento carregado ou `sessao.servicos`
@@ -809,6 +886,10 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                 const horarioMostrar = horarioHms ? horarioParaHoraMinuto(horarioHms) : "";
 
                 const selecionada = viagemSelecionadaUuid === celula.viagem.uuid;
+                const ehReforco =
+                  deteccaoPartidasCoincidentes.reforcosUuids.has(
+                    celula.viagem.uuid,
+                  );
                 const emHover = viagemEmHoverUuid === celula.viagem.uuid;
                 const ehUltimoDia = dia === DIAS_SEMANA[DIAS_SEMANA.length - 1];
                 const posicaoNaSuperficie =
@@ -826,8 +907,15 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                         posicaoNaSuperficie === "inicio" ? "border-t-2" : "",
                         posicaoNaSuperficie === "fim" ? "border-b-2" : "",
                       ].join(" ")
+                    : colunaEmArrasto
+                      ? "bg-azul-50 outline-2 outline-azul-300"
+                      : ehReforco
+                        ? [
+                            "bg-alerta/15 border-x-2 border-alerta",
+                            posicaoNaSuperficie === "inicio" ? "border-t-2" : "",
+                            posicaoNaSuperficie === "fim" ? "border-b-2" : "",
+                          ].join(" ")
                     : "",
-                  classeColunaDestino,
                   selecionada ? "cursor-grab active:cursor-grabbing" : "",
                 ]
                   .filter(Boolean)
@@ -862,10 +950,18 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                       data-testid="celula-partida"
                       data-viagem-uuid={viagemUuid}
                       data-selecionada={selecionada ? "true" : undefined}
-                      data-superficie-viagem={selecionada ? posicaoNaSuperficie : undefined}
+                      data-reforco={ehReforco ? "true" : undefined}
+                      data-superficie-viagem={
+                        selecionada || ehReforco ? posicaoNaSuperficie : undefined
+                      }
                       className={classesCelula}
                       draggable={selecionada}
-                      onClick={() => definirViagemSelecionadaUuid(viagemUuid)}
+                      onMouseDown={(evento) =>
+                        registrarInicioCliqueCelula(evento, viagemUuid)
+                      }
+                      onClick={(evento) =>
+                        alternarSelecaoPorClique(evento, viagemUuid)
+                      }
                       onFocus={() => {
                         definirViagemSelecionadaUuid(viagemUuid);
                       }}
@@ -965,10 +1061,24 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
                     data-testid="celula-passante"
                     data-viagem-uuid={celula.viagem.uuid}
                     data-selecionada={selecionada ? "true" : undefined}
-                    data-superficie-viagem={selecionada ? posicaoNaSuperficie : undefined}
+                    data-reforco={ehReforco ? "true" : undefined}
+                    data-superficie-viagem={
+                      selecionada || ehReforco ? posicaoNaSuperficie : undefined
+                    }
                     className={classesCelula}
                     draggable={selecionada}
-                    onClick={() => definirViagemSelecionadaUuid(celula.viagem.uuid)}
+                    onMouseDown={(evento) =>
+                      registrarInicioCliqueCelula(
+                        evento,
+                        celula.viagem.uuid,
+                      )
+                    }
+                    onClick={(evento) =>
+                      alternarSelecaoPorClique(
+                        evento,
+                        celula.viagem.uuid,
+                      )
+                    }
                     onFocus={() => {
                       definirViagemSelecionadaUuid(celula.viagem.uuid);
                     }}

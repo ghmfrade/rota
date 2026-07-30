@@ -145,3 +145,58 @@ describe("LayoutFormulario — motivo estrutural do bloqueio visível na Revisã
     desmontar();
   });
 });
+
+describe("LayoutFormulario — navegação de partidas coincidentes (TASK-119)", () => {
+  it("o alerta exibe Selo e posiciona Serviço, sentido, grade e primeira ocorrência", () => {
+    const documento = documentoExemploMinimo();
+    const servico = documento.autos.servicos[0];
+    const itinerario = servico.itinerarios[0];
+    const primeira = itinerario.viagens[0];
+    primeira.uuid = "10000000-0000-4000-8000-000000000001";
+    primeira.dia_semana = "segunda";
+    primeira.horario_saida = "08:00:00";
+    primeira.viagem_feriado = false;
+    primeira.tabela_excepcional_uuid = null;
+    const reforco = structuredClone(primeira);
+    reforco.uuid = "20000000-0000-4000-8000-000000000002";
+    itinerario.viagens = [primeira, reforco];
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+    };
+    const { container, desmontar } = renderizar(
+      <LayoutFormulario sessao={sessao} aoAtualizarSessao={vi.fn()} />,
+    );
+    const alerta = [...container.querySelectorAll('[data-testid="pendencia-item"]')].find(
+      (item) => item.textContent?.includes("partidas coincidentes"),
+    ) as HTMLButtonElement;
+    expect(alerta).toBeTruthy();
+    expect(alerta.textContent).toContain("1");
+
+    act(() => alerta.click());
+
+    expect(
+      container
+        .querySelector('[data-testid="conteudo-etapa"]')
+        ?.getAttribute("data-etapa-atual"),
+    ).toBe("viagens-horarios");
+    expect(
+      (container.querySelector(
+        '[data-testid="select-servico-viagens"]',
+      ) as HTMLSelectElement).value,
+    ).toBe(servico.uuid);
+    expect(
+      (container.querySelector(
+        '[data-testid="select-sentido-viagens"]',
+      ) as HTMLSelectElement).value,
+    ).toBe(itinerario.sentido);
+    expect(
+      container.querySelector(
+        `input[data-grade="comuns"][data-viagem-uuid="${primeira.uuid}"]` +
+          '[data-dia="segunda"][data-secao-index="0"]',
+      ),
+    ).not.toBeNull();
+    desmontar();
+  });
+});

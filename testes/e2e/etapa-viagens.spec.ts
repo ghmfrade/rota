@@ -589,7 +589,6 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     const grade = gradeComum(page);
     const partidaOrigem = grade.getByLabel("Horário de partida — segunda, viagem 1");
     const celulaOrigem = partidaOrigem.locator("xpath=ancestor::td");
-    const viagemUuid = await celulaOrigem.getAttribute("data-viagem-uuid");
     await celulaOrigem.hover();
     await celulaOrigem.getByTestId("alternar-modo-headway").click();
     await grade
@@ -1212,6 +1211,160 @@ test.describe("TASK-105 — grade de horários da Tabela excepcional", () => {
         .locator("input[data-grade]"),
     ).toHaveValue("08:40");
     await expect(gradeFeriados(page).getByTestId("celula-partida")).toHaveCount(0);
+    expect(chamadasOsrm).toBe(0);
+  });
+});
+
+test.describe("TASK-119 — partidas coincidentes e toggle de seleção", () => {
+  test("destaca só o reforço, alerta/navega, desfaz seleção e recalcula sem bloquear exportação", async ({
+    page,
+  }) => {
+    let chamadasOsrm = 0;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamadasOsrm += 1;
+      return rota.abort();
+    });
+    const documento = structuredClone(
+      multiServico,
+    ) as unknown as DocumentoOperacao;
+    const servico = documento.autos.servicos.find(
+      (item) => item.numero_n === "0001-1SU",
+    )!;
+    const itinerario = servico.itinerarios.find(
+      (item) => item.sentido === "ida",
+    )!;
+    const base = itinerario.viagens[0];
+    base.uuid = "10000000-0000-4000-8000-000000000001";
+    base.dia_semana = "segunda";
+    base.horario_saida = "08:00:00";
+    base.viagem_feriado = false;
+    base.tabela_excepcional_uuid = null;
+    const reforco = structuredClone(base);
+    reforco.uuid = "20000000-0000-4000-8000-000000000002";
+    reforco.horarios_paradas[1].offset_horario = "00:35:00";
+    itinerario.viagens = [base, reforco];
+
+    await abrirEtapaViagens(page, documento);
+    const comum = gradeComum(page);
+    const celulasBase = comum.locator(
+      `[data-viagem-uuid="${base.uuid}"][data-testid^="celula-"]`,
+    );
+    const celulasReforco = comum.locator(
+      `[data-viagem-uuid="${reforco.uuid}"][data-testid^="celula-"]`,
+    );
+    await expect(celulasBase).toHaveCount(3);
+    await expect(celulasBase.first()).not.toHaveAttribute("data-reforco");
+    await expect(celulasReforco).toHaveCount(3);
+    for (let indice = 0; indice < 3; indice += 1) {
+      await expect(celulasReforco.nth(indice)).toHaveAttribute(
+        "data-reforco",
+        "true",
+      );
+      await expect(celulasReforco.nth(indice)).toHaveClass(/bg-alerta\/15/);
+    }
+
+    const alerta = page
+      .getByTestId("pendencia-item")
+      .filter({ hasText: "partidas coincidentes" });
+    await expect(alerta).toContainText("1");
+    await alerta.click();
+    await expect(page.getByTestId("select-servico-viagens")).toHaveValue(
+      servico.uuid,
+    );
+    await expect(page.getByTestId("select-sentido-viagens")).toHaveValue("ida");
+    await expect(celulasBase.first()).toBeInViewport();
+
+    const partidaBase = comum.locator(
+      `input[data-viagem-uuid="${base.uuid}"][data-secao-index="0"]`,
+    );
+    const celulaPartidaBase = partidaBase.locator("xpath=ancestor::td");
+    await partidaBase.click();
+    await expect(celulaPartidaBase).toHaveAttribute("data-selecionada", "true");
+    await partidaBase.click();
+    await expect(celulaPartidaBase).not.toHaveAttribute("data-selecionada");
+
+    const partidaReforco = comum.locator(
+      `input[data-viagem-uuid="${reforco.uuid}"][data-secao-index="0"]`,
+    );
+    const celulaPartidaReforco = partidaReforco.locator("xpath=ancestor::td");
+    await partidaReforco.click();
+    await expect(celulaPartidaReforco).toHaveClass(/bg-azul-100/);
+    await partidaReforco.click();
+    await expect(celulaPartidaReforco).toHaveClass(/bg-alerta\/15/);
+    await expect(partidaReforco).toBeFocused();
+
+    await preencherEConfirmar(partidaReforco, "08:10");
+    await expect(alerta).toHaveCount(0);
+    await expect(celulasReforco.first()).not.toHaveAttribute("data-reforco");
+
+    await page
+      .locator('[data-testid="etapa-botao"][data-etapa="exportacao"]')
+      .click();
+    await expect(page.getByTestId("botao-exportar-proposta")).toBeEnabled();
+    expect(chamadasOsrm).toBe(0);
+  });
+
+  test("detecta, destaca e navega para reforço numa Tabela excepcional", async ({
+    page,
+  }) => {
+    let chamadasOsrm = 0;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamadasOsrm += 1;
+      return rota.abort();
+    });
+    const documento = structuredClone(
+      multiServico,
+    ) as unknown as DocumentoOperacao;
+    documento.versao_schema = "1.1";
+    for (const item of documento.autos.servicos) {
+      item.tabelas_excepcionais = [];
+      for (const itinerario of item.itinerarios) {
+        for (const viagem of itinerario.viagens) {
+          viagem.tabela_excepcional_uuid = null;
+        }
+      }
+    }
+    const servico = documento.autos.servicos.find(
+      (item) => item.numero_n === "0001-1SU",
+    )!;
+    const itinerario = servico.itinerarios.find(
+      (item) => item.sentido === "ida",
+    )!;
+    const tabelaUuid = "30000000-0000-4000-8000-000000000003";
+    servico.tabelas_excepcionais = [
+      { uuid: tabelaUuid, tipo: "ferias_verao" },
+    ];
+    const base = structuredClone(itinerario.viagens[0]);
+    base.uuid = "40000000-0000-4000-8000-000000000004";
+    base.dia_semana = "terca";
+    base.horario_saida = "10:00:00";
+    base.viagem_feriado = false;
+    base.tabela_excepcional_uuid = tabelaUuid;
+    const reforco = structuredClone(base);
+    reforco.uuid = "50000000-0000-4000-8000-000000000005";
+    itinerario.viagens = [base, reforco];
+
+    await abrirEtapaViagens(page, documento);
+    const excepcional = page
+      .getByTestId("grade-tabela-excepcional")
+      .filter({ hasText: "Férias de verão" });
+    const alvo = excepcional.locator(
+      `input[data-viagem-uuid="${base.uuid}"][data-secao-index="0"]`,
+    );
+    const celulaReforco = excepcional.locator(
+      `[data-viagem-uuid="${reforco.uuid}"][data-testid="celula-partida"]`,
+    );
+    await expect(celulaReforco).toHaveAttribute("data-reforco", "true");
+
+    await page
+      .getByTestId("pendencia-item")
+      .filter({ hasText: "partidas coincidentes" })
+      .click();
+    await expect(alvo).toBeInViewport();
+    await expect(page.getByTestId("select-servico-viagens")).toHaveValue(
+      servico.uuid,
+    );
+    await expect(page.getByTestId("select-sentido-viagens")).toHaveValue("ida");
     expect(chamadasOsrm).toBe(0);
   });
 });

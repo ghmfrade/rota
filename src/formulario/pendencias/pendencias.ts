@@ -7,6 +7,10 @@ import { ocorrenciasLocaisEmExtremo } from "@/formulario/itinerarios/motor-monta
 import type { IdEtapa } from "@/formulario/layout/etapas";
 import type { EstadoRotaViva } from "@/formulario/roteamento";
 import { matrizDistanciasDesatualizada } from "@/formulario/matrizes";
+import {
+  detectarPartidasCoincidentes,
+  type OrigemPartidasCoincidentes,
+} from "@/formulario/viagens";
 import type { DescricaoItinerario, Itinerario } from "@/shared/contrato";
 
 // Painel de pendências vivo (Spec 04 §4/§11): a lista, derivada da sessão de
@@ -73,6 +77,13 @@ export interface Pendencia {
    * destino é a etapa Revisão (DEC-033).
    */
   etapaAlvo: IdEtapa;
+  /** Quantidade exibida em Selo associado ao item (DEC-097/TASK-119). */
+  quantidade?: number;
+  /**
+   * Origem detalhada de uma coincidência na etapa Viagens. Efêmera e derivada
+   * do documento; nunca integra o contrato JSON (NEG-004).
+   */
+  origemPartidasCoincidentes?: OrigemPartidasCoincidentes;
   /**
    * Trilha técnica para DEV (TASK-086): RN + caminho JSON + mensagem crua do
    * schema. Opcional — só os erros estruturais do gate de exportação a
@@ -221,6 +232,26 @@ export function coletarPendencias(
       severidade: "alerta",
       mensagem: `Serviços ${servicosSemGradeDeFeriado.join(", ")} sem grade de feriados — confirme se é intencional.`,
       etapaAlvo: "viagens-horarios",
+    });
+  }
+
+  // DEC-095/097: reforços de partida são válidos (RN-062), portanto geram
+  // somente um alerta por Serviço, com a quantidade de grupos em Selo e a
+  // primeira origem na ordem visual. O detector ignora offsets e cobre as
+  // grades comum, de feriado e excepcionais.
+  const deteccaoCoincidencias = detectarPartidasCoincidentes(
+    servicosDaSessao(sessao),
+  );
+  for (const alerta of deteccaoCoincidencias.alertasPorServico) {
+    pendencias.push({
+      id: `partidas-coincidentes-${alerta.servicoUuid}`,
+      severidade: "alerta",
+      mensagem:
+        `O Serviço ${alerta.numeroN} possui partidas coincidentes no mesmo dia e horário. ` +
+        "As Viagens destacadas em laranja são reforços válidos; confirme se o cadastro é intencional.",
+      etapaAlvo: "viagens-horarios",
+      quantidade: alerta.quantidadeGrupos,
+      origemPartidasCoincidentes: alerta.primeiraOrigem,
     });
   }
 

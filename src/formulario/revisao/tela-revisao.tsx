@@ -5,7 +5,6 @@ import { ROTULO_SENTIDO, type Pendencia } from "@/formulario/pendencias";
 import { montarDocumentoParaExportacao } from "@/formulario/exportacao";
 import { servicosDaSessao, type SessaoFormulario } from "@/formulario/sessao";
 import { Painel, Selo } from "@/shared/ui";
-import type { IdEtapa } from "@/formulario/layout/etapas";
 
 // Tela de Revisão (TASK-032; Spec 04 §11): tela final antes da exportação.
 // Consolida o painel de pendências vivo (já coletado pela casca —
@@ -25,7 +24,7 @@ interface PropsTelaRevisao {
   sessao: SessaoFormulario;
   pendencias: Pendencia[];
   /** Navega para a etapa/entidade de origem da pendência clicada (§11). */
-  aoNavegar: (etapa: IdEtapa) => void;
+  aoNavegar: (pendencia: Pendencia) => void;
 }
 
 export function TelaRevisao({ sessao, pendencias, aoNavegar }: PropsTelaRevisao) {
@@ -111,7 +110,7 @@ function ListaPendencias({
   mensagemVazia: string;
   itens: Pendencia[];
   itemTestId: string;
-  aoNavegar: (etapa: IdEtapa) => void;
+  aoNavegar: (pendencia: Pendencia) => void;
   className?: string;
 }) {
   const cor = itens.length > 0 && titulo === "Erros bloqueantes" ? "erro" : "alerta";
@@ -134,10 +133,15 @@ function ListaPendencias({
                   type="button"
                   data-testid={itemTestId}
                   data-diagnostico={pendencia.diagnostico}
-                  onClick={() => aoNavegar(pendencia.etapaAlvo)}
-                  className="block w-full rounded-controle px-2 py-1 text-left text-sm hover:bg-cinza-100"
+                  onClick={() => aoNavegar(pendencia)}
+                  className="flex w-full items-center rounded-controle px-2 py-1 text-left text-sm hover:bg-cinza-100"
                 >
-                  {pendencia.mensagem}
+                  <span>{pendencia.mensagem}</span>
+                  {pendencia.quantidade !== undefined && (
+                    <Selo tom="alerta" className="ml-2">
+                      {pendencia.quantidade}
+                    </Selo>
+                  )}
                 </button>
               </li>
             ))}

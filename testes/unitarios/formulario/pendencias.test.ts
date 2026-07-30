@@ -67,6 +67,81 @@ describe("coletarPendencias (Spec 04 §11; RN-078)", () => {
   });
 });
 
+describe("coletarPendencias — partidas coincidentes (TASK-119; DEC-095/097)", () => {
+  test("agrega por Serviço, informa grupos e navega para a primeira origem", () => {
+    const documento = documentoExemploMinimo();
+    const servico = documento.autos.servicos[0];
+    const itinerario = servico.itinerarios[0];
+    const primeira = itinerario.viagens[0];
+    primeira.uuid = "10000000-0000-4000-8000-000000000001";
+    primeira.dia_semana = "segunda";
+    primeira.horario_saida = "08:00:00";
+    primeira.viagem_feriado = false;
+    primeira.tabela_excepcional_uuid = null;
+    const reforco = structuredClone(primeira);
+    reforco.uuid = "20000000-0000-4000-8000-000000000002";
+    itinerario.viagens = [primeira, reforco];
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+    };
+
+    const antes = structuredClone(documento);
+    const alerta = coletarPendencias(sessao).find((pendencia) =>
+      pendencia.id.startsWith("partidas-coincidentes-"),
+    );
+
+    expect(alerta).toMatchObject({
+      severidade: "alerta",
+      etapaAlvo: "viagens-horarios",
+      quantidade: 1,
+      origemPartidasCoincidentes: {
+        servicoUuid: servico.uuid,
+        sentido: itinerario.sentido,
+        gradeId: "comuns",
+        diaSemana: "segunda",
+        horarioSaida: "08:00:00",
+        viagemBaseUuid: primeira.uuid,
+      },
+    });
+    expect(alerta?.mensagem).toBe(
+      `O Serviço ${servico.numero_n} possui partidas coincidentes no mesmo dia e horário. ` +
+        "As Viagens destacadas em laranja são reforços válidos; confirme se o cadastro é intencional.",
+    );
+    expect(documento).toEqual(antes);
+  });
+
+  test("[inválido] uma partida isolada ou coincidências corrigidas não mantêm alerta anterior", () => {
+    const documento = documentoExemploMinimo();
+    const servico = documento.autos.servicos[0];
+    const itinerario = servico.itinerarios[0];
+    const primeira = itinerario.viagens[0];
+    primeira.dia_semana = "segunda";
+    primeira.horario_saida = "08:00:00";
+    const reforco = structuredClone(primeira);
+    reforco.uuid = "20000000-0000-4000-8000-000000000002";
+    itinerario.viagens = [primeira, reforco];
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+    };
+    expect(
+      coletarPendencias(sessao).some((pendencia) =>
+        pendencia.id.startsWith("partidas-coincidentes-"),
+      ),
+    ).toBe(true);
+
+    reforco.horario_saida = "08:10:00";
+    expect(
+      coletarPendencias(sessao).some((pendencia) =>
+        pendencia.id.startsWith("partidas-coincidentes-"),
+      ),
+    ).toBe(false);
+  });
+});
+
 describe("coletarPendencias — Local extremo ao vivo (TASK-068/DEC-070; RN-035/078)", () => {
   test("[inválido] bloqueia a ocorrência em edição mesmo com documento anterior válido", () => {
     const documento = documentoExemploMinimo();
