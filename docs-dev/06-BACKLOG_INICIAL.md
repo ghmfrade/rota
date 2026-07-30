@@ -6513,4 +6513,159 @@ quando `Enter` ou `Tab` valida o valor completo.
 
 ---
 
-**Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.
+## TASK-117 — Reancorar operações de dia no cabeçalho e recompor os controles de headway — **desbloqueada (DEC-093)**
+
+## Objetivo
+
+Fazer de cada cabeçalho `SEG…DOM` o botão das operações de coluna “Copiar para
+outro dia” e “Apagar o dia”, retirando essas operações do hover da Viagem.
+Recompor o modo headway com alternador azul claro/azul ativo e formulário em
+duas linhas (`a cada` / `até`) com um único botão de geração à direita.
+
+## Contexto
+
+A TASK-110 entregou corretamente os motores de copiar e apagar um dia inteiro,
+mas ancorou as ações na superfície de uma Viagem: o botão de cópia está no
+hover e o `X` oferece tanto apagar a Viagem quanto apagar o dia. Isso comunica
+granularidade errada. A TASK-109/DEC-092 já cobre a cópia unitária entre dias
+por arrasto e `Ctrl+←`/`Ctrl+→`, sem botão visível. A TASK-108 entregou o motor
+de headway; esta task altera sua composição, estados visuais e a máscara de
+entrada decidida na DEC-093.
+
+## Fora de escopo
+
+- Alterar os motores, a política de mescla/duplicidade, a geração de UUIDs ou a
+  confirmação destrutiva entregues pelas TASK-108/TASK-110.
+- Alterar arrasto, atalhos `Ctrl+←`/`Ctrl+→`, realce do destino ou qualquer
+  outra regra da TASK-109/DEC-092.
+- Alterar a semântica de “Restaurar sugestão”, inserção relativa, navegação,
+  foco, ordenação temporal, grades excepcionais, contrato JSON, PDF,
+  Comparador ou contagens.
+- Criar botão de cópia unitária de Viagem no hover.
+
+## Specs fonte
+
+- Spec 04 §8.1 (colunas dos sete dias e estrutura semântica da grade)
+- Spec 04 §8.2 (ações por Viagem e “Restaurar sugestão”)
+- Spec 04 §8.3 (cópia unitária somente por teclado/arrasto)
+- Spec 02 §11/§12 (Viagem estratificada e identidade de cópias)
+
+## Regras envolvidas
+
+- RN-004, RN-007 (identidade preservada; cópias continuam com UUID nova)
+- RN-061, RN-062 (um dia por Viagem; reforços continuam válidos)
+- RN-063, RN-067 (offsets completos; entradas de headway/limite em horário)
+- RN-096 (estado do menu/modo permanece efêmero)
+
+## Entidades afetadas
+
+- Viagem (somente afordância das operações e geração já existentes)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor (⚠ exige decisão humana — RN-093)
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Em cada grade, os cabeçalhos `SEG…DOM` são botões acessíveis; clicar abre
+      somente as opções “Copiar para outro dia” e “Apagar o dia” para aquele
+      dia e aquela grade.
+- [ ] “Copiar para outro dia” no cabeçalho abre o diálogo de multisseleção já
+      existente e mantém a mescla/guarda, os reforços, offsets e UUIDs novas da
+      TASK-110.
+- [ ] “Apagar o dia” no cabeçalho abre a confirmação já existente; cancelar não
+      altera nada e confirmar apaga somente as Viagens daquele dia e grade.
+- [ ] O hover da Viagem não contém botão de cópia para outro dia/dia inteiro; o
+      `X` oferece somente apagar aquela Viagem, preservando sua confirmação.
+- [ ] Arrasto e `Ctrl+←`/`Ctrl+→` continuam sendo os únicos gestos de cópia
+      unitária entre dias e não regridem.
+- [ ] O alternador de headway usa azul claro quando `aria-pressed="false"` e
+      azul normal quando `aria-pressed="true"`, por variante explícita do
+      `Botao` documentada no design system.
+- [ ] No modo headway, o controle inferior tem duas linhas: rótulo `a cada` +
+      campo `HH:MM`, rótulo `até` + campo `HH:MM`; um único botão de geração
+      ocupa a coluna direita ao lado das duas linhas.
+- [ ] Nos dois campos, a digitação considera no máximo quatro algarismos,
+      preenche zeros à esquerda e insere `:` entre horas/minutos: `1` exibe
+      `00:01` e `123` exibe `01:23`, sem acionar a geração durante a digitação.
+- [ ] A máscara não corrige nem apaga valor temporal impossível: `9875` exibe
+      `98:75`, permanece inválido e deixa o botão de geração desabilitado; a
+      ação só fica habilitada quando headway e limite atendem à DEC-083.
+- [ ] Os `data-testid` e `aria-*` existentes das ações, campos e diálogos são
+      preservados; os novos botões/menu têm nome acessível, foco visível, `Esc`,
+      navegação por teclado e restauração de foco.
+
+## Casos válidos
+
+- Clicar `SEG` na grade comum → “Copiar para outro dia” → selecionar SÁB e DOM
+  → ambos recebem todas as Viagens de SEG conforme a TASK-110.
+- Clicar `TER` na grade de feriados → “Apagar o dia” → confirmar → somente as
+  Viagens de terça-feira da grade de feriados são removidas.
+- Ativar headway numa Viagem de 08:00, preencher `a cada 01:00` e `até 10:00`
+  e acionar o botão lateral → cria 09:00 e 10:00, como antes.
+- Digitar `1` em qualquer dos dois campos → `00:01`; apagar e digitar `123` →
+  `01:23`.
+
+## Casos inválidos
+
+- Cancelar “Apagar o dia” → nenhuma Viagem removida.
+- Tentar copiar sem selecionar destino → confirmação continua desabilitada.
+- Headway `00:00`, formato inválido ou limite anterior à origem → aviso
+  existente, botão desabilitado e nenhuma Viagem criada.
+- Digitar `9875` → o campo mostra `98:75`, não corrige o valor e mantém o botão
+  desabilitado.
+- Acionar o `X` de uma Viagem → nunca oferece nem executa apagar o dia inteiro.
+- Hover de uma Viagem → nenhum botão `copiar-dia` aparece nessa superfície.
+
+## Testes esperados
+
+- Unitários/componentes: cabeçalho abre menu com as duas ações no dia/grade
+  corretos; `X` fica restrito à Viagem; variante visual do `Botao` em repouso e
+  ativa; estrutura de duas linhas e botão abrangente do headway; máscara para
+  `1`, `123`, `9875`, exclusão e limite de quatro algarismos.
+- Integração: copiar/apagar pelo cabeçalho reutiliza os motores existentes sem
+  mudar UUIDs/offsets/âncoras e preserva reforços; botão só habilita com os dois
+  campos temporalmente válidos; casos inválidos são atômicos.
+- E2E (OSRM mockado): fluxo completo do menu de cabeçalho nas grades comum e de
+  feriados; ausência da cópia no hover; arrasto/atalhos sem regressão; cores por
+  estado e geometria do formulário de headway.
+- Snapshot/contrato JSON: n/a — contrato inalterado; regressões existentes de
+  RN-004/RN-007 permanecem na suíte.
+- PDF: n/a.
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/etapa-viagens.tsx`
+- `src/formulario/viagens/horario-relogio.ts`
+- `src/shared/ui/botao.tsx`
+- `docs-dev/18-DESIGN_SYSTEM.md`
+- `testes/unitarios/shared-ui/botao.test.tsx`
+- `testes/unitarios/formulario/viagens-horario-relogio.test.ts`
+- testes unitários/de integração da etapa Viagens
+- `testes/e2e/etapa-viagens.spec.ts`
+
+## Riscos
+
+- Misturar o dia da grade comum com o mesmo dia da grade de feriados ao abrir o
+  menu; o estado precisa carregar grade + dia.
+- Remover o intermediário do `X` pode apagar o `data-testid`/contrato de foco
+  existente; a correção deve preservar os seletores e a confirmação da Viagem.
+- A variante azul clara não pode ser aplicada por `className` conflitante sobre
+  `Botao`; exige prop documentada conforme o design system.
+- O botão no `<th>` não pode quebrar `scope="col"`, o realce do alvo de arrasto,
+  a largura das colunas nem o overflow tratado pela TASK-114.
+
+## Dependências
+
+- TASK-108, TASK-109 e TASK-110 concluídas.
+- Q-071 decidida pela opção B (DEC-093).
+
+## Perguntas em aberto
+
+- Nenhuma — Q-071 decidida (DEC-093).
+
+---

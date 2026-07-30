@@ -994,3 +994,55 @@ reescrita** por esta decisão (deixa de ser "setas ←/→" e passa a ser "arras
 atalhos"), mantendo no escopo a remoção do `Select`/botão "Copiar" e a
 reutilização de `copiarViagemParaDias`. Sem impacto em contrato JSON, PDF,
 Comparador ou contagens.
+
+## DEC-093 — Operações de dia inteiro no cabeçalho e composição em duas linhas do modo headway
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, opção B da
+**Q-071**, com detalhamento explícito da máscara dos campos; Spec 04 §8.1–§8.3;
+Spec 02 §11/§12; DEC-083/DEC-085/DEC-090/DEC-092; TASK-117; DEC-050 ·
+**Data:** 2026-07-29
+
+**Decisão:** as operações de **coluna/dia inteiro** deixam a superfície da
+Viagem e passam ao cabeçalho da própria coluna. Cada `SEG…DOM` é um botão que,
+ao ser acionado, oferece exatamente “Copiar para outro dia” e “Apagar o dia”
+para aquele dia e aquela grade. “Copiar para outro dia” continua abrindo o
+diálogo de multisseleção e usando integralmente a política da DEC-085;
+“Apagar o dia” continua sob confirmação explícita. O `X` no hover fica
+restrito a apagar **aquela Viagem**. Não existe botão visível de cópia unitária
+na Viagem: essa cópia continua exclusivamente por arrasto ou
+`Ctrl+←`/`Ctrl+→`, conforme a DEC-092.
+
+O alternador do modo headway usa **azul claro quando inativo** e **azul normal
+quando ativo**. Ao ativá-lo, o formulário inferior usa duas linhas —
+`a cada [HH:MM]` e `até [HH:MM]` — com um único botão de geração ocupando a
+coluna à direita das duas linhas.
+
+Os dois campos aplicam durante a digitação uma máscara de quatro algarismos,
+preenchida com zeros à esquerda e exibida como `HH:MM`: digitar `1` exibe
+`00:01`; digitar `123` exibe `01:23`. A máscara é somente apresentação e não
+normaliza horário impossível: digitar `9875` exibe `98:75`, permanece inválido
+e deixa o botão de geração desabilitado. A geração só fica acionável quando
+headway e horário-limite formam entradas válidas para as regras da DEC-083.
+
+**Motivo:** a posição do controle deve comunicar sua granularidade: operações
+de dia pertencem ao cabeçalho da coluna, enquanto o hover reúne somente ações
+da Viagem. A nova composição reduz poluição visual, preserva os gestos já
+decididos e torna a entrada do headway rápida sem esconder do usuário o valor
+inválido que precisa ser corrigido.
+
+**Consequências:** resolve a **Q-071** e **desbloqueia a TASK-117**. Supera a
+DEC-085 somente quanto à posição das afordâncias: seus motores, política de
+mescla/guarda, UUIDs novas e confirmação destrutiva permanecem intactos. A
+DEC-092 permanece integralmente válida para a cópia unitária. A máscara e o
+estado habilitado do botão são conveniência efêmera da UI e não entram no
+contrato JSON.
+
+**Impacto em implementação:** nenhuma mudança no texto das RN existentes, no
+contrato JSON, Comparador, PDF ou contagens. **RN-004/RN-007/RN-061/RN-062**
+continuam governando cópia e identidade; **RN-063/RN-067** continuam governando
+offsets e entradas temporais; **RN-096** fundamenta os estados efêmeros.
+**Módulos:** `src/formulario/viagens/etapa-viagens.tsx`,
+`src/formulario/viagens/horario-relogio.ts`, `src/shared/ui/botao.tsx`, testes
+da etapa e do design system. A nova aparência do `Botao` deve ser variante
+explícita documentada em `docs-dev/18-DESIGN_SYSTEM.md`, nunca sobreposição de
+cores por `className`.

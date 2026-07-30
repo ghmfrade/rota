@@ -840,3 +840,66 @@ pelo atalho de teclado e pela permanência da cópia de dia inteiro (TASK-110).
 do responsável pelo domínio, com destino em qualquer dia, cópia sempre (nunca
 mover), guarda de duplicidade preservada e atalho `Ctrl+←` / `Ctrl+→` para o
 dia adjacente. Ver DEC-092.
+
+---
+
+## Q-071 — Onde ficam as operações de dia inteiro e como se compõe o modo headway na grade?
+
+**Status:** Decidida — DEC-093
+
+**Origem:** correção solicitada pelo responsável ao validar manualmente as
+TASK-108/TASK-110 (2026-07-29)
+
+**Contexto:** a TASK-110 colocou “Copiar dia” no hover de uma Viagem e
+“Apagar as Viagens do dia” como alternativa dentro do `X` dessa Viagem. A
+granularidade das operações é de **coluna/dia inteiro**, mas sua afordância ficou
+ancorada numa entidade **Viagem**, misturando os dois escopos. O responsável
+determinou que o cabeçalho `SEG…DOM` seja o alvo das operações de coluna e
+reiterou que a cópia unitária entre dias já é coberta por arrasto e por
+`Ctrl+←`/`Ctrl+→` (DEC-092), portanto não deve ganhar botão no hover.
+
+Na mesma superfície, o alternador do modo headway (TASK-108) hoje usa aparência
+fantasma quando inativo e primária quando ativo; o responsável pediu fundo azul
+claro no repouso e azul normal no estado pressionado. O formulário inferior
+também deve deixar de pôr os dois campos numa única linha e passar a mostrar
+duas linhas: `a cada [HH:MM]` e `até [HH:MM]`, com um único botão de geração
+ocupando a coluna à direita das duas linhas.
+
+O responsável detalhou ainda a entrada dos dois campos: máscara imediata de
+quatro algarismos preenchidos com zeros à esquerda (`1` → `00:01`; `123` →
+`01:23`). A máscara não corrige valores impossíveis: `9875` permanece visível
+como `98:75`, inválido, com o botão de geração desabilitado.
+
+**Spec relacionada:** Spec 04 §8.1 (colunas `SEG…DOM`), §8.2 (ações por
+Viagem), §8.3 (cópia unitária por teclado/arrasto); Spec 02 §11/§12;
+RN-004/RN-007/RN-061/RN-062/RN-063/RN-067; DEC-083, DEC-085, DEC-090,
+DEC-092; TASK-108/TASK-109/TASK-110; DEC-050 e
+`docs-dev/18-DESIGN_SYSTEM.md`.
+
+**Impacto se não decidir:** a TASK-117 não pode alterar a posição definida pela
+DEC-085 nem criar uma nova variante visual do `Botao` sem respaldo; implementar
+diretamente escolheria uma interação de UI que não é literal nas specs.
+
+**Opções:** A — manter a composição atual (operações de dia no hover da Viagem,
+alternador fantasma e formulário de headway em uma linha). B — tornar cada
+cabeçalho `SEG…DOM` um botão que abre as opções “Copiar para outro dia” e
+“Apagar o dia”; deixar o `X` restrito a apagar aquela Viagem; manter a cópia
+unitária somente por arrasto/atalho; usar azul claro no alternador inativo e
+azul normal no ativo; compor o formulário de headway em duas linhas, com um
+único botão de geração abrangendo ambas e máscara temporal que preserve valores
+inválidos visíveis, desabilitando a geração. C — manter controles duplicados no
+cabeçalho e no hover para descoberta.
+
+**Recomendação técnica:** B. Faz a posição comunicar a granularidade da ação,
+elimina controles redundantes na superfície densa da Viagem e preserva
+integralmente os motores e regras já aprovados. O `MenuFlutuante` existente pode
+oferecer as duas opções do cabeçalho; os diálogos de cópia/confirmação continuam
+responsáveis pelas ações subsequentes. A aparência do alternador deve vir de
+variante explícita do `Botao`, nunca de classes de cor sobrepostas.
+
+**Decisão:** **Decidida (DEC-093, 2026-07-29).** Opção B, por decisão explícita
+do responsável pelo domínio, incluindo a máscara `1` → `00:01`, `123` →
+`01:23`, preservação visível de `9875` como `98:75` inválido e botão de geração
+desabilitado enquanto os campos não forem válidos.
+
+---
