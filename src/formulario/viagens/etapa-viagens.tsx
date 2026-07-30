@@ -60,6 +60,7 @@ import {
   type TeclaNavegacaoGrade,
 } from "./montagem-grade";
 import { CampoHorarioGrade } from "./campo-horario-grade";
+import { PainelTabelasExcepcionais } from "./painel-tabelas-excepcionais";
 
 // Etapa "Viagens e horários" (TASK-028/029/030; Spec 04 §8) — duas grades por
 // Serviço × sentido: dias comuns e feriados (RN-068, grades independentes).
@@ -292,6 +293,13 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
     aplicar({ ...itinerarioAtual, viagens: [...itinerarioAtual.viagens, viagemNova] });
     definirViagemSelecionadaUuid(viagemNova.uuid);
     return true;
+  }
+
+  function aplicarServicoAtualizado(servicoAtualizado: Servico) {
+    const servicosAtualizados = servicos.map((servico) =>
+      servico.uuid === servicoAtualizado.uuid ? servicoAtualizado : servico,
+    );
+    aoAtualizarSessao(comServicosDaSessao(sessao, servicosAtualizados));
   }
 
   function aoConfirmarPartida(
@@ -1426,6 +1434,14 @@ export function EtapaViagens({ sessao, aoAtualizarSessao }: PropsEtapaViagens) {
             </Tabela>
           </section>
         </>
+      )}
+
+      {servicoAtual && (
+        <PainelTabelasExcepcionais
+          key={servicoAtual.uuid}
+          servico={servicoAtual}
+          aoAtualizarServico={aplicarServicoAtualizado}
+        />
       )}
     </div>
   );

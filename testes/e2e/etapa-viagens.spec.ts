@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import type { DocumentoOperacao } from "@/shared/contrato";
 import multiServico from "../fixtures/carregar-multi-servico.json";
 
 // E2E da etapa "Viagens e horários" — grades de dias comuns e de feriados
@@ -1115,5 +1116,138 @@ test.describe("Etapa Viagens — grade de feriados e cópias (TASK-030; Spec 04 
     await origem.click();
     await origem.press("Control+ArrowRight");
     await expect(comum.getByLabel("Horário de partida — terca, viagem 1")).toHaveValue("08:00");
+  });
+});
+
+test.describe("TASK-104 — CRUD e filtro de Tabelas excepcionais", () => {
+  test("cria, valida, filtra, edita e remove tabelas vazias sem chamar OSRM", async ({
+    page,
+  }) => {
+    let chamadasOsrm = 0;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamadasOsrm += 1;
+      return rota.abort();
+    });
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const painel = page.getByTestId("painel-tabelas-excepcionais");
+    await painel.locator("summary").click();
+
+    await painel.getByTestId("criar-tabela-excepcional").click();
+    await page.getByTestId("confirmar-tabela-excepcional").click();
+    await expect(painel.getByTestId("linha-tabela-excepcional")).toContainText(
+      "Férias de verão",
+    );
+
+    // As tabelas pertencem ao Serviço selecionado e não vazam para o seguinte.
+    await page
+      .getByTestId("select-servico-viagens")
+      .selectOption({ label: "0001-2SU" });
+    await painel.locator("summary").click();
+    await expect(painel.getByTestId("linha-tabela-excepcional")).toHaveCount(0);
+    await page
+      .getByTestId("select-servico-viagens")
+      .selectOption({ label: "0001-1SU" });
+    await painel.locator("summary").click();
+    await expect(painel.getByTestId("linha-tabela-excepcional")).toHaveCount(1);
+
+    // Caso inválido: o segundo tipo canônico é bloqueado com mensagem.
+    await painel.getByTestId("criar-tabela-excepcional").click();
+    await page.getByTestId("confirmar-tabela-excepcional").click();
+    await expect(page.getByTestId("dialogo-tabela-excepcional")).toContainText(
+      "Já existe uma tabela férias de verão neste Serviço.",
+    );
+
+    // Caso inválido: Personalizado exige nome; depois cria normalmente.
+    await page
+      .getByTestId("tipo-tabela-excepcional")
+      .selectOption("personalizado");
+    await page.getByTestId("confirmar-tabela-excepcional").click();
+    await expect(page.getByTestId("dialogo-tabela-excepcional")).toContainText(
+      "Informe o nome da tabela personalizada.",
+    );
+    await page
+      .getByTestId("descricao-tabela-excepcional")
+      .fill("Excursão Aparecida");
+    await page.getByTestId("confirmar-tabela-excepcional").click();
+
+    await painel
+      .getByTestId("filtro-tipo-tabela-excepcional")
+      .selectOption("personalizado");
+    await expect(painel.getByTestId("linha-tabela-excepcional")).toHaveCount(1);
+    await expect(painel.getByTestId("linha-tabela-excepcional")).toContainText(
+      "Excursão Aparecida",
+    );
+
+    await painel.getByLabel("Editar Excursão Aparecida").click();
+    await page
+      .getByTestId("editar-descricao-tabela-excepcional")
+      .fill("Operação escolar");
+    await page.getByTestId("confirmar-edicao-tabela-excepcional").click();
+    await painel
+      .getByTestId("busca-descricao-tabela-excepcional")
+      .fill("ESCOLAR");
+    await expect(painel.getByTestId("linha-tabela-excepcional")).toHaveCount(1);
+    await expect(painel.getByTestId("linha-tabela-excepcional")).toContainText(
+      "Operação escolar",
+    );
+
+    await painel.getByLabel("Remover Operação escolar").click();
+    await page.getByTestId("confirmar-remocao-tabela-excepcional").click();
+    await expect(painel.getByTestId("linha-tabela-excepcional")).toHaveCount(0);
+
+    await painel
+      .getByTestId("busca-descricao-tabela-excepcional")
+      .fill("");
+    await painel
+      .getByTestId("filtro-tipo-tabela-excepcional")
+      .selectOption("ferias_verao");
+    await expect(painel.getByTestId("linha-tabela-excepcional")).toHaveCount(1);
+    expect(chamadasOsrm).toBe(0);
+  });
+
+  test("DEC-098: bloqueia remoção e informa a quantidade de Viagens associadas", async ({
+    page,
+  }) => {
+    let chamadasOsrm = 0;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamadasOsrm += 1;
+      return rota.abort();
+    });
+
+    const documento = structuredClone(
+      multiServico,
+    ) as unknown as DocumentoOperacao;
+    documento.versao_schema = "1.1";
+    for (const servico of documento.autos.servicos) {
+      servico.tabelas_excepcionais = [];
+      for (const itinerario of servico.itinerarios) {
+        for (const viagem of itinerario.viagens) {
+          viagem.tabela_excepcional_uuid = null;
+        }
+      }
+    }
+    const servicoAlvo = documento.autos.servicos.find(
+      (servico) => servico.numero_n === "0001-1SU",
+    )!;
+    const tabelaUuid = "10000000-0000-4000-8000-000000000001";
+    servicoAlvo.tabelas_excepcionais = [
+      { uuid: tabelaUuid, tipo: "ferias_verao" },
+    ];
+    servicoAlvo.itinerarios[0].viagens[0].tabela_excepcional_uuid =
+      tabelaUuid;
+
+    await abrirEtapaViagens(page, documento);
+    const painel = page.getByTestId("painel-tabelas-excepcionais");
+    await painel.locator("summary").click();
+    await painel.getByLabel("Remover Férias de verão").click();
+
+    await expect(
+      painel.getByTestId("bloqueio-remocao-tabela-excepcional"),
+    ).toContainText("1 Viagem associada");
+    await expect(
+      page.getByTestId("dialogo-remover-tabela-excepcional"),
+    ).toHaveCount(0);
+    await expect(painel.getByTestId("linha-tabela-excepcional")).toHaveCount(1);
+    expect(chamadasOsrm).toBe(0);
   });
 });
