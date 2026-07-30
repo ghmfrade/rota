@@ -1,12 +1,13 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
 **Atualização mais recente:** 2026-07-30 (branch `redesign`) — **TASK-118
-concluída e aprovada na reavaliação final**. A implementação `7ac010f` torna a
+concluída e aprovada, sem ressalvas remanescentes**. A implementação `7ac010f` torna a
 geração por headway idempotente no mesmo dia e grade; a regularização
 documental `2a72bd1` versiona TASK-118, Q-072 e DEC-094 e corrige o estado da
-task para desbloqueada. O parecer
-`14-REVISOES/TASK-118-20260730-reavaliacao.md` encerra a única ressalva anterior
-e reutiliza a suíte canônica verde (1.326 unitários + 93 E2E; fingerprint
+task para desbloqueada. A confirmação independente
+`14-REVISOES/TASK-118-20260730-confirmacao.md` ratifica o parecer final, encerra
+qualquer ressalva remanescente e reutiliza a suíte canônica verde (1.326
+unitários + 93 E2E; fingerprint
 `de9a38e3…`; identidade `498d7fa6…`). A TASK-118 sai da fila; restam **17 tasks
 não concluídas: 15 executáveis, a TASK-038 com bloqueio parcial e a TASK-040
 bloqueada**.
@@ -357,7 +358,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 106 | Redesign da grade de horários: layout tabular compacto, ordenação temporal, seleção contínua, ações no hover e navegação Tab/Enter — aprovada no parecer final `14-REVISOES/TASK-106-20260727-final.md` |
 | 107 | Inserção de Viagem por offset relativo (±X min), com offsets herdados, UUID nova e composição visual da DEC-090 — aprovada em `14-REVISOES/TASK-107-20260727.md` |
 | 108 | Cópia de Viagem por headway até horário-limite inclusivo — aprovada em `14-REVISOES/TASK-108-20260728.md` |
-| 118 | Guarda idempotente na geração por headway, preservando horários preexistentes e criando somente os ausentes — aprovada na reavaliação final em `14-REVISOES/TASK-118-20260730-reavaliacao.md` |
+| 118 | Guarda idempotente na geração por headway, preservando horários preexistentes e criando somente os ausentes — aprovada sem ressalvas; confirmação independente em `14-REVISOES/TASK-118-20260730-confirmacao.md` |
 | 113 | Últimos deslocamentos relativos independentes por direção e compartilhados na instância da etapa (DEC-091) — aprovada no parecer final `14-REVISOES/TASK-113-20260727-final.md` |
 | 114 | Ações “Restaurar sugestão” e “Apagar viagem” visíveis e clicáveis em domingo — aprovada em `14-REVISOES/TASK-114-20260728.md` |
 | 115 | Foco preservado após criação/reordenação da Viagem e redistribuição — aprovada em `14-REVISOES/TASK-115-20260728.md`; a TASK-105 deve exercer a herança na futura grade excepcional |
