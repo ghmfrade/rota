@@ -1107,6 +1107,41 @@ test.describe("Etapa Viagens — grade de feriados e cópias (TASK-030; Spec 04 
     await expect(grade.getByLabel("Horário de partida — domingo, viagem 1")).toHaveCount(0);
   });
 
+  test("TASK-109: soltar fora de qualquer coluna cancela sem criar nem apagar Viagem", async ({
+    page,
+  }) => {
+    let chamadasOsrm = 0;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamadasOsrm += 1;
+      return rota.abort();
+    });
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+
+    const grade = gradeComum(page);
+    const origem = grade
+      .getByLabel("Horário de partida — segunda, viagem 1")
+      .locator("xpath=ancestor::td");
+    const alvoForaDasColunas = page.getByTestId("select-servico-viagens");
+    const uuidsAntes = await grade.getByTestId("celula-partida").evaluateAll((celulas) =>
+      celulas.map((celula) => celula.getAttribute("data-viagem-uuid")),
+    );
+
+    await origem.click();
+    await origem.dragTo(alvoForaDasColunas);
+
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 1")).toHaveValue("08:00");
+    await expect(grade.getByTestId("celula-partida")).toHaveCount(uuidsAntes.length);
+    await expect
+      .poll(() =>
+        grade.getByTestId("celula-partida").evaluateAll((celulas) =>
+          celulas.map((celula) => celula.getAttribute("data-viagem-uuid")),
+        ),
+      )
+      .toEqual(uuidsAntes);
+    await expect(grade.locator(".outline-azul-300")).toHaveCount(0);
+    expect(chamadasOsrm).toBe(0);
+  });
+
   test("TASK-109: Ctrl+→ copia para o dia vizinho", async ({ page }) => {
     await abrirEtapaViagens(page, structuredClone(multiServico));
     const comum = gradeComum(page);
