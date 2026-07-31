@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { DocumentoOperacao } from "@/shared/contrato";
 import { Botao, Campo, Painel } from "@/shared/ui";
 import { itinerariosAoVivoDaSessao } from "@/formulario/itinerarios";
 import type { SessaoFormulario } from "@/formulario/sessao";
@@ -12,7 +13,7 @@ import {
   type ErroExportacao,
 } from "./exportar-documento";
 
-// Etapa Exportação (TASK-032; Spec 04 §12): as duas ações da §12.1/§12.2
+// Etapa Exportação (TASK-032; Spec 04 §12): as ações da §12.1/§12.2
 // ("Exportar proposta"/"Definir como vigente"), sob o gate de RN-078 — Spec
 // 04 §14: "Tentativa de exportar com erro bloqueante → Botões de exportação
 // desabilitados + painel de pendências em foco". Os efeitos impuros (data
@@ -21,6 +22,11 @@ import {
 // continuam sem I/O. `obterDataDeHoje`/`aoBaixarArquivo` são injetáveis
 // (mesmo padrão da injeção de `hoje` na função pura de export) para o
 // componente ser testável sem relógio real nem `URL.createObjectURL` do jsdom.
+//
+// TASK-033 acrescenta a terceira ação da etapa — "Gerar PDF operacional"
+// (Spec 04 §13) — sob o MESMO gate: erro bloqueante impede gerar o JSON **e** o
+// PDF (RN-078; §14). A geração em si (captura dos mapas + @react-pdf) vive em
+// `formulario/pdf` e entra por import dinâmico, também injetável para teste.
 
 const MENSAGEM_GATE =
   "Existem pendências bloqueantes. Resolva os itens listados para gerar o JSON/PDF.";
@@ -35,7 +41,11 @@ function dataDeHojeIso(): string {
 
 /** Dispara o download real do JSON exportado (Blob + `<a download>`). */
 function baixarArquivo(nomeArquivo: string, conteudo: string): void {
-  const blob = new Blob([conteudo], { type: "application/json" });
+  baixarBlob(nomeArquivo, new Blob([conteudo], { type: "application/json" }));
+}
+
+/** Dispara o download real de um Blob já pronto (usado pelo PDF). */
+function baixarBlob(nomeArquivo: string, blob: Blob): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -46,12 +56,28 @@ function baixarArquivo(nomeArquivo: string, conteudo: string): void {
   URL.revokeObjectURL(url);
 }
 
+// Import dinâmico: `@react-pdf/renderer` e `maplibre-gl` só carregam quando o
+// usuário pede o PDF (RN-074 — geração client-side, sob demanda).
+async function gerarPdfSobDemanda(
+  documento: DocumentoOperacao,
+): Promise<{ nomeArquivo: string; blob: Blob; avisos: string[] }> {
+  const { gerarPdfOperacional, nomeArquivoPdf } = await import("@/formulario/pdf");
+  const { blob, avisos } = await gerarPdfOperacional(documento);
+  return { nomeArquivo: nomeArquivoPdf(documento), blob, avisos };
+}
+
 interface PropsTelaExportacao {
   sessao: SessaoFormulario;
   /** Navega/foca o painel de pendências ao tentar exportar bloqueado (§14). */
   aoFocarPendencias?: () => void;
   /** Injetável para teste (evita `URL.createObjectURL` do jsdom). */
   aoBaixarArquivo?: (nomeArquivo: string, conteudo: string) => void;
+  /** Injetável para teste (evita `URL.createObjectURL` do jsdom). */
+  aoBaixarBlob?: (nomeArquivo: string, blob: Blob) => void;
+  /** Injetável para teste (evita @react-pdf, WebGL e tiles reais). */
+  aoGerarPdf?: (
+    documento: DocumentoOperacao,
+  ) => Promise<{ nomeArquivo: string; blob: Blob; avisos: string[] }>;
   /** Injetável para teste (evita relógio real). */
   obterDataDeHoje?: () => string;
 }
@@ -60,10 +86,14 @@ export function TelaExportacao({
   sessao,
   aoFocarPendencias,
   aoBaixarArquivo = baixarArquivo,
+  aoBaixarBlob = baixarBlob,
+  aoGerarPdf = gerarPdfSobDemanda,
   obterDataDeHoje = dataDeHojeIso,
 }: PropsTelaExportacao) {
   const [dataPublicacao, definirDataPublicacao] = useState("");
   const [erros, definirErros] = useState<ErroExportacao[]>([]);
+  const [gerandoPdf, definirGerandoPdf] = useState(false);
+  const [avisosPdf, definirAvisosPdf] = useState<string[]>([]);
 
   const itinerariosAoVivo = itinerariosAoVivoDaSessao(sessao);
   const gate = avaliarGateExportacao(sessao, itinerariosAoVivo);
@@ -96,6 +126,30 @@ export function TelaExportacao({
       return;
     }
     tratarResultado(exportarComoVigente(documento, dataPublicacao));
+  }
+
+  // Spec 04 §13 — PDF operacional. Passa pelo mesmo gate (RN-078) e pela mesma
+  // montagem do documento das ações de JSON: o PDF descreve exatamente a
+  // operação que seria exportada.
+  async function gerarPdf() {
+    const documento = montarDocumentoParaExportacao(sessao);
+    if (!documento) {
+      aoFocarPendencias?.();
+      return;
+    }
+    definirGerandoPdf(true);
+    definirAvisosPdf([]);
+    try {
+      const { nomeArquivo, blob, avisos } = await aoGerarPdf(documento);
+      aoBaixarBlob(nomeArquivo, blob);
+      definirAvisosPdf(avisos);
+    } catch {
+      definirAvisosPdf([
+        "Não foi possível gerar o PDF operacional. Tente novamente.",
+      ]);
+    } finally {
+      definirGerandoPdf(false);
+    }
   }
 
   return (
@@ -172,6 +226,33 @@ export function TelaExportacao({
         >
           Definir como vigente
         </Botao>
+      </section>
+
+      <section className="mt-6">
+        <h3 className="text-lg font-semibold text-cinza-900">PDF operacional</h3>
+        <p className="mt-1 text-sm text-cinza-700">
+          Gera o documento com a operação do Autos — identificação, resumo,
+          Serviços e itinerários com mapa. O fluxo administrativo permanece no
+          SEI.
+        </p>
+        <Botao
+          variante="secundario"
+          className="mt-2"
+          data-testid="botao-gerar-pdf"
+          disabled={!gate.liberado || gerandoPdf}
+          onClick={() => void gerarPdf()}
+        >
+          {gerandoPdf ? "Gerando PDF…" : "Gerar PDF operacional"}
+        </Botao>
+        {avisosPdf.length > 0 && (
+          <Painel tom="informativo" className="mt-3" data-testid="pdf-avisos">
+            <ul className="list-disc space-y-1 pl-5">
+              {avisosPdf.map((aviso, indice) => (
+                <li key={indice}>{aviso}</li>
+              ))}
+            </ul>
+          </Painel>
+        )}
       </section>
     </div>
   );

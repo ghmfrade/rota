@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   COR_LINHA_PADRAO,
   LARGURA_LINHA_PADRAO,
+  limitesDaGeometria,
+  limitesDeCoordenadas,
   linhaDaGeometria,
   linhasParaGeoJson,
   paraPosicao,
@@ -156,5 +158,55 @@ describe("linhaDaGeometria", () => {
     };
     const linha = linhaDaGeometria("rota-ativa", geometria);
     expect(linha.pontos).toHaveLength(2);
+  });
+});
+
+// DEC-104 / Spec 04 §13.1 item 4d — enquadramento da rota na imagem do mapa do
+// PDF: a rota precisa aparecer centralizada e inteiramente contida, o que
+// depende destes limites. Puro, testável sem WebGL.
+
+describe("limitesDeCoordenadas", () => {
+  it("devolve [[oeste, sul], [leste, norte]] contendo todas as coordenadas", () => {
+    const limites = limitesDeCoordenadas([
+      { lng: -46.6, lat: -23.5 },
+      { lng: -47.1, lat: -22.9 },
+      { lng: -46.2, lat: -23.9 },
+    ]);
+
+    expect(limites).toEqual([
+      [-47.1, -23.9],
+      [-46.2, -22.9],
+    ]);
+  });
+
+  it("um único ponto gera limites degenerados (o fitBounds centraliza nele)", () => {
+    expect(limitesDeCoordenadas([{ lng: -46.6, lat: -23.5 }])).toEqual([
+      [-46.6, -23.5],
+      [-46.6, -23.5],
+    ]);
+  });
+
+  // Caso inválido: sem coordenada não há o que enquadrar — a captura falha e a
+  // falha é tolerada (DEC-104), em vez de produzir um mapa arbitrário.
+  it("lista vazia devolve null", () => {
+    expect(limitesDeCoordenadas([])).toBeNull();
+  });
+});
+
+describe("limitesDaGeometria", () => {
+  it("enquadra a LineString congelada da rota (Spec 02 §10.2 — [lng, lat])", () => {
+    const geometria: LineString = {
+      type: "LineString",
+      coordinates: [
+        [-46.6, -23.5],
+        [-46.4, -23.2],
+        [-46.9, -23.8],
+      ],
+    };
+
+    expect(limitesDaGeometria(geometria)).toEqual([
+      [-46.9, -23.8],
+      [-46.4, -23.2],
+    ]);
   });
 });

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { TelaExportacao } from "@/formulario/exportacao";
 import type { SessaoFormulario } from "@/formulario/sessao";
 import { renderizar, act } from "../shared-ui/_ajuda-render";
+import type { DocumentoOperacao } from "@/shared/contrato";
 import { documentoExemploMinimo } from "../../fixtures";
 
 // TASK-032 — etapa Exportação (Spec 04 §12): botões reais das duas ações
@@ -212,4 +213,135 @@ describe("TelaExportacao — gate bloqueado (Spec 04 §14)", () => {
     desmontar();
   });
 
+});
+
+// TASK-033 — terceira ação da etapa: "Gerar PDF operacional" (Spec 04 §13),
+// sob o MESMO gate de RN-078. A geração é injetada (`aoGerarPdf`) para o teste
+// não carregar @react-pdf nem WebGL — mesma disciplina do OSRM mockado.
+
+describe("TelaExportacao — PDF operacional (TASK-033; RN-074/RN-078)", () => {
+  const BLOB_FALSO = { size: 10, type: "application/pdf" } as unknown as Blob;
+
+  it("gate liberado: o botão de PDF fica habilitado e baixa o blob gerado", async () => {
+    const aoBaixarBlob = vi.fn();
+    const aoGerarPdf = vi.fn<
+      (documento: DocumentoOperacao) => Promise<{
+        nomeArquivo: string;
+        blob: Blob;
+        avisos: string[];
+      }>
+    >(async () => ({
+      nomeArquivo: "rota-0000-tabela-operacional.pdf",
+      blob: BLOB_FALSO,
+      avisos: [],
+    }));
+
+    const { container, desmontar } = renderizar(
+      <TelaExportacao
+        sessao={SESSAO_LIBERADA}
+        aoBaixarBlob={aoBaixarBlob}
+        aoGerarPdf={aoGerarPdf}
+      />,
+    );
+
+    const botao = container.querySelector(
+      '[data-testid="botao-gerar-pdf"]',
+    ) as HTMLButtonElement;
+    expect(botao.disabled).toBe(false);
+
+    await act(async () => {
+      botao.click();
+    });
+
+    expect(aoGerarPdf).toHaveBeenCalledTimes(1);
+    expect(aoBaixarBlob).toHaveBeenCalledWith(
+      "rota-0000-tabela-operacional.pdf",
+      BLOB_FALSO,
+    );
+    // O documento entregue à geração é o mesmo que seria exportado em JSON.
+    expect(aoGerarPdf.mock.calls[0][0].autos.codigo).toBe("0000");
+
+    desmontar();
+  });
+
+  it("imagem de mapa ausente vira aviso não bloqueante, com o PDF entregue (DEC-104)", async () => {
+    const aoBaixarBlob = vi.fn();
+    const aoGerarPdf = vi.fn(async () => ({
+      nomeArquivo: "rota-0000-tabela-operacional.pdf",
+      blob: BLOB_FALSO,
+      avisos: ["Não foi possível capturar a imagem do mapa do Serviço 0000-1CR — Ida."],
+    }));
+
+    const { container, desmontar } = renderizar(
+      <TelaExportacao
+        sessao={SESSAO_LIBERADA}
+        aoBaixarBlob={aoBaixarBlob}
+        aoGerarPdf={aoGerarPdf}
+      />,
+    );
+
+    await act(async () => {
+      (container.querySelector('[data-testid="botao-gerar-pdf"]') as HTMLButtonElement).click();
+    });
+
+    expect(aoBaixarBlob).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('[data-testid="pdf-avisos"]')?.textContent).toContain(
+      "0000-1CR",
+    );
+
+    desmontar();
+  });
+
+  it("[inválido] gate bloqueado: o botão de PDF fica desabilitado e não gera nada (RN-078)", async () => {
+    const aoGerarPdf = vi.fn();
+    const { container, desmontar } = renderizar(
+      <TelaExportacao sessao={SESSAO_BLOQUEADA} aoGerarPdf={aoGerarPdf} />,
+    );
+
+    const botao = container.querySelector(
+      '[data-testid="botao-gerar-pdf"]',
+    ) as HTMLButtonElement;
+    expect(botao.disabled).toBe(true);
+
+    await act(async () => {
+      botao.click();
+    });
+
+    expect(aoGerarPdf).not.toHaveBeenCalled();
+
+    desmontar();
+  });
+
+  it("[inválido] falha na geração não derruba a tela: mostra mensagem e reabilita o botão", async () => {
+    const aoBaixarBlob = vi.fn();
+    const aoGerarPdf = vi.fn(async () => {
+      throw new Error("renderizador indisponível");
+    });
+
+    const { container, desmontar } = renderizar(
+      <TelaExportacao
+        sessao={SESSAO_LIBERADA}
+        aoBaixarBlob={aoBaixarBlob}
+        aoGerarPdf={aoGerarPdf}
+      />,
+    );
+
+    const botao = container.querySelector(
+      '[data-testid="botao-gerar-pdf"]',
+    ) as HTMLButtonElement;
+    await act(async () => {
+      botao.click();
+    });
+
+    expect(aoBaixarBlob).not.toHaveBeenCalled();
+    expect(container.querySelector('[data-testid="pdf-avisos"]')?.textContent).toContain(
+      "Não foi possível gerar o PDF operacional",
+    );
+    expect(
+      (container.querySelector('[data-testid="botao-gerar-pdf"]') as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
+
+    desmontar();
+  });
 });

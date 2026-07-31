@@ -21,6 +21,47 @@ export interface LinhaMapa {
 export const COR_LINHA_PADRAO = "#1d4ed8";
 export const LARGURA_LINHA_PADRAO = 4;
 
+/**
+ * Limites (bounding box) de um conjunto de coordenadas, no formato que o
+ * `fitBounds` do MapLibre consome: `[[lngOeste, latSul], [lngLeste, latNorte]]`.
+ */
+export type LimitesMapa = [[number, number], [number, number]];
+
+/**
+ * Limites que contêm todas as `coordenadas`. `null` quando a lista é vazia —
+ * não há o que enquadrar. Função pura, testável sem WebGL: é a entrada do
+ * enquadramento da rota na imagem do mapa do PDF (DEC-104; Spec 04 §13.1
+ * item 4d), onde a rota precisa aparecer centralizada e inteiramente contida.
+ */
+export function limitesDeCoordenadas(
+  coordenadas: readonly Coordenada[],
+): LimitesMapa | null {
+  if (coordenadas.length === 0) return null;
+  let oeste = coordenadas[0].lng;
+  let leste = coordenadas[0].lng;
+  let sul = coordenadas[0].lat;
+  let norte = coordenadas[0].lat;
+  for (const { lng, lat } of coordenadas) {
+    if (lng < oeste) oeste = lng;
+    if (lng > leste) leste = lng;
+    if (lat < sul) sul = lat;
+    if (lat > norte) norte = lat;
+  }
+  return [
+    [oeste, sul],
+    [leste, norte],
+  ];
+}
+
+/**
+ * Limites da geometria congelada de uma Rota (Spec 02 §10.2 — coordenadas
+ * `[longitude, latitude]`). Só lê o congelado: não chama OSRM nem recalcula
+ * (RN-015/NEG-019).
+ */
+export function limitesDaGeometria(geometria: LineString): LimitesMapa | null {
+  return limitesDeCoordenadas(geometria.coordinates.map(dePosicao));
+}
+
 /** Converte uma Coordenada para o par `[lng, lat]` do GeoJSON. */
 export function paraPosicao(c: Coordenada): [number, number] {
   return [c.lng, c.lat];

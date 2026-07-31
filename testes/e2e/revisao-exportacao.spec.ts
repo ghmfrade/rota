@@ -99,3 +99,60 @@ test.describe("Exportação (Spec 04 §12; RN-078)", () => {
     expect(conteudo.autos.secoes[0].uuid).toBe(fixturaValida.autos.secoes[0].uuid);
   });
 });
+
+// TASK-033 — PDF operacional (Spec 04 §13). O mapa do item 4d é capturado sob
+// demanda (DEC-104): os tiles são mockados, e mesmo que a captura falhe no
+// ambiente de CI o PDF sai assim mesmo, com aviso não bloqueante — é
+// exatamente a política que este teste exercita ponta a ponta.
+const PNG_1x1 = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=",
+  "base64",
+);
+
+test.describe("PDF operacional (Spec 04 §13; RN-074/RN-078)", () => {
+  test("gate liberado: 'Gerar PDF operacional' baixa um PDF não vazio", async ({
+    page,
+  }) => {
+    await page.route("https://tile.openstreetmap.org/**", (rota) =>
+      rota.fulfill({ contentType: "image/png", body: PNG_1x1 }),
+    );
+
+    await carregarDocumentoValido(page);
+    await page.locator('[data-testid="etapa-botao"][data-etapa="exportacao"]').click();
+
+    const botao = page.getByTestId("botao-gerar-pdf");
+    await expect(botao).toBeEnabled();
+
+    const [download] = await Promise.all([
+      page.waitForEvent("download", { timeout: 60_000 }),
+      botao.click(),
+    ]);
+
+    expect(download.suggestedFilename()).toBe("rota-1-tabela-operacional.pdf");
+
+    const caminho = await download.path();
+    expect(caminho).not.toBeNull();
+    const conteudo = readFileSync(caminho!);
+    expect(conteudo.byteLength).toBeGreaterThan(1000);
+    expect(conteudo.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+
+    // O botão volta a ficar disponível depois da geração.
+    await expect(botao).toBeEnabled();
+  });
+
+  test("[inválido] gate bloqueado: o botão de PDF fica desabilitado (RN-078)", async ({
+    page,
+  }) => {
+    // Documento recém-criado do zero: sem identidade nem Serviço, o gate
+    // bloqueia — e o bloqueio vale para o PDF tanto quanto para o JSON.
+    await page.goto("/");
+    await page.getByTestId("acao-criar-zero").getByRole("button").click();
+    await page.getByTestId("confirmar-criar-zero").click();
+    await expect(page.getByTestId("layout-formulario")).toBeVisible();
+    await page.locator('[data-testid="etapa-botao"][data-etapa="exportacao"]').click();
+
+    await expect(page.getByTestId("exportacao-mensagem-gate")).toBeVisible();
+    await expect(page.getByTestId("botao-gerar-pdf")).toBeDisabled();
+    await expect(page.getByTestId("botao-exportar-proposta")).toBeDisabled();
+  });
+});
