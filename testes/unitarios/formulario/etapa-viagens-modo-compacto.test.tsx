@@ -284,6 +284,101 @@ describe("EtapaViagens — composição das ações no modo compacto (TASK-122; 
   });
 });
 
+describe("EtapaViagens — ordem alternador/X no modo compacto (TASK-125; DEC-103)", () => {
+  function testesDaAcao(elemento: HTMLElement): string[] {
+    return [...elemento.querySelectorAll("[data-testid]")]
+      .map((el) => el.getAttribute("data-testid"))
+      .filter(
+        (testid): testid is string =>
+          testid === "apagar-viagem" ||
+          testid === "restaurar-viagem" ||
+          testid === "alternar-modo-headway",
+      );
+  }
+
+  it("no modo compacto o alternador de headway vem antes do X", () => {
+    const documento = prepararDocumento();
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+    };
+    const { container, desmontar } = renderizar(
+      <EtapaViagens sessao={sessao} aoAtualizarSessao={vi.fn()} />,
+    );
+    selecionarServicoESentido(container);
+    ativarModoCompacto(container);
+
+    const grade = container.querySelector('[data-testid="grade-dias-comuns"]')!;
+    entrarComPonteiro(
+      grade.querySelector('[data-testid="celula-partida"]') as HTMLElement,
+    );
+    const acoes = grade.querySelector(
+      '[data-testid="acoes-viagem"]',
+    ) as HTMLElement;
+
+    expect(testesDaAcao(acoes)).toEqual(["alternar-modo-headway", "apagar-viagem"]);
+    desmontar();
+  });
+
+  it("no modo completo a ordem da DEC-090 (X, Restaurar, alternador) não muda", () => {
+    const documento = prepararDocumento();
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+    };
+    const { container, desmontar } = renderizar(
+      <EtapaViagens sessao={sessao} aoAtualizarSessao={vi.fn()} />,
+    );
+    selecionarServicoESentido(container);
+
+    const grade = container.querySelector('[data-testid="grade-dias-comuns"]')!;
+    entrarComPonteiro(
+      grade.querySelector('[data-testid="celula-partida"]') as HTMLElement,
+    );
+    const acoes = grade.querySelector(
+      '[data-testid="acoes-viagem"]',
+    ) as HTMLElement;
+
+    expect(testesDaAcao(acoes)).toEqual([
+      "apagar-viagem",
+      "restaurar-viagem",
+      "alternar-modo-headway",
+    ]);
+    desmontar();
+  });
+
+  it("a ordem de tabulação acompanha a ordem visual no modo compacto", () => {
+    const documento = prepararDocumento();
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+    };
+    const { container, desmontar } = renderizar(
+      <EtapaViagens sessao={sessao} aoAtualizarSessao={vi.fn()} />,
+    );
+    selecionarServicoESentido(container);
+    ativarModoCompacto(container);
+
+    const grade = container.querySelector('[data-testid="grade-dias-comuns"]')!;
+    entrarComPonteiro(
+      grade.querySelector('[data-testid="celula-partida"]') as HTMLElement,
+    );
+    const acoes = grade.querySelector(
+      '[data-testid="acoes-viagem"]',
+    ) as HTMLElement;
+    const botoes = [...acoes.querySelectorAll("button")];
+
+    expect(botoes.map((botao) => botao.getAttribute("data-testid"))).toEqual([
+      "alternar-modo-headway",
+      "apagar-viagem",
+    ]);
+    desmontar();
+  });
+});
+
 describe("EtapaViagens — inserção posterior restaurada no modo compacto (TASK-123; DEC-086)", () => {
   it("exibe 'acao-inserir-posterior' na partida nas três grades, sem duplicar entre modos", () => {
     const documento = prepararDocumento();

@@ -878,6 +878,62 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     expect(chamouOsrm).toBe(false);
   });
 
+  test("TASK-125: no modo compacto o alternador vem antes do X e o trajeto até 'a cada' não fecha a superfície (DEC-103)", async ({
+    page,
+  }) => {
+    let chamouOsrm = false;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamouOsrm = true;
+      return rota.abort();
+    });
+
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+    await page.getByTestId("alternar-modo-compacto").click();
+
+    const celulaSegunda = grade
+      .getByLabel("Horário de partida — segunda, viagem 1")
+      .locator("xpath=ancestor::td");
+    await celulaSegunda.hover();
+    const acoes = celulaSegunda.getByTestId("acoes-viagem");
+    const alternador = acoes.getByTestId("alternar-modo-headway");
+    const apagar = acoes.getByTestId("apagar-viagem");
+
+    // DEC-103: no modo compacto o alternador fica à esquerda do X.
+    const [caixaAlternador, caixaApagar] = await Promise.all([
+      alternador.boundingBox(),
+      apagar.boundingBox(),
+    ]);
+    expect(caixaAlternador!.x).toBeLessThan(caixaApagar!.x);
+
+    // Clicar no alternador e caminhar o ponteiro até o campo "a cada" sem
+    // soltar o hover — com o atraso de ~500 ms (DEC-103), o trajeto não deve
+    // fechar a superfície nem perder o formulário.
+    await alternador.click();
+    const campoACada = celulaSegunda.getByRole("textbox", {
+      name: "Headway — segunda, viagem 1",
+      exact: true,
+    });
+    await expect(campoACada).toBeVisible();
+    const [origem, destino] = await Promise.all([
+      alternador.boundingBox(),
+      campoACada.boundingBox(),
+    ]);
+    await page.mouse.move(
+      origem!.x + origem!.width / 2,
+      origem!.y + origem!.height / 2,
+    );
+    await page.mouse.move(
+      destino!.x + destino!.width / 2,
+      destino!.y + destino!.height / 2,
+      { steps: 10 },
+    );
+    await campoACada.fill("0100");
+    await expect(campoACada).toHaveValue("01:00");
+    await expect(celulaSegunda.getByTestId("superficie-headway")).toBeVisible();
+    expect(chamouOsrm).toBe(false);
+  });
+
   test("TASK-123: modo compacto restaura a inserção posterior ancorada na partida, em SEG e DOM", async ({
     page,
   }) => {

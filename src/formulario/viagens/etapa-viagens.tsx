@@ -347,13 +347,16 @@ export function EtapaViagens({
       ?.focus();
   }
 
+  // DEC-103: atraso único de ~500 ms, compartilhado por todas as superfícies
+  // e pelos dois modos — dá tempo do ponteiro percorrer do alternador de
+  // headway até os campos `a cada`/`até` sem a superfície fechar no caminho.
   function agendarSaidaHover() {
     cancelarSaidaHover();
     temporizadorSaidaHoverRef.current = setTimeout(() => {
       temporizadorSaidaHoverRef.current = null;
       if (editandoCampoDaSuperficie()) return;
       definirViagemEmHoverUuid(null);
-    }, 300);
+    }, 500);
   }
 
   const servicos: Servico[] = servicosDaSessao(sessao);
@@ -1337,6 +1340,24 @@ export function EtapaViagens({
                         onBlur={aoSairFocoDaSuperficie}
                         onKeyDown={(evento) => aoTeclarNaSuperficie(evento, alvoFoco)}
                       >
+                        {/* DEC-103: no modo compacto o alternador vem antes do
+                            "X", para que o trajeto do ponteiro até os campos
+                            `a cada`/`até` comece dentro da superfície. No modo
+                            completo a ordem da DEC-090 (X, Restaurar, alternador)
+                            permanece intocada. */}
+                        {modoCompacto && (
+                          <Botao
+                            variante={modoHeadway ? "primario" : "alternador"}
+                            tamanho="compacto"
+                            className="min-h-8 min-w-8"
+                            data-testid="alternar-modo-headway"
+                            aria-label={`Alternar geração por headway — ${dia}, viagem ${indiceBloco + 1}`}
+                            aria-pressed={modoHeadway}
+                            onClick={() => aoAlternarModoHeadway(viagemUuid)}
+                          >
+                            ↪
+                          </Botao>
+                        )}
                         <Botao
                           variante="perigo"
                           tamanho="compacto"
@@ -1362,17 +1383,19 @@ export function EtapaViagens({
                             ↻
                           </Botao>
                         )}
-                        <Botao
-                          variante={modoHeadway ? "primario" : "alternador"}
-                          tamanho="compacto"
-                          className="min-h-8 min-w-8"
-                          data-testid="alternar-modo-headway"
-                          aria-label={`Alternar geração por headway — ${dia}, viagem ${indiceBloco + 1}`}
-                          aria-pressed={modoHeadway}
-                          onClick={() => aoAlternarModoHeadway(viagemUuid)}
-                        >
-                          ↪
-                        </Botao>
+                        {!modoCompacto && (
+                          <Botao
+                            variante={modoHeadway ? "primario" : "alternador"}
+                            tamanho="compacto"
+                            className="min-h-8 min-w-8"
+                            data-testid="alternar-modo-headway"
+                            aria-label={`Alternar geração por headway — ${dia}, viagem ${indiceBloco + 1}`}
+                            aria-pressed={modoHeadway}
+                            onClick={() => aoAlternarModoHeadway(viagemUuid)}
+                          >
+                            ↪
+                          </Botao>
+                        )}
                       </SuperficieFlutuante>
                       {/* Modo compacto (DEC-086): sem Seções passantes, a
                           partida ancora tanto a inserção posterior quanto o

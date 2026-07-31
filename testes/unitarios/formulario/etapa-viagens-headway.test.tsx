@@ -345,6 +345,83 @@ describe("EtapaViagens — formulário de headway na superfície flutuante (TASK
   });
 });
 
+// TASK-125/DEC-103: o atraso de fechamento agendado sobe de 300 ms para
+// ~500 ms, num único ponto compartilhado por todas as superfícies e pelos
+// dois modos — dá tempo do ponteiro percorrer do alternador de headway até
+// os campos `a cada`/`até` sem a superfície fechar no caminho.
+describe("EtapaViagens — atraso único de fechamento do hover (TASK-125/DEC-103)", () => {
+  function acoesViagem(container: HTMLElement): HTMLElement {
+    return celulaPartida(container).querySelector(
+      '[data-testid="acoes-viagem"]',
+    ) as HTMLElement;
+  }
+
+  it("mantém a superfície aberta até ~500 ms depois de sair do hover", () => {
+    vi.useFakeTimers();
+    try {
+      const { container, desmontar } = montarEtapa();
+      const celula = celulaPartida(container);
+      entrarComPonteiro(celula);
+      expect(estaAberta(acoesViagem(container))).toBe(true);
+
+      sairComPonteiro(celula);
+      act(() => {
+        vi.advanceTimersByTime(499);
+      });
+      expect(estaAberta(acoesViagem(container))).toBe(true);
+
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(estaAberta(acoesViagem(container))).toBe(false);
+      desmontar();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("[inválido] não permanece aberta indefinidamente após sair de hover e foco", () => {
+    vi.useFakeTimers();
+    try {
+      const { container, desmontar } = montarEtapa();
+      const celula = celulaPartida(container);
+      entrarComPonteiro(celula);
+      sairComPonteiro(celula);
+
+      act(() => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(estaAberta(acoesViagem(container))).toBe(false);
+      desmontar();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reentrar na superfície antes dos ~500 ms cancela o fechamento agendado", () => {
+    vi.useFakeTimers();
+    try {
+      const { container, desmontar } = montarEtapa();
+      const celula = celulaPartida(container);
+      entrarComPonteiro(celula);
+      sairComPonteiro(celula);
+
+      act(() => {
+        vi.advanceTimersByTime(400);
+      });
+      entrarComPonteiro(acoesViagem(container));
+
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+      expect(estaAberta(acoesViagem(container))).toBe(true);
+      desmontar();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 // TASK-124/DEC-102: as três superfícies de ação da Viagem tomam a largura da
 // célula-âncora; a coluna de ações (`acoes-viagem`) continua com largura de
 // conteúdo. Aqui se prova a adesão de cada superfície e a preservação da
