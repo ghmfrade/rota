@@ -1,7 +1,29 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-07-31 (branch `redesign`) — **TASK-125
-concluída e aprovada com ressalvas.** O commit `a135b99` inverte, só no **modo
+**Atualização mais recente:** 2026-07-31 (branch `redesign`) — **TASK-033
+concluída e aprovada com ressalvas.** O commit `32cd8ae` cria o subsistema
+`src/formulario/pdf/` (modelo puro + renderizador `@react-pdf` + captura de mapa
+sob demanda da DEC-104 + orquestração), acrescenta os helpers puros de limites em
+`src/shared/mapa/geometria.ts` e a ação "Gerar PDF operacional" na etapa
+Exportação, sob o mesmo gate da RN-078. O parecer
+`14-REVISOES/TASK-033-20260731.md` confirma os itens 1, 2, 3, 4 e 9 do §13.1, as
+RN-074/076/077/078 com teste (inclusive a varredura recursiva que proíbe R$,
+offset e horário em todo o modelo) e reutiliza o log canônico verde
+(`test:all:verificar`: executor **Claude**, fingerprint `f614313f…6d1e90f`,
+identidade `498d7fa6…9176`, `Resultado geral: APROVADO`); `typecheck`, `lint` e
+`check:rastreabilidade` rodados na revisão estão limpos. **Condição de merge:**
+acrescentar ao resumo do PDF as colunas "Opções de deslocamento — Ida" e
+"— Volta" por Serviço, que a Spec 04 §10 lista, `ContagensServico` já calcula e a
+tela de Revisão já exibe. Follow-ups não impeditivos: ponto final do parágrafo da
+descrição (o texto congelado tem, o PDF não) e a estratificação por faixa **por
+Serviço**, hoje ausente tanto no PDF quanto no painel da TASK-031 — decisão a
+tomar uma vez, para as duas superfícies. A TASK-033 **sai da fila**: restam **9
+tasks não concluídas** — 7 executáveis (incluindo a **TASK-034**, agora
+desbloqueada), a TASK-038 com bloqueio parcial e a TASK-040 bloqueada. As
+TASK-121..125 continuam fora dessa contagem, por terem nascido depois dela.
+
+**Histórico anterior (2026-07-31) — TASK-125, concluída e aprovada com
+ressalvas:** O commit `a135b99` inverte, só no **modo
 compacto**, a ordem alternador de headway (`↪`)/`X` na superfície
 `acoes-viagem` (o modo completo mantém a coluna `X`, `Restaurar sugestão`,
 alternador da DEC-090 intocada) e eleva `agendarSaidaHover`
@@ -457,7 +479,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 
 ## 3. Tasks executadas
 
-101 tasks concluídas. Agrupadas pela fase do backlog.
+102 tasks concluídas. Agrupadas pela fase do backlog.
 
 ### Fases 1–3 — Fundação, contrato JSON e validações de domínio
 
@@ -516,6 +538,12 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 104 | CRUD e filtro das Tabelas excepcionais por Serviço (RN-098/RN-099) |
 | 105 | Grade de horários da Tabela excepcional + semeadura dos dias comuns (RN-007/RN-099) |
 | 032 | Revisão e validação final |
+
+### Fase 8 — PDF operacional
+
+| Task | Título resumido |
+|---|---|
+| 033 | PDF operacional: estrutura e identificação (§13.1 itens 1–4 e 9; DEC-104) — aprovada com ressalvas em `14-REVISOES/TASK-033-20260731.md`; condição de merge: as colunas "Opções de deslocamento — Ida/Volta" no resumo (§10) |
 
 ### Fase 12 — Qualidade e follow-ups
 
@@ -619,8 +647,11 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 ## 5. Tasks a executar — ordem recomendada
 
-**Estado atual: 10 tasks não concluídas: 8 executáveis, a TASK-038 com bloqueio
-parcial e a TASK-040 bloqueada.** Em 2026-07-30, a **TASK-120 foi concluída e
+**Estado atual: 9 tasks não concluídas: 7 executáveis, a TASK-038 com bloqueio
+parcial e a TASK-040 bloqueada.** Em 2026-07-31, a **TASK-033 saiu da fila**:
+implementada em `32cd8ae` e aprovada com ressalvas em
+`14-REVISOES/TASK-033-20260731.md`; a **TASK-034** fica desbloqueada e herda a
+ordem de blocos, a captura de mapa e a folha de estilos já postas. Em 2026-07-30, a **TASK-120 foi concluída e
 aprovada com ressalvas** (`caec734`; `14-REVISOES/TASK-120-20260730.md`): criada
 após esta contagem pela DEC-099, nunca entrou na fila e por isso não altera o
 total; a ação única `Copiar (sobrescrever)` substitui o par
@@ -756,8 +787,8 @@ Independentes do ramo do mapa: nada aqui bloqueia ou é bloqueado por ele.
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| 5 | **033** — PDF operacional: estrutura e identificação | **4** | Subsistema novo (@react-pdf) + captura do mapa. |
-| 6 | **034** — PDF operacional: tabelas horárias e matrizes | **3** | Sobre a 033. |
+| ~~5~~ | ~~**033** — PDF operacional: estrutura e identificação~~ | **4** | **Concluída em 2026-07-31** (`32cd8ae`), aprovada com ressalvas em `14-REVISOES/TASK-033-20260731.md`. Sai da fila. |
+| 6 | **034** — PDF operacional: tabelas horárias e matrizes | **3** | Sobre a 033 — **desbloqueada**. Herda `ORDEM_BLOCOS`, a captura de mapa (DEC-104) e `estilos-pdf.ts`; preenche `tabelas-horarias`/`matriz-distancias`/`matriz-seccionamento`/`anexo-tecnico` **sem reordenar** a constante. Deve resolver junto a condição de merge da 033 (colunas "Opções de deslocamento — Ida/Volta" no resumo). |
 | 7 | **035** — Comparador: carregamento e validação dos dois arquivos | **3** | |
 | 8 | **036** — Motor de diff por UUID + taxonomia | **5** | Núcleo do Comparador; casamento por UUID e por contexto. |
 | 9 | **037** — Telas de comparação | **4** | Superfície ampla (5 visões/abas). |
