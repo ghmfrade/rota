@@ -259,7 +259,10 @@ export function SuperficieFlutuante({
     "fixed rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3",
     empilhamento === "prioritaria" ? "z-50" : "z-40",
     // Piso de legibilidade da DEC-102: com a largura vinda da âncora, o
-    // `min-content` do conteúdo impede truncar `HH:MM` ou encolher o botão.
+    // `min-content` do conteúdo impede truncar `HH:MM` ou encolher o botão —
+    // desde que o conteúdo o proteja de fato: as faixas de grid do chamador
+    // precisam usar `minmax(min-content,…)`, não `minmax(0,…)`, senão o
+    // `min-content` do contêiner ignora o campo (TASK-124, revisão).
     larguraDaAncora ? "min-w-min" : null,
     "[transition:opacity_var(--transicao-rapida)]",
     aberta ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",

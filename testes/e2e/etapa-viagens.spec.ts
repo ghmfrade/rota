@@ -482,10 +482,10 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     );
     await expect(celulaOrigem.getByTestId("restaurar-viagem")).toHaveClass(/bg-azul-600/);
     // TASK-124/DEC-102: o campo passa a acompanhar a largura da célula-âncora,
-    // com piso de legibilidade de `HH:MM` (min-w-16); o alvo do botão continua
+    // com piso de legibilidade de `HH:MM` (min-w-20); o alvo do botão continua
     // preservado.
-    expect(caixaCampoAnterior!.width).toBeGreaterThanOrEqual(64);
-    expect(caixaCampoPosterior!.width).toBeGreaterThanOrEqual(64);
+    expect(caixaCampoAnterior!.width).toBeGreaterThanOrEqual(80);
+    expect(caixaCampoPosterior!.width).toBeGreaterThanOrEqual(80);
     expect(caixaSetaAnterior!.width).toBeGreaterThanOrEqual(40);
     expect(caixaSetaPosterior!.width).toBeGreaterThanOrEqual(40);
 
@@ -962,18 +962,27 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     const grade = gradeComum(page);
 
     /**
-     * Piso real da superfície (DEC-102): a largura que ela teria em
-     * `min-content` — exatamente "`HH:MM` inteiro + alvo do botão". Medido no
-     * navegador para não depender de constante mágica no teste.
+     * Piso de legibilidade (DEC-102), calculado a partir das peças que o
+     * compõem — `min-width` próprio do campo e do botão, `gap`, padding e
+     * borda da caixa — nunca da largura da própria caixa sob teste. Um piso
+     * derivado do próprio elemento (ex.: aplicar `width: min-content` nele e
+     * medir) seria tautológico: usaria em runtime o mesmo número, correto ou
+     * não, que a asserção compara.
      */
     async function pisoDaSuperficie(superficie: Locator): Promise<number> {
       return superficie.evaluate((elemento) => {
-        const alvo = elemento as HTMLElement;
-        const larguraAnterior = alvo.style.width;
-        alvo.style.width = "min-content";
-        const piso = alvo.getBoundingClientRect().width;
-        alvo.style.width = larguraAnterior;
-        return piso;
+        const campo = elemento.querySelector("input") as HTMLElement;
+        const botao = elemento.querySelector("button") as HTMLElement;
+        const estiloCaixa = getComputedStyle(elemento);
+        const gap = parseFloat(estiloCaixa.columnGap || estiloCaixa.gap || "0");
+        const paddingX =
+          parseFloat(estiloCaixa.paddingLeft) + parseFloat(estiloCaixa.paddingRight);
+        const bordaX =
+          parseFloat(estiloCaixa.borderLeftWidth) +
+          parseFloat(estiloCaixa.borderRightWidth);
+        const minCampo = parseFloat(getComputedStyle(campo).minWidth) || 0;
+        const minBotao = parseFloat(getComputedStyle(botao).minWidth) || 0;
+        return minCampo + gap + minBotao + paddingX + bordaX;
       });
     }
 
@@ -1006,6 +1015,23 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
         (elemento) => elemento.scrollWidth - elemento.clientWidth,
       );
       expect(transbordo, rotulo).toBeLessThanOrEqual(1);
+    }
+
+    /** O campo nunca é coberto pelo botão que vem depois dele no DOM. */
+    async function conferirCampoNaoCobertoPeloBotao(
+      campo: Locator,
+      botao: Locator,
+      rotulo: string,
+    ) {
+      const [caixaCampo, caixaBotao] = await Promise.all([
+        campo.boundingBox(),
+        botao.boundingBox(),
+      ]);
+      expect(caixaCampo, rotulo).not.toBeNull();
+      expect(caixaBotao, rotulo).not.toBeNull();
+      expect(caixaBotao!.x, rotulo).toBeGreaterThanOrEqual(
+        caixaCampo!.x + caixaCampo!.width - 1,
+      );
     }
 
     await preencherEConfirmar(grade.getByLabel("Criar viagem — domingo"), "08:00");
@@ -1043,6 +1069,11 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
         celula.getByTestId("inserir-viagem-anterior"),
         `botão anterior — ${dia}`,
       );
+      await conferirCampoNaoCobertoPeloBotao(
+        celula.getByLabel(`Deslocamento anterior — ${dia}, viagem 1`),
+        celula.getByTestId("inserir-viagem-anterior"),
+        `anterior sem sobreposição — ${dia}`,
+      );
 
       // [inválido] a grade não se alarga para acomodar a superfície: abrir as
       // superfícies no hover não muda a largura da coluna. (A partir do clique
@@ -1063,6 +1094,11 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
       await conferirNaoTruncado(
         headway.getByTestId("gerar-viagens-headway"),
         `botão headway — ${dia}`,
+      );
+      await conferirCampoNaoCobertoPeloBotao(
+        headway.getByRole("textbox", { name: `Headway — ${dia}, viagem 1`, exact: true }),
+        headway.getByTestId("gerar-viagens-headway"),
+        `headway sem sobreposição — ${dia}`,
       );
 
       // DEC-100 preservada dentro da nova largura: botão único à direita,
@@ -1111,6 +1147,11 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
         celula.getByRole("textbox", { name: `Headway — ${dia}, viagem 1`, exact: true }),
         `campo headway — ${dia} compacto`,
       );
+      await conferirCampoNaoCobertoPeloBotao(
+        celula.getByRole("textbox", { name: `Headway — ${dia}, viagem 1`, exact: true }),
+        celula.getByTestId("gerar-viagens-headway"),
+        `headway sem sobreposição — ${dia} compacto`,
+      );
       await celula.getByTestId("alternar-modo-headway").click();
     }
 
@@ -1125,6 +1166,128 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
       celulaSegunda.boundingBox(),
     ]);
     expect(caixaAcoes!.width).toBeLessThan(caixaCelula!.width);
+    expect(chamouOsrm).toBe(false);
+  });
+
+  test("TASK-124: [inválido] coluna mais estreita que o piso faz a superfície usar o piso e transbordar, sem truncar (DEC-102)", async ({
+    page,
+  }) => {
+    let chamouOsrm = false;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamouOsrm = true;
+      return rota.abort();
+    });
+
+    /** Mesmo cálculo independente usado no teste principal (não tautológico). */
+    async function piso(superficie: Locator): Promise<number> {
+      return superficie.evaluate((elemento) => {
+        const campo = elemento.querySelector("input") as HTMLElement;
+        const botao = elemento.querySelector("button") as HTMLElement;
+        const estiloCaixa = getComputedStyle(elemento);
+        const gap = parseFloat(estiloCaixa.columnGap || estiloCaixa.gap || "0");
+        const paddingX =
+          parseFloat(estiloCaixa.paddingLeft) + parseFloat(estiloCaixa.paddingRight);
+        const bordaX =
+          parseFloat(estiloCaixa.borderLeftWidth) +
+          parseFloat(estiloCaixa.borderRightWidth);
+        const minCampo = parseFloat(getComputedStyle(campo).minWidth) || 0;
+        const minBotao = parseFloat(getComputedStyle(botao).minWidth) || 0;
+        return minCampo + gap + minBotao + paddingX + bordaX;
+      });
+    }
+
+    // Viewport estreito o bastante para a coluna do dia encostar no seu
+    // próprio mínimo (min-w-16 do campo de horário + px-3 da Tabela) — abaixo
+    // do piso das superfícies, exercitando o critério de aceite 4.
+    await page.setViewportSize({ width: 420, height: 720 });
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+
+    const celula = grade
+      .getByLabel("Horário de partida — segunda, viagem 1")
+      .locator("xpath=ancestor::td");
+    const viagemUuid = await celula.getAttribute("data-viagem-uuid");
+    // O headway ancora na última Seção visível da Viagem (TASK-123), não na
+    // partida — mesma distinção que o teste principal já faz.
+    const celulaFinal = grade
+      .locator(`[data-testid="celula-passante"][data-viagem-uuid="${viagemUuid}"]`)
+      .last();
+    await celula.hover();
+    const anterior = celula.getByTestId("acao-inserir-anterior");
+    const pisoAnterior = await piso(anterior);
+
+    const [caixaCelula, caixaAnterior] = await Promise.all([
+      celula.boundingBox(),
+      anterior.boundingBox(),
+    ]);
+    // Pré-condição: sem isto a asserção seguinte seria vacuamente satisfeita
+    // (é o que fazia o teste original nunca exercitar este ramo).
+    expect(caixaCelula!.width, "pré-condição: coluna abaixo do piso").toBeLessThan(
+      pisoAnterior,
+    );
+    expect(
+      Math.abs(caixaAnterior!.width - pisoAnterior),
+      "a caixa usa o piso, não a coluna",
+    ).toBeLessThanOrEqual(1);
+    expect(caixaAnterior!.width, "transborda a coluna estreita").toBeGreaterThan(
+      caixaCelula!.width,
+    );
+
+    const campoAnterior = celula.getByLabel("Deslocamento anterior — segunda, viagem 1");
+    const transbordoCampo = await campoAnterior.evaluate(
+      (elemento) => elemento.scrollWidth - elemento.clientWidth,
+    );
+    expect(transbordoCampo, "campo não truncado mesmo no piso").toBeLessThanOrEqual(1);
+    const caixaBotaoAnterior = await celula
+      .getByTestId("inserir-viagem-anterior")
+      .boundingBox();
+    expect(caixaBotaoAnterior!.width, "alvo do botão preservado").toBeGreaterThanOrEqual(40);
+
+    // O headway usa placeholder `HH:MM` em vez de valor — `scrollWidth` de um
+    // campo vazio não capta truncamento; medir o texto do placeholder com a
+    // fonte computada é a única forma de provar que ele cabe (problema 3 da
+    // revisão da TASK-124).
+    await celula.getByTestId("alternar-modo-headway").click();
+    const headway = celulaFinal.getByTestId("superficie-headway");
+    await expect(headway).toBeVisible();
+    const pisoHeadway = await piso(headway);
+    const [caixaCelulaFinal, caixaHeadway] = await Promise.all([
+      celulaFinal.boundingBox(),
+      headway.boundingBox(),
+    ]);
+    expect(
+      caixaCelulaFinal!.width,
+      "pré-condição headway: coluna abaixo do piso",
+    ).toBeLessThan(pisoHeadway);
+    expect(
+      Math.abs(caixaHeadway!.width - pisoHeadway),
+      "headway usa o piso, não a coluna",
+    ).toBeLessThanOrEqual(1);
+
+    const campoHeadway = headway.getByRole("textbox", {
+      name: "Headway — segunda, viagem 1",
+      exact: true,
+    });
+    const placeholderCabe = await campoHeadway.evaluate((elemento) => {
+      const input = elemento as HTMLInputElement;
+      const estilo = getComputedStyle(input);
+      const contexto = document.createElement("canvas").getContext("2d")!;
+      contexto.font = `${estilo.fontStyle} ${estilo.fontWeight} ${estilo.fontSize} ${estilo.fontFamily}`;
+      const larguraTexto = contexto.measureText(input.placeholder).width;
+      const areaConteudo =
+        input.clientWidth - parseFloat(estilo.paddingLeft) - parseFloat(estilo.paddingRight);
+      return larguraTexto <= areaConteudo;
+    });
+    expect(placeholderCabe, "placeholder HH:MM legível no piso").toBe(true);
+
+    const [caixaCampoHeadway, caixaBotaoHeadway] = await Promise.all([
+      campoHeadway.boundingBox(),
+      headway.getByTestId("gerar-viagens-headway").boundingBox(),
+    ]);
+    expect(caixaBotaoHeadway!.x, "headway sem sobreposição no piso").toBeGreaterThanOrEqual(
+      caixaCampoHeadway!.x + caixaCampoHeadway!.width - 1,
+    );
+
     expect(chamouOsrm).toBe(false);
   });
 

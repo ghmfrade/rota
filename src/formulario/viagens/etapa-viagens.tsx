@@ -1009,7 +1009,7 @@ export function EtapaViagens({
         larguraDaAncora
         rotuloAcessivel={`Geração por headway — ${dia}, viagem ${indiceBloco + 1}`}
         data-testid="superficie-headway"
-        className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-1"
+        className="grid grid-cols-[minmax(min-content,1fr)_auto] items-stretch gap-1"
         onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
         onFocus={() => aoFocarSuperficie(viagemUuid)}
         onBlur={aoSairFocoDaSuperficie}
@@ -1018,7 +1018,7 @@ export function EtapaViagens({
         <Campo
           rotulo="a cada"
           densidade="compacta"
-          className="min-w-16 text-center tabular-nums"
+          className="min-w-20 text-center tabular-nums"
           aria-label={`Headway — ${dia}, viagem ${indiceBloco + 1}`}
           placeholder="HH:MM"
           value={mascararRascunhoHoraMinuto(headwayPorViagem[viagemUuid] ?? "")}
@@ -1035,7 +1035,7 @@ export function EtapaViagens({
         <Campo
           rotulo="até"
           densidade="compacta"
-          className="row-start-2 min-w-16 text-center tabular-nums"
+          className="row-start-2 min-w-20 text-center tabular-nums"
           aria-label={`Horário-limite — ${dia}, viagem ${indiceBloco + 1}`}
           placeholder="HH:MM"
           value={mascararRascunhoHoraMinuto(limiteHeadwayPorViagem[viagemUuid] ?? "")}
@@ -1066,10 +1066,13 @@ export function EtapaViagens({
           ↓
         </Botao>
         {errosHeadway[viagemUuid] && (
+          // `min-w-0` impede a mensagem de erro (que pode ser longa) de
+          // participar do `min-content` da faixa de campo e inflar o piso de
+          // legibilidade da caixa (DEC-102) — o piso é só `HH:MM` + botão.
           <span
             role="alert"
             data-testid="erro-headway"
-            className="col-span-2 text-xs text-erro"
+            className="col-span-2 min-w-0 text-xs text-erro"
           >
             {errosHeadway[viagemUuid]}
           </span>
@@ -1110,7 +1113,10 @@ export function EtapaViagens({
         // Grid de duas colunas (como a superfície de headway): com largura
         // fixada pela âncora, o campo precisa de coluna elástica para
         // acompanhá-la; o botão fica na coluna `auto`, com alvo preservado.
-        className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-1"
+        // `minmax(min-content,1fr)` faz o campo participar do piso de
+        // legibilidade da caixa (DEC-102) — com `minmax(0,…)` o `min-content`
+        // do contêiner ignorava o campo e o piso protegia só o botão.
+        className="grid grid-cols-[minmax(min-content,1fr)_auto] items-stretch gap-1"
         onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
         onFocus={() => aoFocarSuperficie(viagemUuid)}
         onBlur={aoSairFocoDaSuperficie}
@@ -1118,7 +1124,7 @@ export function EtapaViagens({
       >
         <Campo
           densidade="compacta"
-          className="min-w-16 text-center tabular-nums"
+          className="min-w-20 text-center tabular-nums"
           aria-label={`Deslocamento posterior — ${dia}, viagem ${indiceBloco + 1}`}
           value={deslocamentoPosterior}
           onChange={(evento) => definirDeslocamentoPosterior(evento.target.value)}
@@ -1285,7 +1291,7 @@ export function EtapaViagens({
                         larguraDaAncora
                         rotuloAcessivel={`Ações de inserção anterior — ${dia}, viagem ${indiceBloco + 1}`}
                         data-testid="acao-inserir-anterior"
-                        className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-1"
+                        className="grid grid-cols-[minmax(min-content,1fr)_auto] items-stretch gap-1"
                         onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
                         onFocus={() => aoFocarSuperficie(viagemUuid)}
                         onBlur={aoSairFocoDaSuperficie}
@@ -1293,7 +1299,7 @@ export function EtapaViagens({
                       >
                         <Campo
                           densidade="compacta"
-                          className="min-w-16 text-center tabular-nums"
+                          className="min-w-20 text-center tabular-nums"
                           aria-label={`Deslocamento anterior — ${dia}, viagem ${indiceBloco + 1}`}
                           value={deslocamentoAnterior}
                           onChange={(evento) => definirDeslocamentoAnterior(evento.target.value)}

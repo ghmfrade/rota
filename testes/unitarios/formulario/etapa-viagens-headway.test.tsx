@@ -378,8 +378,10 @@ describe("EtapaViagens — largura das superfícies da Viagem (TASK-124/DEC-102)
     ativarHeadway(container);
     const superficie = superficieHeadway(container)!;
 
-    // Coluna elástica para os campos + coluna `auto` para o botão único.
-    expect(superficie.className).toContain("grid-cols-[minmax(0,1fr)_auto]");
+    // Coluna elástica para os campos + coluna `auto` para o botão único; o
+    // piso usa `min-content` (não `0`) para que o campo participe do piso de
+    // legibilidade da caixa (DEC-102, correção pós-revisão da TASK-124).
+    expect(superficie.className).toContain("grid-cols-[minmax(min-content,1fr)_auto]");
     const botao = superficie.querySelector(
       '[data-testid="gerar-viagens-headway"]',
     ) as HTMLElement;
@@ -387,10 +389,12 @@ describe("EtapaViagens — largura das superfícies da Viagem (TASK-124/DEC-102)
     expect(botao.className).toContain("row-span-2");
     // O alvo do botão é preservado — o piso de legibilidade existe por isso.
     expect(botao.className).toContain("min-w-10");
-    // `HH:MM` continua com largura mínima própria nas duas linhas.
+    // `HH:MM` continua com largura mínima própria nas duas linhas — `min-w-20`
+    // (não `min-w-16`) é o piso que sobra folga real para o texto completo
+    // (medido no E2E de coluna estreita, TASK-124 pós-revisão).
     const campos = superficie.querySelectorAll("input");
     expect(campos).toHaveLength(2);
-    campos.forEach((campo) => expect(campo.className).toContain("min-w-16"));
+    campos.forEach((campo) => expect(campo.className).toContain("min-w-20"));
     desmontar();
   });
 
