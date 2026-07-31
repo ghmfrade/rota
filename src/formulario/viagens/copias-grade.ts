@@ -3,14 +3,12 @@ import type { DiaSemana } from "./montagem-grade";
 
 // Ações de cópia e remoção da grade (Spec 04 §8.3/§8.4; RN-007/061/068/071).
 // Cópias legítimas criam entidade nova pela fábrica `criarViagem` — UUID nova,
-// jamais reutilizada da origem (RN-007/005). A exceção é a sincronização da
-// DEC-087, que preserva a UUID do destino casado e substitui só seus offsets.
+// jamais reutilizada da origem (RN-007/005). A exceção é a sincronização de
+// `Copiar (sobrescrever)` (Spec 04 §8.5; DEC-099), que preserva a UUID do
+// destino casado e substitui só seus offsets.
 // Nada aqui recalcula offsets: a cópia preserva `horarios_paradas` tal como está.
 // Funções puras (sem UI e sem estado de sessão) — a sincronia das âncoras
 // efêmeras (DEC-049) e as confirmações são responsabilidade do chamador.
-
-/** Modo de semeadura quando a grade de destino já tem conteúdo (Spec 04 §8.5). */
-export type ModoSemeaduraGrade = "sobrescrever" | "mesclar";
 
 /** Discriminadores da grade que receberá a cópia (RN-061/RN-099). */
 export interface GradeDestinoViagem {
@@ -121,19 +119,19 @@ function clonarParaGrade(
 }
 
 /**
- * Semeia uma grade a partir de outra (Spec 04 §8.5; DEC-087).
+ * Semeia uma grade a partir de outra: `Copiar (sobrescrever)` (Spec 04 §8.5;
+ * DEC-099).
  *
- * `sobrescrever` substitui integralmente o destino por clones com UUIDs novas.
- * `mesclar` é sincronização: por `dia_semana + horario_saida`, preserva por
- * contagem as UUIDs do destino que permanecem, atualiza seus offsets, remove o
- * excedente e cria o que falta. A ordem estável dos arrays resolve somente o
- * pareamento interno entre reforços semanticamente equivalentes (RN-062).
+ * Por `dia_semana + horario_saida`, preserva por contagem as UUIDs do destino
+ * que permanecem, atualiza seus offsets, remove o excedente do destino e cria
+ * o que falta com UUID nova (destino vazio recebe tudo com UUIDs novas). A
+ * ordem estável dos arrays resolve o pareamento interno entre reforços
+ * semanticamente equivalentes (RN-062).
  */
 export function semearGradeAPartirDeOutra(
   itinerario: Itinerario,
   gradeOrigem: GradeDestinoViagem,
   gradeDestino: GradeDestinoViagem,
-  modo: ModoSemeaduraGrade,
 ): Itinerario {
   const origem = itinerario.viagens.filter((viagem) =>
     viagemPertenceAGrade(viagem, gradeOrigem),
@@ -141,16 +139,6 @@ export function semearGradeAPartirDeOutra(
   const foraDoDestino = itinerario.viagens.filter(
     (viagem) => !viagemPertenceAGrade(viagem, gradeDestino),
   );
-
-  if (modo === "sobrescrever") {
-    return {
-      ...itinerario,
-      viagens: [
-        ...foraDoDestino,
-        ...origem.map((viagem) => clonarParaGrade(viagem, gradeDestino)),
-      ],
-    };
-  }
 
   const destinoPorChave = new Map<string, Viagem[]>();
   for (const viagem of itinerario.viagens) {
@@ -189,15 +177,11 @@ export function semearGradeAPartirDeOutra(
 }
 
 /** Compatibilidade da ação existente da grade de feriados. */
-export function clonarDiasComunsParaFeriado(
-  itinerario: Itinerario,
-  modo: ModoSemeaduraGrade,
-): Itinerario {
+export function clonarDiasComunsParaFeriado(itinerario: Itinerario): Itinerario {
   return semearGradeAPartirDeOutra(
     itinerario,
     { viagem_feriado: false, tabela_excepcional_uuid: null },
     { viagem_feriado: true, tabela_excepcional_uuid: null },
-    modo,
   );
 }
 

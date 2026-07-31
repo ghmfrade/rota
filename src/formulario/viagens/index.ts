@@ -46,7 +46,6 @@ export {
   type GradeDestinoViagem,
   type ResultadoCopiaViagem,
   type ResultadoCopiaDia,
-  type ModoSemeaduraGrade,
 } from "./copias-grade";
 export {
   criarViagemNaCelula,

@@ -1294,8 +1294,9 @@ test.describe("TASK-105 — grade de horários da Tabela excepcional", () => {
     await preencherEConfirmar(passanteExcepcional, "08:50");
     await expect(passanteExcepcional).toHaveValue("08:50");
 
+    page.once("dialog", (dialogo) => dialogo.accept());
     await excepcional
-      .getByTestId("copiar-dias-comuns-excepcional-mesclar")
+      .getByTestId("copiar-dias-comuns-excepcional-sobrescrever")
       .click();
     await expect(celulaCopiada).toHaveAttribute("data-viagem-uuid", uuidCopiada!);
     await expect(passanteExcepcional).toHaveValue("08:40");
@@ -1422,8 +1423,9 @@ test.describe("TASK-112 — origem estendida da semeadura", () => {
     ).toHaveValue("06:45");
 
     await origemInverno.selectOption({ label: "Férias de verão" });
+    page.once("dialog", (dialogo) => dialogo.accept());
     await inverno
-      .getByTestId("copiar-dias-comuns-excepcional-mesclar")
+      .getByTestId("copiar-dias-comuns-excepcional-sobrescrever")
       .click();
     await expect(celulaInverno).toHaveAttribute(
       "data-viagem-uuid",
@@ -1465,8 +1467,56 @@ test.describe("TASK-112 — origem estendida da semeadura", () => {
       .getByLabel("Horário de partida — segunda, viagem 1")
       .locator("xpath=ancestor::td")
       .getAttribute("data-viagem-uuid");
-    expect(uuidFeriadoSobrescrito).not.toBe(feriado.uuid);
+    // Casamento por dia_semana + horario_saida: a Viagem de feriado já
+    // existente (segunda 06:30) preserva sua própria UUID (RN-004/007;
+    // DEC-099) — a UUID da origem (Férias de inverno) nunca é reutilizada.
+    expect(uuidFeriadoSobrescrito).toBe(feriado.uuid);
     expect(uuidFeriadoSobrescrito).not.toBe(uuidInverno);
+    expect(chamadasOsrm).toBe(0);
+  });
+});
+
+test.describe("TASK-120 — Copiar (sobrescrever) único", () => {
+  test("rótulo único em destino vazio e preenchido; cancelar a confirmação preserva itinerário e estado efêmero", async ({
+    page,
+  }) => {
+    let chamadasOsrm = 0;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamadasOsrm += 1;
+      return rota.abort();
+    });
+
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const feriados = gradeFeriados(page);
+
+    await expect(
+      feriados.getByTestId("copiar-dias-comuns"),
+    ).toHaveText("Copiar (sobrescrever)");
+    await feriados.getByTestId("copiar-dias-comuns").click();
+
+    const celula = feriados
+      .getByLabel("Horário de partida — segunda, viagem 1")
+      .locator("xpath=ancestor::td");
+    const uuidAntes = await celula.getAttribute("data-viagem-uuid");
+    const passante = feriados
+      .getByTestId("linha-grade")
+      .nth(1)
+      .getByTestId("celula-passante")
+      .locator("input[data-grade]");
+    await preencherEConfirmar(passante, "08:50");
+    await expect(passante).toHaveValue("08:50");
+
+    await expect(
+      feriados.getByTestId("copiar-dias-comuns-sobrescrever"),
+    ).toHaveText("Copiar (sobrescrever)");
+    await expect(feriados.getByTestId("copiar-dias-comuns-mesclar")).toHaveCount(0);
+
+    page.once("dialog", (dialogo) => dialogo.dismiss());
+    await feriados.getByTestId("copiar-dias-comuns-sobrescrever").click();
+
+    // Cancelar não altera a Viagem casada nem o estado efêmero (offset editado).
+    await expect(celula).toHaveAttribute("data-viagem-uuid", uuidAntes!);
+    await expect(passante).toHaveValue("08:50");
     expect(chamadasOsrm).toBe(0);
   });
 });

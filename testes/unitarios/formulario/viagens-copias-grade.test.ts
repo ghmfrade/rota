@@ -200,13 +200,13 @@ describe("cópia unitária com guarda (DEC-084/092; RN-062)", () => {
     expect(diaAoLado("quarta", 1)).toBe("quinta");
   });
 });
-describe("clonarDiasComunsParaFeriado (Spec 04 §8.4; RN-007/068)", () => {
+describe("clonarDiasComunsParaFeriado (Spec 04 §8.4/§8.5; RN-007/068; DEC-099)", () => {
   test("clona todas as comuns como feriado com UUIDs novas, sem tocar as comuns", () => {
     const c1 = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
     const c2 = viagem("bbbbbbbb-0000-4000-8000-000000000002", "terca", "09:00:00");
     const it = itinerario([c1, c2]);
 
-    const resultado = clonarDiasComunsParaFeriado(it, "sobrescrever");
+    const resultado = clonarDiasComunsParaFeriado(it);
 
     const comuns = resultado.viagens.filter((v) => !v.viagem_feriado);
     const feriados = resultado.viagens.filter((v) => v.viagem_feriado);
@@ -221,12 +221,12 @@ describe("clonarDiasComunsParaFeriado (Spec 04 §8.4; RN-007/068)", () => {
     expect(feriados.every((f) => f.horarios_paradas.length === 3)).toBe(true); // RN-063
   });
 
-  test("sobrescrever descarta as Viagens de feriado existentes", () => {
+  test("sincroniza a grade: remove Viagem de feriado ausente na origem e cria a faltante", () => {
     const comum = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
     const feriadoAntigo = viagem("cccccccc-0000-4000-8000-000000000003", "domingo", "07:00:00", true);
     const it = itinerario([comum, feriadoAntigo]);
 
-    const resultado = clonarDiasComunsParaFeriado(it, "sobrescrever");
+    const resultado = clonarDiasComunsParaFeriado(it);
 
     const feriados = resultado.viagens.filter((v) => v.viagem_feriado);
     expect(feriados).toHaveLength(1);
@@ -234,29 +234,15 @@ describe("clonarDiasComunsParaFeriado (Spec 04 §8.4; RN-007/068)", () => {
     expect(feriados[0].dia_semana).toBe("segunda"); // clone da comum, não o antigo
   });
 
-  test("mesclar sincroniza a grade: remove ausentes e cria faltantes (DEC-087)", () => {
-    const comum = viagem("aaaaaaaa-0000-4000-8000-000000000001", "segunda", "08:00:00");
-    const feriadoAntigo = viagem("cccccccc-0000-4000-8000-000000000003", "domingo", "07:00:00", true);
-    const it = itinerario([comum, feriadoAntigo]);
-
-    const resultado = clonarDiasComunsParaFeriado(it, "mesclar");
-
-    const feriados = resultado.viagens.filter((v) => v.viagem_feriado);
-    expect(feriados).toHaveLength(1);
-    expect(feriados[0].dia_semana).toBe("segunda");
-    expect(feriados[0].uuid).not.toBe(feriadoAntigo.uuid);
-  });
-
-  test("grade comum vazia: sobrescrever e mesclar esvaziam o destino (DEC-087/RN-071)", () => {
+  test("[inválido] grade comum vazia esvazia o destino de feriados (RN-071)", () => {
     const feriadoAntigo = viagem("cccccccc-0000-4000-8000-000000000003", "domingo", "07:00:00", true);
     const it = itinerario([feriadoAntigo]);
 
-    expect(clonarDiasComunsParaFeriado(it, "sobrescrever").viagens).toEqual([]);
-    expect(clonarDiasComunsParaFeriado(it, "mesclar").viagens).toEqual([]);
+    expect(clonarDiasComunsParaFeriado(it).viagens).toEqual([]);
   });
 });
 
-describe("semearGradeAPartirDeOutra (TASK-105; Spec 04 §8.5; DEC-087)", () => {
+describe("semearGradeAPartirDeOutra — Copiar (sobrescrever) (TASK-105/TASK-120; Spec 04 §8.5; DEC-099)", () => {
   const tabelaUuid = "dddddddd-0000-4000-8000-000000000004";
   const comum = { viagem_feriado: false, tabela_excepcional_uuid: null };
   const excepcional = {
@@ -275,7 +261,6 @@ describe("semearGradeAPartirDeOutra (TASK-105; Spec 04 §8.5; DEC-087)", () => {
       itinerario([origem]),
       comum,
       excepcional,
-      "sobrescrever",
     );
     const [copia] = resultado.viagens.filter(
       (item) => item.tabela_excepcional_uuid === tabelaUuid,
@@ -288,7 +273,7 @@ describe("semearGradeAPartirDeOutra (TASK-105; Spec 04 §8.5; DEC-087)", () => {
     expect(resultado.viagens).toContain(origem);
   });
 
-  test("mesclar preserva UUID casada, atualiza offsets, remove ausente e cria faltante", () => {
+  test("preserva UUID casada, atualiza offsets, remove ausente e cria faltante", () => {
     const origemCasada = viagem(
       "aaaaaaaa-0000-4000-8000-000000000001",
       "segunda",
@@ -322,7 +307,6 @@ describe("semearGradeAPartirDeOutra (TASK-105; Spec 04 §8.5; DEC-087)", () => {
       ]),
       comum,
       excepcional,
-      "mesclar",
     );
     const destino = resultado.viagens.filter(
       (item) => item.tabela_excepcional_uuid === tabelaUuid,
@@ -361,7 +345,6 @@ describe("semearGradeAPartirDeOutra (TASK-105; Spec 04 §8.5; DEC-087)", () => {
       itinerario([origemA, origemB, destinoExistente]),
       comum,
       excepcional,
-      "mesclar",
     );
     const destino = resultado.viagens.filter(
       (item) => item.tabela_excepcional_uuid === tabelaUuid,
@@ -375,6 +358,32 @@ describe("semearGradeAPartirDeOutra (TASK-105; Spec 04 §8.5; DEC-087)", () => {
         .map((item) => item.horarios_paradas[1].offset_horario)
         .sort(),
     ).toEqual(["00:07:00", "00:15:00"]);
+  });
+
+  test("reexecutar com origem e destino já sincronizados é idempotente", () => {
+    const origemA = viagem(
+      "aaaaaaaa-0000-4000-8000-000000000001",
+      "segunda",
+      "08:00:00",
+    );
+    const origemB = viagem(
+      "bbbbbbbb-0000-4000-8000-000000000002",
+      "terca",
+      "09:00:00",
+    );
+    const primeiraSincronizacao = semearGradeAPartirDeOutra(
+      itinerario([origemA, origemB]),
+      comum,
+      excepcional,
+    );
+
+    const segundaSincronizacao = semearGradeAPartirDeOutra(
+      primeiraSincronizacao,
+      comum,
+      excepcional,
+    );
+
+    expect(segundaSincronizacao).toEqual(primeiraSincronizacao);
   });
 
   test("[inválido] não mistura outra Tabela excepcional nem a grade de feriados", () => {
@@ -401,7 +410,6 @@ describe("semearGradeAPartirDeOutra (TASK-105; Spec 04 §8.5; DEC-087)", () => {
       itinerario([origem, outraExcepcional, feriado]),
       comum,
       excepcional,
-      "sobrescrever",
     );
 
     expect(resultado.viagens).toContain(outraExcepcional);
@@ -429,7 +437,6 @@ describe("semearGradeAPartirDeOutra (TASK-105; Spec 04 §8.5; DEC-087)", () => {
       itinerarioOrigem,
       comum,
       excepcional,
-      "sobrescrever",
     );
     const uuidsAntes = servico.itinerarios[0].viagens
       .filter((item) => item.tabela_excepcional_uuid === tabelaUuid)
@@ -511,7 +518,6 @@ describe("TASK-112 — origem estendida e normalização entre grades", () => {
         itinerario([viagemOrigem]),
         origem,
         destino,
-        "sobrescrever",
       );
       const copia = resultado.viagens.find(
         (item) =>
@@ -536,7 +542,7 @@ describe("TASK-112 — origem estendida e normalização entre grades", () => {
     },
   );
 
-  test("mescla excepcional → feriados preserva UUID casada, atualiza offsets e mantém grades alheias", () => {
+  test("sincroniza excepcional → feriados preservando UUID casada, atualiza offsets e mantém grades alheias", () => {
     const origemCasada = viagem(
       "aaaaaaaa-0000-4000-8000-000000000001",
       "segunda",
@@ -578,7 +584,6 @@ describe("TASK-112 — origem estendida e normalização entre grades", () => {
       ]),
       excepcionalA,
       feriados,
-      "mesclar",
     );
     const destino = resultado.viagens.filter(
       (item) => item.viagem_feriado,
@@ -605,7 +610,7 @@ describe("TASK-112 — origem estendida e normalização entre grades", () => {
     expect(resultado.viagens).toContain(origemNova);
   });
 
-  test("[inválido] sobrescrever nunca reutiliza UUID da origem nem do destino anterior", () => {
+  test("[inválido] sincronização nunca reutiliza UUID da origem nem do destino removido", () => {
     const origem = viagem(
       "aaaaaaaa-0000-4000-8000-000000000001",
       "segunda",
@@ -623,7 +628,6 @@ describe("TASK-112 — origem estendida e normalização entre grades", () => {
       itinerario([origem, destinoAnterior]),
       feriados,
       excepcionalA,
-      "sobrescrever",
     );
     const [copia] = resultado.viagens.filter(
       (item) => item.tabela_excepcional_uuid === tabelaAUuid,
@@ -659,7 +663,6 @@ describe("TASK-112 — origem estendida e normalização entre grades", () => {
       itinerarioAlvo,
       feriados,
       excepcionalA,
-      "mesclar",
     );
 
     const reimportado = esquemaDocumentoOperacao.parse(

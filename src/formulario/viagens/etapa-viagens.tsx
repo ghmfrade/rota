@@ -827,45 +827,38 @@ export function EtapaViagens({
     definirConfirmacaoApagarDia(null);
   }
 
-  // Semeadura entre grades do mesmo Serviço/sentido (Spec 04 §8.4/§8.5;
-  // TASK-112/DEC-087).
-  function aoSemearGrade(
-    gradeOrigem: GradeDaTela,
-    gradeDestino: GradeDaTela,
-    modo: "sobrescrever" | "mesclar",
-  ) {
+  // Semeadura entre grades do mesmo Serviço/sentido: ação única
+  // `Copiar (sobrescrever)` — sincronização preservando UUID (Spec 04
+  // §8.4/§8.5; TASK-112/TASK-120; DEC-099).
+  function aoSemearGrade(gradeOrigem: GradeDaTela, gradeDestino: GradeDaTela) {
     if (!itinerarioAtual) return;
     const viagensDestinoAtuais = itinerarioAtual.viagens.filter((viagem) =>
       viagemPertenceAGrade(viagem, gradeDestino.destino),
     );
-    if (modo === "sobrescrever") {
-      if (viagensDestinoAtuais.length > 0) {
-        const confirmado =
-          typeof window === "undefined" ||
-          window.confirm(
-            `Sobrescrever esta grade com ${gradeOrigem.rotulo}? As Viagens atuais serão descartadas.`,
-          );
-        if (!confirmado) return;
-      }
+    if (viagensDestinoAtuais.length > 0) {
+      const confirmado =
+        typeof window === "undefined" ||
+        window.confirm(
+          `Sincronizar esta grade com ${gradeOrigem.rotulo}? As Viagens ausentes na origem serão removidas e as demais terão os horários atualizados.`,
+        );
+      if (!confirmado) return;
     }
-    const uuidsDestinoAtuais = viagensDestinoAtuais.map((viagem) => viagem.uuid);
-    limparEstadoDeSessao(uuidsDestinoAtuais);
     const itinerarioAtualizado = semearGradeAPartirDeOutra(
       itinerarioAtual,
       gradeOrigem.destino,
       gradeDestino.destino,
-      modo,
     );
-    if (
-      viagemSelecionadaUuid &&
-      uuidsDestinoAtuais.includes(viagemSelecionadaUuid) &&
-      !itinerarioAtualizado.viagens.some(
-        (viagem) => viagem.uuid === viagemSelecionadaUuid,
-      )
-    ) {
+    const uuidsAtualizados = new Set(
+      itinerarioAtualizado.viagens.map((viagem) => viagem.uuid),
+    );
+    const uuidsRemovidos = viagensDestinoAtuais
+      .map((viagem) => viagem.uuid)
+      .filter((uuid) => !uuidsAtualizados.has(uuid));
+    limparEstadoDeSessao(uuidsRemovidos);
+    if (viagemSelecionadaUuid && uuidsRemovidos.includes(viagemSelecionadaUuid)) {
       definirViagemSelecionadaUuid(null);
     }
-    aplicar(itinerarioAtualizado, ancorasSem(uuidsDestinoAtuais));
+    aplicar(itinerarioAtualizado, ancorasSem(uuidsRemovidos));
   }
 
   if (servicos.length === 0) {
@@ -1679,50 +1672,22 @@ export function EtapaViagens({
                   </option>
                 ))}
               </Select>
-              {temFeriado ? (
-                <>
-                  <Botao
-                    variante="secundario"
-                    data-testid="copiar-dias-comuns-sobrescrever"
-                    onClick={() =>
-                      aoSemearGrade(
-                        origemSelecionadaDaSemeadura(GRADE_FERIADOS),
-                        GRADE_FERIADOS,
-                        "sobrescrever",
-                      )
-                    }
-                  >
-                    Copiar origem (sobrescrever)
-                  </Botao>
-                  <Botao
-                    variante="secundario"
-                    data-testid="copiar-dias-comuns-mesclar"
-                    onClick={() =>
-                      aoSemearGrade(
-                        origemSelecionadaDaSemeadura(GRADE_FERIADOS),
-                        GRADE_FERIADOS,
-                        "mesclar",
-                      )
-                    }
-                  >
-                    Copiar origem (mesclar)
-                  </Botao>
-                </>
-              ) : (
-                <Botao
-                  variante="secundario"
-                  data-testid="copiar-dias-comuns"
-                  onClick={() =>
-                    aoSemearGrade(
-                      origemSelecionadaDaSemeadura(GRADE_FERIADOS),
-                      GRADE_FERIADOS,
-                      "sobrescrever",
-                    )
-                  }
-                >
-                  Copiar origem
-                </Botao>
-              )}
+              <Botao
+                variante="secundario"
+                data-testid={
+                  temFeriado
+                    ? "copiar-dias-comuns-sobrescrever"
+                    : "copiar-dias-comuns"
+                }
+                onClick={() =>
+                  aoSemearGrade(
+                    origemSelecionadaDaSemeadura(GRADE_FERIADOS),
+                    GRADE_FERIADOS,
+                  )
+                }
+              >
+                Copiar (sobrescrever)
+              </Botao>
             </div>
             <Tabela densidade="compacta" className="mt-4">
               {cabecalhoGrade(GRADE_FERIADOS)}
@@ -1781,50 +1746,19 @@ export function EtapaViagens({
                       </option>
                     ))}
                   </Select>
-                  {temConteudo ? (
-                    <>
-                      <Botao
-                        variante="secundario"
-                        data-testid="copiar-dias-comuns-excepcional-sobrescrever"
-                        onClick={() =>
-                          aoSemearGrade(
-                            origemSelecionadaDaSemeadura(grade),
-                            grade,
-                            "sobrescrever",
-                          )
-                        }
-                      >
-                        Copiar origem (sobrescrever)
-                      </Botao>
-                      <Botao
-                        variante="secundario"
-                        data-testid="copiar-dias-comuns-excepcional-mesclar"
-                        onClick={() =>
-                          aoSemearGrade(
-                            origemSelecionadaDaSemeadura(grade),
-                            grade,
-                            "mesclar",
-                          )
-                        }
-                      >
-                        Copiar origem (mesclar)
-                      </Botao>
-                    </>
-                  ) : (
-                    <Botao
-                      variante="secundario"
-                      data-testid="copiar-dias-comuns-excepcional"
-                      onClick={() =>
-                        aoSemearGrade(
-                          origemSelecionadaDaSemeadura(grade),
-                          grade,
-                          "sobrescrever",
-                        )
-                      }
-                    >
-                      Copiar origem
-                    </Botao>
-                  )}
+                  <Botao
+                    variante="secundario"
+                    data-testid={
+                      temConteudo
+                        ? "copiar-dias-comuns-excepcional-sobrescrever"
+                        : "copiar-dias-comuns-excepcional"
+                    }
+                    onClick={() =>
+                      aoSemearGrade(origemSelecionadaDaSemeadura(grade), grade)
+                    }
+                  >
+                    Copiar (sobrescrever)
+                  </Botao>
                 </div>
                 <Tabela densidade="compacta" className="mt-4">
                   {cabecalhoGrade(grade)}
