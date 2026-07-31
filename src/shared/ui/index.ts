@@ -20,6 +20,15 @@ export {
   type AncoraMenuFlutuante,
   type OpcaoMenuFlutuante,
 } from "./menu-flutuante";
+export {
+  SuperficieFlutuante,
+  posicionarSuperficieFlutuante,
+  type SuperficieFlutuanteProps,
+  type LadoSuperficieFlutuante,
+  type EmpilhamentoSuperficie,
+  type PosicaoSuperficieFlutuante,
+  type RetanguloSuperficie,
+} from "./superficie-flutuante";
 export { Carimbo, type CarimboProps } from "./carimbo";
 export {
   MolduraCarimbo,

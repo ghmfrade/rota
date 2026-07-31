@@ -1,19 +1,28 @@
 "use client";
 
 import {
-  Fragment,
   useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type DragEvent,
+  type FocusEvent,
   type KeyboardEvent,
   type MouseEvent,
 } from "react";
 import { ROTULO_SEMANA_PADRAO } from "@/shared/contagens";
 import { DIAS_SEMANA, type Itinerario, type Parada, type Secao, type Servico } from "@/shared/contrato";
-import { Botao, Campo, Dialogo, MenuFlutuante, Painel, Select, Tabela } from "@/shared/ui";
+import {
+  Botao,
+  Campo,
+  Dialogo,
+  MenuFlutuante,
+  Painel,
+  Select,
+  SuperficieFlutuante,
+  Tabela,
+} from "@/shared/ui";
 import { nomeExibicaoSecao } from "@/formulario/secoes";
 import {
   ancorasHorarioDaSessao,
@@ -174,6 +183,19 @@ export function EtapaViagens({
   const alvoFocoPendenteRef = useRef<AlvoFocoCelulaGrade | null>(null);
   const seletorNavegacaoPendenteRef = useRef<string | null>(null);
   const temporizadorSaidaHoverRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Foco dentro de uma superfície flutuante de Viagem (DEC-100): enquanto
+  // houver **campo** em edição, nem a saída do ponteiro nem o temporizador
+  // fecham a superfície. Foco num botão não segura — concluir a ação fecha.
+  const focoEmSuperficieRef = useRef(false);
+
+  function editandoCampoDaSuperficie(): boolean {
+    const ativo = document.activeElement;
+    return (
+      focoEmSuperficieRef.current &&
+      ativo instanceof HTMLInputElement &&
+      ativo.closest("[data-flutuante-viagem]") !== null
+    );
+  }
   const [servicoSelecionadoUuid, definirServicoSelecionadoUuid] = useState<
     string | null
   >(origemPartidasPendente?.servicoUuid ?? null);
@@ -287,14 +309,50 @@ export function EtapaViagens({
 
   function ocultarAcoesDaViagem() {
     cancelarSaidaHover();
+    // DEC-100: a superfície permanece aberta enquanto houver hover **ou** foco.
+    // Sair do ponteiro com o foco dentro do flutuante não a fecha.
+    if (editandoCampoDaSuperficie()) return;
     definirViagemEmHoverUuid(null);
+  }
+
+  // DEC-100: a superfície permanece aberta enquanto houver hover **ou** foco na
+  // Viagem ou nela própria. Só a saída efetiva do foco — para fora da caixa —
+  // reagenda o fechamento, para que navegar entre os campos do formulário de
+  // headway não o feche no meio da digitação.
+  function aoFocarSuperficie(viagemUuid: string) {
+    focoEmSuperficieRef.current = true;
+    mostrarAcoesDaViagem(viagemUuid);
+  }
+
+  function aoSairFocoDaSuperficie(evento: FocusEvent<HTMLDivElement>) {
+    if (evento.currentTarget.contains(evento.relatedTarget)) return;
+    focoEmSuperficieRef.current = false;
+    agendarSaidaHover();
+  }
+
+  // `Esc` fecha a superfície e devolve o foco à célula-âncora. Os rascunhos e o
+  // modo headway são estado efêmero por Viagem (RN-096) e sobrevivem — reabrir
+  // pelo hover mostra o formulário como estava.
+  function aoTeclarNaSuperficie(
+    evento: KeyboardEvent<HTMLDivElement>,
+    alvoFoco: AlvoFocoCelulaGrade,
+  ) {
+    if (evento.key !== "Escape") return;
+    evento.preventDefault();
+    evento.stopPropagation();
+    focoEmSuperficieRef.current = false;
+    ocultarAcoesDaViagem();
+    raizEtapaRef.current
+      ?.querySelector<HTMLInputElement>(seletorAlvoFocoCelulaGrade(alvoFoco))
+      ?.focus();
   }
 
   function agendarSaidaHover() {
     cancelarSaidaHover();
     temporizadorSaidaHoverRef.current = setTimeout(() => {
-      definirViagemEmHoverUuid(null);
       temporizadorSaidaHoverRef.current = null;
+      if (editandoCampoDaSuperficie()) return;
+      definirViagemEmHoverUuid(null);
     }, 300);
   }
 
@@ -921,6 +979,103 @@ export function EtapaViagens({
     return true;
   }
 
+  // DEC-100: ativar headway substitui o controle de criar outra Viagem "X tempo
+  // depois" dentro da própria superfície flutuante — nenhuma linha auxiliar
+  // entra no corpo da tabela. A superfície ancora na última Seção visível da
+  // Viagem: a célula final no modo completo, a própria partida no compacto
+  // (DEC-086), onde as passantes não são exibidas.
+  function superficieHeadway({
+    viagemUuid,
+    horarioSaida,
+    dia,
+    indiceBloco,
+    emHover,
+    alvoFocoPartida,
+  }: {
+    viagemUuid: string;
+    horarioSaida: string;
+    dia: DiaSemana;
+    indiceBloco: number;
+    emHover: boolean;
+    alvoFocoPartida: AlvoFocoCelulaGrade;
+  }) {
+    return (
+      <SuperficieFlutuante
+        aberta={emHover}
+        data-flutuante-viagem="true"
+        ladoPreferido="abaixo"
+        limiteRef={raizEtapaRef}
+        rotuloAcessivel={`Geração por headway — ${dia}, viagem ${indiceBloco + 1}`}
+        data-testid="superficie-headway"
+        className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-1"
+        onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
+        onFocus={() => aoFocarSuperficie(viagemUuid)}
+        onBlur={aoSairFocoDaSuperficie}
+        onKeyDown={(evento) => aoTeclarNaSuperficie(evento, alvoFocoPartida)}
+      >
+        <Campo
+          rotulo="a cada"
+          densidade="compacta"
+          className="min-w-20 text-center tabular-nums"
+          aria-label={`Headway — ${dia}, viagem ${indiceBloco + 1}`}
+          placeholder="HH:MM"
+          value={mascararRascunhoHoraMinuto(headwayPorViagem[viagemUuid] ?? "")}
+          onChange={(evento) =>
+            definirHeadwayPorViagem((atuais) => ({
+              ...atuais,
+              [viagemUuid]: atualizarRascunhoHoraMinuto(
+                atuais[viagemUuid] ?? "",
+                evento.target.value,
+              ),
+            }))
+          }
+        />
+        <Campo
+          rotulo="até"
+          densidade="compacta"
+          className="row-start-2 min-w-20 text-center tabular-nums"
+          aria-label={`Horário-limite — ${dia}, viagem ${indiceBloco + 1}`}
+          placeholder="HH:MM"
+          value={mascararRascunhoHoraMinuto(limiteHeadwayPorViagem[viagemUuid] ?? "")}
+          onChange={(evento) =>
+            definirLimiteHeadwayPorViagem((atuais) => ({
+              ...atuais,
+              [viagemUuid]: atualizarRascunhoHoraMinuto(
+                atuais[viagemUuid] ?? "",
+                evento.target.value,
+              ),
+            }))
+          }
+        />
+        <Botao
+          variante="primario"
+          className="col-start-2 row-span-2 row-start-1 min-w-10 self-stretch"
+          data-testid="gerar-viagens-headway"
+          aria-label={`Gerar viagens por headway — ${dia}, viagem ${indiceBloco + 1}`}
+          disabled={
+            !entradasHeadwaySaoValidas(
+              horarioSaida,
+              headwayPorViagem[viagemUuid] ?? "",
+              limiteHeadwayPorViagem[viagemUuid] ?? "",
+            )
+          }
+          onClick={() => aoGerarViagensPorHeadway(viagemUuid)}
+        >
+          ↓
+        </Botao>
+        {errosHeadway[viagemUuid] && (
+          <span
+            role="alert"
+            data-testid="erro-headway"
+            className="col-span-2 text-xs text-erro"
+          >
+            {errosHeadway[viagemUuid]}
+          </span>
+        )}
+      </SuperficieFlutuante>
+    );
+  }
+
   // Corpo compartilhado por todas as grades. Os dois discriminadores seguem
   // juntos em toda criação/cópia para preservar a exclusividade da RN-061.
   function corpoGrade(blocos: BlocoGrade[], grade: GradeDaTela) {
@@ -1051,12 +1206,18 @@ export function EtapaViagens({
                         atributosNavegacao={atributosNavegacao}
                         aoSelecionar={() => definirViagemSelecionadaUuid(viagemUuid)}
                       />
-                      <div
+                      <SuperficieFlutuante
+                        aberta={emHover}
+                        data-flutuante-viagem="true"
+                        ladoPreferido="acima"
+                        limiteRef={raizEtapaRef}
+                        rotuloAcessivel={`Ações de inserção anterior — ${dia}, viagem ${indiceBloco + 1}`}
                         data-testid="acao-inserir-anterior"
-                        className={`absolute bottom-full left-1/2 z-40 flex -translate-x-1/2 items-stretch gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3 [transition:opacity_var(--transicao-rapida)] ${
-                          emHover ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
-                        }`}
+                        className="flex items-stretch gap-1"
                         onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
+                        onFocus={() => aoFocarSuperficie(viagemUuid)}
+                        onBlur={aoSairFocoDaSuperficie}
+                        onKeyDown={(evento) => aoTeclarNaSuperficie(evento, alvoFoco)}
                       >
                         <Campo
                           densidade="compacta"
@@ -1074,52 +1235,72 @@ export function EtapaViagens({
                         >
                           ↑
                         </Botao>
-                      </div>
-                      <div
+                      </SuperficieFlutuante>
+                      <SuperficieFlutuante
+                        aberta={emHover}
+                        data-flutuante-viagem="true"
+                        // DEC-101: SEG–SÁB preferem a direita; DOM prefere a
+                        // esquerda. O reposicionamento cuida do resto.
+                        ladoPreferido={ehUltimoDia ? "esquerda" : "direita"}
+                        // Na coluna de domingo a superfície inferior pode ser
+                        // presa sobre esta faixa; as ações da Viagem continuam
+                        // por cima e clicáveis.
+                        empilhamento="prioritaria"
+                        limiteRef={raizEtapaRef}
+                        rotuloAcessivel={`Ações da viagem — ${dia}, viagem ${indiceBloco + 1}`}
                         data-testid="acoes-viagem"
-                        className={`pointer-events-none absolute inset-0 z-30 [transition:opacity_var(--transicao-rapida)] ${
-                          emHover ? "visible opacity-100" : "invisible opacity-0"
-                        }`}
+                        className="flex flex-col items-stretch gap-0.5"
                         onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
+                        onFocus={() => aoFocarSuperficie(viagemUuid)}
+                        onBlur={aoSairFocoDaSuperficie}
+                        onKeyDown={(evento) => aoTeclarNaSuperficie(evento, alvoFoco)}
                       >
-                        <div
-                          className={`pointer-events-auto absolute top-0 z-10 flex flex-col items-stretch gap-0.5 ${
-                            ehUltimoDia ? "right-0" : "left-full"
-                          }`}
+                        <Botao
+                          variante="perigo"
+                          tamanho="compacto"
+                          className="min-h-8 min-w-8"
+                          data-testid="apagar-viagem"
+                          aria-label={`Apagar viagem — ${dia}, viagem ${indiceBloco + 1}`}
+                          onClick={() => definirConfirmacaoApagarViagemUuid(viagemUuid)}
                         >
-                          <Botao
-                            variante="perigo"
-                            tamanho="compacto"
-                            className="min-h-8 min-w-8"
-                            data-testid="apagar-viagem"
-                            aria-label={`Apagar viagem — ${dia}, viagem ${indiceBloco + 1}`}
-                            onClick={() => definirConfirmacaoApagarViagemUuid(viagemUuid)}
-                          >
-                            X
-                          </Botao>
-                          <Botao
-                            variante="primario"
-                            tamanho="compacto"
-                            className="min-h-8 min-w-8"
-                            data-testid="restaurar-viagem"
-                            aria-label={`Restaurar sugestão — ${dia}, viagem ${indiceBloco + 1}`}
-                            onClick={() => aoResetarViagem(viagemUuid)}
-                          >
-                            ↻
-                          </Botao>
-                          <Botao
-                            variante={modoHeadway ? "primario" : "alternador"}
-                            tamanho="compacto"
-                            className="min-h-8 min-w-8"
-                            data-testid="alternar-modo-headway"
-                            aria-label={`Alternar geração por headway — ${dia}, viagem ${indiceBloco + 1}`}
-                            aria-pressed={modoHeadway}
-                            onClick={() => aoAlternarModoHeadway(viagemUuid)}
-                          >
-                            ↪
-                          </Botao>
-                        </div>
-                      </div>
+                          X
+                        </Botao>
+                        <Botao
+                          variante="primario"
+                          tamanho="compacto"
+                          className="min-h-8 min-w-8"
+                          data-testid="restaurar-viagem"
+                          aria-label={`Restaurar sugestão — ${dia}, viagem ${indiceBloco + 1}`}
+                          onClick={() => aoResetarViagem(viagemUuid)}
+                        >
+                          ↻
+                        </Botao>
+                        <Botao
+                          variante={modoHeadway ? "primario" : "alternador"}
+                          tamanho="compacto"
+                          className="min-h-8 min-w-8"
+                          data-testid="alternar-modo-headway"
+                          aria-label={`Alternar geração por headway — ${dia}, viagem ${indiceBloco + 1}`}
+                          aria-pressed={modoHeadway}
+                          onClick={() => aoAlternarModoHeadway(viagemUuid)}
+                        >
+                          ↪
+                        </Botao>
+                      </SuperficieFlutuante>
+                      {/* Modo compacto (DEC-086): a partida é a única Seção
+                          visível, portanto é ela que ancora o formulário de
+                          headway. A inserção posterior segue indisponível
+                          nesse modo, como antes da TASK-121. */}
+                      {secoesDaGrade.length === 1 &&
+                        modoHeadway &&
+                        superficieHeadway({
+                          viagemUuid,
+                          horarioSaida: celula.viagem.horario_saida,
+                          dia,
+                          indiceBloco,
+                          emHover,
+                          alvoFocoPartida: alvoFoco,
+                        })}
                     </td>
                   );
                 }
@@ -1180,16 +1361,20 @@ export function EtapaViagens({
                       </span>
                     )}
                     {posicaoNaSuperficie === "fim" && !modoHeadway && (
-                        <div
-                          data-testid="acao-inserir-posterior"
-                          className={`absolute top-full z-40 flex items-stretch gap-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3 [transition:opacity_var(--transicao-rapida)] ${
-                            ehUltimoDia ? "right-0" : "left-1/2 -translate-x-1/2"
-                          } ${
-                            emHover
-                              ? "pointer-events-auto opacity-100"
-                              : "pointer-events-none opacity-0"
-                          }`}
+                      <SuperficieFlutuante
+                        aberta={emHover}
+                        data-flutuante-viagem="true"
+                        ladoPreferido="abaixo"
+                        limiteRef={raizEtapaRef}
+                        rotuloAcessivel={`Ações de inserção posterior — ${dia}, viagem ${indiceBloco + 1}`}
+                        data-testid="acao-inserir-posterior"
+                        className="flex items-stretch gap-1"
                         onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
+                        onFocus={() => aoFocarSuperficie(viagemUuid)}
+                        onBlur={aoSairFocoDaSuperficie}
+                        onKeyDown={(evento) =>
+                          aoTeclarNaSuperficie(evento, { ...alvoFoco, indiceSecao: 0 })
+                        }
                       >
                         <Campo
                           densidade="compacta"
@@ -1218,8 +1403,18 @@ export function EtapaViagens({
                             {erroInsercaoRelativa}
                           </span>
                         )}
-                      </div>
+                      </SuperficieFlutuante>
                     )}
+                    {posicaoNaSuperficie === "fim" &&
+                      modoHeadway &&
+                      superficieHeadway({
+                        viagemUuid,
+                        horarioSaida: celula.viagem.horario_saida,
+                        dia,
+                        indiceBloco,
+                        emHover,
+                        alvoFocoPartida: { ...alvoFoco, indiceSecao: 0 },
+                      })}
                   </td>
                 );
               }
@@ -1275,115 +1470,7 @@ export function EtapaViagens({
           </tr>
         );
 
-        if (indiceSecao !== secoesDaGrade.length - 1) {
-          return linhaGrade;
-        }
-
-        const temHeadwayNoBloco = DIAS_SEMANA.some((dia) => {
-          const celula = bloco[dia];
-          return (
-            celula.estado === "existente" &&
-            (modoHeadwayPorViagem[celula.viagem.uuid] ?? false)
-          );
-        });
-
-        return (
-          <Fragment key={`${indiceBloco}-${parada.ordem}`}>
-            {linhaGrade}
-            {temHeadwayNoBloco && (
-              <tr data-testid="linha-headway" className="border-b-2 border-cinza-400 bg-azul-50">
-                <th scope="row" className="whitespace-nowrap font-semibold">
-                  Headway
-                </th>
-                {DIAS_SEMANA.map((dia) => {
-                  const celula = bloco[dia];
-                  if (
-                    celula.estado !== "existente" ||
-                    !(modoHeadwayPorViagem[celula.viagem.uuid] ?? false)
-                  ) {
-                    return <td key={dia} />;
-                  }
-
-                  const viagemUuid = celula.viagem.uuid;
-                  const rascunhoHeadway = headwayPorViagem[viagemUuid] ?? "";
-                  const rascunhoLimiteHeadway = limiteHeadwayPorViagem[viagemUuid] ?? "";
-                  const headwayValido = entradasHeadwaySaoValidas(
-                    celula.viagem.horario_saida,
-                    rascunhoHeadway,
-                    rascunhoLimiteHeadway,
-                  );
-                  const erroHeadway = errosHeadway[viagemUuid];
-
-                  return (
-                    <td
-                      key={dia}
-                      data-testid="celula-headway"
-                      data-viagem-uuid={viagemUuid}
-                      className="align-top"
-                      onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
-                    >
-                      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-x-1 gap-y-1 rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-1">
-                        <Campo
-                          rotulo="a cada"
-                          densidade="compacta"
-                          className="min-w-20 text-center tabular-nums"
-                          aria-label={`Headway — ${dia}, viagem ${indiceBloco + 1}`}
-                          placeholder="HH:MM"
-                          value={mascararRascunhoHoraMinuto(rascunhoHeadway)}
-                          onChange={(evento) =>
-                            definirHeadwayPorViagem((atuais) => ({
-                              ...atuais,
-                              [viagemUuid]: atualizarRascunhoHoraMinuto(
-                                atuais[viagemUuid] ?? "",
-                                evento.target.value,
-                              ),
-                            }))
-                          }
-                        />
-                        <Campo
-                          rotulo="até"
-                          densidade="compacta"
-                          className="row-start-2 min-w-20 text-center tabular-nums"
-                          aria-label={`Horário-limite — ${dia}, viagem ${indiceBloco + 1}`}
-                          placeholder="HH:MM"
-                          value={mascararRascunhoHoraMinuto(rascunhoLimiteHeadway)}
-                          onChange={(evento) =>
-                            definirLimiteHeadwayPorViagem((atuais) => ({
-                              ...atuais,
-                              [viagemUuid]: atualizarRascunhoHoraMinuto(
-                                atuais[viagemUuid] ?? "",
-                                evento.target.value,
-                              ),
-                            }))
-                          }
-                        />
-                        <Botao
-                          variante="primario"
-                          className="col-start-2 row-span-2 row-start-1 min-w-10 self-stretch"
-                          data-testid="gerar-viagens-headway"
-                          aria-label={`Gerar viagens por headway — ${dia}, viagem ${indiceBloco + 1}`}
-                          disabled={!headwayValido}
-                          onClick={() => aoGerarViagensPorHeadway(viagemUuid)}
-                        >
-                          ↓
-                        </Botao>
-                        {erroHeadway && (
-                          <span
-                            role="alert"
-                            data-testid="erro-headway"
-                            className="col-span-2 text-xs text-erro"
-                          >
-                            {erroHeadway}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-            )}
-          </Fragment>
-        );
+        return linhaGrade;
       });
     });
   }

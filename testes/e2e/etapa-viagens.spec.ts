@@ -449,9 +449,20 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     expect(caixaAcaoAnterior!.y + caixaAcaoAnterior!.height).toBeLessThanOrEqual(
       caixaOrigem!.y + 1,
     );
-    expect(caixaAcaoPosterior!.y).toBeGreaterThanOrEqual(
-      caixaFinal!.y + caixaFinal!.height - 1,
-    );
+    // TASK-121: a superfície abre abaixo da última Seção quando há espaço na
+    // área útil e sobe quando não há — nunca fica cortada fora dela.
+    const ladoPosterior = await acaoPosterior.getAttribute("data-lado");
+    expect(["abaixo", "acima"]).toContain(ladoPosterior);
+    if (ladoPosterior === "abaixo") {
+      expect(caixaAcaoPosterior!.y).toBeGreaterThanOrEqual(
+        caixaFinal!.y + caixaFinal!.height - 1,
+      );
+    } else {
+      expect(caixaAcaoPosterior!.y + caixaAcaoPosterior!.height).toBeLessThanOrEqual(
+        caixaFinal!.y + 1,
+      );
+    }
+    await expect(acaoPosterior).toBeInViewport({ ratio: 1 });
     expect(caixaApagar!.x + caixaApagar!.width / 2).toBeGreaterThan(
       caixaOrigem!.x + caixaOrigem!.width / 2,
     );
@@ -459,7 +470,16 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     expect(caixaRestaurar!.y).toBeGreaterThanOrEqual(caixaApagar!.y + caixaApagar!.height);
     expect(caixaRestaurar!.width).toBeCloseTo(caixaApagar!.width, 0);
     expect(caixaRestaurar!.height).toBeCloseTo(caixaApagar!.height, 0);
-    expect(caixaApagar!.x).toBeCloseTo(caixaOrigem!.x + caixaOrigem!.width, 0);
+    // TASK-121: a coluna de ações é uma superfície flutuante encostada na
+    // borda da célula; os botões ficam dentro do seu preenchimento.
+    const caixaSuperficieAcoes = (await celulaOrigem
+      .getByTestId("acoes-viagem")
+      .boundingBox())!;
+    expect(caixaSuperficieAcoes.x).toBeCloseTo(caixaOrigem!.x + caixaOrigem!.width, 0);
+    expect(caixaApagar!.x).toBeGreaterThanOrEqual(caixaSuperficieAcoes.x);
+    expect(caixaApagar!.x + caixaApagar!.width).toBeLessThanOrEqual(
+      caixaSuperficieAcoes.x + caixaSuperficieAcoes.width,
+    );
     await expect(celulaOrigem.getByTestId("restaurar-viagem")).toHaveClass(/bg-azul-600/);
     expect(caixaCampoAnterior!.width).toBeGreaterThanOrEqual(80);
     expect(caixaCampoPosterior!.width).toBeGreaterThanOrEqual(80);
@@ -504,9 +524,14 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     await expect(alternarModo).toHaveAttribute("aria-pressed", "true");
     await expect(alternarModo).toHaveClass(/bg-azul-600/);
     await expect(alternarModo).not.toHaveClass(/bg-azul-100/);
-    const celulaHeadwayOrigem = grade.locator(
-      `[data-testid="celula-headway"][data-viagem-uuid="${viagemUuid}"]`,
-    );
+    // TASK-121/DEC-100: o formulário vive na superfície flutuante ancorada à
+    // última Seção da Viagem — nenhuma linha auxiliar entra na tabela.
+    const celulaHeadwayOrigem = grade
+      .locator(`[data-testid="celula-passante"][data-viagem-uuid="${viagemUuid}"]`)
+      .last()
+      .getByTestId("superficie-headway");
+    await expect(grade.getByTestId("linha-headway")).toHaveCount(0);
+    await expect(grade.getByTestId("celula-headway")).toHaveCount(0);
 
     // A ação superior continua sendo a inserção unitária regressiva; apenas o
     // controle inferior troca +X pela geração futura em lote.
@@ -623,6 +648,140 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     await expect(page.getByTestId("aviso-copia-viagem")).toContainText(
       "2 horário(s) já existente(s)",
     );
+    expect(chamouOsrm).toBe(false);
+  });
+
+  test("TASK-121: superfície flutuante da Viagem fica inteira na área útil e opera headway em SEG/DOM", async ({
+    page,
+  }) => {
+    let chamouOsrm = false;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamouOsrm = true;
+      return rota.abort();
+    });
+
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+    const etapa = page.getByTestId("etapa-viagens");
+    const tamanhoJanela = page.viewportSize()!;
+
+    // Área útil = interseção da etapa com a viewport (docs-dev/18 §3).
+    async function conferirContida(alvo: Locator, rotulo: string) {
+      const [caixa, caixaEtapa] = await Promise.all([
+        alvo.boundingBox(),
+        etapa.boundingBox(),
+      ]);
+      expect(caixa, rotulo).not.toBeNull();
+      expect(caixaEtapa).not.toBeNull();
+      const limite = {
+        x: Math.max(0, caixaEtapa!.x),
+        y: Math.max(0, caixaEtapa!.y),
+        direita: Math.min(tamanhoJanela.width, caixaEtapa!.x + caixaEtapa!.width),
+        base: Math.min(tamanhoJanela.height, caixaEtapa!.y + caixaEtapa!.height),
+      };
+      expect(caixa!.x, rotulo).toBeGreaterThanOrEqual(limite.x);
+      expect(caixa!.y, rotulo).toBeGreaterThanOrEqual(limite.y);
+      expect(caixa!.x + caixa!.width, rotulo).toBeLessThanOrEqual(limite.direita);
+      expect(caixa!.y + caixa!.height, rotulo).toBeLessThanOrEqual(limite.base);
+    }
+
+    // Primeira e última Viagem de segunda, mais a coluna de domingo — as três
+    // bordas em que a superfície era recortada antes da TASK-121.
+    await preencherEConfirmar(grade.getByLabel("Criar viagem — segunda"), "22:00");
+    await preencherEConfirmar(grade.getByLabel("Criar viagem — domingo"), "08:00");
+
+    for (const rotuloViagem of [
+      "Horário de partida — segunda, viagem 1",
+      "Horário de partida — segunda, viagem 2",
+      "Horário de partida — domingo, viagem 1",
+    ]) {
+      const partida = grade.getByLabel(rotuloViagem);
+      const celula = partida.locator("xpath=ancestor::td");
+      const viagemUuid = await celula.getAttribute("data-viagem-uuid");
+      const celulaFinal = grade
+        .locator(`[data-testid="celula-passante"][data-viagem-uuid="${viagemUuid}"]`)
+        .last();
+
+      await celula.hover();
+      await conferirContida(celula.getByTestId("acoes-viagem"), `ações — ${rotuloViagem}`);
+      await conferirContida(
+        celula.getByTestId("acao-inserir-anterior"),
+        `inserir antes — ${rotuloViagem}`,
+      );
+      await conferirContida(
+        celulaFinal.getByTestId("acao-inserir-posterior"),
+        `inserir depois — ${rotuloViagem}`,
+      );
+      for (const testId of ["apagar-viagem", "restaurar-viagem", "alternar-modo-headway"]) {
+        await conferirContida(celula.getByTestId(testId), `${testId} — ${rotuloViagem}`);
+        await expect(celula.getByTestId(testId)).toBeInViewport({ ratio: 1 });
+      }
+
+      // Trocar para headway não insere linha na tabela nem muda a altura da grade.
+      const corpo = grade.locator("tbody").first();
+      const alturaAntes = (await corpo.boundingBox())!.height;
+      await celula.getByTestId("alternar-modo-headway").click();
+      await expect(grade.getByTestId("linha-headway")).toHaveCount(0);
+      await expect(grade.getByTestId("celula-headway")).toHaveCount(0);
+      // Uma linha auxiliar acrescentaria dezenas de pixels; a tolerância cobre
+      // apenas arredondamento subpixel da medição.
+      expect(
+        Math.abs((await corpo.boundingBox())!.height - alturaAntes),
+      ).toBeLessThanOrEqual(2);
+      await conferirContida(
+        celulaFinal.getByTestId("superficie-headway"),
+        `headway — ${rotuloViagem}`,
+      );
+      await celula.getByTestId("alternar-modo-headway").click();
+    }
+
+    // Domingo: headway operável pela superfície, com foco vindo do teclado e
+    // rascunho preservado ao mover o ponteiro da célula para o flutuante.
+    const partidaDomingo = grade.getByLabel("Horário de partida — domingo, viagem 1");
+    const celulaDomingo = partidaDomingo.locator("xpath=ancestor::td");
+    const uuidDomingo = await celulaDomingo.getAttribute("data-viagem-uuid");
+    const finalDomingo = grade
+      .locator(`[data-testid="celula-passante"][data-viagem-uuid="${uuidDomingo}"]`)
+      .last();
+    await celulaDomingo.hover();
+    await celulaDomingo.getByTestId("alternar-modo-headway").click();
+    const superficieDomingo = finalDomingo.getByTestId("superficie-headway");
+    await superficieDomingo
+      .getByRole("textbox", { name: "Headway — domingo, viagem 1", exact: true })
+      .fill("01:00");
+    await page.waitForTimeout(350);
+    await superficieDomingo.getByLabel("Horário-limite — domingo, viagem 1").fill("10:00");
+    await expect(
+      superficieDomingo.getByRole("textbox", {
+        name: "Headway — domingo, viagem 1",
+        exact: true,
+      }),
+    ).toHaveValue("01:00");
+    await superficieDomingo.getByTestId("gerar-viagens-headway").click();
+    await expect(grade.getByLabel(/Horário de partida — domingo/)).toHaveCount(3);
+
+    // Esc devolve o foco à célula e fecha a superfície, sem perder o modo.
+    await celulaDomingo.hover();
+    await celulaDomingo.getByTestId("apagar-viagem").press("Escape");
+    await expect(partidaDomingo).toBeFocused();
+    await expect(celulaDomingo.getByTestId("acoes-viagem")).toHaveCSS("opacity", "0");
+
+    // Modo compacto: sem Seções passantes, a superfície continua inteira e o
+    // headway continua operável (DEC-086/DEC-100).
+    await page.getByTestId("alternar-modo-compacto").click();
+    const celulaCompacta = grade
+      .getByLabel("Horário de partida — domingo, viagem 1")
+      .locator("xpath=ancestor::td");
+    await celulaCompacta.hover();
+    await conferirContida(celulaCompacta.getByTestId("acoes-viagem"), "ações — compacto");
+    await conferirContida(
+      celulaCompacta.getByTestId("superficie-headway"),
+      "headway — compacto",
+    );
+    await expect(grade.getByTestId("linha-headway")).toHaveCount(0);
+    await expect(
+      celulaCompacta.getByTestId("gerar-viagens-headway"),
+    ).toBeInViewport({ ratio: 1 });
     expect(chamouOsrm).toBe(false);
   });
 
