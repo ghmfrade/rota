@@ -344,3 +344,70 @@ describe("EtapaViagens — formulário de headway na superfície flutuante (TASK
     desmontar();
   });
 });
+
+// TASK-124/DEC-102: as três superfícies de ação da Viagem tomam a largura da
+// célula-âncora; a coluna de ações (`acoes-viagem`) continua com largura de
+// conteúdo. Aqui se prova a adesão de cada superfície e a preservação da
+// composição da DEC-100; a medida em pixels é verificada no E2E.
+describe("EtapaViagens — largura das superfícies da Viagem (TASK-124/DEC-102)", () => {
+  it("as três superfícies aderem à largura da âncora e a coluna de ações não", () => {
+    const { container, desmontar } = montarEtapa();
+    const grade = gradeComum(container);
+
+    entrarComPonteiro(celulaPartida(container));
+    const anterior = grade.querySelector(
+      '[data-testid="acao-inserir-anterior"]',
+    ) as HTMLElement;
+    const posterior = grade.querySelector(
+      '[data-testid="acao-inserir-posterior"]',
+    ) as HTMLElement;
+    const acoes = grade.querySelector('[data-testid="acoes-viagem"]') as HTMLElement;
+
+    expect(anterior.className).toContain("min-w-min");
+    expect(posterior.className).toContain("min-w-min");
+    // Fora da DEC-102: a coluna de ações continua dimensionada pelo conteúdo.
+    expect(acoes.className).not.toContain("min-w-min");
+
+    ativarHeadway(container);
+    expect(superficieHeadway(container)!.className).toContain("min-w-min");
+    desmontar();
+  });
+
+  it("a composição de duas linhas do headway sobrevive à nova largura (DEC-100)", () => {
+    const { container, desmontar } = montarEtapa();
+    ativarHeadway(container);
+    const superficie = superficieHeadway(container)!;
+
+    // Coluna elástica para os campos + coluna `auto` para o botão único.
+    expect(superficie.className).toContain("grid-cols-[minmax(0,1fr)_auto]");
+    const botao = superficie.querySelector(
+      '[data-testid="gerar-viagens-headway"]',
+    ) as HTMLElement;
+    expect(botao.className).toContain("col-start-2");
+    expect(botao.className).toContain("row-span-2");
+    // O alvo do botão é preservado — o piso de legibilidade existe por isso.
+    expect(botao.className).toContain("min-w-10");
+    // `HH:MM` continua com largura mínima própria nas duas linhas.
+    const campos = superficie.querySelectorAll("input");
+    expect(campos).toHaveLength(2);
+    campos.forEach((campo) => expect(campo.className).toContain("min-w-16"));
+    desmontar();
+  });
+
+  it("[inválido] abrir e fechar as superfícies não altera o documento (RN-063/RN-096)", () => {
+    const documento = structuredClone(multiServico) as unknown as DocumentoOperacao;
+    const antes = structuredClone(documento);
+    const { container, espiaoAtualizacao, desmontar } = montarEtapa(documento);
+
+    const celula = celulaPartida(container);
+    entrarComPonteiro(celula);
+    sairComPonteiro(celula);
+    entrarComPonteiro(celula);
+    ativarHeadway(container);
+    sairComPonteiro(celula);
+
+    expect(espiaoAtualizacao).not.toHaveBeenCalled();
+    expect(documento).toEqual(antes);
+    desmontar();
+  });
+});

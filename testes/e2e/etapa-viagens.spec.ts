@@ -481,8 +481,11 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
       caixaSuperficieAcoes.x + caixaSuperficieAcoes.width,
     );
     await expect(celulaOrigem.getByTestId("restaurar-viagem")).toHaveClass(/bg-azul-600/);
-    expect(caixaCampoAnterior!.width).toBeGreaterThanOrEqual(80);
-    expect(caixaCampoPosterior!.width).toBeGreaterThanOrEqual(80);
+    // TASK-124/DEC-102: o campo passa a acompanhar a largura da célula-âncora,
+    // com piso de legibilidade de `HH:MM` (min-w-16); o alvo do botão continua
+    // preservado.
+    expect(caixaCampoAnterior!.width).toBeGreaterThanOrEqual(64);
+    expect(caixaCampoPosterior!.width).toBeGreaterThanOrEqual(64);
     expect(caixaSetaAnterior!.width).toBeGreaterThanOrEqual(40);
     expect(caixaSetaPosterior!.width).toBeGreaterThanOrEqual(40);
 
@@ -943,6 +946,185 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     await expect(grade.getByLabel("Horário de partida — segunda, viagem 2")).toHaveValue(
       "08:30",
     );
+    expect(chamouOsrm).toBe(false);
+  });
+
+  test("TASK-124: superfícies da Viagem assumem a largura da célula-âncora, com piso de legibilidade (DEC-102)", async ({
+    page,
+  }) => {
+    let chamouOsrm = false;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamouOsrm = true;
+      return rota.abort();
+    });
+
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+
+    /**
+     * Piso real da superfície (DEC-102): a largura que ela teria em
+     * `min-content` — exatamente "`HH:MM` inteiro + alvo do botão". Medido no
+     * navegador para não depender de constante mágica no teste.
+     */
+    async function pisoDaSuperficie(superficie: Locator): Promise<number> {
+      return superficie.evaluate((elemento) => {
+        const alvo = elemento as HTMLElement;
+        const larguraAnterior = alvo.style.width;
+        alvo.style.width = "min-content";
+        const piso = alvo.getBoundingClientRect().width;
+        alvo.style.width = larguraAnterior;
+        return piso;
+      });
+    }
+
+    /** A caixa tem a largura da âncora; abaixo do piso, transborda o mínimo. */
+    async function conferirLarguraDaAncora(
+      superficie: Locator,
+      ancora: Locator,
+      rotulo: string,
+    ) {
+      const piso = await pisoDaSuperficie(superficie);
+      const [caixa, caixaAncora] = await Promise.all([
+        superficie.boundingBox(),
+        ancora.boundingBox(),
+      ]);
+      expect(caixa, rotulo).not.toBeNull();
+      expect(caixaAncora, rotulo).not.toBeNull();
+      expect(
+        Math.abs(caixa!.width - Math.max(caixaAncora!.width, piso)),
+        rotulo,
+      ).toBeLessThanOrEqual(1);
+      // Enquanto a coluna couber o piso, a caixa não invade a coluna vizinha.
+      if (caixaAncora!.width >= piso) {
+        expect(caixa!.width, rotulo).toBeLessThanOrEqual(caixaAncora!.width + 1);
+      }
+    }
+
+    /** Nenhum controle da superfície é truncado pela nova largura. */
+    async function conferirNaoTruncado(alvo: Locator, rotulo: string) {
+      const transbordo = await alvo.evaluate(
+        (elemento) => elemento.scrollWidth - elemento.clientWidth,
+      );
+      expect(transbordo, rotulo).toBeLessThanOrEqual(1);
+    }
+
+    await preencherEConfirmar(grade.getByLabel("Criar viagem — domingo"), "08:00");
+
+    // Modo completo: a inserção anterior ancora na partida; a posterior e o
+    // headway, na última Seção — todas na coluna do próprio dia.
+    for (const [dia, rotuloViagem] of [
+      ["segunda", "Horário de partida — segunda, viagem 1"],
+      ["domingo", "Horário de partida — domingo, viagem 1"],
+    ] as const) {
+      const celula = grade.getByLabel(rotuloViagem).locator("xpath=ancestor::td");
+      const viagemUuid = await celula.getAttribute("data-viagem-uuid");
+      const celulaFinal = grade
+        .locator(`[data-testid="celula-passante"][data-viagem-uuid="${viagemUuid}"]`)
+        .last();
+
+      const larguraColunaAntes = (await celula.boundingBox())!.width;
+      await celula.hover();
+
+      await conferirLarguraDaAncora(
+        celula.getByTestId("acao-inserir-anterior"),
+        celula,
+        `inserir antes — ${dia}`,
+      );
+      await conferirLarguraDaAncora(
+        celulaFinal.getByTestId("acao-inserir-posterior"),
+        celulaFinal,
+        `inserir depois — ${dia}`,
+      );
+      await conferirNaoTruncado(
+        celula.getByLabel(`Deslocamento anterior — ${dia}, viagem 1`),
+        `campo anterior — ${dia}`,
+      );
+      await conferirNaoTruncado(
+        celula.getByTestId("inserir-viagem-anterior"),
+        `botão anterior — ${dia}`,
+      );
+
+      // [inválido] a grade não se alarga para acomodar a superfície: abrir as
+      // superfícies no hover não muda a largura da coluna. (A partir do clique
+      // a célula ganha a borda de seleção da TASK-064, alheia à DEC-102.)
+      expect((await celula.boundingBox())!.width, `coluna intacta — ${dia}`).toBeCloseTo(
+        larguraColunaAntes,
+        0,
+      );
+
+      await celula.getByTestId("alternar-modo-headway").click();
+      const headway = celulaFinal.getByTestId("superficie-headway");
+      await expect(headway).toBeVisible();
+      await conferirLarguraDaAncora(headway, celulaFinal, `headway — ${dia}`);
+      await conferirNaoTruncado(
+        headway.getByRole("textbox", { name: `Headway — ${dia}, viagem 1`, exact: true }),
+        `campo headway — ${dia}`,
+      );
+      await conferirNaoTruncado(
+        headway.getByTestId("gerar-viagens-headway"),
+        `botão headway — ${dia}`,
+      );
+
+      // DEC-100 preservada dentro da nova largura: botão único à direita,
+      // abrangendo as duas linhas `a cada` e `até`.
+      const [caixaCada, caixaAte, caixaGerar] = await Promise.all([
+        headway.getByRole("textbox", { name: `Headway — ${dia}, viagem 1`, exact: true }).boundingBox(),
+        headway.getByLabel(`Horário-limite — ${dia}, viagem 1`).boundingBox(),
+        headway.getByTestId("gerar-viagens-headway").boundingBox(),
+      ]);
+      expect(caixaCada!.y, `duas linhas — ${dia}`).toBeLessThan(caixaAte!.y);
+      expect(caixaGerar!.x, `botão à direita — ${dia}`).toBeGreaterThanOrEqual(
+        caixaCada!.x + caixaCada!.width - 1,
+      );
+      expect(caixaGerar!.y).toBeLessThanOrEqual(caixaCada!.y);
+      expect(caixaGerar!.y + caixaGerar!.height).toBeGreaterThanOrEqual(
+        caixaAte!.y + caixaAte!.height,
+      );
+      expect(caixaGerar!.width, `alvo do botão — ${dia}`).toBeGreaterThanOrEqual(40);
+      await celula.getByTestId("alternar-modo-headway").click();
+    }
+
+    // Modo compacto: sem Seções passantes, tudo ancora na própria partida.
+    await page.getByTestId("alternar-modo-compacto").click();
+    for (const dia of ["segunda", "domingo"] as const) {
+      const celula = grade
+        .getByLabel(`Horário de partida — ${dia}, viagem 1`)
+        .locator("xpath=ancestor::td");
+      await celula.hover();
+      await conferirLarguraDaAncora(
+        celula.getByTestId("acao-inserir-anterior"),
+        celula,
+        `inserir antes — ${dia} compacto`,
+      );
+      await conferirLarguraDaAncora(
+        celula.getByTestId("acao-inserir-posterior"),
+        celula,
+        `inserir depois — ${dia} compacto`,
+      );
+      await celula.getByTestId("alternar-modo-headway").click();
+      await conferirLarguraDaAncora(
+        celula.getByTestId("superficie-headway"),
+        celula,
+        `headway — ${dia} compacto`,
+      );
+      await conferirNaoTruncado(
+        celula.getByRole("textbox", { name: `Headway — ${dia}, viagem 1`, exact: true }),
+        `campo headway — ${dia} compacto`,
+      );
+      await celula.getByTestId("alternar-modo-headway").click();
+    }
+
+    // [inválido] a coluna de ações não entra na regra da DEC-102: continua
+    // dimensionada pelo conteúdo, mais estreita que a célula.
+    const celulaSegunda = grade
+      .getByLabel("Horário de partida — segunda, viagem 1")
+      .locator("xpath=ancestor::td");
+    await celulaSegunda.hover();
+    const [caixaAcoes, caixaCelula] = await Promise.all([
+      celulaSegunda.getByTestId("acoes-viagem").boundingBox(),
+      celulaSegunda.boundingBox(),
+    ]);
+    expect(caixaAcoes!.width).toBeLessThan(caixaCelula!.width);
     expect(chamouOsrm).toBe(false);
   });
 

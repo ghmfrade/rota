@@ -108,6 +108,158 @@ describe("posicionarSuperficieFlutuante (TASK-121)", () => {
   });
 });
 
+/**
+ * Mede a âncora (`[data-testid="ancora"]`) com a largura pedida; qualquer outro
+ * elemento continua com o retângulo zerado do jsdom. É o suficiente para provar
+ * de onde a largura da superfície vem — o piso de legibilidade da DEC-102 é
+ * `min-w-min`, resolvido pelo navegador e coberto no E2E.
+ */
+function medirAncoraCom(largura: number) {
+  return vi
+    .spyOn(Element.prototype, "getBoundingClientRect")
+    .mockImplementation(function (this: Element) {
+      const ehAncora = this.getAttribute?.("data-testid") === "ancora";
+      const l = ehAncora ? largura : 0;
+      return {
+        x: 0,
+        y: 0,
+        width: l,
+        height: ehAncora ? 24 : 0,
+        top: 0,
+        left: 0,
+        right: l,
+        bottom: ehAncora ? 24 : 0,
+        toJSON: () => ({}),
+      } as DOMRect;
+    });
+}
+
+describe("SuperficieFlutuante — largura da âncora (TASK-124/DEC-102)", () => {
+  it("assume a largura da célula-âncora medida em runtime", () => {
+    const medir = medirAncoraCom(96);
+    const { container, desmontar } = renderizar(
+      <div data-testid="ancora">
+        <SuperficieFlutuante
+          aberta
+          larguraDaAncora
+          rotuloAcessivel="Ações de inserção anterior"
+          data-testid="superficie"
+        >
+          <input aria-label="Deslocamento anterior" />
+          <button type="button">↑</button>
+        </SuperficieFlutuante>
+      </div>,
+    );
+
+    const superficie = container.querySelector(
+      '[data-testid="superficie"]',
+    ) as HTMLElement;
+    expect(superficie.style.width).toBe("96px");
+    // Piso de legibilidade: a largura medida nunca encolhe o conteúdo abaixo
+    // do seu mínimo — a caixa transborda o indispensável (DEC-102).
+    expect(superficie.className).toContain("min-w-min");
+    medir.mockRestore();
+    desmontar();
+  });
+
+  it("sem a prop, a largura continua vindo do conteúdo — caso da coluna de ações da Viagem", () => {
+    const medir = medirAncoraCom(96);
+    const { container, desmontar } = renderizar(
+      <div data-testid="ancora">
+        <SuperficieFlutuante aberta rotuloAcessivel="Ações da viagem" data-testid="superficie">
+          <button type="button">X</button>
+        </SuperficieFlutuante>
+      </div>,
+    );
+
+    const superficie = container.querySelector(
+      '[data-testid="superficie"]',
+    ) as HTMLElement;
+    expect(superficie.style.width).toBe("");
+    expect(superficie.className).not.toContain("min-w-min");
+    medir.mockRestore();
+    desmontar();
+  });
+
+  it("acompanha a mudança de largura da coluna — nome de Seção longo alarga a célula", () => {
+    const medir = medirAncoraCom(96);
+    const { container, desmontar } = renderizar(
+      <div data-testid="ancora">
+        <SuperficieFlutuante
+          aberta
+          larguraDaAncora
+          rotuloAcessivel="Geração por headway"
+          data-testid="superficie"
+        >
+          <input aria-label="Headway" />
+        </SuperficieFlutuante>
+      </div>,
+    );
+
+    const superficie = container.querySelector(
+      '[data-testid="superficie"]',
+    ) as HTMLElement;
+    expect(superficie.style.width).toBe("96px");
+
+    medir.mockRestore();
+    const remedir = medirAncoraCom(150);
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+    expect(superficie.style.width).toBe("150px");
+    remedir.mockRestore();
+    desmontar();
+  });
+
+  it("[inválido] fechada não mede a âncora nem aplica largura", () => {
+    const medir = medirAncoraCom(96);
+    const { container, desmontar } = renderizar(
+      <div data-testid="ancora">
+        <SuperficieFlutuante
+          aberta={false}
+          larguraDaAncora
+          rotuloAcessivel="Ações de inserção anterior"
+          data-testid="superficie"
+        >
+          <input aria-label="Deslocamento anterior" />
+        </SuperficieFlutuante>
+      </div>,
+    );
+
+    const superficie = container.querySelector(
+      '[data-testid="superficie"]',
+    ) as HTMLElement;
+    expect(superficie.style.width).toBe("");
+    expect(medir).not.toHaveBeenCalled();
+    medir.mockRestore();
+    desmontar();
+  });
+
+  it("[inválido] âncora sem largura não descarta o piso de legibilidade", () => {
+    const medir = medirAncoraCom(0);
+    const { container, desmontar } = renderizar(
+      <div data-testid="ancora">
+        <SuperficieFlutuante
+          aberta
+          larguraDaAncora
+          rotuloAcessivel="Ações de inserção posterior"
+          data-testid="superficie"
+        >
+          <input aria-label="Deslocamento posterior" />
+        </SuperficieFlutuante>
+      </div>,
+    );
+
+    const superficie = container.querySelector(
+      '[data-testid="superficie"]',
+    ) as HTMLElement;
+    // `min-w-min` é o que impede a caixa de colapsar e truncar `HH:MM`.
+    expect(superficie.className).toContain("min-w-min");
+    medir.mockRestore();
+    desmontar();
+  });
+});
+
 describe("SuperficieFlutuante (TASK-121)", () => {
   it("ancora no elemento pai e não rouba o foco ao abrir", () => {
     const { container, desmontar } = renderizar(

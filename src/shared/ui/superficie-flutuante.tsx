@@ -11,6 +11,10 @@
 // da célula que os declara. A âncora é o **elemento pai** onde a superfície é
 // declarada; a posição é dinâmica porque nasce de medição em runtime, exceção
 // expressamente admitida pelo doc 18 §6.1.
+//
+// A largura também pode nascer dessa mesma medição (`larguraDaAncora`,
+// DEC-102/TASK-124): a superfície assume a largura da célula que a ancora, com
+// piso de legibilidade dado pelo `min-content` do próprio conteúdo.
 
 import {
   useCallback,
@@ -163,6 +167,13 @@ export interface SuperficieFlutuanteProps
   empilhamento?: EmpilhamentoSuperficie;
   /** Elemento que delimita a área útil; sem ele, vale só a viewport. */
   limiteRef?: RefObject<HTMLElement | null>;
+  /**
+   * Assume a largura da âncora, medida em runtime (DEC-102). O piso de
+   * legibilidade é o `min-content` do conteúdo: coluna mais estreita que ele
+   * faz a superfície transbordar o mínimo indispensável, nunca truncar.
+   * Fora dessas superfícies a largura continua vindo do conteúdo.
+   */
+  larguraDaAncora?: boolean;
   rotuloAcessivel: string;
   children: ReactNode;
 }
@@ -172,6 +183,7 @@ export function SuperficieFlutuante({
   ladoPreferido = "abaixo",
   empilhamento = "padrao",
   limiteRef,
+  larguraDaAncora = false,
   rotuloAcessivel,
   className,
   children,
@@ -179,12 +191,23 @@ export function SuperficieFlutuante({
 }: SuperficieFlutuanteProps) {
   const caixaRef = useRef<HTMLDivElement | null>(null);
   const [posicao, definirPosicao] = useState<PosicaoSuperficieFlutuante | null>(null);
+  const [largura, definirLargura] = useState<number | null>(null);
 
   const reposicionar = useCallback(() => {
     const caixa = caixaRef.current;
     const ancora = caixa?.parentElement;
     if (!caixa || !ancora) return;
     const retanguloAncora = ancora.getBoundingClientRect();
+    // A largura sai da mesma medição da âncora que já governa a posição
+    // (DEC-102). Aplicá-la muda a caixa, por isso a posição é recalculada no
+    // passe seguinte, ainda antes da pintura — `largura` é dependência do
+    // efeito de layout abaixo. Não há realimentação: a largura depende só da
+    // âncora, nunca da própria caixa.
+    if (larguraDaAncora) {
+      definirLargura((atual) =>
+        atual === retanguloAncora.width ? atual : retanguloAncora.width,
+      );
+    }
     const propria = caixa.getBoundingClientRect();
     const proxima = posicionarSuperficieFlutuante(
       {
@@ -202,7 +225,7 @@ export function SuperficieFlutuante({
         ? atual
         : proxima,
     );
-  }, [ladoPreferido, limiteRef]);
+  }, [ladoPreferido, limiteRef, larguraDaAncora]);
 
   // Fechada não mede nada: a grade pode ter dezenas de superfícies latentes e
   // nenhuma delas participa de rolagem, redimensionamento ou layout. A posição
@@ -211,7 +234,7 @@ export function SuperficieFlutuante({
   useLayoutEffect(() => {
     if (!aberta) return;
     reposicionar();
-  }, [aberta, reposicionar]);
+  }, [aberta, reposicionar, largura]);
 
   useEffect(() => {
     if (!aberta) return;
@@ -235,6 +258,9 @@ export function SuperficieFlutuante({
   const classes = [
     "fixed rounded-controle border border-cinza-200 bg-white p-1 shadow-sombra-3",
     empilhamento === "prioritaria" ? "z-50" : "z-40",
+    // Piso de legibilidade da DEC-102: com a largura vinda da âncora, o
+    // `min-content` do conteúdo impede truncar `HH:MM` ou encolher o botão.
+    larguraDaAncora ? "min-w-min" : null,
     "[transition:opacity_var(--transicao-rapida)]",
     aberta ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
     className,
@@ -249,7 +275,15 @@ export function SuperficieFlutuante({
       aria-label={rotuloAcessivel}
       data-lado={aberta ? posicao?.lado : undefined}
       className={classes}
-      style={aberta && posicao ? { left: posicao.x, top: posicao.y } : undefined}
+      style={
+        aberta && posicao
+          ? {
+              left: posicao.x,
+              top: posicao.y,
+              ...(largura === null ? null : { width: largura }),
+            }
+          : undefined
+      }
       {...resto}
     >
       {children}

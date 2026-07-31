@@ -1005,6 +1005,8 @@ export function EtapaViagens({
         data-flutuante-viagem="true"
         ladoPreferido="abaixo"
         limiteRef={raizEtapaRef}
+        // DEC-102/TASK-124: a caixa toma a largura da célula-âncora.
+        larguraDaAncora
         rotuloAcessivel={`Geração por headway — ${dia}, viagem ${indiceBloco + 1}`}
         data-testid="superficie-headway"
         className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-1"
@@ -1016,7 +1018,7 @@ export function EtapaViagens({
         <Campo
           rotulo="a cada"
           densidade="compacta"
-          className="min-w-20 text-center tabular-nums"
+          className="min-w-16 text-center tabular-nums"
           aria-label={`Headway — ${dia}, viagem ${indiceBloco + 1}`}
           placeholder="HH:MM"
           value={mascararRascunhoHoraMinuto(headwayPorViagem[viagemUuid] ?? "")}
@@ -1033,7 +1035,7 @@ export function EtapaViagens({
         <Campo
           rotulo="até"
           densidade="compacta"
-          className="row-start-2 min-w-20 text-center tabular-nums"
+          className="row-start-2 min-w-16 text-center tabular-nums"
           aria-label={`Horário-limite — ${dia}, viagem ${indiceBloco + 1}`}
           placeholder="HH:MM"
           value={mascararRascunhoHoraMinuto(limiteHeadwayPorViagem[viagemUuid] ?? "")}
@@ -1101,9 +1103,14 @@ export function EtapaViagens({
         data-flutuante-viagem="true"
         ladoPreferido="abaixo"
         limiteRef={raizEtapaRef}
+        // DEC-102/TASK-124: a caixa toma a largura da célula-âncora.
+        larguraDaAncora
         rotuloAcessivel={`Ações de inserção posterior — ${dia}, viagem ${indiceBloco + 1}`}
         data-testid="acao-inserir-posterior"
-        className="flex items-stretch gap-1"
+        // Grid de duas colunas (como a superfície de headway): com largura
+        // fixada pela âncora, o campo precisa de coluna elástica para
+        // acompanhá-la; o botão fica na coluna `auto`, com alvo preservado.
+        className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-1"
         onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
         onFocus={() => aoFocarSuperficie(viagemUuid)}
         onBlur={aoSairFocoDaSuperficie}
@@ -1111,7 +1118,7 @@ export function EtapaViagens({
       >
         <Campo
           densidade="compacta"
-          className="min-w-20 text-center tabular-nums"
+          className="min-w-16 text-center tabular-nums"
           aria-label={`Deslocamento posterior — ${dia}, viagem ${indiceBloco + 1}`}
           value={deslocamentoPosterior}
           onChange={(evento) => definirDeslocamentoPosterior(evento.target.value)}
@@ -1273,9 +1280,12 @@ export function EtapaViagens({
                         data-flutuante-viagem="true"
                         ladoPreferido="acima"
                         limiteRef={raizEtapaRef}
+                        // DEC-102/TASK-124: a caixa toma a largura da
+                        // célula-âncora.
+                        larguraDaAncora
                         rotuloAcessivel={`Ações de inserção anterior — ${dia}, viagem ${indiceBloco + 1}`}
                         data-testid="acao-inserir-anterior"
-                        className="flex items-stretch gap-1"
+                        className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-1"
                         onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
                         onFocus={() => aoFocarSuperficie(viagemUuid)}
                         onBlur={aoSairFocoDaSuperficie}
@@ -1283,7 +1293,7 @@ export function EtapaViagens({
                       >
                         <Campo
                           densidade="compacta"
-                          className="min-w-20 text-center tabular-nums"
+                          className="min-w-16 text-center tabular-nums"
                           aria-label={`Deslocamento anterior — ${dia}, viagem ${indiceBloco + 1}`}
                           value={deslocamentoAnterior}
                           onChange={(evento) => definirDeslocamentoAnterior(evento.target.value)}
