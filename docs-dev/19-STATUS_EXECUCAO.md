@@ -17,7 +17,16 @@ como regra (não como exceção), a RN-099 passou a citar a ação única
 `Copiar (sobrescrever)`, a matriz foi atualizada e a DEC-087 ganhou o status de
 superada em parte pela DEC-099; (2) **permanece aberta** a falta dos unitários de
 imutabilidade da entrada e de cópia defensiva dos `horarios_paradas` na Viagem
-casada. A TASK-120 nasceu depois da última contagem
+casada. A **reavaliação `14-REVISOES/TASK-120-20260730-reavaliacao.md`** revisou o
+commit documental `ceac3be` e manteve o parecer **aprovado com ressalvas**:
+confirmou o encerramento da ressalva (1) nos quatro derivados afetados
+(RN-007, RN-099, matriz e `02-DOMAIN_MODEL`), registrou que `ceac3be` não toca
+código nem testes — logo a evidência canônica segue válida — e deixou a ressalva
+(2) como **único follow-up aberto**, a ser absorvido pela próxima task que tocar
+`copias-grade.ts`. Registrou ainda duas observações não bloqueantes: o commit
+`ceac3be` mistura alteração de `docs/specs/**` (do responsável, pendente no
+working tree) com o alinhamento dos derivados, e as âncoras de sessão (DEC-049)
+das Viagens casadas sobrevivem à sincronização. A TASK-120 nasceu depois da última contagem
 e **não integrava** as 10 tasks não concluídas, que permanecem **10: 8
 executáveis, a TASK-038 com bloqueio parcial e a TASK-040 bloqueada**.
 
@@ -460,7 +469,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 119 | Destaque e alerta de partidas coincidentes, com reforços laranja, navegação por Serviço/sentido/grade e toggle de seleção — aprovada em `14-REVISOES/TASK-119-20260730.md` |
 | 111 | Modo compacto da grade: somente Seções de partida visíveis, com dados ocultos preservados e Enter entre partidas — aprovada em `14-REVISOES/TASK-111-20260730.md` |
 | 112 | Origem estendida da semeadura entre grades + sincronização preservando UUID — aprovada em `14-REVISOES/TASK-112-20260730.md` |
-| 120 | `Copiar (sobrescrever)` único na semeadura de grades, com a sincronização preservando UUID da Spec 04 §8.5 (DEC-099) — implementada em `caec734` e aprovada com ressalvas documentais/de cobertura em `14-REVISOES/TASK-120-20260730.md` |
+| 120 | `Copiar (sobrescrever)` único na semeadura de grades, com a sincronização preservando UUID da Spec 04 §8.5 (DEC-099) — implementada em `caec734` e aprovada com ressalvas documentais/de cobertura em `14-REVISOES/TASK-120-20260730.md`; ressalva documental encerrada por `ceac3be` e confirmada na reavaliação `14-REVISOES/TASK-120-20260730-reavaliacao.md`, que mantém aberto só o follow-up dos unitários de imutabilidade/cópia defensiva |
 
 ---
 
