@@ -255,6 +255,7 @@
 
 **Prioridade:** Alta · **Fase:** Horários
 **Resumo:** Grade de feriados (`viagem_feriado=true`), botão "copiar dias comuns" (clona com UUIDs novas, confirmação de sobrescrever/mesclar), "copiar viagem para outro dia", apagar viagem/bloco.
+**Nota (DEC-099, 2026-07-30):** o resumo acima é histórico. A semeadura entre grades passou a ter uma **única** ação, `Copiar (sobrescrever)`, cuja semântica é a sincronização preservando a UUID das Viagens casadas do destino (Spec 04 §8.4/§8.5; RN-007 reescrita). O par sobrescrever/mesclar não existe mais — ver TASK-105, TASK-112 e TASK-120.
 **Regras RN:** RN-007, RN-061, RN-068, RN-071. **Depende de:** TASK-028.
 **Testes esperados:** unitários (cópia → UUIDs novas; grades independentes); E2E.
 
@@ -5212,6 +5213,8 @@ Spec 04 §8.5. Reusa a grade de dias comuns (TASK-028, concluída) e o motor de 
 
 **Nota (DEC-087, 2026-07-27):** a semântica de **"mesclar"** do "copiar dias comuns" passa a ser **sincronização preservando UUID** (torna o destino igual à origem: apaga ausentes, atualiza offsets, preserva o `uuid` das casadas por `horario_saida`, acrescenta faltantes com UUID nova) — **exceção à RN-007**, a mesma da TASK-112; "sobrescrever" segue com UUIDs novas. A **Spec 04 §8.4/§8.5 já foi atualizada** e a **carve-out da RN-007 já está registrada** — a task está implementável na íntegra (destino vazio = UUIDs novas; mesclar = sincronização). O motor de sincronização é compartilhado com a TASK-112.
 
+**Nota (DEC-099, 2026-07-30) — supera a nota anterior:** a Spec 04 §8.4/§8.5 foi alterada de novo pelo responsável e hoje descreve **uma única** ação, `Copiar (sobrescrever)`, cuja semântica é a sincronização preservando a UUID do destino casado; o par sobrescrever/mesclar deixou de existir e a RN-007 foi reescrita para tratar a sincronização como regra, não como exceção. A **TASK-120** implementou essa unificação. Reforços coincidentes são pareados pela ordem estável nos arrays (DEC-099).
+
 ## Fora de escopo
 
 - CRUD/filtro das tabelas (TASK-104); contagens (TASK-103); PDF; Comparador.
@@ -5811,6 +5814,8 @@ Estender a semente de grades para copiar Viagens da grade comum, **de feriados**
 ## Contexto
 
 §8.4/§8.5 e a **TASK-105** antes só copiavam da grade **comum** com "UUIDs novas". A **Q-065 foi decidida (DEC-087)**: origem estendida + mescla como sincronização preservando UUID — **exceção à RN-007**. **A Spec 04 §8.4/§8.5 já foi atualizada** (semeadura com origem selecionável; "mesclar" = sincronização preservando UUID; "sobrescrever" = UUIDs novas) e a **carve-out da RN-007** já está no `01-RULE_INDEX.md`/`03-TRACEABILITY_MATRIX.md` — a task está **implementável**. Depende da TASK-105 revisada (mesma semântica de mescla) e do contrato (TASK-102/104).
+
+**Nota (DEC-099, 2026-07-30):** o texto acima é o registro histórico da entrega. A Spec 04 §8.4/§8.5 foi alterada de novo pelo responsável: existe **uma única** ação, `Copiar (sobrescrever)`, com a semântica de sincronização preservando a UUID do destino casado — o par sobrescrever/mesclar e a "carve-out" da RN-007 deixaram de existir, e a RN-007 hoje descreve a sincronização como regra. A unificação foi entregue pela **TASK-120**; os critérios de aceite abaixo que citam "mesclar"/"sobrescrever" como opções distintas valem só como histórico.
 
 ## Fora de escopo
 
@@ -7031,6 +7036,448 @@ DEC-095.
 ## Perguntas em aberto
 
 - Nenhuma — Q-073/Q-074 decididas (DEC-095/DEC-096).
+
+---
+
+## TASK-120 — Unificar `Copiar (sobrescrever)` como sincronização preservando UUID — **desbloqueada (DEC-099)**
+
+## Objetivo
+
+Remover da semeadura entre grades a escolha entre os modos antigos
+`sobrescrever` e `mesclar` e manter uma única ação, `Copiar (sobrescrever)`,
+com a sincronização definida na Spec 04 §8.5: o destino fica igual à origem,
+preservando as UUIDs das Viagens casadas no destino.
+
+## Contexto
+
+A TASK-112 entregou dois caminhos: `sobrescrever` descartava todas as Viagens
+do destino e as recriava, enquanto `mesclar` já executava a sincronização
+preservando identidade. A Spec 04 §8.4/§8.5 foi alterada pelo responsável:
+agora existe uma única operação chamada `Copiar (sobrescrever)`, cuja semântica
+é a sincronização antes associada a `mesclar`. O bug observado é que os dois
+caminhos atuais podem descartar indevidamente horários do destino e o caminho
+rotulado como sobrescrever troca UUIDs que deveriam permanecer.
+
+A Q-077 precisa decidir o pareamento determinístico quando origem e destino
+contêm vários reforços com o mesmo `dia_semana + horario_saida`.
+
+## Fora de escopo
+
+- Alterar a cópia unitária de Viagem entre dias ou a cópia de um dia inteiro
+  para outros dias, que continuam acrescentando entidades com UUID nova e não
+  sincronizam o destino (Spec 04 §8.3).
+- Alterar o CRUD de Tabelas excepcionais, contagens, PDF, Comparador ou o
+  contrato JSON.
+- Proibir reforços coincidentes, que permanecem válidos pela RN-062.
+- Alterar a normalização dos discriminadores da grade destino.
+
+## Specs fonte
+
+- Spec 02 §11/§11.1/§12/§14 (Viagem, horários de passagem, identidade e
+  reforços coincidentes)
+- Spec 03 §9.1 (independência das grades e cópia para feriados)
+- Spec 04 §8.3 (cópias entre dias), §8.4/§8.5 (semeadura e
+  `Copiar (sobrescrever)`), §16 item 4 (resumo das operações de cópia)
+
+## Regras envolvidas
+
+- RN-004 (identidade estável para o Comparador)
+- RN-005 (unicidade global das UUIDs de Viagem)
+- RN-007 (UUID nova somente para entidade efetivamente acrescentada; derivado
+  deve ser alinhado à nova redação da Spec 04)
+- RN-061/RN-062 (grade da Viagem e reforços coincidentes válidos)
+- RN-063 (offsets completos e monotônicos)
+- RN-099 (normalização e pertencimento à Tabela excepcional)
+
+## Entidades afetadas
+
+- Viagem
+- Horários de passagem
+- Tabela excepcional
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor (⚠ exige decisão humana — RN-093)
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Grades vazias e preenchidas exibem uma única ação de semeadura chamada
+      `Copiar (sobrescrever)`; a opção `Copiar origem (mesclar)` deixa de
+      existir.
+- [ ] Em destino preenchido, a ação pede confirmação antes de sincronizar;
+      cancelar mantém integralmente o itinerário e o estado efêmero da grade.
+- [ ] Após confirmar, as Viagens do destino ausentes na origem são removidas.
+- [ ] Viagens casadas por `dia_semana + horario_saida` preservam a UUID que já
+      possuíam no destino, nunca reutilizam a UUID da origem e recebem uma cópia
+      defensiva dos `horarios_paradas` da origem.
+- [ ] Viagens da origem ausentes no destino são acrescentadas com UUID nova e
+      discriminadores normalizados para a grade destino.
+- [ ] Em destino vazio, todas as Viagens copiadas recebem UUIDs novas.
+- [ ] Reexecutar a ação com origem e destino já sincronizados é idempotente:
+      mantém UUIDs e conteúdo.
+- [ ] Reforços coincidentes são pareados conforme a decisão da Q-077.
+- [ ] O modo antigo que descartava todas as UUIDs do destino e o tipo público
+      com dois modos deixam de existir; o `data-testid` da ação sobrevivente é
+      preservado, e os seletores exclusivos da opção retirada são removidos
+      junto com ela.
+- [ ] A operação mantém RN-005/RN-061/RN-063/RN-099 e não acrescenta campos ao
+      JSON.
+
+## Casos válidos
+
+- Origem SEG 08:00 UUID O1, destino SEG 08:00 UUID D1 com offsets diferentes:
+  após confirmar, permanece D1 com os offsets de O1.
+- Origem SEG 08:00 e 09:00; destino SEG 08:00 e 10:00: preserva a UUID de
+  08:00, remove 10:00 e cria 09:00 com UUID nova.
+- Destino vazio: copia todas as Viagens da origem com UUIDs novas e
+  discriminadores da grade destino.
+- Origem de feriados para Tabela excepcional: zera `viagem_feriado` e aplica o
+  `tabela_excepcional_uuid` do destino.
+
+## Casos inválidos
+
+- Cancelar a confirmação e ainda remover, atualizar ou acrescentar Viagem:
+  manter o estado anterior sem alterações.
+- Reutilizar UUID da origem numa Viagem acrescentada: gerar UUID nova.
+- Trocar a UUID de uma Viagem casada do destino: preservar a identidade
+  existente.
+- Manter no destino Viagem ausente na origem: removê-la após confirmação.
+- Produzir `tabela_excepcional_uuid != null` com `viagem_feriado=true`: impedir
+  regressão e preservar RN-099.
+
+## Testes esperados
+
+- Unitários: destino vazio; sincronização remove/atualiza/acrescenta; cópia
+  defensiva de offsets; idempotência; normalização entre todos os pares de
+  grades; reforços conforme Q-077; imutabilidade da entrada.
+- Integração: uma única ação na grade de feriados e em Tabela excepcional;
+  confirmação/cancelamento; retirada da opção `mesclar`; limpeza segura dos
+  estados efêmeros apenas para UUIDs realmente removidas.
+- E2E: selecionar origens comum/feriado/excepcional, confirmar
+  `Copiar (sobrescrever)` e provar remoção, atualização de offsets, preservação
+  de UUID e criação de faltantes, com OSRM mockado.
+- Snapshot/contrato JSON: round-trip sem campos novos, UUIDs casadas preservadas
+  e UUIDs acrescentadas únicas.
+- PDF: n/a.
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/copias-grade.ts`
+- `src/formulario/viagens/etapa-viagens.tsx`
+- `src/formulario/viagens/index.ts`
+- `testes/unitarios/formulario/viagens-copias-grade.test.ts`
+- `testes/e2e/etapa-viagens.spec.ts`
+
+## Dependências
+
+- Q-077 decidida pela opção A (DEC-099).
+- Alinhamento da camada derivada à nova Spec 04 §8.4/§8.5, especialmente
+  RN-007/RN-099, DEC-087, TASK-105/TASK-112 e matriz de rastreabilidade.
+
+## Riscos
+
+- Preservar a quantidade correta de UUIDs, mas violar a ordem estável de
+  pareamento fixada na DEC-099.
+- Limpar âncoras/seleção de Viagens casadas que continuam existindo.
+- Confundir esta sincronização entre grades com a cópia aditiva de uma Viagem
+  ou de um dia para outros dias.
+- Alterar o contrato JSON ao tentar persistir estado de sincronização.
+
+## Perguntas em aberto
+
+- Nenhuma — Q-077 decidida pela opção A (DEC-099).
+
+---
+
+## TASK-121 — Recolocar o formulário de headway na superfície flutuante da Viagem e impedir recorte — **desbloqueada (DEC-100)**
+
+## Objetivo
+
+Fazer com que todas as ações abertas pelo hover de uma Viagem apareçam acima da
+grade, sem serem cortadas por células, linhas posteriores ou pelo wrapper de
+rolagem. Ao ativar o modo headway, apresentar `a cada`, `até` e o botão de
+geração na própria superfície flutuante ancorada à Viagem, sem inserir uma linha
+auxiliar na tabela.
+
+## Contexto
+
+A TASK-117 recompôs os controles de headway em duas linhas, mas a implementação
+os renderiza numa `<tr>` adicional ao fundo da grade. Os controles de inserção,
+apagar, restaurar e alternar headway são descendentes posicionados das células e
+podem ser recortados pelo `overflow-x-auto` da `Tabela` ou encobertos por outras
+células. O problema ocorre com as Seções visíveis ou ocultas. A Q-078 precisa
+decidir se o formulário passa definitivamente para a superfície flutuante,
+superando a posição inferior da DEC-093.
+
+## Fora de escopo
+
+- Alterar cálculo, limite inclusivo, máscara, guarda de duplicidade, UUIDs ou
+  offsets da geração por headway.
+- Alterar a composição específica de botões do modo compacto
+  (TASK-122/Q-079).
+- Alterar a semântica de apagar, restaurar, inserção relativa, cópias entre
+  dias ou `Copiar (sobrescrever)`.
+- Alterar ordenação, navegação ou confirmação dos horários da grade.
+
+## Specs fonte
+
+- Spec 04 §8.1 (estrutura semântica da grade)
+- Spec 04 §8.2 (ações e restauração por Viagem)
+- Spec 04 §8.3 (ações da grade)
+- Spec 02 §11/§12 (Viagem e identidade)
+- `docs-dev/18-DESIGN_SYSTEM.md` §2/§3/§5/§6 (elementos flutuantes,
+  reposicionamento, tokens e acessibilidade)
+
+## Regras envolvidas
+
+- RN-061 (ações pertencem à Viagem/dia correto)
+- RN-063/RN-067 (offsets completos e entradas de relógio)
+- RN-096 (estado de hover/headway é efêmero)
+
+## Entidades afetadas
+
+- Viagem (somente interação e apresentação)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor (⚠ exige decisão humana — RN-093)
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] A superfície de ações é renderizada num plano flutuante acima da tabela e
+      das células posteriores, sem alterar a estrutura semântica
+      `<table>/<thead>/<tbody>`.
+- [ ] A superfície permanece inteiramente visível na viewport e na área útil da
+      etapa, reposicionando-se horizontal e verticalmente quando não houver
+      espaço no lado preferido.
+- [ ] Controles de inserção anterior/posterior, `X`, restaurar e alternar
+      headway não são cortados no primeiro/último dia nem na primeira/última
+      Viagem visível.
+- [ ] Conforme a Q-078, ativar headway substitui o conteúdo da superfície
+      flutuante por duas linhas (`a cada` e `até`) e um botão de geração; nenhuma
+      `<tr>`/célula de headway é inserida ao fundo da grade.
+- [ ] Mover o ponteiro ou o foco da célula para a superfície permite editar e
+      acionar seus controles sem fechá-la prematuramente.
+- [ ] `Esc`, saída efetiva do hover/foco e conclusão da ação fecham ou restauram
+      a superfície conforme a decisão da Q-078, sem perder rascunhos válidos
+      antes da ação.
+- [ ] Máscara, validações, mensagens, botão desabilitado e geração da
+      DEC-083/DEC-093/DEC-094 permanecem inalterados.
+- [ ] Os `data-testid` e `aria-*` existentes dos controles sobreviventes são
+      preservados; foco visível, nomes acessíveis e ordem de teclado continuam
+      válidos.
+- [ ] O comportamento funciona igualmente nas grades comum, de feriados e
+      excepcionais, com todas as Seções visíveis ou no modo compacto.
+
+## Casos válidos
+
+- Hover em Viagem intermediária: controles aparecem sobre as células seguintes
+  e permanecem clicáveis.
+- Hover em domingo: a superfície se reposiciona para a esquerda sem sair da
+  área visível.
+- Viagem próxima ao limite inferior: o formulário de headway abre para cima ou
+  em outra posição disponível, sem criar linha na tabela.
+- Ativar headway, preencher `a cada 01:00` e `até 10:00` numa partida 08:00:
+  gera as mesmas Viagens previstas pela DEC-083.
+
+## Casos inválidos
+
+- Inserir `linha-headway` no `<tbody>` ou alterar a altura das linhas ao ativar
+  o modo: manter a grade de fundo inalterada.
+- Superfície ficar atrás de outra célula ou parcialmente fora da viewport:
+  reposicionar e manter o plano flutuante.
+- Sair da célula em direção a um campo do próprio flutuante e fechá-lo:
+  preservar a interação.
+- Headway inválido habilitar geração: manter a recusa existente.
+- Resolver o recorte removendo a rolagem horizontal da `Tabela`: preservar o
+  contrato do design system.
+
+## Testes esperados
+
+- Unitários/componente: abertura, troca para headway, preservação de rascunhos,
+  foco/`Esc`, ausência de `linha-headway` e manutenção dos seletores existentes.
+- Integração: posicionamento/reposicionamento da superfície em bordas; interação
+  por mouse e teclado; nenhuma mutação do itinerário ao apenas abrir/fechar.
+- E2E: `boundingBox()` da superfície e de todos os controles contida na
+  viewport/área útil em SEG, DOM, primeira e última Viagem; headway operável no
+  modo completo e compacto, com OSRM mockado.
+- Snapshot/contrato JSON: abrir, alternar e fechar a superfície não altera o
+  JSON.
+- PDF: n/a.
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/etapa-viagens.tsx`
+- `src/shared/ui/menu-flutuante.tsx` ou novo primitivo compartilhado de
+  superfície flutuante, se o contrato atual não comportar formulário
+- `src/shared/ui/index.ts`, se houver novo primitivo
+- `src/app/globals.css` e `docs-dev/18-DESIGN_SYSTEM.md`, somente se uma nova
+  prop/variante compartilhada for necessária
+- `testes/unitarios/formulario/etapa-viagens-headway.test.tsx`
+- `testes/e2e/etapa-viagens.spec.ts`
+
+## Dependências
+
+- Q-078 decidida pela opção A, com composição detalhada (DEC-100).
+- TASK-108/TASK-114/TASK-117/TASK-118 concluídas.
+
+## Riscos
+
+- Um portal/fixed layer perder a associação de hover/foco com a célula âncora.
+- Corrigir o `z-index` sem escapar do ancestral com overflow e continuar
+  recortando a superfície.
+- Quebrar arrasto, seleção, foco ou confirmação entregues pelas
+  TASK-109/TASK-115/TASK-116.
+- Duplicar lógica de posicionamento já existente em `MenuFlutuante`.
+
+## Perguntas em aberto
+
+- Nenhuma — Q-078 decidida pela opção A, com composição detalhada (DEC-100).
+
+---
+
+## TASK-122 — Reorganizar as ações da Viagem no modo compacto — **bloqueada (DEC-101; depende da TASK-121)**
+
+## Objetivo
+
+No modo “Exibir somente partidas”, adequar a superfície flutuante à linha única
+visível: ocultar `Restaurar sugestão`, colocar o alternador de headway ao lado
+do `X` e abrir os controles para o lado com espaço, invertendo-os em domingo.
+Ao reexibir todas as Seções, restaurar a composição completa.
+
+## Contexto
+
+A TASK-111 criou o modo compacto como visualização pura, sem alterar
+`horarios_paradas`. A composição da DEC-090 foi desenhada para a grade completa:
+`X`, restaurar e headway formam uma coluna. Com apenas a partida visível, a
+restauração dos horários passantes deixa de ter contexto visual e a coluna de
+ações é mais sujeita a recorte. A Q-079 precisa decidir se a composição proposta
+supera a DEC-090 apenas durante o modo compacto.
+
+## Fora de escopo
+
+- Remover ou alterar `Restaurar sugestão` no modo completo ou na ação em lote.
+- Alterar o cálculo de restauração, âncoras ou `horarios_paradas`.
+- Alterar o formulário/motor de headway além da integração com a superfície
+  entregue pela TASK-121.
+- Alterar quais Seções o modo compacto oculta, sua persistência efêmera ou a
+  navegação por Enter.
+- Alterar contrato JSON, PDF, Comparador ou contagens.
+
+## Specs fonte
+
+- Spec 04 §8.1 (linhas e modo de apresentação da grade)
+- Spec 04 §8.2 (`Restaurar sugestão` por Viagem)
+- Spec 02 §11/§11.1 (Viagem e horários de passagem)
+- `docs-dev/18-DESIGN_SYSTEM.md` §3/§5/§6 (botões compactos, flutuantes,
+  reposicionamento e acessibilidade)
+
+## Regras envolvidas
+
+- RN-061 (ação restrita à Viagem correta)
+- RN-063 (Seções ocultas permanecem íntegras)
+- RN-066 (semântica da restauração permanece disponível no modo completo)
+- RN-067 (modo compacto não expõe offsets)
+- RN-096 (modo e composição são estado efêmero)
+
+## Entidades afetadas
+
+- Viagem (somente apresentação das ações)
+- Horários de passagem (preservados, não editados por esta task)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor (⚠ exige decisão humana — RN-093)
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Conforme a Q-079, no modo compacto `Restaurar sugestão` não é renderizado
+      na superfície da Viagem; reexibir todas as Seções faz a ação voltar.
+- [ ] No modo compacto, `X` e o alternador de headway aparecem lado a lado e
+      permanecem associados à Viagem sob hover/foco.
+- [ ] Em SEG–SÁB a composição prefere o lado direito; em DOM prefere o lado
+      esquerdo, admitindo reposicionamento adicional da TASK-121 para continuar
+      dentro da viewport.
+- [ ] Ativar headway substitui essa composição pelo formulário flutuante
+      definido na TASK-121; fechar/desativar restaura `X` + alternador.
+- [ ] No modo completo, a composição `X` + restaurar + headway continua
+      obedecendo à DEC-090, exceto pelo novo mecanismo de posicionamento da
+      TASK-121.
+- [ ] Ocultar/exibir Seções ou apenas abrir ações não altera
+      `horarios_paradas`, UUIDs, âncoras nem o JSON.
+- [ ] `data-testid`, `aria-pressed`, nomes acessíveis, foco visível e operação
+      por teclado dos controles sobreviventes são preservados.
+
+## Casos válidos
+
+- Modo compacto em SEG: hover mostra `X` e headway lado a lado à direita, sem
+  restaurar.
+- Modo compacto em DOM: hover mostra os dois controles à esquerda, inteiramente
+  visíveis.
+- Voltar ao modo completo: hover volta a mostrar `X`, restaurar e headway; a
+  restauração continua funcional.
+- Ativar headway no modo compacto: o formulário aparece na própria superfície,
+  sem linha auxiliar ao fundo.
+
+## Casos inválidos
+
+- Ocultar `Restaurar sugestão` também no modo completo: restaurar a ação.
+- Apagar âncoras ou recalcular offsets ao ocultar o botão: não alterar dados.
+- Renderizar controles de domingo para fora da área visível: inverter ou
+  reposicionar.
+- Manter simultaneamente os botões compactos e o formulário de headway
+  sobrepostos: exibir um estado da superfície por vez.
+
+## Testes esperados
+
+- Unitários/componente: composição por modo completo/compacto e por dia;
+  retorno do restaurar ao expandir; troca entre ações e formulário headway;
+  nenhuma chamada de restauração ao ocultar o botão.
+- Integração: preservação de foco/hover ao alternar headway; manutenção de
+  `horarios_paradas` e âncoras ao alternar o modo compacto.
+- E2E: SEG e DOM no modo compacto, `boundingBox()` integralmente visível,
+  ausência/presença contextual do restaurar e geração por headway, com OSRM
+  mockado.
+- Snapshot/contrato JSON: alternar modo e ações não muda o documento.
+- PDF: n/a.
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/etapa-viagens.tsx`
+- componente/primitivo flutuante definido pela TASK-121
+- `testes/unitarios/formulario/etapa-viagens-modo-compacto.test.tsx`
+- `testes/unitarios/formulario/etapa-viagens-headway.test.tsx`
+- `testes/e2e/etapa-viagens.spec.ts`
+
+## Dependências
+
+- Q-079 decidida pela opção A (DEC-101).
+- TASK-121 implementada e revisada.
+- TASK-111/TASK-114/TASK-117 concluídas.
+
+## Riscos
+
+- Ocultar o botão ser confundido com remover a capacidade de restaurar dados.
+- A regra especial de domingo duplicar ou conflitar com o reposicionamento
+  genérico da TASK-121.
+- Regressão na composição completa definida pela DEC-090.
+- Quebrar foco ou hover ao trocar o conteúdo da superfície.
+
+## Perguntas em aberto
+
+- Nenhuma — Q-079 decidida pela opção A (DEC-101).
 
 ---
 

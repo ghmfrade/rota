@@ -9,12 +9,15 @@ confirma sempre que o destino tem conteúdo e limpa o estado efêmero só das UU
 realmente removidas. O parecer `14-REVISOES/TASK-120-20260730.md` reutiliza a
 suíte verde (1.364 unitários + 103 E2E; fingerprint `ac9fd79e…`; identidade
 `498d7fa6…`), com `typecheck` e `lint` limpos. As **ressalvas são documentais e
-de cobertura, não impeditivas de merge**: (1) RN-007 e a menção da RN-099 em
-`01-RULE_INDEX.md`, e a linha da RN-007 em `03-TRACEABILITY_MATRIX.md`, ainda
-descrevem os dois modos antigos (DEC-087) e contradizem a Spec 04 §8.5 vigente —
-alinhamento devido antes que outra task volte a tocar a semeadura; (2) faltam os
-unitários de imutabilidade da entrada e de cópia defensiva dos
-`horarios_paradas` na Viagem casada. A TASK-120 nasceu depois da última contagem
+de cobertura, não impeditivas de merge**: (1) a ressalva documental — RN-007 e a
+menção da RN-099 em `01-RULE_INDEX.md`, e a linha da RN-007 em
+`03-TRACEABILITY_MATRIX.md`, descreviam os dois modos antigos (DEC-087) — foi
+**resolvida em 2026-07-30**: a RN-007 foi reescrita para tratar a sincronização
+como regra (não como exceção), a RN-099 passou a citar a ação única
+`Copiar (sobrescrever)`, a matriz foi atualizada e a DEC-087 ganhou o status de
+superada em parte pela DEC-099; (2) **permanece aberta** a falta dos unitários de
+imutabilidade da entrada e de cópia defensiva dos `horarios_paradas` na Viagem
+casada. A TASK-120 nasceu depois da última contagem
 e **não integrava** as 10 tasks não concluídas, que permanecem **10: 8
 executáveis, a TASK-038 com bloqueio parcial e a TASK-040 bloqueada**.
 
@@ -627,7 +630,7 @@ Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Servi
 
 Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). As **TASK-106 a 119 estão concluídas e aprovadas**, e o Grupo H está encerrado. A 106 consolidou seleção, Enter/Tab, retirada de “Apagar bloco” e densidade pública de `Campo`/`Select`; a 107 entregou inserção relativa e a composição da DEC-090; a 108 entregou a geração em lote por headway da DEC-083; a 109 entregou cópia unitária por arrasto e atalhos, com cancelamento fora das colunas coberto em `9f4b4ed`; a 110 entregou cópia e remoção de dia inteiro; a 111 entregou o modo compacto efêmero por Serviço × sentido, com Enter entre partidas e dados ocultos preservados; a 112 entregou a origem estendida entre grades com normalização e sincronização preservando UUID; a 113 preservou os dois últimos deslocamentos da DEC-091; a 114 manteve as ações inteiramente visíveis em domingo; a 115 fez o foco acompanhar a UUID da Viagem após criação/reordenação e redistribuição; a 116 passou a confirmar horários somente por `Enter`/`Tab`, com rascunho local e normalização final; a 117 reancorou as operações de dia nos cabeçalhos e recompôs o headway conforme a DEC-093; a 118 tornou o headway idempotente pela DEC-094; e a 119 destacou somente os reforços coincidentes, agregou o alerta por Serviço, navegou para a primeira origem e acrescentou o toggle da DEC-096. A entrega `8cc8908` da TASK-110 foi corrigida em `d594034` e aprovada na reavaliação `14-REVISOES/TASK-110-20260729.md`: a cópia preserva reforços da origem e o `Dialogo` contém, estabiliza e restaura o foco. A entrega `92414d2` da TASK-116 foi corrigida em `213626d` e aprovada na reavaliação `14-REVISOES/TASK-116-20260728.md`; o E2E da TASK-105 confirmou a herança na grade excepcional. A **TASK-117 foi aprovada na reavaliação final** `14-REVISOES/TASK-117-20260730-reavaliacao.md` após `bf98389` encerrar a ressalva documental. A **TASK-118 foi aprovada na reavaliação final** `14-REVISOES/TASK-118-20260730-reavaliacao.md` após `2a72bd1` versionar TASK-118/Q-072/DEC-094 e encerrar a única ressalva documental. A **TASK-119 foi implementada em `233501e` e aprovada sem ressalvas** no parecer `14-REVISOES/TASK-119-20260730.md`; cobre também as grades excepcionais exigidas pela DEC-097 e permanece independente da guarda da TASK-118. A **TASK-109 foi aprovada sem ressalvas remanescentes** em `14-REVISOES/TASK-109-20260730.md`, encerrando a condição registrada no parecer de 2026-07-28. A **TASK-111 foi implementada em `4dbf068` e aprovada sem ressalvas** em `14-REVISOES/TASK-111-20260730.md`. A **TASK-112 foi implementada em `595e290` e aprovada sem ressalvas** em `14-REVISOES/TASK-112-20260730.md`. Botões de ação da Viagem surgem **no hover**.
 
-**Ação de spec (DEC-087) — superada pela DEC-099:** a Spec 04 §8.4/§8.5 foi novamente alterada pelo responsável e hoje descreve **uma única** ação, `Copiar (sobrescrever)`, cuja semântica é a sincronização preservando a UUID do destino casado; o par sobrescrever/mesclar deixou de existir. A **TASK-120** (`caec734`, parecer `14-REVISOES/TASK-120-20260730.md`) implementou essa unificação. O pareamento de reforços coincidentes (RN-062) é por **ordem estável** nos arrays (DEC-099). **Pendência documental aberta:** a redação de RN-007 e a menção da RN-099 em `01-RULE_INDEX.md`, e a linha da RN-007 em `03-TRACEABILITY_MATRIX.md`, ainda refletem a DEC-087 e contradizem a spec vigente — alinhar antes que outra task toque a semeadura de grades.
+**Ação de spec (DEC-087) — superada pela DEC-099:** a Spec 04 §8.4/§8.5 foi novamente alterada pelo responsável e hoje descreve **uma única** ação, `Copiar (sobrescrever)`, cuja semântica é a sincronização preservando a UUID do destino casado; o par sobrescrever/mesclar deixou de existir. A **TASK-120** (`caec734`, parecer `14-REVISOES/TASK-120-20260730.md`) implementou essa unificação. O pareamento de reforços coincidentes (RN-062) é por **ordem estável** nos arrays (DEC-099). **Pendência documental encerrada em 2026-07-30:** a RN-007 foi reescrita (cópias aditivas com UUID nova × sincronização entre grades preservando a UUID do destino casado), a menção da RN-099 passou a citar a ação única `Copiar (sobrescrever)`, a linha da RN-007 em `03-TRACEABILITY_MATRIX.md` foi atualizada e a DEC-087 recebeu o status de **superada em parte pela DEC-099**; as notas históricas de TASK-030/105/112 no backlog apontam a semântica vigente.
 
 ### Grupo F — Bloqueada
 

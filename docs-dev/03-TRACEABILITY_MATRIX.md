@@ -11,7 +11,7 @@
 | RN-004 | Spec 01 §6; 02 §12; 04 §3.1; DEC-053 | Import/export; promoção Serviço (novo) | F | importador de JSON; promoção `ServicoEmConstrucao → Servico` preserva UUID (TASK-061) | U + INT (import→export idempotente; round-trip de UUID pós-promoção) | **Alta** |
 | RN-005 | Spec 02 §12/§14 | Documento | F/C/I | validador estrutural | U + CONTRATO | Alta |
 | RN-006 | Spec 01 §6; 02 §6/§12; DEC-037 | Serviço | F/C/I | diff/persistência nunca usam `numero_n`; sufixo regenerado na troca de característica | U (diff por uuid; regeneração de sufixo) | Alta |
-| RN-007 | Spec 02 §12; 04 §6/§8.3-5; DEC-087 | Cópias (exceção: mescla de grade preserva UUID) | F | ações duplicar/copiar/semear | U | Alta |
+| RN-007 | Spec 02 §12; 04 §6/§8.3-5/§16 item 4; DEC-099 | Cópias aditivas (UUID nova) + sincronização entre grades (`Copiar (sobrescrever)` preserva a UUID do destino casado) | F | ações duplicar/copiar/semear (`formulario/viagens/copias-grade.ts`) | U + E2E | Alta |
 | RN-008 | Spec 02 §3/§14 | Raiz | F/C/I | schema | CONTRATO | Média |
 | RN-009 | Spec 01 §5; 02 §1 | Documento | F/C/I | schema + leitores sem fetch externo | CONTRATO + INT | Alta |
 | RN-010 | Spec 01 §3; 02 §16 | Documento | F/C/I | schema **fechado** (rejeitar campos extras de fluxo) | CONTRATO (negativo) | **Alta** |
@@ -97,7 +97,7 @@
 | RN-096 | Spec 01 §5; 04 §2.1 | Sem persistência | F | (ausência de backend) | revisão + E2E (sem chamadas de escrita) | Alta |
 | RN-097 | Spec 01 §2 | Desacoplamento | F/C/I | separação de módulos/rotas | revisão de arquitetura | Alta |
 | RN-098 | Spec 02 §6.1/§14; 04 §8.5; DEC-081; DEC-098 | TabelaExcepcional (`servico.tabelas_excepcionais[]`) | F/C/I | schema (zod strict) + validador (cardinalidade, `descricao` condicional, sem sobreposição) + migração 1.0→1.1 + CRUD no Formulário com remoção somente quando vazia | U + CONTRATO + E2E (negativos: 2ª verão, descricao ausente em personalizado, remoção referenciada bloqueada com quantidade) | Alta |
-| RN-099 | Spec 02 §11/§6.1; 03 §9.1/§9.2; 04 §8.5; 05 §10.4/§12.3; DEC-081; DEC-098 | Grade excepcional da Viagem (referência, invariante, integridade na remoção, precedência, contagens, cópia, diff) | F/C/I | schema (referência + invariante) + bloqueio de remoção sem cascata/conversão + grade no Formulário + contagens + diff por `uuid` da tabela | U + CONTRATO + INT + E2E (remoção preserva tabela e Viagens associadas; copiar dias comuns) | Alta |
+| RN-099 | Spec 02 §11/§6.1; 03 §9.1/§9.2; 04 §8.5; 05 §10.4/§12.3; DEC-081; DEC-098; DEC-099 | Grade excepcional da Viagem (referência, invariante, integridade na remoção, precedência, contagens, semeadura, diff) | F/C/I | schema (referência + invariante) + bloqueio de remoção sem cascata/conversão + grade no Formulário + contagens + diff por `uuid` da tabela | U + CONTRATO + INT + E2E (remoção preserva tabela e Viagens associadas; `Copiar (sobrescrever)` normaliza discriminadores) | Alta |
 
 ---
 

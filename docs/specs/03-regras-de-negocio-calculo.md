@@ -613,13 +613,13 @@ _(Reescrito na v0.2 — a Spec 02 §11 v0.6 estratificou Viagem por dia: `dia_se
 
 A operação de um itinerário é o conjunto das suas Viagens, cada uma valendo para **um único** `dia_semana`, em **uma** das grades a seguir (mutuamente exclusivas por Viagem):
 
-| Grade da Viagem | Significado |
-| --- | --- |
-| **Comum** (`viagem_feriado = false` e `tabela_excepcional_uuid = null`) | Opera normalmente quando `dia_semana` cai (grade de dias comuns). |
-| **Feriado** (`viagem_feriado = true`) | Opera **apenas** quando um feriado cai no `dia_semana`. Num feriado, a grade de feriados **substitui integralmente** a operação daquele dia (inclusive a excepcional): as viagens comuns e as excepcionais do dia não operam; operam as de feriado. |
-| **Excepcional** (`tabela_excepcional_uuid ≠ null`, `viagem_feriado = false`) | Opera no período (textual) daquela tabela excepcional, **exceto** quando cai feriado — aí prevalece a grade de feriado. Uma tabela excepcional **não** tem sub-grade de feriado própria. |
+| Grade da Viagem                                                              | Significado                                                                                                                                                                                                                                         |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Comum** (`viagem_feriado = false` e `tabela_excepcional_uuid = null`)      | Opera normalmente quando `dia_semana` cai (grade de dias comuns).                                                                                                                                                                                   |
+| **Feriado** (`viagem_feriado = true`)                                        | Opera **apenas** quando um feriado cai no `dia_semana`. Num feriado, a grade de feriados **substitui integralmente** a operação daquele dia (inclusive a excepcional): as viagens comuns e as excepcionais do dia não operam; operam as de feriado. |
+| **Excepcional** (`tabela_excepcional_uuid ≠ null`, `viagem_feriado = false`) | Opera no período (textual) daquela tabela excepcional, **exceto** quando cai feriado — aí prevalece a grade de feriado. Uma tabela excepcional **não** tem sub-grade de feriado própria.                                                            |
 
-- As grades são independentes: um dia de feriado pode ter mais, menos ou nenhuma viagem em relação ao dia comum correspondente. "Operação de feriado igual à comum" é obtida copiando a grade (ação de UX — Spec 04 §8.4 —, que cria Viagens novas, com UUIDs novas).
+- As grades são independentes: um dia de feriado pode ter mais, menos ou nenhuma Viagem em relação ao dia comum correspondente. A operação de feriado pode ser igualada à grade escolhida como origem por meio da ação **"Copiar (sobrescrever)"** da Spec 04 §8.4–§8.5. Em destino vazio, são criadas Viagens com UUIDs novas; em destino preenchido, a grade é sincronizada preservando as UUIDs das Viagens casadas no destino.
 - **Precedência:** **feriado > excepcional > comum**. As tabelas excepcionais são independentes entre si; não há verificação de sobreposição (Spec 02 §6.1) — a vigência é interpretação humana.
 - O **calendário de feriados** (quais datas) permanece **externo** ao ROTA e ao JSON (Spec 01 §3). O documento diz o que acontece num feriado que caia em cada dia da semana, não **quando** ele cai.
 - **Uso: informativo/operacional de exibição.** A grade de feriados serve às tabelas da UX e do PDF (Spec 04 §8.4, §13); ela **não** gera partidas contáveis (§9.2).

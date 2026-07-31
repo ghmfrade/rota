@@ -1160,3 +1160,125 @@ do responsável pelo domínio: a remoção de uma Tabela excepcional é bloquead
 enquanto houver Viagens associadas a ela. A interface informa a quantidade de
 Viagens que ainda a referenciam e orienta removê-las previamente na grade
 excepcional. Não há remoção em cascata nem conversão para a grade comum.
+
+## Q-077 — Como parear reforços coincidentes no `Copiar (sobrescrever)`?
+
+**Status:** Decidida — DEC-099
+
+**Origem:** correção solicitada para a semeadura entre grades após a atualização
+da Spec 04 §8.4/§8.5 (2026-07-30)
+
+**Contexto:** a Spec 04 §8.5 determina que `Copiar (sobrescrever)` sincroniza a
+grade destino com a origem, casando Viagens por `horario_saida`, preservando por
+contagem as UUIDs que já existiam no destino e atualizando seus
+`horarios_paradas`. A RN-062, porém, permite duas ou mais Viagens no mesmo dia,
+grade e `horario_saida`. Quando origem e destino possuem vários reforços
+coincidentes com offsets diferentes, a contagem define quantas UUIDs permanecem,
+mas não define qual Viagem do destino recebe os offsets de qual Viagem da
+origem.
+
+**Spec relacionada:** Spec 02 §11/§11.1/§12/§14; Spec 04 §8.4/§8.5;
+RN-004/RN-005/RN-007/RN-061/RN-062/RN-063/RN-099; DEC-087; TASK-105/TASK-112.
+
+**Impacto se não decidir:** implementações diferentes podem preservar a mesma
+quantidade de UUIDs, mas associá-las a conjuntos diferentes de offsets. O JSON
+continua estruturalmente válido, porém o Comparador pode atribuir uma alteração
+de horário de passagem à Viagem errada.
+
+**Opções:** A — dentro de cada `dia_semana + horario_saida`, parear origem e
+destino pela ordem estável em que aparecem nos respectivos arrays; B — parear
+primeiro Viagens com `horarios_paradas` idênticos e, depois, parear os
+excedentes pela ordem estável; C — recusar a sincronização quando houver
+reforços coincidentes, exigindo que o usuário os diferencie antes da cópia.
+
+**Recomendação técnica:** A. É determinística, preserva a semântica já descrita
+como casamento “por contagem”, não transforma offsets em identidade e coincide
+com a ordem estável já praticada pelo motor entregue na TASK-112.
+
+**Decisão:** **Decidida (DEC-099, 2026-07-30).** Opção A, por decisão explícita
+do responsável pelo domínio: dentro de cada `dia_semana + horario_saida`,
+origem e destino são pareados pela ordem estável em que aparecem nos
+respectivos arrays. As UUIDs preservadas são sempre as do destino; excedentes
+da origem recebem UUID nova e excedentes do destino são removidos.
+
+## Q-078 — Onde deve aparecer o formulário de geração por headway?
+
+**Status:** Decidida — DEC-100
+
+**Origem:** bug visual relatado após a TASK-117 (2026-07-30)
+
+**Contexto:** ao ativar o modo headway no hover de uma Viagem, a implementação
+atual insere `a cada`, `até` e o botão de geração numa linha auxiliar da própria
+tabela. Essa linha aparece ao fundo, separada da superfície de ações da Viagem,
+e pode deslocar ou desconfigurar a grade. Os controles flutuantes também são
+recortados pelo wrapper de rolagem ou pelas células seguintes, especialmente no
+modo compacto e nas bordas da tabela.
+
+**Spec relacionada:** Spec 04 §8.1–§8.3; Spec 02 §11/§12;
+RN-061/RN-063/RN-067/RN-096; DEC-083/DEC-090/DEC-093; TASK-108/TASK-114/TASK-117;
+`docs-dev/18-DESIGN_SYSTEM.md` §2/§3/§5/§6.
+
+**Impacto se não decidir:** mover o formulário para dentro do hover altera a
+composição em duas linhas fixada pela DEC-093 e o ciclo de abertura/fechamento
+da superfície interativa. Manter a linha auxiliar preserva a decisão anterior,
+mas não atende à composição solicitada nem resolve por si só o recorte dos
+controles.
+
+**Opções:** A — ao ativar headway, substituir o conteúdo da superfície
+flutuante da Viagem por `a cada`, `até` e o botão de geração, mantendo-a aberta
+enquanto houver hover ou foco e reposicionando-a para permanecer visível sobre
+a tabela e dentro da viewport; B — manter o formulário em uma linha auxiliar da
+tabela e corrigir apenas dimensões, empilhamento e recorte; C — abrir o
+formulário em diálogo separado.
+
+**Recomendação técnica:** A. Mantém os campos associados visualmente à Viagem
+que origina a geração, elimina a linha inserida ao fundo e segue o contrato de
+elemento flutuante reposicionável do design system.
+
+**Decisão:** **Decidida (DEC-100, 2026-07-30).** Opção A, com detalhamento
+explícito do responsável: ao ativar headway, o controle de criar outra Viagem
+“X tempo depois” é substituído, dentro da superfície flutuante, por duas linhas
+`a cada [HH:MM]` e `até [HH:MM]`, com um único botão na coluna direita
+abrangendo ambas. Não há linha auxiliar na tabela, e a superfície permanece
+aberta enquanto houver hover ou foco na âncora ou no próprio flutuante.
+
+## Q-079 — Como compor as ações da Viagem no modo compacto?
+
+**Status:** Decidida — DEC-101
+
+**Origem:** proposta de correção do hover no modo “Exibir somente partidas”
+(2026-07-30)
+
+**Contexto:** a DEC-090 posiciona `Restaurar sugestão` abaixo do `X`, e a
+DEC-093 mantém o alternador de headway na superfície da Viagem. No modo compacto
+as Seções intermediárias/final ficam ocultas, portanto o responsável propôs
+ocultar `Restaurar sugestão`, colocar o alternador de headway ao lado do `X` e
+inverter a superfície na coluna de domingo para que abra à esquerda.
+
+**Spec relacionada:** Spec 04 §8.1/§8.2; RN-063/RN-066/RN-067/RN-096;
+DEC-086/DEC-090/DEC-093; TASK-111/TASK-114/TASK-117;
+`docs-dev/18-DESIGN_SYSTEM.md` §3/§5/§6.
+
+**Impacto se não decidir:** ocultar `Restaurar sugestão` muda a disponibilidade
+de uma ação prevista na Spec 04 §8.2 enquanto o modo compacto estiver ativo, e
+reposicionar os controles supera parcialmente a composição da DEC-090. Manter a
+composição atual conserva a decisão anterior, mas continua ocupando uma coluna
+vertical maior e sujeita a recorte.
+
+**Opções:** A — no modo compacto, ocultar `Restaurar sugestão`, exibir `X` e o
+alternador de headway lado a lado, abrir à direita de SEG–SÁB e à esquerda de
+DOM; ao sair do modo compacto, restaurar a composição completa da DEC-090;
+B — manter `X`, restaurar e headway na mesma coluna vertical em ambos os modos,
+apenas corrigindo o recorte; C — manter `Restaurar sugestão` acessível no modo
+compacto, mas movê-lo para um menu secundário, deixando `X` e headway lado a
+lado.
+
+**Recomendação técnica:** A. O modo compacto passa a oferecer somente ações
+compreensíveis sobre a partida visível; a restauração continua disponível ao
+reexibir todas as Seções, sem alterar dados nem o contrato JSON.
+
+**Decisão:** **Decidida (DEC-101, 2026-07-30).** Opção A, por decisão explícita
+do responsável: no modo compacto, `Restaurar sugestão` fica oculto, `X` e o
+alternador de headway aparecem lado a lado, SEG–SÁB preferem abrir à direita e
+DOM à esquerda. Ao reexibir todas as Seções, retorna a composição completa da
+DEC-090; ao ativar headway, entra o formulário flutuante da DEC-100.

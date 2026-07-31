@@ -747,7 +747,7 @@ pelo domínio, **Q-063** (dada nesta conversa, 2026-07-27); Spec 04 §8.3; Spec 
 
 ## DEC-087 — "Copiar dias comuns" com origem estendida (feriados/excepcional) e mescla como sincronização preservando UUID (exceção à RN-007)
 
-**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, **Q-065** (dada nesta conversa, 2026-07-27); Spec 04 §8.4/§8.5, §13; Spec 02 §11/§12; RN-007/RN-099 · **Data:** 2026-07-27
+**Status:** Aceita · **Superada em parte pela DEC-099 (2026-07-30):** a Spec 04 §8.4/§8.5 passou a ter uma **única** ação, `Copiar (sobrescrever)`, cuja semântica é a sincronização preservando a UUID do destino casado; o par sobrescrever/mesclar e a moldura de "exceção à RN-007" deixam de valer, e a RN-007 foi reescrita para descrever a sincronização como regra, não como exceção (TASK-120). Permanecem válidas a **origem estendida** (comum/feriados/excepcional) e a **normalização automática dos discriminadores** · **Origem:** decisão do responsável pelo domínio, **Q-065** (dada nesta conversa, 2026-07-27); Spec 04 §8.4/§8.5, §13; Spec 02 §11/§12; RN-007/RN-099 · **Data:** 2026-07-27
 **Decisão:** Duas partes:
 1. **Origem estendida da semente de grade:** o "copiar dias comuns" passa a poder puxar Viagens não só da **grade comum**, mas também da **grade de feriados** ou de **qualquer tabela excepcional** existente do Serviço. A **normalização** dos discriminadores de grade no destino é **automática e obrigatória** para preservar o invariante **RN-099** (ex.: origem feriado → destino excepcional: zera `viagem_feriado`, seta `tabela_excepcional_uuid` do destino; origem excepcional → destino feriado: seta `viagem_feriado = true`, limpa `tabela_excepcional_uuid`).
 2. **Semântica da mescla = sincronização preservando UUID (idempotente):** quando o destino já tem conteúdo e o usuário confirma **mesclar**, a operação torna o destino **igual à origem** (após normalização):
@@ -1253,3 +1253,114 @@ comum. **RN afetadas:** RN-098 e RN-099; suas entradas no
 `03-TRACEABILITY_MATRIX.md` precisam incorporar a política quando os derivados
 forem atualizados. Não há campo novo nem alteração do contrato JSON.
 **Tasks:** TASK-104 e TASK-105.
+
+## DEC-099 — Reforços coincidentes são pareados pela ordem estável na sincronização de grades
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, opção A
+da **Q-077**; Spec 02 §11/§11.1/§12/§14; Spec 04 §8.4/§8.5;
+RN-004/RN-005/RN-007/RN-061/RN-062/RN-063/RN-099 · **Data:** 2026-07-30
+
+**Decisão:** no `Copiar (sobrescrever)`, dentro de cada grupo com o mesmo
+`dia_semana + horario_saida`, as Viagens da origem e do destino são pareadas
+pela **ordem estável em que aparecem nos respectivos arrays**. Cada par preserva
+a UUID que a Viagem já possuía no destino e recebe uma cópia dos
+`horarios_paradas` da Viagem correspondente na origem. Depois do pareamento, o
+excedente do destino é removido e o excedente da origem é acrescentado com UUID
+nova. UUIDs da origem nunca são reutilizadas no destino.
+
+**Motivo:** a ordem estável torna determinístico o casamento “por contagem” da
+Spec 04 §8.5 sem transformar offsets em chave de identidade e sem proibir os
+reforços válidos da RN-062. Também coincide com o comportamento já praticado
+pelo motor da TASK-112.
+
+**Consequências:** resolve a **Q-077** e desbloqueia a **TASK-120** quanto ao
+pareamento de reforços coincidentes. A sincronização pode remover, atualizar e
+acrescentar Viagens de forma idempotente, preservando a identidade correta do
+destino conforme a ordem documentada. A decisão não altera a cópia unitária de
+Viagem nem a cópia aditiva de um dia para outros dias.
+
+**Impacto em implementação:** o motor de
+`src/formulario/viagens/copias-grade.ts` deve manter filas/grupos em ordem
+estável por `dia_semana + horario_saida`, com testes para reforços de offsets
+iguais e diferentes, excedentes nos dois lados, idempotência, imutabilidade e
+preservação das UUIDs do destino. **RN afetadas:** RN-007 e RN-062; a redação da
+RN-007 e a rastreabilidade correspondente precisam ser alinhadas à nova
+semântica da Spec 04 quando os derivados forem atualizados.
+**Tasks:** TASK-105, TASK-112 e TASK-120.
+
+## DEC-100 — Formulário de headway substitui a inserção posterior dentro da superfície flutuante
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, opção A
+da **Q-078**, com detalhamento explícito da composição; Spec 04 §8.1–§8.3;
+Spec 02 §11/§12; RN-061/RN-063/RN-067/RN-096;
+DEC-083/DEC-090/DEC-093 · **Data:** 2026-07-30
+
+**Decisão:** ao ativar o modo headway, o conteúdo da superfície flutuante da
+Viagem — especificamente o controle de criar outra Viagem “X tempo depois” —
+é substituído pelo formulário:
+
+```text
+a cada [HH:MM] [ botão ]
+   até [HH:MM] [        ]
+```
+
+O botão único ocupa a coluna à direita e abrange visualmente as duas linhas.
+Não é criada linha auxiliar no corpo da tabela. A superfície permanece aberta
+enquanto houver **hover ou foco** na Viagem ou no próprio flutuante e é
+reposicionada para continuar visível sobre a tabela e dentro da viewport.
+
+**Motivo:** o formulário pertence à Viagem que origina a geração e deve
+permanecer no mesmo contexto interativo de suas ações. Substituir o controle de
+inserção posterior evita empilhar duas ações concorrentes, elimina a linha de
+headway ao fundo e permite editar os campos sem o hover fechar prematuramente.
+
+**Consequências:** resolve a **Q-078** e desbloqueia a **TASK-121**. Supera a
+DEC-093 somente quanto à posição do formulário em uma linha auxiliar inferior:
+permanecem válidas a composição em duas linhas, a máscara, a validação, o estado
+desabilitado e o botão único à direita. A DEC-083 e a DEC-094 permanecem
+integralmente válidas para cálculo, limite e guarda de duplicidade.
+
+**Impacto em implementação:** retirar a `<tr>`/célula auxiliar de headway de
+`src/formulario/viagens/etapa-viagens.tsx` e renderizar os campos dentro de uma
+superfície flutuante capaz de escapar do recorte da `Tabela`, preservando
+`data-testid`, `aria-*`, foco, `Esc` e rascunhos. O fechamento deve considerar
+conjuntamente hover e foco da âncora e do flutuante. Nenhuma RN, spec, contrato
+JSON, PDF, Comparador ou contagem precisa ser alterada.
+**Tasks:** TASK-108, TASK-117 e TASK-121.
+
+## DEC-101 — Modo compacto oculta restaurar e alinha apagar/headway horizontalmente
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, opção A
+da **Q-079**; Spec 04 §8.1/§8.2; RN-063/RN-066/RN-067/RN-096;
+DEC-086/DEC-090/DEC-093/DEC-100 · **Data:** 2026-07-30
+
+**Decisão:** no modo **“Exibir somente partidas”**, a superfície da Viagem:
+
+- não renderiza `Restaurar sugestão`;
+- exibe o `X` de apagar a Viagem e o alternador de headway lado a lado;
+- prefere abrir à direita nas colunas SEG–SÁB e à esquerda na coluna DOM,
+  admitindo o reposicionamento adicional necessário para permanecer visível.
+
+Ao reexibir todas as Seções, volta a composição completa da DEC-090, com
+`Restaurar sugestão` disponível. Ao ativar headway no modo compacto, os dois
+botões são substituídos pelo formulário flutuante definido na DEC-100.
+
+**Motivo:** com as Seções intermediárias e final ocultas, a restauração de
+horários passantes perde contexto visual imediato e pode ser acessada após
+reexibir a grade completa. A disposição horizontal reduz a altura do hover e a
+inversão em domingo evita recorte na última coluna.
+
+**Consequências:** resolve a **Q-079** e desbloqueia a **TASK-122 quanto à
+decisão de UX**; sua implementação continua sequenciada depois da TASK-121,
+que entrega a superfície flutuante reposicionável. A DEC-090 permanece válida
+no modo completo e é superada apenas pela composição específica do modo
+compacto. Ocultar o botão não recalcula nem restaura offsets e não altera o
+JSON.
+
+**Impacto em implementação:** condicionar a composição das ações em
+`src/formulario/viagens/etapa-viagens.tsx` ao modo compacto, sem disparar
+handlers nem modificar âncoras ao ocultar o botão. Testes de componente e E2E
+devem cobrir SEG/DOM, completo/compacto, retorno do restaurar, troca para o
+formulário da DEC-100 e preservação de `horarios_paradas`. Nenhuma RN, spec,
+contrato JSON, PDF, Comparador ou contagem precisa ser alterada.
+**Tasks:** TASK-111, TASK-114, TASK-117, TASK-121 e TASK-122.

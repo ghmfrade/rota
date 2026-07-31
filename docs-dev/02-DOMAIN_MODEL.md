@@ -153,7 +153,7 @@
 **Tem UUID estável?** **Sim.**
 **Entra no JSON?** Sim. **Entra no PDF?** Sim (grade de horários; feriados e cada grade excepcional em tabelas separadas).
 **Participa de tarifa?** Não diretamente (entra na contagem de opções, só a grade comum). **Participa de rota?** Não (usa a do itinerário).
-**Observações:** célula preenchida da grade = uma Viagem; cópias geram UUID nova (RN-007); reforço de horário é válido (RN-062).
+**Observações:** célula preenchida da grade = uma Viagem; cópias **aditivas** geram UUID nova, enquanto a semeadura entre grades (`Copiar (sobrescrever)`) preserva a UUID da Viagem casada no destino (RN-007; DEC-099); reforço de horário é válido (RN-062).
 
 ## Horários de passagem
 
