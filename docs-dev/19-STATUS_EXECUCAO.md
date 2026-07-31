@@ -1,6 +1,36 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-07-31 (branch `redesign`) — **TASK-123
+**Atualização mais recente:** 2026-07-31 (branch `redesign`) — **TASK-124
+implementada e REPROVADA na revisão de aderência; o ciclo não está fechado.** A
+implementação `36c2d5f` acrescenta a prop `larguraDaAncora` à
+`SuperficieFlutuante` (`src/shared/ui/superficie-flutuante.tsx:176,206-210,263,278-286`)
+e a aplica às três superfícies de ação da Viagem
+(`src/formulario/viagens/etapa-viagens.tsx:1009,1106,1285`), de modo que a caixa
+assume a largura da célula-âncora medida em runtime — objetivo principal da
+DEC-102, entregue com correção e cobertura geométrica E2E. O parecer
+`14-REVISOES/TASK-124-20260731.md` reprova pelo **segundo detalhamento da
+DEC-102**, o piso de legibilidade: o `min-w-min` aplicado sobre a faixa
+`grid-cols-[minmax(0,1fr)_auto]` exclui o campo do `min-content` do contêiner
+(medido em Chromium: piso de **54px** em vez de 118px), e em qualquer coluna
+abaixo de ~118px — inclusive nos **88px** que a coluna de dia assume ao encostar
+no seu mínimo (`campo-horario-grade.tsx:85` + `[&_td]:px-3` da `Tabela`) — o
+campo `HH:MM` transborda a faixa e é coberto pelo botão. Dois dos oito critérios
+de aceite ficam não atendidos, e o E2E do piso
+(`testes/e2e/etapa-viagens.spec.ts:966-991`) deriva o valor esperado da própria
+implementação, nunca exercitando o ramo estreito. **Condições de correção:**
+fazer a faixa do campo participar do `min-content` (ex.: `minmax(min-content,1fr)`,
+medido como suficiente) e reescrever a asserção do piso para que possa falhar.
+Follow-up não impeditivo: folga do `min-w-16`/placeholder e o versionamento de
+TASK-124/125, DEC-102/103 e Q-080/081, hoje só no working tree. A revisão
+reutilizou o log canônico verde (`test:all:verificar`: executor **Claude**,
+fingerprint `799aea24…c477`, identidade `498d7fa6…9176`; 1.400 unitários +
+107 E2E, `Resultado geral: APROVADO`) **sem reexecutar a suíte** — a suíte verde
+não cobre o caso reprovado. A TASK-124 nasceu depois da última contagem (como a
+121/122/123) e **não integra** as 10 tasks não concluídas, que permanecem
+**10: 8 executáveis, a TASK-038 com bloqueio parcial e a TASK-040 bloqueada**. A
+**TASK-125** (DEC-103) segue não iniciada e é independente da 124.
+
+**Histórico anterior (2026-07-31) — TASK-123:** **TASK-123
 concluída e aprovada, sem ressalvas**. A implementação `3dec0bf` extrai a
 superfície `acao-inserir-posterior` para a função reaproveitável
 `superficieInserirPosterior` (`src/formulario/viagens/etapa-viagens.tsx:1083-1139`)
