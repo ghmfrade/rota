@@ -285,6 +285,7 @@
 **Regras RN:** RN-074, RN-076, RN-077. **Depende de:** TASK-020, TASK-025, TASK-031.
 **Testes esperados:** PDF (presença/ordem de seções; aviso; sem R$).
 **Nota (DEC-081, 2026-07-27):** o resumo rotulado usa "semana padrão (sem feriados nem operação excepcional)"; `versao_schema` agora pode ser `"1.1"` (documentos com operação excepcional). Ver TASK-034 para as tabelas excepcionais no corpo.
+**Nota (DEC-104, 2026-07-31):** a imagem do mapa (§13.1 item 4d) é capturada **sob demanda na geração**, em mapa oculto que desenha a rota congelada, com a rota **centralizada e inteiramente contida** (enquadramento pelos limites da geometria); falha de captura não interrompe o PDF nem vira pendência bloqueante. Resolve a Q-082.
 
 ## TASK-034 — PDF operacional: tabelas horárias e matrizes
 

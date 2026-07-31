@@ -1376,3 +1376,47 @@ alternador de headway vem primeiro e o `X` depois; no modo completo a coluna da
 DEC-090 permanece intacta (`X` no topo, `Restaurar sugestão` no meio,
 alternador no fim). O atraso de fechamento do hover sobe de 300 ms para ~500 ms,
 num valor único compartilhado pelas superfícies e pelos dois modos.
+
+## Q-082 — Origem da imagem do mapa no PDF operacional
+
+**Status:** Decidida — DEC-104
+
+**Origem:** `/analisar-task` da TASK-033 (2026-07-31) — primeira task a construir
+a superfície de PDF operacional
+
+**Contexto:** a Spec 04 §13.1 item 4d exige, para cada Serviço e sentido, a
+**imagem do mapa com a rota**, obtida por **captura do próprio canvas**
+(Spec 01 §8). A primitiva já existe (`src/shared/mapa/captura.ts`, com
+`preserveDrawingBuffer: true` em `src/shared/mapa/mapa.tsx`), mas o canvas só
+existe **enquanto a etapa Itinerários está montada**. O PDF é gerado na etapa
+Exportação (§12), onde nenhum mapa está em tela, e um documento tem até duas
+imagens por Serviço. A spec não define **quando** a captura ocorre, se ela é
+persistida em sessão, nem o que o PDF faz quando a imagem não está disponível.
+
+**Spec relacionada:** Spec 04 §13.1 item 4d, §12; Spec 01 §8; RN-074 (estrutura
+fixa do PDF), RN-096/NEG-004 (nada persistido além do JSON exportado).
+
+**Impacto se não decidir:** o item 4d da TASK-033 fica sem implementação
+definida — ou o PDF sai sem mapa (descumprindo a estrutura da RN-074), ou o
+implementador inventa por conta própria um mecanismo de captura não
+especificado.
+
+**Opções:** 1 — **captura sob demanda na geração**: a rotina de PDF monta um
+mapa oculto por itinerário, aguarda o mapa ficar ocioso, captura e descarta
+(PDF sempre completo; geração mais lenta e dependente dos tiles); 2 — **cache
+efêmero em sessão**: captura ao concluir/recalcular cada itinerário e guarda o
+data-URI na sessão (rápido, mas itinerário nunca visitado nesta sessão sai sem
+imagem — inclusive todo documento apenas importado); 3 — **passo explícito de
+pré-visualização** antes de gerar, que percorre os itinerários capturando;
+4 — subquestão válida para 1, 2 e 3: imagem ausente é **pendência bloqueante**
+ou **lacuna tolerada com aviso**.
+
+**Recomendação técnica:** opção 1 com **lacuna tolerada** — mantém o PDF correto
+para documentos importados (que nunca passaram pela etapa de mapa), não cria
+estado novo de sessão e é mockável nos testes; a captura que falha por tile
+indisponível não derruba a geração do PDF.
+
+**Decisão:** **Decidida (DEC-104, 2026-07-31).** Opção 1 com lacuna tolerada,
+por decisão explícita do responsável, **acrescida do enquadramento**: o mapa
+capturado deve mostrar a rota **centralizada e inteiramente contida**, no melhor
+zoom possível (ajuste aos limites da geometria da rota). Ver DEC-104.

@@ -1480,3 +1480,65 @@ ordem visual no modo compacto. Atenção a testes existentes que usem
 temporizadores fictícios com o valor antigo. Nenhuma spec, contrato JSON, PDF,
 Comparador ou contagem precisa ser alterada.
 **Tasks:** TASK-121, TASK-122 e TASK-125.
+
+## DEC-104 — Imagem do mapa no PDF: captura sob demanda na geração, com a rota enquadrada e centralizada
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, opção 1 da
+**Q-082**, dada explicitamente nesta conversa e acrescida do requisito de
+enquadramento; Spec 04 §13.1 item 4d, §12; Spec 01 §8; RN-074, RN-015/NEG-019,
+RN-096/NEG-004 · **Data:** 2026-07-31
+
+**Decisão:** três partes:
+
+1. **Momento da captura.** A imagem do mapa de cada Serviço/sentido é capturada
+   **sob demanda, durante a geração do PDF**: a rotina monta um mapa oculto por
+   itinerário, desenha a rota **congelada** do documento, espera o mapa ficar
+   ocioso, captura o canvas (`capturarImagemMapa`) e o descarta. Nenhuma imagem
+   é guardada em sessão nem gravada no JSON.
+2. **Enquadramento.** O mapa capturado mostra a rota **centralizada e
+   inteiramente contida** no quadro, no **melhor zoom possível** — ajuste aos
+   limites (bounding box) da geometria da rota, com margem mínima para os
+   extremos não encostarem na borda. Não se usa centro/zoom fixos nem o
+   enquadramento herdado da etapa Itinerários.
+3. **Lacuna tolerada.** Se a captura de um itinerário falhar (tile indisponível,
+   canvas sem contexto, rota ausente), a geração do PDF **não é interrompida**:
+   aquele bloco sai sem a imagem, com aviso não bloqueante ao usuário. Imagem
+   ausente **não** vira pendência bloqueante e **não** altera o gate da RN-078.
+
+**Motivo:** o canvas do mapa só existe enquanto a etapa Itinerários está
+montada, e o PDF é gerado na etapa Exportação — não há canvas para capturar no
+momento da geração. Entre as três opções da Q-082, a captura sob demanda é a
+única que produz PDF completo para **documento apenas importado**, que nunca
+passou pela etapa de mapa nesta sessão; o cache em sessão (opção 2) deixaria
+justamente esse caso sem imagem, e o passo de pré-visualização (opção 3)
+acrescentaria uma etapa de UX não prevista na Spec 04. O enquadramento pela
+bounding box da rota foi exigido pelo responsável: um mapa de PDF cortando a
+rota ou exibindo-a minúscula não serve como peça operacional. A tolerância à
+falha evita que a indisponibilidade de um tile — infraestrutura externa, fora do
+controle do ROTA — impeça a emissão de um documento cujos dados estão completos.
+
+**Consequências:** resolve a **Q-082** e **desbloqueia integralmente a
+TASK-033** (o item 4d do §13.1 deixa de ser contingente). **Nenhuma alteração de
+spec** — a decisão implementa o §13.1 item 4d e a Spec 01 §8 à letra; a spec
+manda capturar o canvas e não fixa quando nem com qual enquadramento.
+**Nenhuma mudança de contrato JSON**: a imagem é artefato de renderização,
+nunca campo do documento (RN-008..015, RN-096/NEG-004). **Nenhum recálculo**: o
+mapa oculto desenha a `rota.geometria` congelada e **não** chama OSRM
+(RN-015/NEG-019) — a geração de PDF permanece um leitor. Sem impacto no
+Comparador (PDF comparativo é próprio — DEC-015), nas contagens ou nas RN de
+horários.
+
+**Impacto em implementação:** **RN:** nenhuma muda de texto — a RN-074 ganha o
+**como** do item 4d; RN-015/NEG-019 e RN-096/NEG-004 são confirmadas
+(congelado + efêmero); RN-078 permanece o gate do JSON e do PDF, sem novo
+motivo de bloqueio. **Módulos:** `src/shared/mapa/geometria.ts` — helper puro de
+**limites da rota** (bounding box a partir das coordenadas), testável sem WebGL;
+`src/shared/mapa/mapa.tsx` — enquadramento por `fitBounds` a partir desses
+limites (aditivo; consumidor que não usa fica inalterado) e sinal de "mapa
+ocioso" para a captura; `src/shared/mapa/captura.ts` — reusado **sem
+alteração**; novo módulo de captura para PDF em `src/formulario/pdf/`
+(monta/descarta o mapa oculto, injetável nos testes). **Testes:** os limites e o
+enquadramento são cobertos por unitário puro; a captura em si é **injetada** nos
+testes de PDF (nunca WebGL nem tiles reais em Vitest), e o E2E mocka tiles como
+já fazem os specs de itinerários. **Tasks:** TASK-033 (dona); TASK-034 herda a
+mesma captura sem trabalho adicional.
