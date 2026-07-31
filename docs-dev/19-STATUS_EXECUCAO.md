@@ -1,29 +1,46 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-07-31 (branch `redesign`) — **TASK-124
-corrigida e aprovada com ressalvas na reavaliação de aderência.** O commit
-`1de5576` corrige os dois problemas que motivaram a reprovação anterior: troca
-`grid-cols-[minmax(0,1fr)_auto]` por `grid-cols-[minmax(min-content,1fr)_auto]`
-nas três superfícies de ação da Viagem, de modo que a faixa do campo passe a
-contribuir para o `min-content` do contêiner (o `min-w-min` da
-`SuperficieFlutuante` volta a proteger campo **e** botão, não só o botão);
-eleva o campo de `min-w-16` para `min-w-20`; e reescreve a asserção de piso do
-E2E (`testes/e2e/etapa-viagens.spec.ts:966-991`) para não depender do próprio
+**Atualização mais recente:** 2026-07-31 (branch `redesign`) — **TASK-125
+concluída e aprovada com ressalvas.** O commit `a135b99` inverte, só no **modo
+compacto**, a ordem alternador de headway (`↪`)/`X` na superfície
+`acoes-viagem` (o modo completo mantém a coluna `X`, `Restaurar sugestão`,
+alternador da DEC-090 intocada) e eleva `agendarSaidaHover`
+(`src/formulario/viagens/etapa-viagens.tsx:353`) de 300 ms para 500 ms num
+único ponto, compartilhado pelas três grades (comum, feriados, excepcionais).
+O parecer `14-REVISOES/TASK-125-20260731.md` confirma os oito critérios de
+aceite com teste capaz de falhar (temporizadores falsos para o atraso,
+comparação de ordem por `data-testid` para a composição, geometria real no E2E
+para o trajeto do ponteiro alternador→campo `a cada`), nenhuma violação de
+escopo e reutiliza o log canônico verde (`test:all:verificar`: executor
+**Claude**, fingerprint `99556a32…4f639f001`, identidade `498d7fa6…9176`,
+`Resultado geral: APROVADO`) sem reexecutar a suíte; `npm run typecheck` e
+`npm run lint` rodados na própria revisão não acusam erro. **Única ressalva,
+não impeditiva:** `docs-dev/06-BACKLOG_INICIAL.md`, `docs-dev/10-DECISION_LOG.md`
+e `docs-dev/16-OPEN_QUESTIONS.md` continuam modificados e não comitados — a
+TASK-124/125, a DEC-102/103 e a Q-080/081 existem só no working tree, apesar de
+já citadas em três commits de código; é a **terceira** vez que essa mesma
+lacuna atravessa o ciclo de revisão. A TASK-125 nasceu depois da última
+contagem (como a 121/122/123/124) e **não integra** as 10 tasks não
+concluídas, que permanecem **10: 8 executáveis, a TASK-038 com bloqueio
+parcial e a TASK-040 bloqueada**.
+
+**Histórico anterior (2026-07-31) — TASK-124, correção e aprovação com
+ressalvas:** o commit `1de5576` corrige os dois problemas que motivaram a
+reprovação anterior: troca `grid-cols-[minmax(0,1fr)_auto]` por
+`grid-cols-[minmax(min-content,1fr)_auto]` nas três superfícies de ação da
+Viagem, de modo que a faixa do campo passe a contribuir para o `min-content`
+do contêiner (o `min-w-min` da `SuperficieFlutuante` volta a proteger campo
+**e** botão, não só o botão); eleva o campo de `min-w-16` para `min-w-20`; e
+reescreve a asserção de piso do E2E
+(`testes/e2e/etapa-viagens.spec.ts:966-991`) para não depender do próprio
 elemento sob teste, com um caso novo em viewport 420px que exercita de fato o
 ramo de coluna mais estreita que o piso. A reavaliação
 `14-REVISOES/TASK-124-20260731-correcao.md` confirma os oito critérios de
 aceite atendidos e reutiliza o log canônico verde (`test:all:verificar`:
 executor **Claude**, fingerprint `6d25fa92…560c477`, identidade
-`498d7fa6…9176`, `Resultado geral: APROVADO`) sem reexecutar a suíte. **Única
-ressalva, virada condição de merge:** `docs-dev/06-BACKLOG_INICIAL.md`,
-`docs-dev/10-DECISION_LOG.md` e `docs-dev/16-OPEN_QUESTIONS.md` continuam
-modificados e não comitados — a TASK-123/124/125, a DEC-102/103 e a Q-080/081
-existem só no working tree, apesar de já citadas em dois commits de código; é a
-segunda vez que essa mesma lacuna atravessa o ciclo de revisão desta task. A
+`498d7fa6…9176`, `Resultado geral: APROVADO`) sem reexecutar a suíte. A
 TASK-124 nasceu depois da última contagem (como a 121/122/123) e **não
-integra** as 10 tasks não concluídas, que permanecem **10: 8 executáveis, a
-TASK-038 com bloqueio parcial e a TASK-040 bloqueada**. A **TASK-125**
-(DEC-103) segue não iniciada e é independente da 124.
+integrava** as 10 tasks não concluídas.
 
 **Histórico anterior (2026-07-31) — TASK-124, reprovação:** a implementação
 `36c2d5f` acrescentou a prop `larguraDaAncora` à `SuperficieFlutuante`
@@ -587,6 +604,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 122 | Composição das ações da Viagem no modo compacto — `Restaurar sugestão` oculto e `X` + alternador de headway lado a lado (DEC-101) — implementada em `94c4468` e aprovada com ressalvas em `14-REVISOES/TASK-122-20260731.md`; código exato e suíte verde, **sem condição de merge** — a reescrita da frase de fechamento da DEC-101 feita no mesmo commit teve autoria e redação confirmadas pelo responsável em 2026-07-31 (adendo do parecer), restando só ressalvas cosméticas |
 | 123 | Restaura a inserção de Viagem posterior por offset no modo compacto (DEC-086) — implementada em `3dec0bf` e aprovada sem ressalvas em `14-REVISOES/TASK-123-20260731.md`; `superficieInserirPosterior` extraída e ancorada na partida quando não há Seções passantes, motor de inserção intocado |
 | 124 | Limita a largura das superfícies flutuantes da Viagem à largura da célula de horário-âncora, com piso de legibilidade (DEC-102) — implementada em `36c2d5f`, reprovada em `14-REVISOES/TASK-124-20260731.md` pelo piso de legibilidade não proteger o campo `HH:MM`, corrigida em `1de5576` (`minmax(min-content,1fr)` em vez de `minmax(0,1fr)`) e aprovada com ressalvas em `14-REVISOES/TASK-124-20260731-correcao.md`; ressalva única (versionar TASK-123/124/125 e DEC-102/103/Q-080/081) segue como condição de merge |
+| 125 | Inverte a ordem alternador/`X` no modo compacto e amplia o atraso de fechamento do hover para ~500 ms num único ponto compartilhado (DEC-103) — implementada em `a135b99` e aprovada com ressalvas em `14-REVISOES/TASK-125-20260731.md`; modo completo permanece byte a byte igual à DEC-090; ressalva não impeditiva (versionar TASK-124/125 e DEC-102/103/Q-080/081) segue como follow-up, agora na terceira ocorrência |
 
 ---
 
