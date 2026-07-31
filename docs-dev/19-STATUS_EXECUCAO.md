@@ -1,7 +1,7 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
 **Atualização mais recente:** 2026-07-31 (branch `redesign`) — **TASK-122
-concluída e aprovada com ressalvas, com uma condição de merge aberta**. A
+concluída e aprovada com ressalvas, sem condição de merge**. A
 implementação `94c4468` condiciona a composição da superfície `acoes-viagem` ao
 modo compacto (`flex-row` no compacto, `flex-col` no completo) e só renderiza
 `Restaurar sugestão` fora do compacto
@@ -10,16 +10,19 @@ SEG–SÁB/DOM já vinha da TASK-121 e não foi tocada. O parecer
 `14-REVISOES/TASK-122-20260731.md` reutiliza a suíte verde (1.385 unitários +
 104 E2E; fingerprint `27b359c6…`; identidade `498d7fa6…`) e não encontrou
 violação de RN Alta, de NEG-xxx nem de escopo no código — os seis itens do "Fora
-de escopo" estão respeitados. A **ressalva impeditiva é documental**: o mesmo
-commit reescreveu a frase de fechamento da **DEC-101**
+de escopo" estão respeitados. A revisão levantou uma ressalva impeditiva
+documental — o mesmo commit reescreveu a frase de fechamento da **DEC-101**
 (`10-DECISION_LOG.md:1360-1362`), que antes dizia que ativar headway no modo
 compacto **substitui** os dois botões pelo formulário, para dizer que os botões
-permanecem ao lado — e o código segue a nova redação. A leitura é sustentada
-pela **Q-079** e pela **DEC-100**, ambas intocadas, mas a mudança de texto de uma
-decisão aceita cabe ao responsável (`/registrar-decisao`), não à implementação;
-enquanto não houver ratificação explícita — ou reversão com ajuste de código e
-testes —, o **critério de aceite 4 da TASK-122 fica não verificado conforme
-redigido**. Ressalvas não impeditivas: acentuação e largura da linha nova da
+permanecem ao lado, e o código segue a nova redação. **Encerrada no mesmo dia:**
+o **responsável pelo domínio declarou a autoria da alteração e confirmou a
+redação vigente da DEC-101**, registro lavrado no adendo do parecer. A leitura
+já era sustentada pela **Q-079** e pela **DEC-100**, ambas intocadas; com a
+ratificação, o **critério de aceite 4 é lido pela redação confirmada** e a
+implementação está aderente a ele. **Não resta condição de merge.** A lição de
+processo fica anotada: alteração de DEC aceita entra por `/registrar-decisao`,
+em commit próprio, para que a autoria fique legível no histórico sem depender de
+confirmação posterior. Ressalvas não impeditivas: acentuação e largura da linha nova da
 DEC-101, e a reformatação automática que reescreveu `10-DECISION_LOG.md` inteiro
 (conferido: as 101 âncoras `## DEC-` estão íntegras, nada foi perdido). Com a
 122 entregue, o **desdobramento do Grupo H fica sem tasks pendentes**; a TASK-122
@@ -523,7 +526,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 112 | Origem estendida da semeadura entre grades + sincronização preservando UUID — aprovada em `14-REVISOES/TASK-112-20260730.md` |
 | 120 | `Copiar (sobrescrever)` único na semeadura de grades, com a sincronização preservando UUID da Spec 04 §8.5 (DEC-099) — implementada em `caec734` e aprovada com ressalvas documentais/de cobertura em `14-REVISOES/TASK-120-20260730.md`; ressalva documental encerrada por `ceac3be` e confirmada na reavaliação `14-REVISOES/TASK-120-20260730-reavaliacao.md`, que mantém aberto só o follow-up dos unitários de imutabilidade/cópia defensiva |
 | 121 | Formulário de headway na superfície flutuante da Viagem, sem linha auxiliar no `<tbody>` e sem recorte pelo `overflow-x-auto` da `Tabela` (DEC-100) — novo primitivo `SuperficieFlutuante` em `shared/ui`; implementada em `2962df3` e aprovada com ressalvas em `14-REVISOES/TASK-121-20260731.md` (fechamento segurado só por `<input>` focado; cobertura restrita à grade comum), ambas como follow-up da TASK-122 |
-| 122 | Composição das ações da Viagem no modo compacto — `Restaurar sugestão` oculto e `X` + alternador de headway lado a lado (DEC-101) — implementada em `94c4468` e aprovada com ressalvas em `14-REVISOES/TASK-122-20260731.md`; código exato e suíte verde, mas com **condição de merge aberta**: a reescrita da frase de fechamento da DEC-101 feita no próprio commit precisa de ratificação do responsável (ou reversão), sem a qual o critério de aceite 4 fica não verificado |
+| 122 | Composição das ações da Viagem no modo compacto — `Restaurar sugestão` oculto e `X` + alternador de headway lado a lado (DEC-101) — implementada em `94c4468` e aprovada com ressalvas em `14-REVISOES/TASK-122-20260731.md`; código exato e suíte verde, **sem condição de merge** — a reescrita da frase de fechamento da DEC-101 feita no mesmo commit teve autoria e redação confirmadas pelo responsável em 2026-07-31 (adendo do parecer), restando só ressalvas cosméticas |
 
 ---
 
@@ -703,9 +706,10 @@ implementada em `94c4468` e aprovada com ressalvas** em
 `14-REVISOES/TASK-122-20260731.md`: o modo compacto deixa de renderizar
 `Restaurar sugestão` e alinha `X` + alternador na horizontal, o modo completo
 mantém a composição da DEC-090 e nada em `horarios_paradas`, âncoras ou contrato
-JSON é tocado. Com ela, **o desdobramento fica sem tasks pendentes**, mas com uma
-**condição de merge aberta** (ratificação da reescrita da DEC-101 feita no commit
-de implementação — ver cabeçalho). Dos dois follow-ups do parecer da 121, a 122
+JSON é tocado. Com ela, **o desdobramento fica sem tasks pendentes e sem
+condição de merge** — a reescrita da DEC-101 feita no commit de implementação foi
+ratificada pelo responsável em 2026-07-31 (ver cabeçalho e o adendo do parecer).
+Dos dois follow-ups do parecer da 121, a 122
 absorveu o de cobrir as grades de feriado e excepcionais (os três cenários novos
 percorrem as três grades); o de alinhar o fechamento ao "hover **ou** foco" da
 DEC-100 (hoje segurado só por `<input>` focado) **permanece aberto e sem task
