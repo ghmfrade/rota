@@ -1,6 +1,24 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-07-30 (branch `redesign`) — **TASK-112
+**Atualização mais recente:** 2026-07-30 (branch `redesign`) — **TASK-120
+concluída e aprovada com ressalvas**. A implementação `caec734` unifica a
+semeadura entre grades numa única ação `Copiar (sobrescrever)`, cuja semântica é
+a sincronização preservando a UUID do destino casado (Spec 04 §8.5; DEC-099):
+remove o parâmetro de modo do motor e do barril, retira a opção `mesclar` da UI,
+confirma sempre que o destino tem conteúdo e limpa o estado efêmero só das UUIDs
+realmente removidas. O parecer `14-REVISOES/TASK-120-20260730.md` reutiliza a
+suíte verde (1.364 unitários + 103 E2E; fingerprint `ac9fd79e…`; identidade
+`498d7fa6…`), com `typecheck` e `lint` limpos. As **ressalvas são documentais e
+de cobertura, não impeditivas de merge**: (1) RN-007 e a menção da RN-099 em
+`01-RULE_INDEX.md`, e a linha da RN-007 em `03-TRACEABILITY_MATRIX.md`, ainda
+descrevem os dois modos antigos (DEC-087) e contradizem a Spec 04 §8.5 vigente —
+alinhamento devido antes que outra task volte a tocar a semeadura; (2) faltam os
+unitários de imutabilidade da entrada e de cópia defensiva dos
+`horarios_paradas` na Viagem casada. A TASK-120 nasceu depois da última contagem
+e **não integrava** as 10 tasks não concluídas, que permanecem **10: 8
+executáveis, a TASK-038 com bloqueio parcial e a TASK-040 bloqueada**.
+
+**Histórico anterior (2026-07-30):** **TASK-112
 concluída e aprovada, sem ressalvas**. A implementação `595e290` entrega a
 origem selecionável entre grade comum, feriados e Tabelas excepcionais, com
 normalização dos discriminadores, sobrescrita por UUIDs novas e mescla como
@@ -439,6 +457,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 119 | Destaque e alerta de partidas coincidentes, com reforços laranja, navegação por Serviço/sentido/grade e toggle de seleção — aprovada em `14-REVISOES/TASK-119-20260730.md` |
 | 111 | Modo compacto da grade: somente Seções de partida visíveis, com dados ocultos preservados e Enter entre partidas — aprovada em `14-REVISOES/TASK-111-20260730.md` |
 | 112 | Origem estendida da semeadura entre grades + sincronização preservando UUID — aprovada em `14-REVISOES/TASK-112-20260730.md` |
+| 120 | `Copiar (sobrescrever)` único na semeadura de grades, com a sincronização preservando UUID da Spec 04 §8.5 (DEC-099) — implementada em `caec734` e aprovada com ressalvas documentais/de cobertura em `14-REVISOES/TASK-120-20260730.md` |
 
 ---
 
@@ -454,7 +473,14 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 ## 5. Tasks a executar — ordem recomendada
 
 **Estado atual: 10 tasks não concluídas: 8 executáveis, a TASK-038 com bloqueio
-parcial e a TASK-040 bloqueada.** Em 2026-07-30, a **TASK-112 saiu da fila**:
+parcial e a TASK-040 bloqueada.** Em 2026-07-30, a **TASK-120 foi concluída e
+aprovada com ressalvas** (`caec734`; `14-REVISOES/TASK-120-20260730.md`): criada
+após esta contagem pela DEC-099, nunca entrou na fila e por isso não altera o
+total; a ação única `Copiar (sobrescrever)` substitui o par
+sobrescrever/mesclar e absorve integralmente o caminho destrutivo antigo da
+TASK-112, que não deve ser reintroduzido. Restam como condição de acompanhamento
+o alinhamento de RN-007/RN-099 em `01-RULE_INDEX.md` e da RN-007 em
+`03-TRACEABILITY_MATRIX.md` à Spec 04 §8.5 vigente. Também em 2026-07-30, a **TASK-112 saiu da fila**:
 implementada em `595e290` e aprovada sem ressalvas em
 `14-REVISOES/TASK-112-20260730.md`; a origem estendida preserva os invariantes
 RN-007/RN-099, e o Grupo H fica encerrado. Também em 2026-07-30, a **TASK-111
@@ -601,7 +627,7 @@ Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Servi
 
 Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). As **TASK-106 a 119 estão concluídas e aprovadas**, e o Grupo H está encerrado. A 106 consolidou seleção, Enter/Tab, retirada de “Apagar bloco” e densidade pública de `Campo`/`Select`; a 107 entregou inserção relativa e a composição da DEC-090; a 108 entregou a geração em lote por headway da DEC-083; a 109 entregou cópia unitária por arrasto e atalhos, com cancelamento fora das colunas coberto em `9f4b4ed`; a 110 entregou cópia e remoção de dia inteiro; a 111 entregou o modo compacto efêmero por Serviço × sentido, com Enter entre partidas e dados ocultos preservados; a 112 entregou a origem estendida entre grades com normalização e sincronização preservando UUID; a 113 preservou os dois últimos deslocamentos da DEC-091; a 114 manteve as ações inteiramente visíveis em domingo; a 115 fez o foco acompanhar a UUID da Viagem após criação/reordenação e redistribuição; a 116 passou a confirmar horários somente por `Enter`/`Tab`, com rascunho local e normalização final; a 117 reancorou as operações de dia nos cabeçalhos e recompôs o headway conforme a DEC-093; a 118 tornou o headway idempotente pela DEC-094; e a 119 destacou somente os reforços coincidentes, agregou o alerta por Serviço, navegou para a primeira origem e acrescentou o toggle da DEC-096. A entrega `8cc8908` da TASK-110 foi corrigida em `d594034` e aprovada na reavaliação `14-REVISOES/TASK-110-20260729.md`: a cópia preserva reforços da origem e o `Dialogo` contém, estabiliza e restaura o foco. A entrega `92414d2` da TASK-116 foi corrigida em `213626d` e aprovada na reavaliação `14-REVISOES/TASK-116-20260728.md`; o E2E da TASK-105 confirmou a herança na grade excepcional. A **TASK-117 foi aprovada na reavaliação final** `14-REVISOES/TASK-117-20260730-reavaliacao.md` após `bf98389` encerrar a ressalva documental. A **TASK-118 foi aprovada na reavaliação final** `14-REVISOES/TASK-118-20260730-reavaliacao.md` após `2a72bd1` versionar TASK-118/Q-072/DEC-094 e encerrar a única ressalva documental. A **TASK-119 foi implementada em `233501e` e aprovada sem ressalvas** no parecer `14-REVISOES/TASK-119-20260730.md`; cobre também as grades excepcionais exigidas pela DEC-097 e permanece independente da guarda da TASK-118. A **TASK-109 foi aprovada sem ressalvas remanescentes** em `14-REVISOES/TASK-109-20260730.md`, encerrando a condição registrada no parecer de 2026-07-28. A **TASK-111 foi implementada em `4dbf068` e aprovada sem ressalvas** em `14-REVISOES/TASK-111-20260730.md`. A **TASK-112 foi implementada em `595e290` e aprovada sem ressalvas** em `14-REVISOES/TASK-112-20260730.md`. Botões de ação da Viagem surgem **no hover**.
 
-**Ação de spec (DEC-087) — concluída:** a **Spec 04 §8.4/§8.5** foi atualizada (origem selecionável; "mesclar" = sincronização preservando UUID; "sobrescrever" = UUIDs novas) e a **carve-out da RN-007** foi registrada no `01-RULE_INDEX.md` e `03-TRACEABILITY_MATRIX.md`. O casamento sob duplicatas (RN-062) ficou resolvido na spec (§8.5, "por contagem").
+**Ação de spec (DEC-087) — superada pela DEC-099:** a Spec 04 §8.4/§8.5 foi novamente alterada pelo responsável e hoje descreve **uma única** ação, `Copiar (sobrescrever)`, cuja semântica é a sincronização preservando a UUID do destino casado; o par sobrescrever/mesclar deixou de existir. A **TASK-120** (`caec734`, parecer `14-REVISOES/TASK-120-20260730.md`) implementou essa unificação. O pareamento de reforços coincidentes (RN-062) é por **ordem estável** nos arrays (DEC-099). **Pendência documental aberta:** a redação de RN-007 e a menção da RN-099 em `01-RULE_INDEX.md`, e a linha da RN-007 em `03-TRACEABILITY_MATRIX.md`, ainda refletem a DEC-087 e contradizem a spec vigente — alinhar antes que outra task toque a semeadura de grades.
 
 ### Grupo F — Bloqueada
 
