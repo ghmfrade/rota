@@ -1,34 +1,46 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
 **Atualização mais recente:** 2026-07-31 (branch `redesign`) — **TASK-124
-implementada e REPROVADA na revisão de aderência; o ciclo não está fechado.** A
-implementação `36c2d5f` acrescenta a prop `larguraDaAncora` à
-`SuperficieFlutuante` (`src/shared/ui/superficie-flutuante.tsx:176,206-210,263,278-286`)
-e a aplica às três superfícies de ação da Viagem
-(`src/formulario/viagens/etapa-viagens.tsx:1009,1106,1285`), de modo que a caixa
-assume a largura da célula-âncora medida em runtime — objetivo principal da
-DEC-102, entregue com correção e cobertura geométrica E2E. O parecer
-`14-REVISOES/TASK-124-20260731.md` reprova pelo **segundo detalhamento da
-DEC-102**, o piso de legibilidade: o `min-w-min` aplicado sobre a faixa
-`grid-cols-[minmax(0,1fr)_auto]` exclui o campo do `min-content` do contêiner
-(medido em Chromium: piso de **54px** em vez de 118px), e em qualquer coluna
-abaixo de ~118px — inclusive nos **88px** que a coluna de dia assume ao encostar
-no seu mínimo (`campo-horario-grade.tsx:85` + `[&_td]:px-3` da `Tabela`) — o
-campo `HH:MM` transborda a faixa e é coberto pelo botão. Dois dos oito critérios
-de aceite ficam não atendidos, e o E2E do piso
-(`testes/e2e/etapa-viagens.spec.ts:966-991`) deriva o valor esperado da própria
-implementação, nunca exercitando o ramo estreito. **Condições de correção:**
-fazer a faixa do campo participar do `min-content` (ex.: `minmax(min-content,1fr)`,
-medido como suficiente) e reescrever a asserção do piso para que possa falhar.
-Follow-up não impeditivo: folga do `min-w-16`/placeholder e o versionamento de
-TASK-124/125, DEC-102/103 e Q-080/081, hoje só no working tree. A revisão
-reutilizou o log canônico verde (`test:all:verificar`: executor **Claude**,
-fingerprint `799aea24…c477`, identidade `498d7fa6…9176`; 1.400 unitários +
-107 E2E, `Resultado geral: APROVADO`) **sem reexecutar a suíte** — a suíte verde
-não cobre o caso reprovado. A TASK-124 nasceu depois da última contagem (como a
-121/122/123) e **não integra** as 10 tasks não concluídas, que permanecem
-**10: 8 executáveis, a TASK-038 com bloqueio parcial e a TASK-040 bloqueada**. A
-**TASK-125** (DEC-103) segue não iniciada e é independente da 124.
+corrigida e aprovada com ressalvas na reavaliação de aderência.** O commit
+`1de5576` corrige os dois problemas que motivaram a reprovação anterior: troca
+`grid-cols-[minmax(0,1fr)_auto]` por `grid-cols-[minmax(min-content,1fr)_auto]`
+nas três superfícies de ação da Viagem, de modo que a faixa do campo passe a
+contribuir para o `min-content` do contêiner (o `min-w-min` da
+`SuperficieFlutuante` volta a proteger campo **e** botão, não só o botão);
+eleva o campo de `min-w-16` para `min-w-20`; e reescreve a asserção de piso do
+E2E (`testes/e2e/etapa-viagens.spec.ts:966-991`) para não depender do próprio
+elemento sob teste, com um caso novo em viewport 420px que exercita de fato o
+ramo de coluna mais estreita que o piso. A reavaliação
+`14-REVISOES/TASK-124-20260731-correcao.md` confirma os oito critérios de
+aceite atendidos e reutiliza o log canônico verde (`test:all:verificar`:
+executor **Claude**, fingerprint `6d25fa92…560c477`, identidade
+`498d7fa6…9176`, `Resultado geral: APROVADO`) sem reexecutar a suíte. **Única
+ressalva, virada condição de merge:** `docs-dev/06-BACKLOG_INICIAL.md`,
+`docs-dev/10-DECISION_LOG.md` e `docs-dev/16-OPEN_QUESTIONS.md` continuam
+modificados e não comitados — a TASK-123/124/125, a DEC-102/103 e a Q-080/081
+existem só no working tree, apesar de já citadas em dois commits de código; é a
+segunda vez que essa mesma lacuna atravessa o ciclo de revisão desta task. A
+TASK-124 nasceu depois da última contagem (como a 121/122/123) e **não
+integra** as 10 tasks não concluídas, que permanecem **10: 8 executáveis, a
+TASK-038 com bloqueio parcial e a TASK-040 bloqueada**. A **TASK-125**
+(DEC-103) segue não iniciada e é independente da 124.
+
+**Histórico anterior (2026-07-31) — TASK-124, reprovação:** a implementação
+`36c2d5f` acrescentou a prop `larguraDaAncora` à `SuperficieFlutuante`
+(`src/shared/ui/superficie-flutuante.tsx:176,206-210,263,278-286`) e a aplicou
+às três superfícies de ação da Viagem
+(`src/formulario/viagens/etapa-viagens.tsx:1009,1106,1285`), de modo que a
+caixa assume a largura da célula-âncora medida em runtime — objetivo
+principal da DEC-102, entregue com correção e cobertura geométrica E2E. O
+parecer `14-REVISOES/TASK-124-20260731.md` reprovou pelo **segundo
+detalhamento da DEC-102**, o piso de legibilidade: o `min-w-min` aplicado
+sobre a faixa `grid-cols-[minmax(0,1fr)_auto]` excluía o campo do
+`min-content` do contêiner (medido em Chromium: piso de **54px** em vez de
+118px), e em qualquer coluna abaixo de ~118px — inclusive nos **88px** que a
+coluna de dia assume ao encostar no seu mínimo
+(`campo-horario-grade.tsx:85` + `[&_td]:px-3` da `Tabela`) — o campo `HH:MM`
+transbordava a faixa e era coberto pelo botão. A correção acima resolveu essa
+reprovação.
 
 **Histórico anterior (2026-07-31) — TASK-123:** **TASK-123
 concluída e aprovada, sem ressalvas**. A implementação `3dec0bf` extrai a
@@ -574,6 +586,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 121 | Formulário de headway na superfície flutuante da Viagem, sem linha auxiliar no `<tbody>` e sem recorte pelo `overflow-x-auto` da `Tabela` (DEC-100) — novo primitivo `SuperficieFlutuante` em `shared/ui`; implementada em `2962df3` e aprovada com ressalvas em `14-REVISOES/TASK-121-20260731.md` (fechamento segurado só por `<input>` focado; cobertura restrita à grade comum), ambas como follow-up da TASK-122 |
 | 122 | Composição das ações da Viagem no modo compacto — `Restaurar sugestão` oculto e `X` + alternador de headway lado a lado (DEC-101) — implementada em `94c4468` e aprovada com ressalvas em `14-REVISOES/TASK-122-20260731.md`; código exato e suíte verde, **sem condição de merge** — a reescrita da frase de fechamento da DEC-101 feita no mesmo commit teve autoria e redação confirmadas pelo responsável em 2026-07-31 (adendo do parecer), restando só ressalvas cosméticas |
 | 123 | Restaura a inserção de Viagem posterior por offset no modo compacto (DEC-086) — implementada em `3dec0bf` e aprovada sem ressalvas em `14-REVISOES/TASK-123-20260731.md`; `superficieInserirPosterior` extraída e ancorada na partida quando não há Seções passantes, motor de inserção intocado |
+| 124 | Limita a largura das superfícies flutuantes da Viagem à largura da célula de horário-âncora, com piso de legibilidade (DEC-102) — implementada em `36c2d5f`, reprovada em `14-REVISOES/TASK-124-20260731.md` pelo piso de legibilidade não proteger o campo `HH:MM`, corrigida em `1de5576` (`minmax(min-content,1fr)` em vez de `minmax(0,1fr)`) e aprovada com ressalvas em `14-REVISOES/TASK-124-20260731-correcao.md`; ressalva única (versionar TASK-123/124/125 e DEC-102/103/Q-080/081) segue como condição de merge |
 
 ---
 
