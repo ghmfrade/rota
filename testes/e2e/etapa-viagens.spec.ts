@@ -875,6 +875,77 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     expect(chamouOsrm).toBe(false);
   });
 
+  test("TASK-123: modo compacto restaura a inserção posterior ancorada na partida, em SEG e DOM", async ({
+    page,
+  }) => {
+    let chamouOsrm = false;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamouOsrm = true;
+      return rota.abort();
+    });
+
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+    const etapa = page.getByTestId("etapa-viagens");
+    const tamanhoJanela = page.viewportSize()!;
+
+    // Mesma área útil usada pelo teste da TASK-121 (docs-dev/18 §3).
+    async function conferirContida(alvo: Locator, rotulo: string) {
+      const [caixa, caixaEtapa] = await Promise.all([
+        alvo.boundingBox(),
+        etapa.boundingBox(),
+      ]);
+      expect(caixa, rotulo).not.toBeNull();
+      expect(caixaEtapa).not.toBeNull();
+      const limite = {
+        x: Math.max(0, caixaEtapa!.x),
+        y: Math.max(0, caixaEtapa!.y),
+        direita: Math.min(tamanhoJanela.width, caixaEtapa!.x + caixaEtapa!.width),
+        base: Math.min(tamanhoJanela.height, caixaEtapa!.y + caixaEtapa!.height),
+      };
+      expect(caixa!.x, rotulo).toBeGreaterThanOrEqual(limite.x);
+      expect(caixa!.y, rotulo).toBeGreaterThanOrEqual(limite.y);
+      expect(caixa!.x + caixa!.width, rotulo).toBeLessThanOrEqual(limite.direita);
+      expect(caixa!.y + caixa!.height, rotulo).toBeLessThanOrEqual(limite.base);
+    }
+
+    await preencherEConfirmar(grade.getByLabel("Criar viagem — domingo"), "08:00");
+    await page.getByTestId("alternar-modo-compacto").click();
+
+    for (const rotuloViagem of [
+      "Horário de partida — segunda, viagem 1",
+      "Horário de partida — domingo, viagem 1",
+    ]) {
+      const partida = grade.getByLabel(rotuloViagem);
+      const celula = partida.locator("xpath=ancestor::td");
+      await celula.hover();
+
+      const acaoPosterior = celula.getByTestId("acao-inserir-posterior");
+      await expect(acaoPosterior).toBeVisible();
+      await conferirContida(acaoPosterior, `inserir depois — ${rotuloViagem} — compacto`);
+      // Ancorada na própria partida (sem célula passante no modo compacto).
+      await expect(celula.getByTestId("celula-passante")).toHaveCount(0);
+      // Alternar headway substitui a inserção posterior (DEC-100), sem as duas juntas.
+      await celula.getByTestId("alternar-modo-headway").click();
+      await expect(celula.getByTestId("superficie-headway")).toBeVisible();
+      await expect(celula.getByTestId("acao-inserir-posterior")).toHaveCount(0);
+      await celula.getByTestId("alternar-modo-headway").click();
+      await expect(celula.getByTestId("acao-inserir-posterior")).toBeVisible();
+    }
+
+    // Inserção efetiva pela UI no modo compacto: 08:00 + 00:30 → nova Viagem 08:30.
+    const celulaSegunda = grade
+      .getByLabel("Horário de partida — segunda, viagem 1")
+      .locator("xpath=ancestor::td");
+    await celulaSegunda.hover();
+    await celulaSegunda.getByLabel("Deslocamento posterior — segunda, viagem 1").fill("00:30");
+    await celulaSegunda.getByLabel("Inserir viagem depois — segunda, viagem 1").click();
+    await expect(grade.getByLabel("Horário de partida — segunda, viagem 2")).toHaveValue(
+      "08:30",
+    );
+    expect(chamouOsrm).toBe(false);
+  });
+
   test("reutiliza os últimos deslocamentos válidos por direção na instância da etapa (TASK-113)", async ({
     page,
   }) => {

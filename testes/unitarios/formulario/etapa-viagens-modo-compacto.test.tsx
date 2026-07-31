@@ -283,3 +283,81 @@ describe("EtapaViagens — composição das ações no modo compacto (TASK-122; 
     desmontar();
   });
 });
+
+describe("EtapaViagens — inserção posterior restaurada no modo compacto (TASK-123; DEC-086)", () => {
+  it("exibe 'acao-inserir-posterior' na partida nas três grades, sem duplicar entre modos", () => {
+    const documento = prepararDocumento();
+    const antes = structuredClone(documento);
+    const aoAtualizarSessao = vi.fn();
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+    };
+    const { container, desmontar } = renderizar(
+      <EtapaViagens sessao={sessao} aoAtualizarSessao={aoAtualizarSessao} />,
+    );
+    selecionarServicoESentido(container);
+    ativarModoCompacto(container);
+
+    const grades = [
+      container.querySelector('[data-testid="grade-dias-comuns"]')!,
+      container.querySelector('[data-testid="grade-feriados"]')!,
+      container.querySelector('[data-testid="grade-tabela-excepcional"]')!,
+    ];
+
+    for (const grade of grades) {
+      const celulaPartida = grade.querySelector(
+        '[data-testid="celula-partida"]',
+      ) as HTMLElement;
+      entrarComPonteiro(celulaPartida);
+      expect(
+        celulaPartida.querySelectorAll('[data-testid="acao-inserir-posterior"]'),
+      ).toHaveLength(1);
+      expect(
+        celulaPartida.querySelector('[data-testid="inserir-viagem-posterior"]'),
+      ).not.toBeNull();
+    }
+
+    // Nenhuma alteração de dados só por exibir o controle no hover (RN-096).
+    expect(aoAtualizarSessao).not.toHaveBeenCalled();
+    expect(documento).toEqual(antes);
+    desmontar();
+  });
+
+  it("alternar entre modo compacto e completo preserva horarios_paradas, âncoras e UUIDs", () => {
+    const documento = prepararDocumento();
+    const antes = structuredClone(documento);
+    const aoAtualizarSessao = vi.fn();
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+    };
+    const { container, desmontar } = renderizar(
+      <EtapaViagens sessao={sessao} aoAtualizarSessao={aoAtualizarSessao} />,
+    );
+    selecionarServicoESentido(container);
+
+    const grade = container.querySelector('[data-testid="grade-dias-comuns"]')!;
+    ativarModoCompacto(container);
+    entrarComPonteiro(
+      grade.querySelector('[data-testid="celula-partida"]') as HTMLElement,
+    );
+    expect(
+      grade.querySelector('[data-testid="acao-inserir-posterior"]'),
+    ).not.toBeNull();
+
+    ativarModoCompacto(container);
+    entrarComPonteiro(
+      grade.querySelector('[data-testid="celula-partida"]') as HTMLElement,
+    );
+    expect(
+      grade.querySelectorAll('[data-testid="acao-inserir-posterior"]'),
+    ).toHaveLength(1);
+
+    expect(aoAtualizarSessao).not.toHaveBeenCalled();
+    expect(documento).toEqual(antes);
+    desmontar();
+  });
+});

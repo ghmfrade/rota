@@ -1076,6 +1076,68 @@ export function EtapaViagens({
     );
   }
 
+  // TASK-123: a superfície de inserção posterior ancora na última Seção
+  // visível da Viagem — a célula final no modo completo, a própria partida
+  // no compacto (DEC-086, sem Seções passantes) —, mesmo mecanismo já usado
+  // pela superfícieHeadway acima.
+  function superficieInserirPosterior({
+    viagemUuid,
+    dia,
+    indiceBloco,
+    emHover,
+    alvoFocoPartida,
+    erroInsercaoRelativa,
+  }: {
+    viagemUuid: string;
+    dia: DiaSemana;
+    indiceBloco: number;
+    emHover: boolean;
+    alvoFocoPartida: AlvoFocoCelulaGrade;
+    erroInsercaoRelativa: string | undefined;
+  }) {
+    return (
+      <SuperficieFlutuante
+        aberta={emHover}
+        data-flutuante-viagem="true"
+        ladoPreferido="abaixo"
+        limiteRef={raizEtapaRef}
+        rotuloAcessivel={`Ações de inserção posterior — ${dia}, viagem ${indiceBloco + 1}`}
+        data-testid="acao-inserir-posterior"
+        className="flex items-stretch gap-1"
+        onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
+        onFocus={() => aoFocarSuperficie(viagemUuid)}
+        onBlur={aoSairFocoDaSuperficie}
+        onKeyDown={(evento) => aoTeclarNaSuperficie(evento, alvoFocoPartida)}
+      >
+        <Campo
+          densidade="compacta"
+          className="min-w-20 text-center tabular-nums"
+          aria-label={`Deslocamento posterior — ${dia}, viagem ${indiceBloco + 1}`}
+          value={deslocamentoPosterior}
+          onChange={(evento) => definirDeslocamentoPosterior(evento.target.value)}
+        />
+        <Botao
+          variante="primario"
+          className="min-w-10"
+          data-testid="inserir-viagem-posterior"
+          aria-label={`Inserir viagem depois — ${dia}, viagem ${indiceBloco + 1}`}
+          onClick={() => aoInserirViagemPorOffset(viagemUuid, 1)}
+        >
+          ↓
+        </Botao>
+        {erroInsercaoRelativa && (
+          <span
+            role="alert"
+            data-testid="erro-insercao-relativa"
+            className="absolute left-1/2 top-full mt-1 min-w-52 -translate-x-1/2 rounded-controle bg-white p-1 text-xs text-erro shadow-sombra-3"
+          >
+            {erroInsercaoRelativa}
+          </span>
+        )}
+      </SuperficieFlutuante>
+    );
+  }
+
   // Corpo compartilhado por todas as grades. Os dois discriminadores seguem
   // juntos em toda criação/cópia para preservar a exclusividade da RN-061.
   function corpoGrade(blocos: BlocoGrade[], grade: GradeDaTela) {
@@ -1296,10 +1358,20 @@ export function EtapaViagens({
                           ↪
                         </Botao>
                       </SuperficieFlutuante>
-                      {/* Modo compacto (DEC-086): a partida é a única Seção
-                          visível, portanto é ela que ancora o formulário de
-                          headway. A inserção posterior segue indisponível
-                          nesse modo, como antes da TASK-121. */}
+                      {/* Modo compacto (DEC-086): sem Seções passantes, a
+                          partida ancora tanto a inserção posterior quanto o
+                          formulário de headway (DEC-100), nunca os dois ao
+                          mesmo tempo (TASK-123). */}
+                      {secoesDaGrade.length === 1 &&
+                        !modoHeadway &&
+                        superficieInserirPosterior({
+                          viagemUuid,
+                          dia,
+                          indiceBloco,
+                          emHover,
+                          alvoFocoPartida: alvoFoco,
+                          erroInsercaoRelativa,
+                        })}
                       {secoesDaGrade.length === 1 &&
                         modoHeadway &&
                         superficieHeadway({
@@ -1369,51 +1441,16 @@ export function EtapaViagens({
                         {erro}
                       </span>
                     )}
-                    {posicaoNaSuperficie === "fim" && !modoHeadway && (
-                      <SuperficieFlutuante
-                        aberta={emHover}
-                        data-flutuante-viagem="true"
-                        ladoPreferido="abaixo"
-                        limiteRef={raizEtapaRef}
-                        rotuloAcessivel={`Ações de inserção posterior — ${dia}, viagem ${indiceBloco + 1}`}
-                        data-testid="acao-inserir-posterior"
-                        className="flex items-stretch gap-1"
-                        onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
-                        onFocus={() => aoFocarSuperficie(viagemUuid)}
-                        onBlur={aoSairFocoDaSuperficie}
-                        onKeyDown={(evento) =>
-                          aoTeclarNaSuperficie(evento, { ...alvoFoco, indiceSecao: 0 })
-                        }
-                      >
-                        <Campo
-                          densidade="compacta"
-                          className="min-w-20 text-center tabular-nums"
-                          aria-label={`Deslocamento posterior — ${dia}, viagem ${indiceBloco + 1}`}
-                          value={deslocamentoPosterior}
-                          onChange={(evento) =>
-                            definirDeslocamentoPosterior(evento.target.value)
-                          }
-                        />
-                        <Botao
-                          variante="primario"
-                          className="min-w-10"
-                          data-testid="inserir-viagem-posterior"
-                          aria-label={`Inserir viagem depois — ${dia}, viagem ${indiceBloco + 1}`}
-                          onClick={() => aoInserirViagemPorOffset(viagemUuid, 1)}
-                        >
-                          ↓
-                        </Botao>
-                        {erroInsercaoRelativa && (
-                          <span
-                            role="alert"
-                            data-testid="erro-insercao-relativa"
-                            className="absolute left-1/2 top-full mt-1 min-w-52 -translate-x-1/2 rounded-controle bg-white p-1 text-xs text-erro shadow-sombra-3"
-                          >
-                            {erroInsercaoRelativa}
-                          </span>
-                        )}
-                      </SuperficieFlutuante>
-                    )}
+                    {posicaoNaSuperficie === "fim" &&
+                      !modoHeadway &&
+                      superficieInserirPosterior({
+                        viagemUuid,
+                        dia,
+                        indiceBloco,
+                        emHover,
+                        alvoFocoPartida: { ...alvoFoco, indiceSecao: 0 },
+                        erroInsercaoRelativa,
+                      })}
                     {posicaoNaSuperficie === "fim" &&
                       modoHeadway &&
                       superficieHeadway({
