@@ -58,6 +58,20 @@ function selecionarServicoESentido(container: HTMLElement) {
   selecionar(seletorSentido, "ida");
 }
 
+/** React sintetiza `onMouseEnter` a partir do `mouseover` delegado na raiz. */
+function entrarComPonteiro(elemento: Element) {
+  act(() => {
+    elemento.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+  });
+}
+
+function ativarModoCompacto(container: HTMLElement) {
+  const alternador = container.querySelector(
+    '[data-testid="alternar-modo-compacto"]',
+  ) as HTMLButtonElement;
+  act(() => alternador.click());
+}
+
 describe("EtapaViagens — modo compacto (TASK-111; DEC-086)", () => {
   it("oculta somente passantes em todas as grades e restaura os mesmos dados", () => {
     const documento = prepararDocumento();
@@ -156,6 +170,116 @@ describe("EtapaViagens — modo compacto (TASK-111; DEC-086)", () => {
         .querySelector('[data-testid="grade-dias-comuns"]')
         ?.querySelectorAll('[data-testid="linha-grade"]'),
     ).toHaveLength(6);
+    desmontar();
+  });
+});
+
+describe("EtapaViagens — composição das ações no modo compacto (TASK-122; DEC-101)", () => {
+  it("oculta 'Restaurar sugestão' e alinha X + alternador na horizontal, nas três grades", () => {
+    const documento = prepararDocumento();
+    const antes = structuredClone(documento);
+    const aoAtualizarSessao = vi.fn();
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+    };
+    const { container, desmontar } = renderizar(
+      <EtapaViagens sessao={sessao} aoAtualizarSessao={aoAtualizarSessao} />,
+    );
+    selecionarServicoESentido(container);
+    ativarModoCompacto(container);
+
+    const grades = [
+      container.querySelector('[data-testid="grade-dias-comuns"]')!,
+      container.querySelector('[data-testid="grade-feriados"]')!,
+      container.querySelector('[data-testid="grade-tabela-excepcional"]')!,
+    ];
+
+    for (const grade of grades) {
+      const celulaPartida = grade.querySelector(
+        '[data-testid="celula-partida"]',
+      ) as HTMLElement;
+      entrarComPonteiro(celulaPartida);
+      const acoes = grade.querySelector(
+        '[data-testid="acoes-viagem"]',
+      ) as HTMLElement;
+      expect(acoes.querySelector('[data-testid="restaurar-viagem"]')).toBeNull();
+      expect(acoes.querySelector('[data-testid="apagar-viagem"]')).not.toBeNull();
+      expect(
+        acoes.querySelector('[data-testid="alternar-modo-headway"]'),
+      ).not.toBeNull();
+      expect(acoes.className).toContain("flex-row");
+    }
+
+    // Ocultar o botão não dispara restauração nem altera o documento (RN-063/RN-066/RN-096).
+    expect(aoAtualizarSessao).not.toHaveBeenCalled();
+    expect(documento).toEqual(antes);
+    desmontar();
+  });
+
+  it("volta a exibir 'Restaurar sugestão' em coluna ao reexibir todas as Seções (DEC-090)", () => {
+    const documento = prepararDocumento();
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+    };
+    const { container, desmontar } = renderizar(
+      <EtapaViagens sessao={sessao} aoAtualizarSessao={vi.fn()} />,
+    );
+    selecionarServicoESentido(container);
+    ativarModoCompacto(container);
+
+    const grade = container.querySelector('[data-testid="grade-dias-comuns"]')!;
+    entrarComPonteiro(
+      grade.querySelector('[data-testid="celula-partida"]') as HTMLElement,
+    );
+    expect(
+      grade.querySelector('[data-testid="acoes-viagem"]')?.querySelector(
+        '[data-testid="restaurar-viagem"]',
+      ),
+    ).toBeNull();
+
+    ativarModoCompacto(container);
+
+    entrarComPonteiro(
+      grade.querySelector('[data-testid="celula-partida"]') as HTMLElement,
+    );
+    const acoesCompleto = grade.querySelector(
+      '[data-testid="acoes-viagem"]',
+    ) as HTMLElement;
+    expect(
+      acoesCompleto.querySelector('[data-testid="restaurar-viagem"]'),
+    ).not.toBeNull();
+    expect(acoesCompleto.className).toContain("flex-col");
+    desmontar();
+  });
+
+  it("[inválido] não chama restauração ao alternar o modo compacto e abrir/fechar o hover", () => {
+    const documento = prepararDocumento();
+    const antes = structuredClone(documento);
+    const aoAtualizarSessao = vi.fn();
+    const sessao: SessaoFormulario = {
+      modo: "carregado",
+      documento,
+      alertasImportacao: [],
+    };
+    const { container, desmontar } = renderizar(
+      <EtapaViagens sessao={sessao} aoAtualizarSessao={aoAtualizarSessao} />,
+    );
+    selecionarServicoESentido(container);
+    ativarModoCompacto(container);
+
+    const grade = container.querySelector('[data-testid="grade-dias-comuns"]')!;
+    const celulaPartida = grade.querySelector(
+      '[data-testid="celula-partida"]',
+    ) as HTMLElement;
+    entrarComPonteiro(celulaPartida);
+    entrarComPonteiro(celulaPartida);
+
+    expect(aoAtualizarSessao).not.toHaveBeenCalled();
+    expect(documento).toEqual(antes);
     desmontar();
   });
 });

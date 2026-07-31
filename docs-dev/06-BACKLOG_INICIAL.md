@@ -7344,7 +7344,7 @@ superando a posição inferior da DEC-093.
 
 ---
 
-## TASK-122 — Reorganizar as ações da Viagem no modo compacto — **bloqueada (DEC-101; depende da TASK-121)**
+## TASK-122 — Reorganizar as ações da Viagem no modo compacto
 
 ## Objetivo
 

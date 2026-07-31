@@ -1249,7 +1249,11 @@ export function EtapaViagens({
                         limiteRef={raizEtapaRef}
                         rotuloAcessivel={`Ações da viagem — ${dia}, viagem ${indiceBloco + 1}`}
                         data-testid="acoes-viagem"
-                        className="flex flex-col items-stretch gap-0.5"
+                        className={
+                          modoCompacto
+                            ? "flex flex-row items-stretch gap-0.5"
+                            : "flex flex-col items-stretch gap-0.5"
+                        }
                         onMouseEnter={() => mostrarAcoesDaViagem(viagemUuid)}
                         onFocus={() => aoFocarSuperficie(viagemUuid)}
                         onBlur={aoSairFocoDaSuperficie}
@@ -1265,16 +1269,21 @@ export function EtapaViagens({
                         >
                           X
                         </Botao>
-                        <Botao
-                          variante="primario"
-                          tamanho="compacto"
-                          className="min-h-8 min-w-8"
-                          data-testid="restaurar-viagem"
-                          aria-label={`Restaurar sugestão — ${dia}, viagem ${indiceBloco + 1}`}
-                          onClick={() => aoResetarViagem(viagemUuid)}
-                        >
-                          ↻
-                        </Botao>
+                        {/* DEC-101: modo compacto oculta "Restaurar sugestão" —
+                            as Seções ocultas tiram o contexto visual da
+                            restauração; ela volta ao reexibir todas as Seções. */}
+                        {!modoCompacto && (
+                          <Botao
+                            variante="primario"
+                            tamanho="compacto"
+                            className="min-h-8 min-w-8"
+                            data-testid="restaurar-viagem"
+                            aria-label={`Restaurar sugestão — ${dia}, viagem ${indiceBloco + 1}`}
+                            onClick={() => aoResetarViagem(viagemUuid)}
+                          >
+                            ↻
+                          </Botao>
+                        )}
                         <Botao
                           variante={modoHeadway ? "primario" : "alternador"}
                           tamanho="compacto"

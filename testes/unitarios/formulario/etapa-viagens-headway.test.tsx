@@ -275,6 +275,40 @@ describe("EtapaViagens — formulário de headway na superfície flutuante (TASK
     desmontar();
   });
 
+  it("no modo compacto, ligar headway mantém X e alternador visíveis e clicáveis (DEC-101)", () => {
+    const { container, desmontar } = montarEtapa();
+    const alternadorCompacto = container.querySelector(
+      '[data-testid="alternar-modo-compacto"]',
+    ) as HTMLButtonElement;
+    act(() => alternadorCompacto.click());
+
+    ativarHeadway(container);
+
+    const celula = celulaPartida(container);
+    const acoes = celula.querySelector('[data-testid="acoes-viagem"]') as HTMLElement;
+    expect(acoes.querySelector('[data-testid="restaurar-viagem"]')).toBeNull();
+    const apagar = acoes.querySelector(
+      '[data-testid="apagar-viagem"]',
+    ) as HTMLButtonElement;
+    const alternadorHeadway = acoes.querySelector(
+      '[data-testid="alternar-modo-headway"]',
+    ) as HTMLButtonElement;
+    expect(apagar).not.toBeNull();
+    expect(alternadorHeadway.getAttribute("aria-pressed")).toBe("true");
+    expect(estaAberta(superficieHeadway(container))).toBe(true);
+
+    // Desligar o alternador desfaz o modo headway e volta à composição de ações.
+    act(() => alternadorHeadway.click());
+    expect(superficieHeadway(container)).toBeNull();
+    expect(
+      celula
+        .querySelector('[data-testid="acoes-viagem"]')
+        ?.querySelector('[data-testid="alternar-modo-headway"]')
+        ?.getAttribute("aria-pressed"),
+    ).toBe("false");
+    desmontar();
+  });
+
   it("Esc fecha a superfície, devolve o foco à célula e não altera o documento", () => {
     const documento = structuredClone(multiServico) as unknown as DocumentoOperacao;
     const antes = structuredClone(documento);

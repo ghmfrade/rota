@@ -785,6 +785,96 @@ test.describe("Etapa Viagens e horários — grade de dias comuns (Spec 04 §8.1
     expect(chamouOsrm).toBe(false);
   });
 
+  test("TASK-122: modo compacto oculta 'Restaurar sugestão' e alinha X + headway na horizontal (DEC-101)", async ({
+    page,
+  }) => {
+    let chamouOsrm = false;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      chamouOsrm = true;
+      return rota.abort();
+    });
+
+    await abrirEtapaViagens(page, structuredClone(multiServico));
+    const grade = gradeComum(page);
+    const etapa = page.getByTestId("etapa-viagens");
+    const tamanhoJanela = page.viewportSize()!;
+
+    async function conferirContida(alvo: Locator, rotulo: string) {
+      const [caixa, caixaEtapa] = await Promise.all([
+        alvo.boundingBox(),
+        etapa.boundingBox(),
+      ]);
+      expect(caixa, rotulo).not.toBeNull();
+      expect(caixaEtapa).not.toBeNull();
+      const limite = {
+        x: Math.max(0, caixaEtapa!.x),
+        y: Math.max(0, caixaEtapa!.y),
+        direita: Math.min(tamanhoJanela.width, caixaEtapa!.x + caixaEtapa!.width),
+        base: Math.min(tamanhoJanela.height, caixaEtapa!.y + caixaEtapa!.height),
+      };
+      expect(caixa!.x, rotulo).toBeGreaterThanOrEqual(limite.x);
+      expect(caixa!.y, rotulo).toBeGreaterThanOrEqual(limite.y);
+      expect(caixa!.x + caixa!.width, rotulo).toBeLessThanOrEqual(limite.direita);
+      expect(caixa!.y + caixa!.height, rotulo).toBeLessThanOrEqual(limite.base);
+    }
+
+    await preencherEConfirmar(grade.getByLabel("Criar viagem — domingo"), "08:00");
+    await page.getByTestId("alternar-modo-compacto").click();
+
+    const celulaSegunda = grade
+      .getByLabel("Horário de partida — segunda, viagem 1")
+      .locator("xpath=ancestor::td");
+    const celulaDomingo = grade
+      .getByLabel("Horário de partida — domingo, viagem 1")
+      .locator("xpath=ancestor::td");
+
+    // SEG: sem restaurar, X + headway lado a lado, abrindo à direita.
+    await celulaSegunda.hover();
+    const acoesSegunda = celulaSegunda.getByTestId("acoes-viagem");
+    await expect(acoesSegunda.getByTestId("restaurar-viagem")).toHaveCount(0);
+    await expect(acoesSegunda.getByTestId("apagar-viagem")).toBeVisible();
+    await expect(acoesSegunda.getByTestId("alternar-modo-headway")).toBeVisible();
+    await conferirContida(acoesSegunda.getByTestId("apagar-viagem"), "apagar — segunda compacto");
+    await conferirContida(
+      acoesSegunda.getByTestId("alternar-modo-headway"),
+      "headway — segunda compacto",
+    );
+    expect(await acoesSegunda.getAttribute("data-lado")).toBe("direita");
+
+    // DOM: mesma composição, abrindo à esquerda e inteiramente visível.
+    await celulaDomingo.hover();
+    const acoesDomingo = celulaDomingo.getByTestId("acoes-viagem");
+    await expect(acoesDomingo.getByTestId("restaurar-viagem")).toHaveCount(0);
+    await conferirContida(acoesDomingo.getByTestId("apagar-viagem"), "apagar — domingo compacto");
+    await conferirContida(
+      acoesDomingo.getByTestId("alternar-modo-headway"),
+      "headway — domingo compacto",
+    );
+    await expect(acoesDomingo.getByTestId("apagar-viagem")).toBeInViewport({ ratio: 1 });
+    await expect(acoesDomingo.getByTestId("alternar-modo-headway")).toBeInViewport({
+      ratio: 1,
+    });
+    expect(await acoesDomingo.getAttribute("data-lado")).toBe("esquerda");
+
+    // Ligar headway no compacto mantém X e o alternador visíveis e clicáveis
+    // (DEC-101 revisada — a superfície de inserção é o que dá lugar ao
+    // formulário, os dois botões continuam ao lado).
+    await celulaSegunda.hover();
+    await acoesSegunda.getByTestId("alternar-modo-headway").click();
+    await expect(celulaSegunda.getByTestId("superficie-headway")).toBeVisible();
+    await expect(acoesSegunda.getByTestId("apagar-viagem")).toBeVisible();
+    await expect(acoesSegunda.getByTestId("alternar-modo-headway")).toBeVisible();
+    await expect(grade.getByTestId("linha-headway")).toHaveCount(0);
+    await acoesSegunda.getByTestId("alternar-modo-headway").click();
+    await expect(celulaSegunda.getByTestId("superficie-headway")).toHaveCount(0);
+
+    // Reexibir todas as Seções restaura a composição completa da DEC-090.
+    await page.getByTestId("alternar-modo-compacto").click();
+    await celulaSegunda.hover();
+    await expect(celulaSegunda.getByTestId("acoes-viagem").getByTestId("restaurar-viagem")).toBeVisible();
+    expect(chamouOsrm).toBe(false);
+  });
+
   test("reutiliza os últimos deslocamentos válidos por direção na instância da etapa (TASK-113)", async ({
     page,
   }) => {
