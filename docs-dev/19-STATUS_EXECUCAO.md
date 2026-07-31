@@ -1,6 +1,22 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-07-31 (branch `redesign`) — **TASK-122
+**Atualização mais recente:** 2026-07-31 (branch `redesign`) — **TASK-123
+concluída e aprovada, sem ressalvas**. A implementação `3dec0bf` extrai a
+superfície `acao-inserir-posterior` para a função reaproveitável
+`superficieInserirPosterior` (`src/formulario/viagens/etapa-viagens.tsx:1083-1139`)
+e passa a renderizá-la também ancorada na célula de partida quando
+`secoesDaGrade.length === 1` (modo compacto, DEC-086), no mesmo mecanismo já
+usado por `superficieHeadway`; o motor de inserção (`aoInserirViagemPorOffset`)
+não foi alterado, só o call site. O parecer `14-REVISOES/TASK-123-20260731.md`
+reutiliza o log canônico já verde (`test:all:verificar` confirmou fingerprint
+`7f5c87e9…5546`, identidade `498d7fa6…9176`, sem reexecução) e não encontrou
+violação de RN, de NEG-xxx nem de escopo — os cinco itens do "Fora de escopo"
+estão respeitados e os oito critérios de aceite têm teste correspondente. A
+TASK-123 nasceu depois da última contagem (assim como a 121/122) e **não
+integrava** as 10 tasks não concluídas, que permanecem **10: 8 executáveis, a
+TASK-038 com bloqueio parcial e a TASK-040 bloqueada**.
+
+**Histórico anterior (2026-07-31) — TASK-122:** **TASK-122
 concluída e aprovada com ressalvas, sem condição de merge**. A
 implementação `94c4468` condiciona a composição da superfície `acoes-viagem` ao
 modo compacto (`flex-row` no compacto, `flex-col` no completo) e só renderiza
@@ -527,6 +543,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 120 | `Copiar (sobrescrever)` único na semeadura de grades, com a sincronização preservando UUID da Spec 04 §8.5 (DEC-099) — implementada em `caec734` e aprovada com ressalvas documentais/de cobertura em `14-REVISOES/TASK-120-20260730.md`; ressalva documental encerrada por `ceac3be` e confirmada na reavaliação `14-REVISOES/TASK-120-20260730-reavaliacao.md`, que mantém aberto só o follow-up dos unitários de imutabilidade/cópia defensiva |
 | 121 | Formulário de headway na superfície flutuante da Viagem, sem linha auxiliar no `<tbody>` e sem recorte pelo `overflow-x-auto` da `Tabela` (DEC-100) — novo primitivo `SuperficieFlutuante` em `shared/ui`; implementada em `2962df3` e aprovada com ressalvas em `14-REVISOES/TASK-121-20260731.md` (fechamento segurado só por `<input>` focado; cobertura restrita à grade comum), ambas como follow-up da TASK-122 |
 | 122 | Composição das ações da Viagem no modo compacto — `Restaurar sugestão` oculto e `X` + alternador de headway lado a lado (DEC-101) — implementada em `94c4468` e aprovada com ressalvas em `14-REVISOES/TASK-122-20260731.md`; código exato e suíte verde, **sem condição de merge** — a reescrita da frase de fechamento da DEC-101 feita no mesmo commit teve autoria e redação confirmadas pelo responsável em 2026-07-31 (adendo do parecer), restando só ressalvas cosméticas |
+| 123 | Restaura a inserção de Viagem posterior por offset no modo compacto (DEC-086) — implementada em `3dec0bf` e aprovada sem ressalvas em `14-REVISOES/TASK-123-20260731.md`; `superficieInserirPosterior` extraída e ancorada na partida quando não há Seções passantes, motor de inserção intocado |
 
 ---
 
@@ -715,6 +732,15 @@ percorrem as três grades); o de alinhar o fechamento ao "hover **ou** foco" da
 DEC-100 (hoje segurado só por `<input>` focado) **permanece aberto e sem task
 dona** — precisa virar task nova ou ser absorvido explicitamente, para não sumir
 por ter sido citado num parecer já encerrado.
+
+**TASK-123 (2026-07-31):** criada para corrigir uma lacuna herdada da
+TASK-121 — a inserção posterior (`↓`) ficava indisponível no modo compacto por
+só ser renderizada no ramo de célula passante, contradizendo a DEC-086.
+Implementada em `3dec0bf` e **aprovada sem ressalvas** em
+`14-REVISOES/TASK-123-20260731.md`: `superficieInserirPosterior` foi extraída
+para função reaproveitável e passou a ancorar na célula de partida quando
+`secoesDaGrade.length === 1`, mesmo mecanismo já usado pelo headway; o motor de
+inserção não foi tocado.
 
 **Ação de spec (DEC-087) — superada pela DEC-099:** a Spec 04 §8.4/§8.5 foi novamente alterada pelo responsável e hoje descreve **uma única** ação, `Copiar (sobrescrever)`, cuja semântica é a sincronização preservando a UUID do destino casado; o par sobrescrever/mesclar deixou de existir. A **TASK-120** (`caec734`, parecer `14-REVISOES/TASK-120-20260730.md`) implementou essa unificação. O pareamento de reforços coincidentes (RN-062) é por **ordem estável** nos arrays (DEC-099). **Pendência documental encerrada em 2026-07-30:** a RN-007 foi reescrita (cópias aditivas com UUID nova × sincronização entre grades preservando a UUID do destino casado), a menção da RN-099 passou a citar a ação única `Copiar (sobrescrever)`, a linha da RN-007 em `03-TRACEABILITY_MATRIX.md` foi atualizada e a DEC-087 recebeu o status de **superada em parte pela DEC-099**; as notas históricas de TASK-030/105/112 no backlog apontam a semântica vigente.
 
