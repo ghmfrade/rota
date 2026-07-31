@@ -1,6 +1,36 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-07-31 (branch `redesign`) — **TASK-121
+**Atualização mais recente:** 2026-07-31 (branch `redesign`) — **TASK-122
+concluída e aprovada com ressalvas, com uma condição de merge aberta**. A
+implementação `94c4468` condiciona a composição da superfície `acoes-viagem` ao
+modo compacto (`flex-row` no compacto, `flex-col` no completo) e só renderiza
+`Restaurar sugestão` fora do compacto
+(`src/formulario/viagens/etapa-viagens.tsx:1252-1286`); a preferência de lado
+SEG–SÁB/DOM já vinha da TASK-121 e não foi tocada. O parecer
+`14-REVISOES/TASK-122-20260731.md` reutiliza a suíte verde (1.385 unitários +
+104 E2E; fingerprint `27b359c6…`; identidade `498d7fa6…`) e não encontrou
+violação de RN Alta, de NEG-xxx nem de escopo no código — os seis itens do "Fora
+de escopo" estão respeitados. A **ressalva impeditiva é documental**: o mesmo
+commit reescreveu a frase de fechamento da **DEC-101**
+(`10-DECISION_LOG.md:1360-1362`), que antes dizia que ativar headway no modo
+compacto **substitui** os dois botões pelo formulário, para dizer que os botões
+permanecem ao lado — e o código segue a nova redação. A leitura é sustentada
+pela **Q-079** e pela **DEC-100**, ambas intocadas, mas a mudança de texto de uma
+decisão aceita cabe ao responsável (`/registrar-decisao`), não à implementação;
+enquanto não houver ratificação explícita — ou reversão com ajuste de código e
+testes —, o **critério de aceite 4 da TASK-122 fica não verificado conforme
+redigido**. Ressalvas não impeditivas: acentuação e largura da linha nova da
+DEC-101, e a reformatação automática que reescreveu `10-DECISION_LOG.md` inteiro
+(conferido: as 101 âncoras `## DEC-` estão íntegras, nada foi perdido). Com a
+122 entregue, o **desdobramento do Grupo H fica sem tasks pendentes**; a TASK-122
+absorveu o follow-up de cobertura de feriados/excepcionais da TASK-121 (os três
+cenários novos exercitam as três grades), mas **não** o de alinhar o fechamento
+da superfície ao "hover **ou** foco" da DEC-100, que **segue aberto sem task
+dona**. A TASK-122 nasceu depois da última contagem e **não integrava** as 10
+tasks não concluídas, que permanecem **10: 8 executáveis, a TASK-038 com
+bloqueio parcial e a TASK-040 bloqueada**.
+
+**Histórico anterior (2026-07-31) — TASK-121:** **TASK-121
 concluída e aprovada com ressalvas**. A implementação `2962df3` cria o primitivo
 compartilhado `SuperficieFlutuante` (`src/shared/ui/superficie-flutuante.tsx`,
 documentado no `18-DESIGN_SYSTEM.md` §3) e move para ele as quatro superfícies de
@@ -493,6 +523,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 112 | Origem estendida da semeadura entre grades + sincronização preservando UUID — aprovada em `14-REVISOES/TASK-112-20260730.md` |
 | 120 | `Copiar (sobrescrever)` único na semeadura de grades, com a sincronização preservando UUID da Spec 04 §8.5 (DEC-099) — implementada em `caec734` e aprovada com ressalvas documentais/de cobertura em `14-REVISOES/TASK-120-20260730.md`; ressalva documental encerrada por `ceac3be` e confirmada na reavaliação `14-REVISOES/TASK-120-20260730-reavaliacao.md`, que mantém aberto só o follow-up dos unitários de imutabilidade/cópia defensiva |
 | 121 | Formulário de headway na superfície flutuante da Viagem, sem linha auxiliar no `<tbody>` e sem recorte pelo `overflow-x-auto` da `Tabela` (DEC-100) — novo primitivo `SuperficieFlutuante` em `shared/ui`; implementada em `2962df3` e aprovada com ressalvas em `14-REVISOES/TASK-121-20260731.md` (fechamento segurado só por `<input>` focado; cobertura restrita à grade comum), ambas como follow-up da TASK-122 |
+| 122 | Composição das ações da Viagem no modo compacto — `Restaurar sugestão` oculto e `X` + alternador de headway lado a lado (DEC-101) — implementada em `94c4468` e aprovada com ressalvas em `14-REVISOES/TASK-122-20260731.md`; código exato e suíte verde, mas com **condição de merge aberta**: a reescrita da frase de fechamento da DEC-101 feita no próprio commit precisa de ratificação do responsável (ou reversão), sem a qual o critério de aceite 4 fica não verificado |
 
 ---
 
@@ -667,12 +698,19 @@ responsável decidiu a **Q-078 (DEC-100)** e a **Q-079 (DEC-101)**, criando as
 **TASK-121** e **TASK-122**. A **TASK-121 foi implementada em `2962df3` e
 aprovada com ressalvas** em `14-REVISOES/TASK-121-20260731.md`: as superfícies de
 hover da Viagem passaram ao primitivo `SuperficieFlutuante`, o formulário de
-headway vive nela e a `linha-headway` saiu do corpo da tabela. Com isso a
-**TASK-122** perde a dependência de task (a base flutuante da DEC-101 está
-entregue) e permanece a única pendente deste desdobramento; a ela cabem também os
-dois follow-ups do parecer da 121 — alinhar o fechamento ao "hover **ou** foco"
-da DEC-100 (hoje segurado só por `<input>` focado) e cobrir as grades de feriado
-e excepcionais.
+headway vive nela e a `linha-headway` saiu do corpo da tabela. A **TASK-122 foi
+implementada em `94c4468` e aprovada com ressalvas** em
+`14-REVISOES/TASK-122-20260731.md`: o modo compacto deixa de renderizar
+`Restaurar sugestão` e alinha `X` + alternador na horizontal, o modo completo
+mantém a composição da DEC-090 e nada em `horarios_paradas`, âncoras ou contrato
+JSON é tocado. Com ela, **o desdobramento fica sem tasks pendentes**, mas com uma
+**condição de merge aberta** (ratificação da reescrita da DEC-101 feita no commit
+de implementação — ver cabeçalho). Dos dois follow-ups do parecer da 121, a 122
+absorveu o de cobrir as grades de feriado e excepcionais (os três cenários novos
+percorrem as três grades); o de alinhar o fechamento ao "hover **ou** foco" da
+DEC-100 (hoje segurado só por `<input>` focado) **permanece aberto e sem task
+dona** — precisa virar task nova ou ser absorvido explicitamente, para não sumir
+por ter sido citado num parecer já encerrado.
 
 **Ação de spec (DEC-087) — superada pela DEC-099:** a Spec 04 §8.4/§8.5 foi novamente alterada pelo responsável e hoje descreve **uma única** ação, `Copiar (sobrescrever)`, cuja semântica é a sincronização preservando a UUID do destino casado; o par sobrescrever/mesclar deixou de existir. A **TASK-120** (`caec734`, parecer `14-REVISOES/TASK-120-20260730.md`) implementou essa unificação. O pareamento de reforços coincidentes (RN-062) é por **ordem estável** nos arrays (DEC-099). **Pendência documental encerrada em 2026-07-30:** a RN-007 foi reescrita (cópias aditivas com UUID nova × sincronização entre grades preservando a UUID do destino casado), a menção da RN-099 passou a citar a ação única `Copiar (sobrescrever)`, a linha da RN-007 em `03-TRACEABILITY_MATRIX.md` foi atualizada e a DEC-087 recebeu o status de **superada em parte pela DEC-099**; as notas históricas de TASK-030/105/112 no backlog apontam a semântica vigente.
 
