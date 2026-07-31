@@ -1,6 +1,28 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-07-30 (branch `redesign`) — **TASK-120
+**Atualização mais recente:** 2026-07-31 (branch `redesign`) — **TASK-121
+concluída e aprovada com ressalvas**. A implementação `2962df3` cria o primitivo
+compartilhado `SuperficieFlutuante` (`src/shared/ui/superficie-flutuante.tsx`,
+documentado no `18-DESIGN_SYSTEM.md` §3) e move para ele as quatro superfícies de
+hover da Viagem — inserção anterior, ações (`X`/restaurar/alternar), inserção
+posterior e o novo formulário de headway. O `position: fixed` com coordenadas
+medidas em runtime escapa do recorte do `overflow-x-auto` da `Tabela`, e a
+`<tr data-testid="linha-headway">` foi removida do `<tbody>` conforme a
+**DEC-100**. O parecer `14-REVISOES/TASK-121-20260731.md` reutiliza a suíte verde
+(1.381 unitários + 104 E2E; fingerprint `909d0429…`; identidade `498d7fa6…`),
+com `typecheck` e `lint` limpos. As **ressalvas não são impeditivas de merge**:
+(1) o fechamento da superfície só é segurado quando o foco está num `<input>`
+dela, mais restritivo que o "hover **ou** foco" da DEC-100; (2) os cenários novos
+cobrem só a grade de dias comuns, sem exercitar feriados e Tabelas excepcionais
+(mesmo `corpoGrade`, risco baixo). Ambas ficam como follow-up da **TASK-122**,
+que volta ao mesmo componente. Com a 121 entregue, a **TASK-122 deixa de estar
+bloqueada por dependência de task** (a base flutuante da DEC-101 existe); a
+composição específica do modo compacto **não** foi antecipada e segue sendo
+escopo dela. A TASK-121 nasceu depois da última contagem e **não integrava** as
+10 tasks não concluídas, que permanecem **10: 8 executáveis, a TASK-038 com
+bloqueio parcial e a TASK-040 bloqueada**.
+
+**Histórico anterior (2026-07-30) — TASK-120:** **TASK-120
 concluída e aprovada com ressalvas**. A implementação `caec734` unifica a
 semeadura entre grades numa única ação `Copiar (sobrescrever)`, cuja semântica é
 a sincronização preservando a UUID do destino casado (Spec 04 §8.5; DEC-099):
@@ -470,6 +492,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 111 | Modo compacto da grade: somente Seções de partida visíveis, com dados ocultos preservados e Enter entre partidas — aprovada em `14-REVISOES/TASK-111-20260730.md` |
 | 112 | Origem estendida da semeadura entre grades + sincronização preservando UUID — aprovada em `14-REVISOES/TASK-112-20260730.md` |
 | 120 | `Copiar (sobrescrever)` único na semeadura de grades, com a sincronização preservando UUID da Spec 04 §8.5 (DEC-099) — implementada em `caec734` e aprovada com ressalvas documentais/de cobertura em `14-REVISOES/TASK-120-20260730.md`; ressalva documental encerrada por `ceac3be` e confirmada na reavaliação `14-REVISOES/TASK-120-20260730-reavaliacao.md`, que mantém aberto só o follow-up dos unitários de imutabilidade/cópia defensiva |
+| 121 | Formulário de headway na superfície flutuante da Viagem, sem linha auxiliar no `<tbody>` e sem recorte pelo `overflow-x-auto` da `Tabela` (DEC-100) — novo primitivo `SuperficieFlutuante` em `shared/ui`; implementada em `2962df3` e aprovada com ressalvas em `14-REVISOES/TASK-121-20260731.md` (fechamento segurado só por `<input>` focado; cobertura restrita à grade comum), ambas como follow-up da TASK-122 |
 
 ---
 
@@ -638,6 +661,18 @@ Recurso novo decidido em 2026-07-27 (tabelas de operação excepcional por Servi
 ### Grupo H — Redesign da grade de horários (proposta 2026-07-27)
 
 Proposta do responsável em 2026-07-27 (Excel de layout + 4 imagens em `docs-dev/`). As **TASK-106 a 119 estão concluídas e aprovadas**, e o Grupo H está encerrado. A 106 consolidou seleção, Enter/Tab, retirada de “Apagar bloco” e densidade pública de `Campo`/`Select`; a 107 entregou inserção relativa e a composição da DEC-090; a 108 entregou a geração em lote por headway da DEC-083; a 109 entregou cópia unitária por arrasto e atalhos, com cancelamento fora das colunas coberto em `9f4b4ed`; a 110 entregou cópia e remoção de dia inteiro; a 111 entregou o modo compacto efêmero por Serviço × sentido, com Enter entre partidas e dados ocultos preservados; a 112 entregou a origem estendida entre grades com normalização e sincronização preservando UUID; a 113 preservou os dois últimos deslocamentos da DEC-091; a 114 manteve as ações inteiramente visíveis em domingo; a 115 fez o foco acompanhar a UUID da Viagem após criação/reordenação e redistribuição; a 116 passou a confirmar horários somente por `Enter`/`Tab`, com rascunho local e normalização final; a 117 reancorou as operações de dia nos cabeçalhos e recompôs o headway conforme a DEC-093; a 118 tornou o headway idempotente pela DEC-094; e a 119 destacou somente os reforços coincidentes, agregou o alerta por Serviço, navegou para a primeira origem e acrescentou o toggle da DEC-096. A entrega `8cc8908` da TASK-110 foi corrigida em `d594034` e aprovada na reavaliação `14-REVISOES/TASK-110-20260729.md`: a cópia preserva reforços da origem e o `Dialogo` contém, estabiliza e restaura o foco. A entrega `92414d2` da TASK-116 foi corrigida em `213626d` e aprovada na reavaliação `14-REVISOES/TASK-116-20260728.md`; o E2E da TASK-105 confirmou a herança na grade excepcional. A **TASK-117 foi aprovada na reavaliação final** `14-REVISOES/TASK-117-20260730-reavaliacao.md` após `bf98389` encerrar a ressalva documental. A **TASK-118 foi aprovada na reavaliação final** `14-REVISOES/TASK-118-20260730-reavaliacao.md` após `2a72bd1` versionar TASK-118/Q-072/DEC-094 e encerrar a única ressalva documental. A **TASK-119 foi implementada em `233501e` e aprovada sem ressalvas** no parecer `14-REVISOES/TASK-119-20260730.md`; cobre também as grades excepcionais exigidas pela DEC-097 e permanece independente da guarda da TASK-118. A **TASK-109 foi aprovada sem ressalvas remanescentes** em `14-REVISOES/TASK-109-20260730.md`, encerrando a condição registrada no parecer de 2026-07-28. A **TASK-111 foi implementada em `4dbf068` e aprovada sem ressalvas** em `14-REVISOES/TASK-111-20260730.md`. A **TASK-112 foi implementada em `595e290` e aprovada sem ressalvas** em `14-REVISOES/TASK-112-20260730.md`. Botões de ação da Viagem surgem **no hover**.
+
+**Desdobramento do Grupo H (2026-07-30/31):** depois do encerramento acima, o
+responsável decidiu a **Q-078 (DEC-100)** e a **Q-079 (DEC-101)**, criando as
+**TASK-121** e **TASK-122**. A **TASK-121 foi implementada em `2962df3` e
+aprovada com ressalvas** em `14-REVISOES/TASK-121-20260731.md`: as superfícies de
+hover da Viagem passaram ao primitivo `SuperficieFlutuante`, o formulário de
+headway vive nela e a `linha-headway` saiu do corpo da tabela. Com isso a
+**TASK-122** perde a dependência de task (a base flutuante da DEC-101 está
+entregue) e permanece a única pendente deste desdobramento; a ela cabem também os
+dois follow-ups do parecer da 121 — alinhar o fechamento ao "hover **ou** foco"
+da DEC-100 (hoje segurado só por `<input>` focado) e cobrir as grades de feriado
+e excepcionais.
 
 **Ação de spec (DEC-087) — superada pela DEC-099:** a Spec 04 §8.4/§8.5 foi novamente alterada pelo responsável e hoje descreve **uma única** ação, `Copiar (sobrescrever)`, cuja semântica é a sincronização preservando a UUID do destino casado; o par sobrescrever/mesclar deixou de existir. A **TASK-120** (`caec734`, parecer `14-REVISOES/TASK-120-20260730.md`) implementou essa unificação. O pareamento de reforços coincidentes (RN-062) é por **ordem estável** nos arrays (DEC-099). **Pendência documental encerrada em 2026-07-30:** a RN-007 foi reescrita (cópias aditivas com UUID nova × sincronização entre grades preservando a UUID do destino casado), a menção da RN-099 passou a citar a ação única `Copiar (sobrescrever)`, a linha da RN-007 em `03-TRACEABILITY_MATRIX.md` foi atualizada e a DEC-087 recebeu o status de **superada em parte pela DEC-099**; as notas históricas de TASK-030/105/112 no backlog apontam a semântica vigente.
 
