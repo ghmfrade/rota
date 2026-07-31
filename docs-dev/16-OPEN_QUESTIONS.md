@@ -1282,3 +1282,97 @@ do responsável: no modo compacto, `Restaurar sugestão` fica oculto, `X` e o
 alternador de headway aparecem lado a lado, SEG–SÁB preferem abrir à direita e
 DOM à esquerda. Ao reexibir todas as Seções, retorna a composição completa da
 DEC-090; ao ativar headway, entra o formulário flutuante da DEC-100.
+
+## Q-080 — Qual deve ser a largura das superfícies flutuantes de ação da Viagem?
+
+**Status:** Decidida — DEC-102
+
+**Origem:** observação do responsável pelo domínio sobre o hover entregue pelas
+TASK-121/TASK-122 (2026-07-31)
+
+**Contexto:** as superfícies `acao-inserir-anterior`, `acao-inserir-posterior` e
+`superficie-headway` compõem um campo `HH:MM` (`min-w-20`) mais um botão
+(`min-w-10`), resultando numa caixa sensivelmente mais larga que a célula de
+horário que a ancora. O responsável avalia que a caixa deve ter a **largura da
+célula de horário** para não cobrir colunas vizinhas nem parecer desalinhada. A
+DEC-100 fixou a *composição* (duas linhas e um botão à direita abrangendo
+ambas), mas não fixou largura; nenhuma DEC anterior fixa a largura dessas
+superfícies.
+
+**Spec relacionada:** Spec 04 §8.1/§8.2/§8.3; RN-096;
+DEC-082/DEC-090/DEC-093/DEC-100/DEC-101;
+`docs-dev/18-DESIGN_SYSTEM.md` §3/§5/§6.
+
+**Impacto se não decidir:** o hover continua mais largo que a coluna,
+sobrepondo células vizinhas e forçando reposicionamento em SÁB/DOM com mais
+frequência do que o necessário. Por outro lado, estreitar a caixa pode reduzir a
+legibilidade do campo `HH:MM` e do botão, e a DEC-090 pede "controles ±X largos
+e legíveis" — daí a necessidade de decisão explícita.
+
+**Opções:** A — a superfície assume a largura da célula de horário que a ancora
+(medida em runtime), com o conteúdo se adaptando a essa largura;
+B — a superfície recebe uma largura fixa em token do design system, próxima da
+largura nominal da coluna, sem medir a célula; C — manter a largura atual
+dirigida pelo conteúdo, apenas reduzindo os mínimos (`min-w-20`/`min-w-10`).
+
+**Recomendação técnica:** A. A `SuperficieFlutuante` já mede a âncora em runtime
+para posicionar, de modo que reutilizar a mesma medida para a largura não
+acrescenta mecanismo novo e mantém o alinhamento mesmo quando a largura da
+coluna varia com o conteúdo. Se a decisão for A, é preciso definir também o
+piso mínimo de legibilidade (a caixa não deve encolher a ponto de cortar
+`HH:MM`) e se o botão continua na coluna à direita das duas linhas do headway.
+
+**Decisão:** **Decidida (DEC-102, 2026-07-31).** Opção A, com detalhamento
+explícito do responsável: a superfície assume a largura da célula de horário
+medida em runtime; há **piso de legibilidade** — a caixa nunca encolhe a ponto
+de truncar `HH:MM` ou o alvo mínimo do botão, e em coluna mais estreita que o
+piso ela usa o piso e transborda o mínimo indispensável; o botão único do
+headway continua na coluna à direita abrangendo as duas linhas (DEC-100).
+
+## Q-081 — Ordem dos botões na superfície da Viagem e tolerância de fechamento do hover
+
+**Status:** Decidida — DEC-103
+
+**Origem:** observação do responsável pelo domínio sobre o hover entregue pelas
+TASK-121/TASK-122 (2026-07-31)
+
+**Contexto:** hoje o `X` de apagar vem antes do alternador de headway (`↪`) — em
+coluna no modo completo (DEC-090) e lado a lado no modo compacto (DEC-101).
+Depois de clicar no alternador, o usuário precisa deslocar o ponteiro até os
+campos `a cada`/`até` do formulário da DEC-100; com o alternador no fim da
+composição, esse trajeto passa por fora da âncora e da superfície e o hover
+fecha antes de o ponteiro chegar ao campo. O responsável propõe **inverter a
+ordem** (1º o alternador, 2º o `X`) e **atrasar em cerca de 0,5 s** o
+fechamento — hoje `agendarSaidaHover` usa 300 ms.
+
+**Spec relacionada:** Spec 04 §8.2/§8.3; RN-096 (estado de hover é efêmero);
+DEC-090/DEC-101/DEC-100; `docs-dev/18-DESIGN_SYSTEM.md` §3/§5/§6.
+
+**Impacto se não decidir:** a inversão supera parcialmente a DEC-090 ("X no topo
+à direita", restaurar imediatamente abaixo do X) e a ordem descrita na DEC-101
+("`X` e o alternador de headway lado a lado"), de modo que implementar sem
+decisão seria alterar composição já decidida. Manter como está preserva as
+decisões, mas conserva o problema de usabilidade relatado. O atraso maior é
+tuning do mesmo gesto, mas convém decidir junto porque só faz sentido como par.
+
+**Opções:** A — inverter a ordem em ambos os modos (alternador primeiro, `X`
+depois; no modo completo, definir também onde fica `Restaurar sugestão`) e
+elevar o atraso de fechamento para ~500 ms; B — inverter a ordem apenas no modo
+compacto, mantendo a coluna da DEC-090 no modo completo, com o mesmo atraso
+maior; C — manter a ordem atual e resolver apenas com atraso maior e/ou uma
+faixa de tolerância entre a âncora e a superfície.
+
+**Recomendação técnica:** A, com a ressalva de que o `X` destrutivo deve
+continuar visualmente distinto e não deve assumir a posição onde o usuário
+clicava no alternador por hábito. O atraso deve permanecer um único valor
+compartilhado (hoje em `agendarSaidaHover`), não um por superfície, e continuar
+sendo estado efêmero (RN-096). No modo completo é preciso dizer explicitamente
+a ordem final dos três controles (alternador, restaurar, `X`) para não deixar a
+DEC-090 ambígua.
+
+**Decisão:** **Decidida (DEC-103, 2026-07-31).** Opção B, por confirmação
+explícita do responsável: a inversão vale **somente no modo compacto** — o
+alternador de headway vem primeiro e o `X` depois; no modo completo a coluna da
+DEC-090 permanece intacta (`X` no topo, `Restaurar sugestão` no meio,
+alternador no fim). O atraso de fechamento do hover sobe de 300 ms para ~500 ms,
+num valor único compartilhado pelas superfícies e pelos dois modos.

@@ -7481,4 +7481,434 @@ supera a DEC-090 apenas durante o modo compacto.
 
 ---
 
+## TASK-123 — Restaurar a inserção de Viagem posterior por offset no modo compacto
+
+## Objetivo
+
+Fazer com que, no modo "Exibir somente partidas", o hover da Viagem volte a
+oferecer o controle de criar outra Viagem "X tempo depois", hoje disponível
+apenas quando todas as Seções estão visíveis.
+
+## Contexto
+
+A DEC-086 definiu o modo compacto como **modo de exibição** que mantém "todas as
+funções de cópia/inserção". Na implementação atual, porém, a superfície
+`acao-inserir-posterior` só é renderizada no ramo das células passantes
+(`posicaoNaSuperficie === "fim"`), que não existe quando `secoesDaGrade.length
+=== 1`. O resultado é que, no modo compacto, o usuário tem a inserção anterior
+(`↑`, ancorada na célula de partida) e o alternador de headway, mas não tem a
+inserção posterior (`↓`). O comentário deixado pela TASK-121 registra a ausência
+como herdada ("a inserção posterior segue indisponível nesse modo, como antes da
+TASK-121"), sem decisão que a sustente — ela contradiz a DEC-086. A superfície de
+headway já demonstra que a célula de partida consegue ancorar um flutuante
+`abaixo` no modo compacto, então o mecanismo necessário já existe.
+
+## Fora de escopo
+
+- Alterar o motor de inserção relativa, o cálculo do offset, a guarda de
+  duplicidade ou os últimos deslocamentos compartilhados (DEC-082/DEC-091).
+- Alterar a composição, a ordem ou a largura das superfícies (TASK-124/TASK-125,
+  Q-080/Q-081).
+- Alterar quais Seções o modo compacto oculta, sua persistência efêmera ou a
+  navegação por Enter (DEC-086/TASK-111).
+- Alterar o formulário de headway, seu cálculo ou seu limite inclusivo.
+- Alterar contrato JSON, PDF, Comparador ou contagens.
+
+## Specs fonte
+
+- Spec 04 §8.1 (estrutura da grade e modo de apresentação)
+- Spec 04 §8.3 ("Inserir viagem entre viagens ou no início da grade")
+- Spec 02 §11/§12 (Viagem e identidade)
+- `docs-dev/18-DESIGN_SYSTEM.md` §3/§5/§6 (flutuantes, reposicionamento,
+  acessibilidade)
+
+## Regras envolvidas
+
+- RN-061 (a ação pertence à Viagem/dia correto)
+- RN-063 (Seções ocultas permanecem íntegras)
+- RN-067 (o modo compacto não expõe offsets ao usuário)
+- RN-096 (modo e hover são estado efêmero)
+- RN-004/RN-007 (a Viagem inserida é entidade nova, com UUID nova)
+
+## Entidades afetadas
+
+- Viagem (criação por offset relativo)
+- Horários de passagem (gerados pela sugestão inicial da Viagem criada)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor (⚠ exige decisão humana — RN-093)
+- [ ] PDF
+- [x] JSON (contrato) — apenas como resultado da Viagem criada; sem campo novo
+
+## Critérios de aceite
+
+- [ ] No modo compacto, o hover de uma Viagem exibe o controle de inserção
+      posterior (`acao-inserir-posterior`, campo de deslocamento + `↓`),
+      ancorado na célula de partida.
+- [ ] O controle inserido no modo compacto usa os mesmos `data-testid` e
+      `aria-label` já existentes no modo completo, sem duplicá-los na mesma
+      árvore.
+- [ ] Acionar a inserção posterior no modo compacto cria a Viagem com o mesmo
+      resultado do modo completo: mesmo offset aplicado sobre `horario_saida`,
+      UUID nova e `horarios_paradas` completo.
+- [ ] Ativar o modo headway continua substituindo a inserção posterior pela
+      superfície de headway também no modo compacto (DEC-100), sem exibir as
+      duas simultaneamente.
+- [ ] O controle não é recortado no primeiro/último dia nem na primeira/última
+      Viagem visível, reaproveitando o reposicionamento da TASK-121.
+- [ ] Alternar entre modo compacto e completo não duplica, não perde nem
+      reordena controles, e não altera `horarios_paradas`, âncoras ou UUIDs.
+- [ ] A mensagem de erro de inserção relativa (`erro-insercao-relativa`)
+      continua sendo exibida associada ao controle nos dois modos.
+- [ ] O comportamento vale nas grades comum, de feriados e excepcionais.
+
+## Casos válidos
+
+- Modo compacto, SEG, Viagem 08:00, deslocamento `00:30`: cria Viagem 08:30 no
+  mesmo dia, com UUID nova e offsets derivados da sugestão inicial.
+- Modo compacto, última Viagem do dia: o flutuante abre e permanece
+  inteiramente visível.
+- Modo compacto, DOM: o flutuante se reposiciona sem sair da área útil.
+- Alternar para o modo completo após inserir: a Viagem criada aparece com todas
+  as Seções preenchidas.
+
+## Casos inválidos
+
+- Deslocamento vazio, `00:00` ou fora de máscara: mantém a recusa e a mensagem
+  atuais, sem criar Viagem.
+- Inserção que resultaria em Viagem duplicada no mesmo `horario_saida`: mantém
+  exatamente a política já vigente no modo completo (nada de política nova).
+- Renderizar simultaneamente `acao-inserir-posterior` e `superficie-headway`
+  para a mesma Viagem: exibir um estado por vez.
+- Resolver a ausência reintroduzindo linha auxiliar no `<tbody>`: proibido pela
+  DEC-100.
+
+## Testes esperados
+
+- Unitários/componente: presença do controle no modo compacto e no completo;
+  ausência de duplicação de `data-testid`; troca com o modo headway; inserção
+  produzindo a mesma Viagem nos dois modos.
+- Integração: alternância entre modos preservando `horarios_paradas`, âncoras e
+  UUIDs; erro de inserção relativa exibido nos dois modos.
+- E2E: modo compacto em SEG e DOM, `boundingBox()` do controle contido na área
+  útil, inserção efetiva pela UI, com OSRM mockado.
+- Snapshot/contrato JSON: a Viagem criada pelo modo compacto é idêntica à
+  criada pelo modo completo, exceto pela UUID.
+- PDF: n/a.
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/etapa-viagens.tsx`
+- `testes/unitarios/formulario/etapa-viagens-modo-compacto.test.tsx`
+- `testes/unitarios/formulario/etapa-viagens-insercao-relativa.test.tsx`
+- `testes/e2e/etapa-viagens.spec.ts`
+
+## Dependências
+
+- TASK-111, TASK-121 e TASK-122 concluídas.
+- Nenhuma Q-xxx pendente: a DEC-086 já garante a disponibilidade das funções de
+  inserção no modo compacto.
+
+## Riscos
+
+- Extrair a superfície para reuso entre os dois ramos de renderização e, com
+  isso, alterar sem querer a âncora usada no modo completo.
+- Duplicar `data-testid` ao renderizar o controle nos dois ramos ao mesmo tempo.
+- Colidir com a superfície de headway, que também ancora `abaixo` na célula de
+  partida no modo compacto.
+- Regressão no reposicionamento entregue pela TASK-121.
+
+## Perguntas em aberto
+
+- Nenhuma.
+
+---
+
+## TASK-124 — Limitar a largura das superfícies flutuantes da Viagem à largura da célula de horário — **desbloqueada (DEC-102)**
+
+## Objetivo
+
+Fazer com que as superfícies de inserção anterior/posterior e o formulário de
+headway tenham a largura da célula de horário que os ancora, em vez de uma
+largura dirigida pelo conteúdo que ultrapassa a coluna e cobre células vizinhas.
+
+## Contexto
+
+As três superfícies compõem um campo `HH:MM` com `min-w-20` e um botão com
+`min-w-10`, mais `gap` e padding da caixa — resultado sensivelmente mais largo
+que a coluna de um dia. O responsável pelo domínio relatou que a caixa "está
+muito grande" e que o correto é ter o tamanho das células de horário. A
+`SuperficieFlutuante` já mede a âncora em runtime para posicionar, mas usa a
+largura natural do conteúdo. Nenhuma DEC fixa a largura dessas superfícies; a
+DEC-100 fixa apenas a composição em duas linhas com botão único à direita, e a
+DEC-090 pede controles "largos e legíveis" — por isso a largura foi levada à
+Q-080, decidida pela **DEC-102**: largura da célula medida em runtime, com piso
+de legibilidade e botão do headway preservado na coluna à direita.
+
+## Fora de escopo
+
+- Alterar a composição em duas linhas, a máscara, a validação, o estado
+  desabilitado ou o cálculo do headway (DEC-083/DEC-093/DEC-094/DEC-100).
+- Alterar a ordem dos botões ou o atraso de fechamento do hover (TASK-125,
+  Q-081).
+- Alterar a largura das colunas da grade, o `overflow-x` da `Tabela` ou o
+  layout da tabela.
+- Alterar o algoritmo de reposicionamento entregue pela TASK-121 além do
+  necessário para acomodar a nova largura.
+- Criar token, variante ou prop compartilhada sem necessidade real no design
+  system.
+
+## Specs fonte
+
+- Spec 04 §8.1 (estrutura da grade)
+- Spec 04 §8.2/§8.3 (ações da Viagem e da grade)
+- `docs-dev/18-DESIGN_SYSTEM.md` §3/§5/§6 (flutuantes, tokens, densidade,
+  acessibilidade)
+
+## Regras envolvidas
+
+- RN-061 (a superfície permanece associada à Viagem correta)
+- RN-096 (largura/abertura são estado efêmero, não dado)
+
+## Entidades afetadas
+
+- Viagem (somente apresentação)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor (⚠ exige decisão humana — RN-093)
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Conforme a DEC-102, a largura de `acao-inserir-anterior`,
+      `acao-inserir-posterior` e `superficie-headway` passa a corresponder à
+      largura da célula de horário-âncora, medida em runtime.
+- [ ] A caixa não ultrapassa horizontalmente a coluna do dia ao qual pertence,
+      exceto quando o reposicionamento da TASK-121 precisar deslocá-la para
+      mantê-la dentro da área útil.
+- [ ] O piso de legibilidade da DEC-102 é respeitado: `HH:MM` nunca é truncado,
+      o botão continua alcançável por ponteiro e teclado e nenhum controle fica
+      com alvo menor que o mínimo do design system.
+- [ ] Em coluna mais estreita que o piso, a superfície usa o piso e transborda
+      o mínimo indispensável, em vez de encolher o conteúdo.
+- [ ] No headway, o botão único continua na coluna à direita abrangendo as duas
+      linhas (DEC-100), dentro da nova largura.
+- [ ] Nada muda na estrutura semântica da tabela nem nas larguras das colunas
+      da grade.
+- [ ] `data-testid`, `aria-*`, foco visível e ordem de teclado são preservados.
+- [ ] Vale igualmente no modo completo e no compacto, nas grades comum, de
+      feriados e excepcionais.
+
+## Casos válidos
+
+- Hover em Viagem de SEG no modo completo: a caixa cobre apenas a coluna de SEG.
+- Hover no modo compacto: a caixa acompanha a mesma largura da célula de
+  partida.
+- Coluna mais larga por causa de um nome de Seção longo: a caixa acompanha a
+  largura efetiva medida.
+- Headway ativo: `a cada`, `até` e o botão cabem na largura da célula sem
+  quebrar a composição de duas linhas.
+
+## Casos inválidos
+
+- Caixa estreita a ponto de truncar `HH:MM` ou o placeholder: preservar o piso
+  mínimo de legibilidade fixado pela DEC-102.
+- Alargar as colunas da grade para "caber" a superfície: proibido — a grade não
+  muda.
+- Remover a rolagem horizontal da `Tabela` como solução: preserva-se o contrato
+  do design system.
+- Aplicar a largura por `style=` inline fora do mecanismo já existente de
+  posicionamento medido: proibido pelo `docs-dev/18` §6.1, que admite a exceção
+  apenas para a posição calculada em runtime.
+
+## Testes esperados
+
+- Unitários/componente: cálculo da largura a partir da âncora; piso mínimo;
+  preservação da composição de duas linhas e dos seletores.
+- Integração: mudança de largura da coluna refletida na superfície; nenhuma
+  mutação do itinerário ao abrir/fechar.
+- E2E: `boundingBox().width` da superfície comparado ao da célula-âncora em SEG
+  e DOM, modo completo e compacto; conteúdo não truncado; OSRM mockado.
+- Snapshot/contrato JSON: abrir/fechar a superfície não altera o documento.
+- PDF: n/a.
+
+## Arquivos prováveis
+
+- `src/shared/ui/superficie-flutuante.tsx`
+- `src/formulario/viagens/etapa-viagens.tsx`
+- `src/shared/ui/index.ts` e `docs-dev/18-DESIGN_SYSTEM.md`, somente se a
+  decisão exigir prop/variante compartilhada nova
+- `testes/unitarios/shared/superficie-flutuante.test.tsx`
+- `testes/unitarios/formulario/etapa-viagens-headway.test.tsx`
+- `testes/e2e/etapa-viagens.spec.ts`
+
+## Dependências
+
+- Q-080 decidida pela opção A, com detalhamento explícito (DEC-102).
+- TASK-121 e TASK-122 concluídas.
+
+## Riscos
+
+- Estreitar a caixa e quebrar a composição de duas linhas da DEC-100.
+- Medir a âncora antes da estabilização do layout e produzir largura errada no
+  primeiro quadro.
+- Conflito entre largura medida e o reposicionamento por lado preferido.
+- Regressão de acessibilidade por alvos de clique menores que o mínimo.
+
+## Perguntas em aberto
+
+- Nenhuma — Q-080 decidida pela opção A, com detalhamento explícito (DEC-102).
+
+---
+
+## TASK-125 — Inverter a ordem alternador/`X` no modo compacto e ampliar a tolerância de fechamento do hover — **desbloqueada (DEC-103)**
+
+## Objetivo
+
+No modo compacto, colocar o alternador de headway antes do `X` de apagar na
+superfície de ações da Viagem, e ampliar o atraso de fechamento do hover nos
+dois modos, para que o usuário consiga alcançar os campos `a cada`/`até` depois
+de acionar o alternador sem a superfície desaparecer no caminho.
+
+## Contexto
+
+Hoje o `X` vem primeiro — em coluna no modo completo (DEC-090) e lado a lado no
+modo compacto (DEC-101) — e o alternador fica no fim da composição. Ao ativar o
+headway, o ponteiro precisa percorrer da posição do alternador até os campos do
+formulário; nesse trajeto ele sai da âncora e da superfície, e o fechamento
+agendado em `agendarSaidaHover` (300 ms) dispara antes da chegada. O responsável
+pelo domínio pediu a inversão da ordem e um atraso de aproximadamente 0,5 s. A
+**DEC-103** restringiu a inversão ao **modo compacto** — a linha única, onde os
+dois botões ficam lado a lado e o trajeto é crítico — e manteve o modo completo
+exatamente como está (`X`, `Restaurar sugestão`, alternador), preservando a
+DEC-090 íntegra. O atraso maior vale nos dois modos.
+
+## Fora de escopo
+
+- Alterar quais botões existem em cada modo — `Restaurar sugestão` continua
+  oculto no compacto (DEC-101) e presente no completo (DEC-090).
+- Alterar a largura das superfícies (TASK-124/Q-080).
+- Alterar o formulário, o cálculo, o limite ou a guarda de duplicidade do
+  headway.
+- Alterar a semântica de apagar, a confirmação destrutiva ou a restauração.
+- Transformar o fechamento por hover em fechamento por clique/pin, ou persistir
+  o estado do hover.
+
+## Specs fonte
+
+- Spec 04 §8.2 (ações por Viagem)
+- Spec 04 §8.3 (ações da grade)
+- `docs-dev/18-DESIGN_SYSTEM.md` §3/§5/§6 (composição de botões, flutuantes,
+  acessibilidade)
+
+## Regras envolvidas
+
+- RN-061 (a ação continua restrita à Viagem correta)
+- RN-096 (hover, atraso e modo headway são estado efêmero)
+
+## Entidades afetadas
+
+- Viagem (somente apresentação e interação)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor (⚠ exige decisão humana — RN-093)
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Conforme a DEC-103, no **modo compacto** o alternador de headway aparece
+      antes do `X` na superfície `acoes-viagem`.
+- [ ] No **modo completo** a composição não muda: `X` no topo,
+      `Restaurar sugestão` no meio e o alternador no fim, exatamente como a
+      DEC-090 define hoje.
+- [ ] O atraso de fechamento do hover passa a ~500 ms, num único ponto
+      compartilhado, sem valores diferentes por superfície.
+- [ ] Após clicar no alternador, mover o ponteiro da posição do alternador até
+      o campo `a cada` mantém a superfície aberta.
+- [ ] Sair efetivamente da Viagem e do flutuante continua fechando a superfície
+      após o atraso; `Esc` continua fechando imediatamente e devolvendo o foco à
+      célula-âncora.
+- [ ] A regra "permanece aberta enquanto houver hover **ou** foco" (DEC-100)
+      permanece intacta, inclusive durante a digitação nos campos.
+- [ ] `data-testid`, `aria-label`, `aria-pressed`, foco visível e ordem de
+      teclado dos controles são preservados; a ordem de tabulação acompanha a
+      nova ordem visual.
+- [ ] A inversão vale apenas no modo compacto; o atraso maior vale nos dois
+      modos, nas grades comum, de feriados e excepcionais.
+
+## Casos válidos
+
+- Modo compacto, SEG: hover mostra `↪` e depois `X`, lado a lado; clicar em `↪`
+  e caminhar até `a cada` mantém a superfície.
+- Modo completo: os três controles continuam em `X`, `↻`, `↪`, operáveis por
+  teclado, e apenas o atraso maior é observável.
+- Sair da Viagem e voltar antes de ~500 ms: a superfície não pisca nem perde o
+  rascunho de headway.
+- `Esc` com foco no campo `até`: fecha imediatamente e devolve o foco à célula
+  de partida.
+
+## Casos inválidos
+
+- Atraso que mantenha a superfície aberta indefinidamente após sair de hover e
+  foco: deve fechar.
+- Ordem visual e ordem de tabulação divergentes: devem coincidir.
+- Reordenar deixando o `X` destrutivo sob o cursor logo após um clique no
+  alternador, induzindo apagar por engano: evitar essa adjacência.
+- Inverter também a coluna do modo completo: a DEC-090 permanece íntegra.
+- Introduzir atraso diferente por superfície ou por modo: valor único.
+
+## Testes esperados
+
+- Unitários/componente: ordem de renderização por modo — invertida no compacto,
+  inalterada no completo; ordem de tabulação; valor único do atraso; `Esc`
+  imediato.
+- Integração: com temporizadores controlados, sair da âncora e entrar na
+  superfície dentro da janela de ~500 ms mantém a superfície aberta; sair de
+  vez fecha; digitação não é interrompida.
+- E2E: no modo compacto e no completo, acionar o alternador e alcançar o campo
+  `a cada` com o ponteiro sem o flutuante fechar; geração por headway continua
+  funcionando com OSRM mockado.
+- Snapshot/contrato JSON: abrir, alternar e fechar não altera o documento.
+- PDF: n/a.
+
+## Arquivos prováveis
+
+- `src/formulario/viagens/etapa-viagens.tsx`
+- `testes/unitarios/formulario/etapa-viagens-modo-compacto.test.tsx`
+- `testes/unitarios/formulario/etapa-viagens-headway.test.tsx`
+- `testes/e2e/etapa-viagens.spec.ts`
+
+## Dependências
+
+- Q-081 decidida pela opção B, confirmada explicitamente (DEC-103).
+- TASK-121 e TASK-122 concluídas.
+- Independente da TASK-123 e da TASK-124; se implementadas juntas, coordenar os
+  testes E2E geométricos.
+
+## Riscos
+
+- Apagar Viagem por engano por causa da nova adjacência do `X`.
+- Atraso maior deixar superfícies abertas sobrepostas ao percorrer várias
+  Viagens rapidamente.
+- Testes existentes com temporizadores fictícios quebrarem ao mudar o valor.
+- Aplicar a inversão também ao modo completo por descuido ao compartilhar a
+  composição entre os dois ramos de renderização.
+
+## Perguntas em aberto
+
+- Nenhuma — Q-081 decidida pela opção B (DEC-103).
+
+---
+
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.

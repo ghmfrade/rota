@@ -1380,3 +1380,103 @@ devem cobrir SEG/DOM, completo/compacto, retorno do restaurar, troca para o
 formulário da DEC-100 e preservação de `horarios_paradas`. Nenhuma RN, spec,
 contrato JSON, PDF, Comparador ou contagem precisa ser alterada.
 **Tasks:** TASK-111, TASK-114, TASK-117, TASK-121 e TASK-122.
+
+## DEC-102 — Superfícies flutuantes da Viagem assumem a largura da célula de horário-âncora, com piso de legibilidade
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, opção A
+da **Q-080**, com detalhamento explícito; Spec 04 §8.1/§8.2/§8.3; RN-061/RN-096;
+DEC-082/DEC-090/DEC-093/DEC-100/DEC-101;
+`docs-dev/18-DESIGN_SYSTEM.md` §3/§5/§6 · **Data:** 2026-07-31
+
+**Decisão:** as superfícies flutuantes de ação da Viagem — inserção anterior
+(`acao-inserir-anterior`), inserção posterior (`acao-inserir-posterior`) e o
+formulário de headway (`superficie-headway`) — passam a ter a **largura da
+célula de horário que as ancora**, medida em runtime, com o conteúdo se
+adaptando a essa largura. Dois detalhamentos explícitos do responsável:
+
+- **Piso de legibilidade:** a caixa nunca encolhe abaixo do necessário para
+  exibir `HH:MM` por inteiro e para preservar o alvo mínimo do botão. Quando a
+  coluna for mais estreita que esse piso, a superfície usa o piso e transborda o
+  mínimo indispensável, em vez de truncar o conteúdo.
+- **Composição do headway preservada:** o botão único continua na coluna à
+  direita, abrangendo visualmente as duas linhas `a cada` e `até` (DEC-100),
+  agora dentro da nova largura.
+
+**Motivo:** a composição atual (campo `min-w-20` + botão `min-w-10`, mais `gap` e
+padding) produz uma caixa sensivelmente mais larga que a coluna de um dia, que
+cobre células vizinhas, parece desalinhada com a âncora e força reposicionamento
+em SÁB/DOM com mais frequência que o necessário. A `SuperficieFlutuante` já mede
+a âncora em runtime para posicionar, de modo que reutilizar a mesma medida para
+a largura não acrescenta mecanismo novo e mantém o alinhamento mesmo quando a
+largura da coluna varia com o conteúdo.
+
+**Consequências:** resolve a **Q-080** e **desbloqueia a TASK-124**. Não supera
+a DEC-100 — a composição em duas linhas com botão único à direita permanece
+integralmente válida —, apenas fixa a largura, que nenhuma decisão anterior
+tratava. A DEC-090 continua válida quanto a controles legíveis: o piso de
+legibilidade é justamente o que a preserva. As larguras das colunas da grade, o
+`overflow-x` da `Tabela` e a estrutura semântica da tabela não mudam.
+
+**Impacto em implementação:** **RN:** RN-061 e RN-096 — sem mudança de texto;
+largura e abertura continuam sendo estado efêmero, nunca dado. **Módulos:**
+`src/shared/ui/superficie-flutuante.tsx` (largura derivada da mesma medição da
+âncora já usada para posicionar, respeitando o piso) e
+`src/formulario/viagens/etapa-viagens.tsx` (mínimos do campo e do botão nas três
+superfícies). A largura calculada em runtime segue coberta pela exceção do
+`docs-dev/18` §6.1, que admite valor dinâmico medido — não autoriza `style=`
+inline para estilo estático. Testes: componente para o cálculo e o piso, E2E
+comparando `boundingBox().width` da superfície com o da célula-âncora em SEG e
+DOM, modo completo e compacto. Nenhuma spec, contrato JSON, PDF, Comparador ou
+contagem precisa ser alterada.
+**Tasks:** TASK-121, TASK-122 e TASK-124.
+
+## DEC-103 — Inversão alternador/`X` restrita ao modo compacto; atraso único de fechamento do hover em ~500 ms
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, opção B
+da **Q-081**, confirmada explicitamente nesta conversa após ele detalhar que o
+modo completo não se altera; Spec 04 §8.2/§8.3; RN-061/RN-096;
+DEC-090/DEC-100/DEC-101; `docs-dev/18-DESIGN_SYSTEM.md` §3/§5/§6 ·
+**Data:** 2026-07-31
+
+**Decisão:** duas partes:
+
+1. **Ordem dos controles.** No modo **compacto** ("Exibir somente partidas"), a
+   superfície de ações da Viagem passa a exibir **primeiro o alternador de
+   headway (`↪`) e depois o `X`** de apagar. No modo **completo** nada muda: a
+   coluna vertical permanece exatamente como hoje — `X` no topo,
+   `Restaurar sugestão` (`↻`) no meio e o alternador de headway no fim.
+2. **Atraso de fechamento do hover.** O fechamento agendado ao sair da Viagem
+   sobe de **300 ms para ~500 ms**, num **valor único compartilhado** por todas
+   as superfícies e pelos dois modos — não um atraso por superfície nem por
+   modo.
+
+Permanecem intactas: a regra "a superfície permanece aberta enquanto houver
+hover **ou** foco" (DEC-100); o fechamento imediato por `Esc` com devolução do
+foco à célula-âncora; a ocultação de `Restaurar sugestão` no modo compacto
+(DEC-101); e o lado preferido por coluna (SEG–SÁB à direita, DOM à esquerda).
+
+**Motivo:** depois de acionar o alternador, o ponteiro precisa percorrer da
+posição do alternador até os campos `a cada`/`até` do formulário; com o
+alternador no fim da composição esse trajeto sai da âncora e da superfície, e o
+fechamento em 300 ms dispara antes da chegada. Inverter só no compacto resolve o
+trajeto onde ele é crítico — a linha única, onde os dois botões ficam lado a
+lado — sem mexer numa composição vertical que o responsável considerou boa e que
+já havia sido decidida na DEC-090. O atraso maior cobre o caso restante nos dois
+modos.
+
+**Consequências:** resolve a **Q-081** e **desbloqueia a TASK-125**. **A DEC-090
+permanece integralmente válida** — a inversão não a alcança. Supera a DEC-101
+apenas quanto à ordem dos dois botões do modo compacto (que dizia "`X` e o
+alternador de headway lado a lado"); o restante da DEC-101 — ocultar
+`Restaurar sugestão`, disposição horizontal, preferência de lado por coluna —
+continua valendo. Nenhuma ação é adicionada ou removida em qualquer modo.
+
+**Impacto em implementação:** **RN:** RN-061 e RN-096 — sem mudança de texto; o
+hover, o atraso e o modo headway continuam sendo estado efêmero. **Módulos:**
+`src/formulario/viagens/etapa-viagens.tsx` — ordem de renderização dos botões
+condicionada ao modo compacto e o valor de `agendarSaidaHover` (hoje 300 ms)
+elevado a ~500 ms num único ponto. A ordem de tabulação deve acompanhar a nova
+ordem visual no modo compacto. Atenção a testes existentes que usem
+temporizadores fictícios com o valor antigo. Nenhuma spec, contrato JSON, PDF,
+Comparador ou contagem precisa ser alterada.
+**Tasks:** TASK-121, TASK-122 e TASK-125.
