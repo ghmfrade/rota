@@ -1,7 +1,40 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-08-02 (branch `redesign`) — **TASK-126: concluída e
-aprovada com ressalvas, com uma condição de merge.** O commit `0c22040` troca a paleta
+**Atualização mais recente:** 2026-08-02 (branch `redesign`) — **TASK-126: ressalvas
+fechadas, condição de merge cumprida, ciclo encerrado.** O commit `ab7cc9c` fecha a única
+condição de merge do parecer de 2026-08-02: a RN-077 passa a ter teste dedicado que
+assere, `Page` a `Page`, exatamente um rodapé `fixed` contendo o `AVISO_SEI` literal, com
+**controle negativo** (uma `Page` sem rodapé é acusada pela mesma varredura), o que impede
+a asserção de passar vacuamente — é a regressão que a TASK-034 poderia introduzir ao
+acrescentar `Page` para os itens 5–8. Junto vieram: `Page` própria para os Serviços e um
+itinerário por página (`break` a partir do segundo, nunca no primeiro — teste conta 3 nós
+com `break` numa fixture de 4 itinerários); cada estratificação por faixa como grupo
+`wrap={false}` íntegro (subtítulo + nota da RN-069 + cabeçalho + as 7 linhas), com a
+distinção documentada entre a tabela de altura conhecida e a de N ilimitado por Serviço;
+`MARGEM_ENQUADRAMENTO` derivada de `LARGURA_CAPTURA × 0,04`, o que torna o enquadramento
+da DEC-104 impossível de quebrar por descuido; e o token `azul600` deixando de ser morto
+ao virar o terceiro nível tipográfico do subtítulo. `modelo-pdf-operacional.ts` continua
+fora do diff. O parecer `14-REVISOES/TASK-126-20260802-fechamento.md` registra **checklist
+07 com 21 itens ok, 30 N/A, nenhum violado e 2 com ressalva**, reutiliza o log canônico
+verde (`test:all:verificar`: executor **Claude**, fingerprint `cc20c05d…056b60`, identidade
+`498d7fa6…9176`, `Resultado geral: APROVADO`, **1481 unitários + 111 E2E**) e reporta
+`typecheck`, `lint` e `check:rastreabilidade` limpos. **Sem condição de merge
+remanescente.** **Follow-up a resolver antes da TASK-034:** registrar em
+`10-DECISION_LOG.md` a leitura de "uma página por bloco lógico" adotada — itinerários com
+`break` individual, blocos de Serviço agrupados numa `Page` única; a justificativa (um
+bloco de Serviço são ~6 linhas; uma página por Serviço ficaria 90% vazia) hoje mora só em
+comentário de código, e a TASK-034 multiplica esses blocos. Ressalvas menores, não
+impeditivas: a asserção da RN-077 é estrutural (árvore de elementos) e não sobre o buffer
+inflado do PDF, e a expansão de árvore dos testes chama componentes-função diretamente,
+premissa que quebra se algum bloco passar a usar hooks. A contagem de pendentes **não
+muda** (a TASK-126 nasceu depois dela): seguem **9 tasks não concluídas — 7 executáveis, a
+TASK-038 com bloqueio parcial e a TASK-040 bloqueada**. A **TASK-127** continua
+independente e herda a folha de estilos corrigida; a **TASK-034** segue desbloqueada e
+escreve sobre a paginação de 4 `Page` agora travada por teste de igualdade exata — ao
+acrescentar `Page` para os itens 5–8 ela **deve** falhar o teste e revisá-lo junto.
+
+**Histórico anterior (2026-08-02) — TASK-126, primeira entrega, aprovada com ressalvas e
+uma condição de merge:** O commit `0c22040` troca a paleta
 de `src/formulario/pdf/estilos-pdf.ts` pelos hex canônicos do `18-DESIGN_SYSTEM.md` §2
 (saem os cinzas do Tailwind default `#374151`/`#6b7280`/`#e5e7eb`), dá `Page` própria à
 capa com código destacado, pares rótulo-valor e selo de status, separa cabeçalho ×
