@@ -1420,3 +1420,55 @@ indisponível não derruba a geração do PDF.
 por decisão explícita do responsável, **acrescida do enquadramento**: o mapa
 capturado deve mostrar a rota **centralizada e inteiramente contida**, no melhor
 zoom possível (ajuste aos limites da geometria da rota). Ver DEC-104.
+
+## Q-083 — Locais comuns na imagem do mapa e na legenda do itinerário do PDF
+
+**Status:** Decidida — DEC-105
+
+**Origem:** `/analisar-task` de melhoria visual do PDF operacional (2026-08-02),
+a pedido do responsável — "manter o padrão de quadrado para Seção e círculo
+verde para ponto, numerar na ordem do itinerário e apresentar a tabela
+correspondente".
+
+**Contexto:** a Spec 04 §13.1 item 4 proíbe Locais comuns no bloco de itinerário
+do corpo, mas a proibição é redigida enumerando **(b) a sequência de Seções** e
+**(c) a descrição textual** — nada diz sobre **(d) a imagem do mapa**. A RN-076
+generaliza para "Locais só no anexo técnico". Já o §13.1 item 8b prevê, **no
+anexo**, a relação de Locais com "posição no itinerário" — isto é, a numeração
+pedida existe na spec, mas endereçada a outro bloco. A imagem capturada pela
+TASK-033 mostra apenas o traçado, sem nenhum marcador: nem Seções.
+
+**Spec relacionada:** Spec 04 §13.1 itens 4 e 8b, §13.4; RN-076 (Locais só no
+anexo), RN-074 (estrutura fixa), RN-031 (Local pertence ao Serviço),
+RN-035 (extremos são Seção); DEC-069 (quadrado azul = Seção, círculo verde =
+Local); DEC-104 (enquadramento da captura).
+
+**Impacto se não decidir:** o PDF continua com um mapa sem marcos — ilegível
+como peça operacional —, ou o implementador decide sozinho pôr Locais no corpo,
+contrariando a RN-076, de criticidade Alta.
+
+**Opções:** 1 — **só Seções no corpo**: mapa e legenda numeram exclusivamente
+Seções (quadrado azul, `1º, 2º…` por sentido) e os Locais aparecem numerados
+**no anexo técnico** (item 8b, TASK-034); zero atrito com a RN-076;
+2 — **Seções e Locais no mapa, legenda do corpo só com Seções**: a imagem (d) —
+silente na spec — recebe os dois símbolos na numeração da travessia, a lista
+textual do corpo continua só com Seções e o anexo detalha os Locais;
+3 — **Seções e Locais no mapa e na legenda do corpo** (pedido literal inicial):
+exige ler "não aparecem aqui" como restrito a (b) e (c), o que contraria a
+RN-076 como está redigida e obrigaria a reescrevê-la;
+4 — subquestão válida para 2 e 3: a numeração é **contínua** entre Seções e
+Locais (1º Seção, 2º Local, 3º Seção…) ou são **duas séries independentes** por
+tipo?
+
+**Recomendação técnica:** opção **2** — entrega o que o pedido busca de fato
+("identificar a parada no mapa e a ordem dela no itinerário"), usa a única
+brecha que a spec deixa em aberto (o item 4d) e mantém intocado o que a spec
+fecha explicitamente (sequência (b), descrição (c), tabela horária). A opção 3 é
+legítima, mas custa alteração de RN e provavelmente de spec.
+
+**Decisão:** **Decidida (DEC-105, 2026-08-02).** Opção 2, por decisão explícita
+do responsável, com a subquestão 4 respondida por uma **terceira forma**:
+numeração **hierárquica** dos Locais (`1.1`, `1.2`… para os Locais posteriores à
+Seção `1º`), rótulo do Local desenhado **ao lado** do círculo no mapa (não
+dentro) e o mesmo identificador **referenciado no anexo técnico** que detalha os
+Locais. Ver DEC-105.

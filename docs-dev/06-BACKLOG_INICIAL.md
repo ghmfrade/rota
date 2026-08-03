@@ -7912,4 +7912,356 @@ DEC-090 íntegra. O atraso maior vale nos dois modos.
 
 ---
 
+## TASK-126 — PDF operacional: identidade visual e legibilidade de peça operacional
+
+## Objetivo
+
+O PDF operacional passa a ter acabamento de documento oficial: cores dos tokens
+reais do `docs-dev/18-DESIGN_SYSTEM.md`, capa em página própria, hierarquia
+tipográfica, tabelas com cabeçalho/zebra/linha de total distintos, um bloco
+lógico por página e imagem de mapa em resolução adequada à impressão — sem
+alterar nenhum conteúdo, contador ou regra do §13.
+
+## Contexto
+
+A TASK-033 entregou a estrutura do §13.1 (itens 1, 2, 3, 4 e 9) corretamente,
+mas com aparência provisória: capa, resumo e Serviços dividem a mesma página;
+todas as colunas de todas as tabelas são `flex: 1`, o que espreme "Serviço" e
+sobra em "Viagens"; a linha de total reusa o estilo de cabeçalho; e
+`estilos-pdf.ts` transcreve cinzas do Tailwind default (`#374151`, `#6b7280`,
+`#e5e7eb`) em vez dos tokens do doc 18 (`#334155`, `#64748b`, `#e2e8f0`,
+`#0f172a`) — é a principal razão de o documento parecer de outro produto. A
+captura do mapa em 1000×600 espalhada por ~515 pt de A4 dá cerca de 140 dpi, e o
+texto do mapa sai lavado na impressão. O §13.3 pede explicitamente "legível como
+tabela operacional de linha de ônibus, tipografia tabular, **uma página por
+bloco lógico quando possível**" — a autorização para reorganizar as páginas está
+na própria spec. O responsável pelo domínio pediu esta melhoria ao revisar o PDF
+gerado (2026-08-02).
+
+## Fora de escopo
+
+- **Qualquer mudança de conteúdo**: nenhum contador novo, nenhuma coluna nova,
+  nenhum bloco novo. As duas colunas faltantes do §10 e o rótulo de faixa com
+  intervalo pertencem ao fechamento das ressalvas da **TASK-033**.
+- Símbolos, numeração ou legenda de paradas no mapa — é a **TASK-127** (DEC-105).
+- Itens 5–8 do §13.1 (tabelas horárias, matrizes, anexo técnico) — **TASK-034**;
+  esta task **não pode reordenar** `ORDEM_BLOCOS`.
+- Transformar a descrição textual (§13.4) em tabela ou lista: ela permanece
+  parágrafo corrido.
+- Embarcar fonte externa (CDN ou arquivo novo) no `@react-pdf`: a hierarquia é
+  obtida com Helvetica, tamanho, peso, cor e espaçamento.
+- Alterar `shared/ui/`, `globals.css`, a etapa Exportação ou o gate da RN-078.
+- Alterar a UI web para "ficar igual ao PDF" (ou o contrário).
+
+## Specs fonte
+
+- Spec 04 §13.1 (estrutura e ordem dos blocos — preservadas)
+- Spec 04 §13.3 (tipografia tabular; uma página por bloco lógico quando possível)
+- Spec 04 §13.4 (descrição como parágrafo corrido, Seções em destaque)
+- Spec 01 §8 (mapa client-side; a imagem é captura de canvas)
+- `docs-dev/18-DESIGN_SYSTEM.md` §2 (tokens de cor) — vinculante por DEC-050
+
+## Regras envolvidas
+
+- RN-074 (estrutura fixa do PDF — a reorganização de páginas não pode alterar a
+  ordem nem omitir bloco)
+- RN-076 (nomes `Cidade - Nome`, sem R$, sem offsets, contagens rotuladas)
+- RN-077 (aviso SEI presente em **todas** as páginas, inclusive nas novas)
+- RN-069/NEG-018 (o rótulo "semana padrão…" continua junto das contagens)
+- RN-078 (nada aqui cria motivo novo de bloqueio)
+- RN-015/NEG-019 (nenhum recálculo; a captura maior continua desenhando a
+  geometria congelada)
+
+## Entidades afetadas
+
+- Nenhuma entidade de domínio é alterada — apenas a apresentação de Autos,
+  Serviço, Seção e Itinerário já montados pelo modelo do PDF.
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor (⚠ exige decisão humana — RN-093)
+- [x] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] `estilos-pdf.ts` usa exclusivamente os valores dos tokens do doc 18 §2;
+      nenhum cinza do Tailwind default permanece no arquivo.
+- [ ] A capa (§13.1 item 1) ocupa página própria, com o código do Autos em corpo
+      destacado, pares rótulo-valor alinhados e o status como selo.
+- [ ] O resumo (item 2) começa em página nova; cada bloco de Serviço (item 3) e
+      cada itinerário (item 4) começam em página nova quando couber.
+- [ ] As tabelas têm cabeçalho visualmente distinto da linha de total, zebra nas
+      linhas alternadas e **larguras proporcionais por coluna** — não `flex: 1`
+      uniforme.
+- [ ] Nenhuma linha de tabela é partida entre duas páginas.
+- [ ] Toda página traz o rodapé da RN-077 e a numeração "Página X de Y".
+- [ ] A captura do mapa passa a ~1400×840 px, mantendo o enquadramento da
+      DEC-104 (rota centralizada e inteiramente contida).
+- [ ] A ordem de `ORDEM_BLOCOS` e o conteúdo de todos os blocos permanecem
+      idênticos aos da TASK-033 (nenhum texto, número ou rótulo muda).
+- [ ] O documento continua gerando com `%PDF-` válido e sem R$, offsets,
+      horários ou dados de workflow.
+
+## Casos válidos
+
+- Autos com 3 Serviços e 6 itinerários: capa isolada, resumo em página própria,
+  um itinerário por página, rodapé e numeração em todas.
+- Autos com 1 Serviço unidirecional: sem páginas em branco nem bloco órfão.
+- Serviço com `numero_n` longo e Seção com nome longo (`Cidade - Nome` extenso):
+  a coluna não estoura nem sobrepõe a vizinha.
+- Documento `status: "vigente"`: o selo mostra "vigente" e a data de publicação.
+
+## Casos inválidos
+
+- Rodapé da RN-077 ausente em qualquer página nova: reprovado.
+- Tabela cuja linha de dados quebra entre páginas deixando o cabeçalho para trás:
+  reprovado.
+- Contagem exibida sem o rótulo "semana padrão (sem feriados nem operação
+  excepcional)" após a reorganização: reprovado (RN-069/NEG-018).
+- Documento sem imagem de mapa (captura falhou — DEC-104): o bloco continua
+  legível, com o aviso não bloqueante, sem página em branco.
+- Autos sem data (`data_criacao` e `data_publicacao` ausentes): a capa omite a
+  linha, sem selo vazio nem rótulo solto.
+
+## Testes esperados
+
+- Unitários: `estilos-pdf.ts` não contém nenhum valor fora da paleta do doc 18;
+  larguras de coluna somam o esperado; a ordem de `ORDEM_BLOCOS` é a mesma da
+  TASK-033.
+- Integração: o modelo montado antes e depois da task é **idêntico** (a task não
+  toca conteúdo) — asserção de igualdade estrutural.
+- E2E: os casos existentes de `revisao-exportacao.spec.ts` continuam verdes
+  (gate liberado × bloqueado), sem caso novo.
+- Snapshot/contrato JSON: n/a — nenhum campo é lido ou escrito de forma nova.
+- PDF: renderização real produz `%PDF-`; a varredura recursiva transversal
+  (R$, tarifa, offset, horário, workflow) continua limpa; aviso SEI presente em
+  todas as páginas; contagem de páginas ≥ número de blocos lógicos.
+
+## Arquivos prováveis
+
+- `src/formulario/pdf/estilos-pdf.ts` (alterar — tokens, tabelas, capa, selo)
+- `src/formulario/pdf/documento-pdf-operacional.tsx` (alterar — páginas,
+  cabeçalho corrido, numeração, larguras)
+- `src/formulario/pdf/captura-mapa-pdf.ts` (alterar — dimensão de captura)
+- `testes/unitarios/formulario/pdf-renderizacao.test.tsx` (alterar)
+- `testes/unitarios/formulario/pdf-regras-transversais.test.ts` (alterar)
+
+## Dependências
+
+- TASK-033 concluída (`32cd8ae`) e com as ressalvas da revisão de 2026-07-31
+  fechadas antes desta task, para não editar o mesmo trecho duas vezes.
+- Independente da TASK-127; se implementadas em sequência, a TASK-127 herda a
+  folha de estilos já corrigida.
+- Precede idealmente a **TASK-034**, que escreveria os itens 5–8 sobre a folha
+  de estilos antiga.
+
+## Riscos
+
+- Reorganizar páginas derrubar o `fixed` do rodapé RN-077 — risco principal,
+  coberto por teste dedicado.
+- `break`/`wrap={false}` gerando páginas em branco em documentos pequenos.
+- Captura maior aumentar memória e tempo de geração em documentos com muitos
+  itinerários (a captura já é sequencial, um contexto WebGL por vez).
+- Deriva de escopo para "melhorar também a tela" — proibido aqui.
+- Ajuste fino de layout não é assertável (doc 08 §7: "o que não testar aqui —
+  layout fino/visual"), então parte da verificação é revisão humana do PDF.
+
+## Perguntas em aberto
+
+- Nenhuma. A task não depende de decisão pendente: o §13.3 autoriza a
+  reorganização por bloco lógico e o doc 18 já fixa a paleta.
+
+---
+
+## TASK-127 — PDF operacional: Seções e Locais numerados no mapa do itinerário e legenda vertical
+
+## Objetivo
+
+A imagem do mapa de cada Serviço/sentido passa a mostrar as paradas com a
+simbologia do projeto — quadrado azul para Seção, círculo verde para Local —,
+numeradas na ordem da travessia (`1º`, `2º`… para Seções; `1.1`, `1.2`… para os
+Locais posteriores a cada Seção), e o bloco do itinerário ganha uma legenda
+vertical das Seções ligada por linha azul, casando símbolo, número e
+`Cidade - Nome`.
+
+## Contexto
+
+A TASK-033 entregou a imagem do mapa com **apenas o traçado**: os marcadores da
+etapa de mapa são elementos DOM do MapLibre e não são capturados por
+`toDataURL()`, de modo que a peça não permite identificar qual ponto é qual nem
+em que ordem. A **DEC-105** (2026-08-02, resolve a **Q-083**) decidiu a opção 2:
+Seções **e** Locais aparecem na imagem (item 4d, sobre o qual a Spec 04 é
+silente), a legenda do corpo continua **só com Seções** (preservando a RN-076 e o
+§13.1 item 4, que proíbem Locais na sequência (b) e na descrição (c)), e os
+Locais são detalhados no anexo técnico (item 8b), onde os identificadores `1.1`,
+`1.2`… são referenciados. A numeração é hierárquica e reinicia por sentido; o
+rótulo do Local é desenhado **ao lado** do círculo, não dentro (o círculo tem
+12 px no doc 18 e não comporta `1.1` legível). A simbologia reaproveita a
+DEC-069, já em uso na etapa de mapa.
+
+## Fora de escopo
+
+- **Pôr Locais na legenda do corpo, na sequência de Seções (§13.1 item 4b) ou na
+  descrição textual (item 4c)** — a DEC-105 fecha isso: corpo só com Seções.
+- Escrever a relação de Locais do **anexo técnico** (§13.1 item 8b): é da
+  **TASK-034**; esta task apenas produz e expõe os identificadores que o anexo
+  vai referenciar.
+- Pontos de rota: continuam sem símbolo e sem rótulo no PDF.
+- Alterar a etapa de mapa, `shared/mapa/mapa.tsx`, os marcadores da UX ou o
+  vocabulário visual da DEC-069.
+- Usar camada GL com `text-field`: exigiria endpoint de glyphs externo,
+  incompatível com a stack fixada (nenhuma dependência que exija servidor
+  próprio).
+- Alterar o enquadramento da DEC-104 ou tornar a falha de captura bloqueante.
+- Acabamento tipográfico geral do PDF — é a **TASK-126**.
+
+## Specs fonte
+
+- Spec 04 §13.1 item 4b (sequência resumida de Seções — permanece literal)
+- Spec 04 §13.1 item 4d (imagem do mapa com a rota)
+- Spec 04 §13.1 item 8b (Locais do anexo com "posição no itinerário")
+- Spec 04 §7.1 (padrão `Cidade - Nome da Seção`) e §7.3 (vocabulário do mapa)
+- Spec 01 §8 (mapa MapLibre client-side, captura de canvas)
+- `docs-dev/18-DESIGN_SYSTEM.md` §2 (quadrado azul 16 px = Seção; círculo verde
+  12 px = Local)
+
+## Regras envolvidas
+
+- RN-074 (a imagem é parte da estrutura fixa do item 4)
+- RN-076 (Locais fora da sequência, da descrição e das tabelas horárias —
+  a legenda do corpo só com Seções)
+- RN-031 (Local pertence ao Serviço; numeração por Serviço **e** sentido)
+- RN-033 (Parada é XOR Seção/Local — define qual símbolo desenhar)
+- RN-035 (extremos são Seção — garante que todo Local tenha prefixo definido)
+- RN-015/NEG-019 (desenho lê geometria e pontos congelados; sem OSRM)
+- RN-096/NEG-004 (imagem efêmera, nada persistido)
+- RN-077/RN-078 (rodapé preservado; nenhum bloqueio novo)
+
+## Entidades afetadas
+
+- Seção (geolocalização por Serviço e sentido — Spec 02 §5.1)
+- Local (geolocalização unidirecional do sentido — Spec 02 §7.1)
+- Parada (`ordem`, XOR `secao_uuid`/`local_uuid`)
+- Itinerário (sentido, `rota.geometria`)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor (⚠ exige decisão humana — RN-093)
+- [x] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] As Seções do itinerário aparecem na imagem como **quadrado azul**
+      (`#1d4ed8`) com o número (`1º`, `2º`, `3º`…) **dentro**, na ordem de
+      `paradas[].ordem` do sentido.
+- [ ] Os Locais aparecem como **círculo verde** (`#16a34a`) com o identificador
+      hierárquico (`1.1`, `1.2`…) desenhado **ao lado** do símbolo, em corpo
+      menor, nunca dentro.
+- [ ] O prefixo do Local é o número da **Seção imediatamente anterior** na
+      travessia; a numeração das Seções não é deslocada pelos Locais.
+- [ ] A numeração **reinicia por sentido**: a Volta começa de novo em `1º`, com
+      mapa e legenda próprios.
+- [ ] A legenda vertical do bloco de itinerário lista **apenas Seções**, na
+      ordem, com o símbolo numerado à esquerda, `Cidade - Nome` à direita e um
+      conector azul entre os itens.
+- [ ] O modelo expõe os identificadores dos Locais (`1.1`, `1.2`…) por
+      Serviço/sentido, prontos para o anexo da TASK-034 referenciar.
+- [ ] A ordenação usa o campo `ordem` das paradas, não a ordem do array.
+- [ ] Falha de captura (DEC-104) continua tolerada: **a legenda ainda é
+      renderizada**, com o aviso não bloqueante no lugar da imagem.
+- [ ] Nenhuma chamada a OSRM e nenhum campo novo no JSON.
+
+## Casos válidos
+
+- Ida com Seção A, Local X, Local Y, Seção B, Seção C: quadrados `1º`, `2º`,
+  `3º` e círculos `1.1`, `1.2`; legenda do corpo com A, B e C apenas.
+- Volta do mesmo Serviço com 4 Seções: numeração recomeça em `1º`, série
+  independente da Ida.
+- Itinerário sem nenhum Local: só quadrados; nenhuma série `n.m` é criada.
+- Serviço unidirecional: um único mapa e uma única legenda.
+- Seção reutilizada por dois Serviços com pontos distintos: cada Serviço desenha
+  o **seu** ponto do **seu** sentido (Spec 02 §5.1).
+
+## Casos inválidos
+
+- Parada apontando `secao_uuid`/`local_uuid` inexistente: é ignorada sem quebrar
+  a numeração das demais e sem derrubar a geração.
+- Local sem geolocalização do sentido em edição: não é desenhado, e o
+  identificador não é atribuído a outro Local por engano.
+- Itinerário sem paradas: legenda vazia e mapa sem símbolos, sem exceção.
+- Local antes da primeira Seção (documento importado violando a RN-035): não
+  recebe prefixo inventado — é registrado como caso de borda tratado, nunca
+  numerado como `0.1`.
+- Coordenada de parada fora dos limites enquadrados: o símbolo não é desenhado
+  fora da moldura da imagem.
+- Numeração contínua misturando Seções e Locais (`1º, 2º, 3º` atravessando os
+  dois tipos): contraria a DEC-105 — reprovado.
+
+## Testes esperados
+
+- Unitários: modelo puro da legenda e da numeração — hierarquia `n.m`, reinício
+  por sentido, ordenação por `ordem`, `Cidade - Nome` (RN-076), legenda do corpo
+  sem nenhum Local; todos os casos inválidos acima.
+- Unitários de desenho: a rotina de símbolos é verificada contra um **contexto
+  2D falso** que registra as chamadas — forma por tipo de parada, cor por token,
+  número dentro do quadrado, rótulo ao lado do círculo, nenhum símbolo para
+  ponto de rota. **Nunca WebGL nem tiles reais em Vitest.**
+- Integração: captura injetada devolve imagem composta; captura que falha ainda
+  produz o bloco com legenda e aviso.
+- E2E: geração do PDF com tiles interceptados, como já faz a suíte; gate da
+  RN-078 inalterado.
+- Snapshot/contrato JSON: round-trip prova que nada foi escrito no documento.
+- PDF: varredura transversal continua sem R$, offsets, horários e workflow; a
+  sequência (b) e a descrição (c) continuam sem nenhum Local.
+
+## Arquivos prováveis
+
+- `src/formulario/pdf/legenda-itinerario.ts` (criar — modelo puro da legenda e
+  da numeração hierárquica)
+- `src/formulario/pdf/simbolos-mapa-pdf.ts` (criar — desenho 2D dos símbolos
+  sobre a captura)
+- `src/formulario/pdf/captura-mapa-pdf.ts` (alterar — projeção das paradas e
+  composição da imagem)
+- `src/formulario/pdf/modelo-pdf-operacional.ts` (alterar — campo de legenda no
+  bloco de itinerário)
+- `src/formulario/pdf/documento-pdf-operacional.tsx` (alterar — render da
+  legenda)
+- `testes/unitarios/formulario/pdf-legenda-itinerario.test.ts` (criar)
+- `testes/unitarios/formulario/pdf-simbolos-mapa.test.ts` (criar)
+- `testes/unitarios/formulario/pdf-captura-e-geracao.test.ts` (alterar)
+
+## Dependências
+
+- **DEC-105** (resolve a Q-083) — sem ela a task estaria bloqueada.
+- DEC-104 (enquadramento e tolerância a falha) e DEC-069 (simbologia).
+- TASK-033 concluída; idealmente após a **TASK-126**, para desenhar sobre a
+  folha de estilos já corrigida.
+- **TASK-034** consome os identificadores produzidos aqui na relação de Locais
+  do anexo (§13.1 item 8b).
+
+## Riscos
+
+- Sobreposição de símbolos em paradas próximas (terminal urbano): mitigada com
+  halo branco e ordem de desenho estável; anti-colisão automática **não** é
+  escopo (doc 08 §7 remete layout fino à revisão humana).
+- Projeção de coordenadas divergir do enquadramento se a captura mudar de
+  dimensão — acoplamento com a TASK-126 (fazer nesta ordem, ou revalidar).
+- Tentação de "já aproveitar" e escrever o anexo de Locais: é da TASK-034.
+- Regressão na tolerância a falha de captura, transformando ausência de imagem
+  em erro.
+- Desenhar o cluster de pontos de outros Serviços por engano: só o ponto do
+  Serviço/sentido corrente entra (Spec 02 §5.1, DEC-044).
+
+## Perguntas em aberto
+
+- Nenhuma — **Q-083 decidida pela opção 2 com numeração hierárquica (DEC-105)**.
+
+---
+
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.

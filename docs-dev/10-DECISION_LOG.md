@@ -1542,3 +1542,80 @@ enquadramento são cobertos por unitário puro; a captura em si é **injetada** 
 testes de PDF (nunca WebGL nem tiles reais em Vitest), e o E2E mocka tiles como
 já fazem os specs de itinerários. **Tasks:** TASK-033 (dona); TASK-034 herda a
 mesma captura sem trabalho adicional.
+
+## DEC-105 — Seções e Locais na imagem do mapa do PDF, com numeração hierárquica dos Locais
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, opção 2 da
+**Q-083** com a subquestão 4 respondida em forma própria, dada explicitamente
+nesta conversa; Spec 04 §13.1 itens 4 e 8b, §13.4; RN-074, RN-076, RN-031,
+RN-035; DEC-069, DEC-104 · **Data:** 2026-08-02
+
+**Decisão:** quatro partes:
+
+1. **Símbolos na imagem do mapa (item 4d).** A imagem capturada de cada
+   Serviço/sentido passa a exibir as paradas do itinerário no mesmo vocabulário
+   visual da etapa de mapa (DEC-069): **Seção = quadrado azul**, **Local =
+   círculo verde**. Pontos de rota continuam sem rótulo e fora da simbologia do
+   PDF.
+2. **Numeração hierárquica.** As **Seções** são numeradas na ordem da travessia
+   do sentido — `1º`, `2º`, `3º`… —, com o número **dentro** do quadrado. Os
+   **Locais** recebem numeração **hierárquica derivada da Seção anterior**:
+   os Locais situados após a Seção `1º` são `1.1`, `1.2`, `1.3`…; os situados
+   após a Seção `2º` são `2.1`, `2.2`… A numeração **reinicia por sentido**: a
+   Ida tem sua série e a Volta recomeça em `1º`, cada uma com seu mapa e sua
+   legenda.
+3. **Rótulo do Local ao lado do símbolo.** No mapa, `1.1` **não** é escrito
+   dentro do círculo verde — não cabe: é desenhado **pequeno, ao lado do
+   círculo**, como um pequeno comentário anexo ao símbolo.
+4. **Legenda do corpo × anexo.** A legenda/lista vertical do bloco de itinerário
+   (corpo) continua **só com Seções**, preservando a RN-076. Os Locais são
+   detalhados **no anexo técnico** (§13.1 item 8b), e é lá que os
+   identificadores `1.1`, `1.2`… são **referenciados**, ligando cada Local do
+   anexo ao símbolo correspondente no mapa do corpo.
+
+**Motivo:** o objetivo declarado pelo responsável é "conseguir identificar o nome
+da parada no mapa e a ordem em que ela pertence no itinerário" — um mapa apenas
+com o traçado, como o entregue pela TASK-033, não serve como peça operacional.
+A opção 2 atende a isso usando a **única brecha que a Spec 04 deixa em aberto**:
+a proibição do §13.1 item 4 enumera a sequência de Seções (b) e a descrição
+textual (c), e é silente sobre a imagem (d); a lista textual do corpo e a tabela
+horária continuam sem Locais, e a RN-076 permanece válida sem reescrita. A
+numeração hierárquica foi preferida à série contínua porque preserva a leitura
+tarifária do documento: o `1º`, `2º`, `3º` continua sendo a sequência de
+**Seções** — os marcos que importam para seccionamento e matrizes —, e o Local
+aparece como subordinado ao trecho em que está, sem deslocar a contagem das
+Seções. A regra é **total** porque os extremos do itinerário são sempre Seção
+(RN-035): nenhum Local pode preceder a primeira Seção, logo todo Local tem um
+prefixo definido. O rótulo ao lado do círculo é restrição física do desenho:
+o círculo do Local tem 12 px no vocabulário do doc 18 e não comporta `1.1`
+legível.
+
+**Consequências:** resolve a **Q-083**. **Nenhuma alteração de spec** — a
+decisão implementa o §13.1 item 4d (silente quanto ao conteúdo da imagem) e o
+item 8b (que já pede "posição no itinerário" para os Locais do anexo).
+**Nenhuma mudança de contrato JSON**: numeração e símbolos são artefato de
+renderização, derivados de `paradas[].ordem` e das geolocalizações congeladas —
+nunca campo do documento (RN-008..015). **Nenhum recálculo**: o desenho lê a
+`rota.geometria` e os pontos já congelados, sem OSRM (RN-015/NEG-019). Sem
+impacto no Comparador, nas contagens ou nas RN de horários. A **RN-076
+permanece com o texto atual** — "Locais só no anexo técnico" continua verdadeira
+para a sequência (b), a descrição (c) e as tabelas horárias; a imagem do mapa
+não é nenhuma dessas superfícies.
+
+**Impacto em implementação:** **RN:** nenhuma muda de texto; a RN-074 ganha o
+**como** do item 4d (conteúdo da imagem) e a RN-076 é confirmada nas superfícies
+que ela nomeia. **Módulos:** `src/formulario/pdf/` — modelo puro da legenda e da
+numeração hierárquica (testável sem canvas) e desenho dos símbolos sobre a
+captura; a simbologia reaproveita as cores e formas já fixadas pela DEC-069
+(`#1d4ed8` quadrado, `#16a34a` círculo), sem tokens novos. Os marcadores da UX
+são elementos **DOM** e não entram em `toDataURL()`: o desenho dos símbolos é
+composição sobre o canvas capturado, não camada GL com `text-field` — esta
+exigiria endpoint de glyphs externo, incompatível com "nenhuma dependência que
+exija servidor próprio". **Testes:** numeração hierárquica, reinício por
+sentido, ordenação por `paradas[].ordem` e casos inválidos (parada apontando
+entidade inexistente, Local sem geolocalização do sentido, itinerário sem
+paradas) cobertos por unitário puro; o desenho é verificado contra um contexto
+2D falso — nunca WebGL nem tiles reais em Vitest. **Tasks:** **TASK-127**
+(dona — mapa e legenda numerados) e **TASK-034**, que passa a referenciar os
+identificadores `1.1`, `1.2`… na relação de Locais do anexo técnico; TASK-126
+(identidade visual do PDF) é independente desta decisão.
