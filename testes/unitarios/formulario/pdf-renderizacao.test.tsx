@@ -221,30 +221,15 @@ describe("Legenda do itinerário (DEC-105/TASK-127)", () => {
   });
 
   test("nenhum nome de Local aparece na legenda", () => {
-    // Insere um Local direto no objeto (sem repassar por
-    // `esquemaDocumentoOperacao.parse`, que exigiria recompor `trechos` e
-    // `horarios_paradas` — irrelevante para esta asserção sobre a legenda) e
-    // monta o modelo diretamente: `montarModeloPdfOperacional` só lê a forma
-    // do documento, não valida estrutura.
-    const documento = documentoBidirecionalMultiServico();
-    const servicoComLocal = documento.autos.servicos[0];
-    servicoComLocal.locais = [
-      {
-        uuid: "77777777-0000-4000-8000-000000000099",
-        nome: "Local Que Não Pode Vazar",
-        municipio: "Santos",
-        geolocalizacao_ida: { latitude: -23.96, longitude: -46.33 },
-      },
-    ];
-    servicoComLocal.itinerarios[0].paradas = [
-      servicoComLocal.itinerarios[0].paradas[0],
-      { ordem: 2, local_uuid: servicoComLocal.locais[0].uuid },
-      ...servicoComLocal.itinerarios[0].paradas
-        .slice(1)
-        .map((p) => ({ ...p, ordem: p.ordem + 1 })),
-    ];
+    // Renomeia o Local já existente na fixture canônica (exemplo mínimo da
+    // Spec 02 §15, que tem Seção → Seção → Local → Seção na Ida) e revalida
+    // por `esquemaDocumentoOperacao.parse` — o documento sob teste é
+    // comprovadamente válido, ao contrário de inserir campo à mão.
+    const documento = documentoExemploMinimo();
+    documento.autos.servicos[0].locais[0].nome = "Local Que Não Pode Vazar";
+    const validado = esquemaDocumentoOperacao.parse(documento);
 
-    const modelo = montarModeloPdfOperacional(documento, {
+    const modelo = montarModeloPdfOperacional(validado, {
       geradoEm: new Date(2026, 6, 31, 14, 5),
     });
     const paginaItinerarios = paginasDe(arvoreDo(modelo))[3];

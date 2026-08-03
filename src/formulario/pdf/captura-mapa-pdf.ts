@@ -88,13 +88,18 @@ function criarContainerOculto(largura: number, altura: number): HTMLDivElement {
   return container;
 }
 
+/** Subconjunto de `maplibre-gl.Map` usado na projeção — testável sem WebGL. */
+export interface ProjetorDeCoordenadas {
+  project(lngLat: [number, number]): { x: number; y: number };
+}
+
 /**
  * Projeta os símbolos numerados (coordenadas geográficas) para pixels do
  * canvas do mapa. `mapa.project` devolve pixels CSS do contêiner; a escala
  * para pixels do canvas fica a cargo do chamador (devicePixelRatio).
  */
-function projetarSimbolos(
-  mapa: import("maplibre-gl").Map,
+export function projetarSimbolos(
+  mapa: ProjetorDeCoordenadas,
   simbolos: readonly SimboloParada[],
 ): SimboloProjetado[] {
   return simbolos.map((simbolo) => {
@@ -107,10 +112,13 @@ function projetarSimbolos(
  * Compõe os símbolos sobre o canvas já capturado: um canvas novo, do MESMO
  * tamanho em pixels do canvas do mapa (não da largura CSS — DEC-104 já roda
  * em devicePixelRatio), recebe o traçado e os símbolos desenhados por cima
- * (`simbolos-mapa-pdf.ts`). A escala dos símbolos usa `canvas.width / largura`
- * porque `mapa.project` devolve pixels CSS, não pixels de canvas.
+ * (`simbolos-mapa-pdf.ts`). `escala = canvas.width / largura` porque
+ * `mapa.project` devolve pixels CSS, não pixels de canvas — a mesma razão
+ * escala tanto as coordenadas quanto os TAMANHOS dos símbolos (lado, raio,
+ * corpo de fonte), para que a peça permaneça legível em qualquer
+ * `devicePixelRatio`.
  */
-function compornImagemComSimbolos(
+export function comporImagemComSimbolos(
   canvasBase: HTMLCanvasElement,
   simbolosProjetados: readonly SimboloProjetado[],
   largura: number,
@@ -131,10 +139,12 @@ function compornImagemComSimbolos(
     x: simbolo.x * escala,
     y: simbolo.y * escala,
   }));
-  desenharSimbolos(ctx, escalados, {
-    larguraMoldura: canvasComposto.width,
-    alturaMoldura: canvasComposto.height,
-  });
+  desenharSimbolos(
+    ctx,
+    escalados,
+    { larguraMoldura: canvasComposto.width, alturaMoldura: canvasComposto.height },
+    escala,
+  );
 
   return canvasComposto.toDataURL("image/png");
 }
@@ -226,7 +236,7 @@ export async function capturarMapaDaRota(
       const canvasBase = mapa.getCanvas();
       if (!canvasBase) return capturarImagemMapa(mapa);
       const projetados = projetarSimbolos(mapa, simbolos);
-      return compornImagemComSimbolos(canvasBase, projetados, largura);
+      return comporImagemComSimbolos(canvasBase, projetados, largura);
     } catch {
       // Composição falhou (contexto 2D indisponível): a falha é tolerada
       // (DEC-104) — cai para o traçado puro, sem símbolos.

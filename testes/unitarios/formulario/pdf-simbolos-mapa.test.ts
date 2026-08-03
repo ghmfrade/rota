@@ -156,4 +156,60 @@ describe("desenharSimbolos (DEC-105/DEC-069)", () => {
 
     expect(ordemDosTipos).toEqual(["local-rotulo", "secao"]);
   });
+
+  describe("escala (condição de merge — devicePixelRatio)", () => {
+    test("Seção com escala 2: lado do quadrado e fonte do número dobram; posição não muda", () => {
+      const ctx = contextoFalso();
+      const simbolo: SimboloProjetado = { tipo: "secao", rotulo: "1º", x: 100, y: 200 };
+
+      desenharSimbolos(ctx, [simbolo], MOLDURA, 2);
+
+      const [x, y, largura, altura] = ctx.chamadas.find((c) => c.metodo === "fillRect")!
+        .args as number[];
+      expect(largura).toBe(LADO_QUADRADO_SECAO * 2);
+      expect(altura).toBe(LADO_QUADRADO_SECAO * 2);
+      expect(x).toBeCloseTo(100 - LADO_QUADRADO_SECAO);
+      expect(y).toBeCloseTo(200 - LADO_QUADRADO_SECAO);
+
+      const textos = ctx.chamadas.filter((c) => c.metodo === "fillText");
+      expect(textos[0].args).toEqual(["1º", 100, 200]);
+    });
+
+    test("Local com escala 2: raio do círculo e distância do rótulo dobram", () => {
+      const ctx = contextoFalso();
+      const simbolo: SimboloProjetado = { tipo: "local", rotulo: "1.1", x: 50, y: 60 };
+
+      desenharSimbolos(ctx, [simbolo], MOLDURA, 2);
+
+      // Dois `arc`: [0] o halo (raio + margem), [1] o círculo do Local em si
+      // (raio exato) — mesma ordem de `desenharLocal`.
+      const arcos = ctx.chamadas.filter((c) => c.metodo === "arc");
+      const [, , raio] = arcos[1].args as number[];
+      expect(raio).toBe(RAIO_CIRCULO_LOCAL * 2);
+      const [, x] = ctx.chamadas.find((c) => c.metodo === "fillText")!.args as [string, number];
+      expect(x).toBeGreaterThanOrEqual(50 + RAIO_CIRCULO_LOCAL * 2);
+    });
+
+    test("escala default (ausente) reproduz exatamente o tamanho nominal — sem regressão", () => {
+      const ctx = contextoFalso();
+      const simbolo: SimboloProjetado = { tipo: "secao", rotulo: "1º", x: 100, y: 200 };
+
+      desenharSimbolos(ctx, [simbolo], MOLDURA);
+
+      const [, , largura] = ctx.chamadas.find((c) => c.metodo === "fillRect")!.args as number[];
+      expect(largura).toBe(LADO_QUADRADO_SECAO);
+    });
+
+    test("[inválido] escala não produz NaN em coordenadas nem na fonte", () => {
+      const ctx = contextoFalso();
+      const simbolo: SimboloProjetado = { tipo: "secao", rotulo: "1º", x: 100, y: 200 };
+
+      desenharSimbolos(ctx, [simbolo], MOLDURA, 1.75);
+
+      const [x, y, largura] = ctx.chamadas.find((c) => c.metodo === "fillRect")!.args as number[];
+      expect(Number.isNaN(x)).toBe(false);
+      expect(Number.isNaN(y)).toBe(false);
+      expect(Number.isNaN(largura)).toBe(false);
+    });
+  });
 });

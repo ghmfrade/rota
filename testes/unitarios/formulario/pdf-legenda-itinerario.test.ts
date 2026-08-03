@@ -1,11 +1,16 @@
 import { describe, expect, test } from "vitest";
 import { numerarItinerario } from "@/formulario/pdf/legenda-itinerario";
+import { esquemaDocumentoOperacao } from "@/shared/contrato";
 import type { Itinerario, Local, Parada, Secao } from "@/shared/contrato";
+import { documentoExemploMinimo } from "../../fixtures";
 
 // TASK-127 — numeração hierárquica das paradas do mapa/legenda do PDF
 // (DEC-105; Spec 04 §13.1 itens 4d/8b). Módulo puro: fixtures mínimas
 // construídas à mão (não precisam de `rota`/`viagens`/estrutura válida
-// completa — `numerarItinerario` só lê `paradas` e `sentido`).
+// completa — `numerarItinerario` só lê `paradas` e `sentido`), exceto onde a
+// fixture canônica já cobre o caso (abaixo) — casos de borda que a violam de
+// propósito (RN-035, geolocalização ausente, Seção compartilhada) continuam
+// construídos à mão, porque não podem ser canônicos por definição.
 
 const SERVICO_UUID = "aaaaaaaa-0000-4000-8000-000000000001";
 const OUTRO_SERVICO_UUID = "bbbbbbbb-0000-4000-8000-000000000002";
@@ -64,6 +69,38 @@ const SECAO_B = "22222222-0000-4000-8000-000000000002";
 const SECAO_C = "33333333-0000-4000-8000-000000000003";
 const LOCAL_X = "44444444-0000-4000-8000-000000000004";
 const LOCAL_Y = "55555555-0000-4000-8000-000000000005";
+
+describe("numerarItinerario — fixture canônica (Spec 02 §15, exemplo mínimo)", () => {
+  test("Ida: 1º, 2º, Local 2.1, 3º — legenda só com as três Seções", () => {
+    const documento = esquemaDocumentoOperacao.parse(documentoExemploMinimo());
+    const servico = documento.autos.servicos[0];
+    const ida = servico.itinerarios.find((i) => i.sentido === "ida")!;
+
+    const resultado = numerarItinerario(ida, servico.uuid, documento.autos.secoes, servico.locais);
+
+    expect(resultado.simbolos.map((s) => [s.tipo, s.rotulo])).toEqual([
+      ["secao", "1º"],
+      ["secao", "2º"],
+      ["local", "2.1"],
+      ["secao", "3º"],
+    ]);
+    expect(resultado.legendaSecoes.map((s) => s.rotulo)).toEqual(["1º", "2º", "3º"]);
+    expect(resultado.identificadoresLocais).toEqual([
+      { localUuid: servico.locais[0].uuid, identificador: "2.1" },
+    ]);
+  });
+
+  test("Volta do mesmo Serviço: série reiniciada, sem nenhum Local", () => {
+    const documento = esquemaDocumentoOperacao.parse(documentoExemploMinimo());
+    const servico = documento.autos.servicos[0];
+    const volta = servico.itinerarios.find((i) => i.sentido === "volta")!;
+
+    const resultado = numerarItinerario(volta, servico.uuid, documento.autos.secoes, servico.locais);
+
+    expect(resultado.simbolos.map((s) => s.rotulo)).toEqual(["1º", "2º", "3º"]);
+    expect(resultado.identificadoresLocais).toEqual([]);
+  });
+});
 
 describe("numerarItinerario — casos válidos (DEC-105)", () => {
   test("Seção A, Local X, Local Y, Seção B, Seção C: quadrados 1º/2º/3º e círculos 1.1/1.2; legenda só com A, B, C", () => {
@@ -189,7 +226,7 @@ describe("numerarItinerario — casos inválidos", () => {
     expect(resultado.legendaSecoes.map((s) => s.rotulo)).toEqual(["1º", "2º"]);
   });
 
-  test("Local sem geolocalização do sentido em edição: não é desenhado, e o identificador não passa para o próximo Local", () => {
+  test("Local sem geolocalização do sentido em edição: numerado (identificador próprio, sem símbolo), e o identificador NÃO passa para o próximo Local", () => {
     const secoes = [secao(SECAO_A, "Cidade A", "Seção A")];
     const semGeolocVolta = local(LOCAL_X, "Local X", "Cidade A", { latitude: 1, longitude: 1 }, ["ida"]);
     const comGeoloc = local(LOCAL_Y, "Local Y", "Cidade A");
@@ -201,9 +238,39 @@ describe("numerarItinerario — casos inválidos", () => {
 
     const resultado = numerarItinerario(it, SERVICO_UUID, secoes, [semGeolocVolta, comGeoloc]);
 
+    // Mesmo princípio de `sequenciaDeSecoes`: a numeração descreve a
+    // travessia (a Parada existe), a geolocalização só governa o desenho.
+    // Cada Local recebe seu PRÓPRIO identificador — nenhum herda o do outro.
     expect(resultado.identificadoresLocais).toEqual([
-      { localUuid: LOCAL_Y, identificador: "1.1" },
+      { localUuid: LOCAL_X, identificador: "1.1" },
+      { localUuid: LOCAL_Y, identificador: "1.2" },
     ]);
+    // Sem geolocalização do sentido: nenhum símbolo para o Local X.
+    expect(resultado.simbolos.some((s) => s.rotulo === "1.1")).toBe(false);
+    expect(resultado.simbolos.find((s) => s.rotulo === "1.2")).toMatchObject({
+      tipo: "local",
+      latitude: comGeoloc.geolocalizacao_volta?.latitude,
+    });
+  });
+
+  test("Seção sem geolocalização do sentido: numerada e na legenda, sem símbolo — a Seção seguinte não herda o ordinal", () => {
+    const secaoSemGeoloc = secao(SECAO_A, "Cidade A", "Seção A", {});
+    const secaoComGeoloc = secao(SECAO_B, "Cidade B", "Seção B");
+    const it = itinerario("ida", [
+      parada(1, { secao: SECAO_A }),
+      parada(2, { secao: SECAO_B }),
+    ]);
+
+    const resultado = numerarItinerario(it, SERVICO_UUID, [secaoSemGeoloc, secaoComGeoloc], []);
+
+    // A legenda continua com o mesmo número de itens que `sequenciaDeSecoes`
+    // listaria (ambas as Seções referenciadas) — sem deslocar o ordinal.
+    expect(resultado.legendaSecoes).toEqual([
+      { rotulo: "1º", nome: "Cidade A - Seção A" },
+      { rotulo: "2º", nome: "Cidade B - Seção B" },
+    ]);
+    expect(resultado.simbolos.some((s) => s.rotulo === "1º")).toBe(false);
+    expect(resultado.simbolos.find((s) => s.rotulo === "2º")).toBeDefined();
   });
 
   test("itinerário sem paradas: listas vazias, sem exceção", () => {

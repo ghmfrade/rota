@@ -31,8 +31,14 @@ const COR_NUMERO_SECAO = "#ffffff";
 const COR_ROTULO_LOCAL = "#0f172a";
 const HALO_EXTRA_PX = 2;
 const ESPACAMENTO_ROTULO_LOCAL_PX = 4;
-const FONTE_NUMERO_SECAO = "bold 13px Helvetica, Arial, sans-serif";
-const FONTE_ROTULO_LOCAL = "bold 11px Helvetica, Arial, sans-serif";
+/** Corpo nominal (escala 1, captura 1400×840 — DEC-104) do número da Seção. */
+const CORPO_NUMERO_SECAO_PX = 13;
+/** Corpo nominal (escala 1) do rótulo do Local. */
+const CORPO_ROTULO_LOCAL_PX = 11;
+
+function fonte(corpoNominalPx: number, escala: number): string {
+  return `bold ${corpoNominalPx * escala}px Helvetica, Arial, sans-serif`;
+}
 
 /** Posição em pixels da captura (já projetada e escalada — ver `captura-mapa-pdf.ts`). */
 export interface PontoProjetado {
@@ -102,31 +108,33 @@ function desenharHalo(ctx: Contexto2DDesenho, x: number, y: number, raio: number
   ctx.restore();
 }
 
-function desenharSecao(ctx: Contexto2DDesenho, simbolo: SimboloProjetado): void {
-  const metadeLado = LADO_QUADRADO_SECAO / 2;
-  desenharHalo(ctx, simbolo.x, simbolo.y, metadeLado + HALO_EXTRA_PX);
+function desenharSecao(ctx: Contexto2DDesenho, simbolo: SimboloProjetado, escala: number): void {
+  const lado = LADO_QUADRADO_SECAO * escala;
+  const metadeLado = lado / 2;
+  desenharHalo(ctx, simbolo.x, simbolo.y, metadeLado + HALO_EXTRA_PX * escala);
 
   ctx.save();
   ctx.fillStyle = COR_QUADRADO_SECAO;
-  ctx.fillRect(simbolo.x - metadeLado, simbolo.y - metadeLado, LADO_QUADRADO_SECAO, LADO_QUADRADO_SECAO);
+  ctx.fillRect(simbolo.x - metadeLado, simbolo.y - metadeLado, lado, lado);
   ctx.restore();
 
   // (b) número DENTRO do quadrado — DEC-105.
   ctx.save();
   ctx.fillStyle = COR_NUMERO_SECAO;
-  ctx.font = FONTE_NUMERO_SECAO;
+  ctx.font = fonte(CORPO_NUMERO_SECAO_PX, escala);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(simbolo.rotulo ?? "", simbolo.x, simbolo.y);
   ctx.restore();
 }
 
-function desenharLocal(ctx: Contexto2DDesenho, simbolo: SimboloProjetado): void {
-  desenharHalo(ctx, simbolo.x, simbolo.y, RAIO_CIRCULO_LOCAL + HALO_EXTRA_PX);
+function desenharLocal(ctx: Contexto2DDesenho, simbolo: SimboloProjetado, escala: number): void {
+  const raio = RAIO_CIRCULO_LOCAL * escala;
+  desenharHalo(ctx, simbolo.x, simbolo.y, raio + HALO_EXTRA_PX * escala);
 
   ctx.save();
   ctx.beginPath();
-  ctx.arc(simbolo.x, simbolo.y, RAIO_CIRCULO_LOCAL, 0, Math.PI * 2);
+  ctx.arc(simbolo.x, simbolo.y, raio, 0, Math.PI * 2);
   ctx.fillStyle = COR_CIRCULO_LOCAL;
   ctx.fill();
   ctx.restore();
@@ -137,10 +145,10 @@ function desenharLocal(ctx: Contexto2DDesenho, simbolo: SimboloProjetado): void 
   if (!simbolo.rotulo) return;
   ctx.save();
   ctx.fillStyle = COR_ROTULO_LOCAL;
-  ctx.font = FONTE_ROTULO_LOCAL;
+  ctx.font = fonte(CORPO_ROTULO_LOCAL_PX, escala);
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.fillText(simbolo.rotulo, simbolo.x + RAIO_CIRCULO_LOCAL + ESPACAMENTO_ROTULO_LOCAL_PX, simbolo.y);
+  ctx.fillText(simbolo.rotulo, simbolo.x + raio + ESPACAMENTO_ROTULO_LOCAL_PX * escala, simbolo.y);
   ctx.restore();
 }
 
@@ -149,17 +157,25 @@ function desenharLocal(ctx: Contexto2DDesenho, simbolo: SimboloProjetado): void 
  * fora da moldura são descartados sem lançar. Ordem de desenho estável —
  * Locais primeiro, Seções por cima — mitiga sobreposição em paradas próximas
  * (terminal urbano); anti-colisão automática não é escopo desta task.
+ *
+ * `escala` multiplica todos os tamanhos (lado, raio, halo, espaçamento,
+ * corpo de fonte) — nunca as posições, já projetadas em pixels de canvas
+ * pelo chamador. Os símbolos são declarados nominalmente para a captura
+ * 1400×840 (DEC-104); `escala` é `canvas.width / largura nominal`, a mesma
+ * razão que corrige as coordenadas, para que o símbolo ocupe sempre a
+ * mesma fração da imagem — inclusive em canvas maior por `devicePixelRatio`.
  */
 export function desenharSimbolos(
   ctx: Contexto2DDesenho,
   simbolos: readonly SimboloProjetado[],
   moldura: MolduraDesenho,
+  escala = 1,
 ): void {
   const visiveis = simbolos.filter((simbolo) => simboloDentroDaMoldura(simbolo, moldura));
   for (const simbolo of visiveis.filter((s) => s.tipo === "local")) {
-    desenharLocal(ctx, simbolo);
+    desenharLocal(ctx, simbolo, escala);
   }
   for (const simbolo of visiveis.filter((s) => s.tipo === "secao")) {
-    desenharSecao(ctx, simbolo);
+    desenharSecao(ctx, simbolo, escala);
   }
 }
