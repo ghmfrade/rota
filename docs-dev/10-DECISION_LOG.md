@@ -1670,3 +1670,60 @@ mudança). **Testes:** cobertos por
 `geolocalizacao_ida` continua listado com seu `n.m`, e parada apontando para
 Local inexistente não vira linha. **Tasks:** **TASK-034** (entregue sob esta
 decisão); nenhuma outra afetada.
+
+## DEC-107 — Matrizes do PDF: cabeçalho de coluna na diagonal, unidade no título e detalhe Ida/Volta empilhado e abreviado
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, **opção 2
+da Q-085** (dada explicitamente na conversa de análise da correção da TASK-034 e
+confirmada por `/registrar-decisao`); Spec 04 §9, §9.1, §9.2, §13.1 itens 6–7,
+§13.3; RN-076, RN-056, RN-058/RN-059, RN-013 · **Data:** 2026-08-03
+
+**Decisão:** na apresentação das duas matrizes do **PDF operacional** (§13.1
+itens 6 e 7):
+
+1. o **cabeçalho de coluna** é escrito **na diagonal, a 45°, subindo, sem quebra
+   de linha**; o **cabeçalho de linha permanece horizontal**;
+2. a **unidade sai da célula** e passa para o **título do bloco** — "Matriz de
+   distâncias (km)" e "Matriz de seccionamento (km)";
+3. a célula da matriz de distâncias do par **bidirecional** é **empilhada em três
+   linhas** — valor adotado, depois `I: <valor>`, depois `V: <valor>` —, **nunca
+   na mesma linha**, com Ida e Volta em corpo menor e cinza; **não** existe o
+   rótulo "Média"; no Serviço **unidirecional** a célula tem apenas a primeira
+   linha (RN-056);
+4. permanecem **intactos**: a forma **triangular inferior**, o **"X"** na
+   diagonal, o padrão `Cidade - Nome da Seção` nos cabeçalhos de linha e coluna,
+   a ausência de **R$** (RN-013/RN-076) e o "—" **exclusivo** da matriz de
+   seccionamento (RN-058/RN-059).
+
+**Motivo:** o §9.1 desenha a matriz para a **tela**, onde o detalhe Ida/Volta é
+expansível e a largura é rolável; no papel, o cabeçalho horizontal com
+`Cidade - Nome da Seção` força colunas de ~66 pt dos 515 pt úteis da A4 e limita
+a matriz a poucas Seções por página, e repetir `" km"` em cada célula consome a
+largura de que o próprio valor precisa. O cabeçalho diagonal desacopla a largura
+da coluna do comprimento do nome, permitindo colunas estreitas e próximas sem
+perder legibilidade. A RN-076 exige valores **em km**, não `" km"` por célula —
+declarar a unidade uma vez por bloco satisfaz a regra com menos ruído.
+
+**Consequências:** resolve a **Q-085**. **Nenhuma alteração de spec** — a decisão
+adapta a mídia impressa mantendo tudo o que a RN-076 fixa; o §9.1 continua
+governando a **tela** sem mudança (a etapa Matrizes do Formulário, TASK-048, não
+é tocada: lá o detalhe segue expansível e o valor segue com `" km"`). **Nenhuma
+mudança de contrato JSON**, nenhum recálculo, nenhum impacto no Comparador
+(Spec 05 §10.4), nas contagens ou nas RN de horários. Fecha a lacuna de
+justificativa que a revisão apontaria contra o exemplo literal do §9.1.
+
+**Impacto em implementação:** **RN:** nenhuma muda de texto; a **RN-076** é
+confirmada (triangular inferior, "X", `Cidade - Nome da Seção`, km, sem R$) e a
+**RN-056** delimita o item 3 (só o bidirecional tem `I:`/`V:`). **Módulos:**
+`src/formulario/pdf/matrizes-pdf.ts` (modelo e quebra em blocos),
+`src/formulario/pdf/documento-pdf-operacional.tsx` (componente `MatrizPdfView` e
+títulos dos itens 6 e 7) e `src/formulario/pdf/estilos-pdf.ts` (cabeçalho
+diagonal, larguras fixas de coluna); `formatarKm` de
+`src/formulario/matrizes/apresentacao-matriz-distancias.ts` **não muda** (é
+compartilhado com a tela) — a formatação sem unidade vale só no PDF. **Testes:**
+título com "(km)", ausência de "km" nas células, `I:`/`V:` em linhas separadas,
+ausência da palavra "Média" e célula unidirecional sem detalhe. **Tasks:**
+**TASK-034** (correção em andamento, reprovada em
+`docs-dev/14-REVISOES/TASK-034-20260803.md`); **TASK-048** não é afetada;
+TASK-037/039 (matrizes comparativas do Comparador) permanecem regidas pela
+Spec 05, sem herança automática desta decisão.

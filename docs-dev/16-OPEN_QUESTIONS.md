@@ -1511,3 +1511,42 @@ não há bijeção exigida entre a relação do anexo e os símbolos da imagem. 
 DEC-105 permanece válida e não é superada. Implementada em
 `src/formulario/pdf/anexo-tecnico-pdf.ts` (TASK-034), com teste dedicado. Ver
 DEC-106.
+
+## Q-085 — Apresentação das matrizes no PDF: cabeçalho diagonal, unidade no título e detalhe abreviado
+
+**Contexto:** Levantada na correção da **TASK-034**, após a reprovação por
+desalinhamento das matrizes no PDF gerado
+(`docs-dev/14-REVISOES/TASK-034-20260803.md`, problema 1). O §9.1 desenha a
+matriz com **cabeçalhos horizontais** e células no formato `12,40 km`. No papel,
+com `Cidade - Nome da Seção` em cada coluna, o cabeçalho horizontal força colunas
+largas (~66 pt de 515 pt úteis da A4) e limita a matriz a poucas Seções por
+página; repetir `" km"` em toda célula consome a largura que falta ao próprio
+valor. A célula bidirecional ainda precisa exibir o detalhe Ida/Volta, que na
+tela é expansível por hover/clique (comportamento inexistente no papel).
+
+**Spec relacionada:** Spec 04 §9, §9.1, §9.2, §13.1 itens 6–7, §13.3; RN-076
+(matrizes triangulares inferiores, em km, sem R$), RN-056
+(`valor_adotado_de_distancia` é média só no bidirecional), RN-058/RN-059 ("—" só
+no seccionamento), RN-013 (sem R$).
+
+**Impacto se não decidir:** a implementação escolhe sozinha o formato do papel
+(violando o princípio 2 do `docs-dev/04`) e a revisão fica sem critério para
+separar "adaptação de mídia" de "divergência do §9.1".
+
+**Opções:** 1 — manter o §9.1 ao pé da letra (cabeçalho de coluna horizontal,
+`" km"` em cada célula), aceitando poucas Seções por bloco; 2 — adaptar a mídia:
+cabeçalho de **coluna na diagonal a 45°** (o de linha permanece horizontal),
+unidade declarada **no título** do bloco ("Matriz de distâncias (km)"), e detalhe
+do par bidirecional **empilhado e abreviado** (`I: 100,00` / `V: 99,98`), sem
+rótulo "Média", mantendo intactos a forma triangular inferior, o "X" na diagonal,
+o padrão `Cidade - Nome da Seção` e a ausência de R$; 3 — aplicar a opção 2 só
+quando o Serviço exceder N Seções (formato variável no mesmo documento).
+
+**Recomendação técnica:** opção **2** — a RN-076 exige "em km", não "km em cada
+célula"; o que a regra de fato fixa (triangular inferior, "X", padrão de nome,
+sem R$) permanece. A opção 3 criaria dois formatos para o mesmo documento,
+prejudicando a comparação entre Serviços.
+
+**Decisão:** **Decidida (DEC-107, 2026-08-03).** Opção 2, com o detalhe da célula
+empilhado em três linhas (valor adotado / `I:` / `V:`), nunca na mesma linha e
+sem o rótulo "Média". Ver DEC-107.
