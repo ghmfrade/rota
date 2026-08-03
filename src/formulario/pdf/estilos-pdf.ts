@@ -317,6 +317,73 @@ export const estilosPdf = StyleSheet.create({
     textAlign: "center",
     color: CINZA_500,
   },
+  // Matriz triangular do PDF (correção da TASK-034; DEC-107) — largura FIXA
+  // por coluna, nunca `flex`: o `flex` reparte a largura DENTRO de cada linha,
+  // então linhas com números de células diferentes (o triângulo) nunca
+  // alinhavam sob o mesmo cabeçalho (causa do desalinhamento reprovado no
+  // parecer). Estilos exclusivos desta matriz — não confundir com
+  // `celulaMatriz`/`celulaCabecalhoMatriz`/`celulaDiagonal` acima, que
+  // continuam servindo só a tabela de Locais do anexo técnico.
+  tabelaMatriz: {
+    borderTopWidth: 1,
+    borderTopColor: CINZA_200,
+    marginBottom: 8,
+    alignSelf: "flex-start",
+  },
+  // Coluna do rótulo de linha (`Cidade - Nome da Seção`), que continua
+  // horizontal — só os cabeçalhos de COLUNA giram (D6).
+  cabecalhoLinhaMatriz: {
+    width: 130,
+    paddingHorizontal: 3,
+  },
+  celulaMatrizValor: {
+    width: 38,
+    paddingHorizontal: 3,
+    textAlign: "center",
+  },
+  celulaMatrizDiagonal: {
+    width: 38,
+    paddingHorizontal: 3,
+    textAlign: "center",
+    color: CINZA_500,
+  },
+  celulaMatrizVazia: {
+    width: 38,
+    paddingHorizontal: 3,
+  },
+  // Linha de cabeçalho com altura reservada (vinda do bloco — `alturaCabecalho`
+  // é o único valor de estilo dinâmico do documento, ver o comentário no
+  // componente) para os rótulos diagonais não serem cortados.
+  linhaCabecalhoDiagonal: {
+    flexDirection: "row",
+    backgroundColor: CINZA_100,
+    borderBottomWidth: 1,
+    borderBottomColor: CINZA_200,
+    fontFamily: "Helvetica-Bold",
+    color: CINZA_900,
+  },
+  // Contêiner de cada coluna do cabeçalho — `position: relative` ancora o
+  // rótulo `absolute` dentro dos 38 pt da própria coluna, não da linha
+  // inteira; a altura vem do `stretch` padrão do Yoga (herda a altura fixada
+  // em `linhaCabecalhoDiagonal`).
+  cabecalhoColunaDiagonal: {
+    width: 38,
+    position: "relative",
+  },
+  // Rótulo do cabeçalho de coluna girado a 45° (D6). `transform` não afeta o
+  // layout (só a pintura) — por isso a altura da linha é reservada à parte, e
+  // o rótulo é ancorado no canto inferior esquerdo da própria coluna
+  // (`transformOriginX/Y`) para subir para a direita sem empurrar nada.
+  rotuloColunaDiagonal: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    fontSize: 8,
+    color: CINZA_900,
+    transformOriginX: "0%",
+    transformOriginY: "100%",
+    transform: "rotate(-45deg)",
+  },
   rodape: {
     position: "absolute",
     bottom: 24,

@@ -14,9 +14,12 @@ import {
   type GradeHorariaPdf,
   type TabelaHorariaPdf,
 } from "./tabelas-horarias-pdf";
-import type {
-  MatrizDistanciasPdf,
-  MatrizSeccionamentoPdf,
+import {
+  dividirMatrizEmBlocos,
+  type CelulaDistanciaPdf,
+  type CelulaSeccionamentoPdf,
+  type MatrizDistanciasPdf,
+  type MatrizSeccionamentoPdf,
 } from "./matrizes-pdf";
 import type { BlocoAnexoTecnico, BlocoLocaisAnexo } from "./anexo-tecnico-pdf";
 
@@ -444,10 +447,48 @@ function TabelaHorariaPdfView({ tabela }: { tabela: TabelaHorariaPdf }) {
 }
 
 /**
- * Matriz triangular inferior (§9.1/§9.2): "X" na diagonal, cabeçalhos
- * `Cidade - Nome da Seção`, valores em km — nunca R$ (RN-013/076). As duas
- * matrizes compartilham a forma; a diferença de semântica da célula vazia mora
- * no modelo (`matrizes-pdf.ts`), não aqui.
+ * Uma célula de dados da matriz (§9.1/§9.2): diagonal "X", preenchimento
+ * vazio (fora do triângulo — nunca "—", DEC-107 §3.3) ou valor. O detalhe
+ * Ida/Volta do Serviço bidirecional (RN-056) empilha em linhas próprias,
+ * abreviado `I:`/`V:`, nunca junto do valor adotado (D3/D4 da DEC-107).
+ */
+function CelulaMatrizView({
+  celula,
+}: {
+  celula: CelulaDistanciaPdf | CelulaSeccionamentoPdf | undefined;
+}) {
+  if (celula === undefined) {
+    return <View style={estilosPdf.celulaMatrizVazia} />;
+  }
+  if (celula.tipo === "diagonal") {
+    return (
+      <View style={estilosPdf.celulaMatrizDiagonal}>
+        <Text>{celula.texto}</Text>
+      </View>
+    );
+  }
+  return (
+    <View style={estilosPdf.celulaMatrizValor}>
+      <Text>{celula.texto}</Text>
+      {"detalheIda" in celula && celula.detalheIda !== undefined ? (
+        <>
+          <Text style={estilosPdf.detalheMatriz}>I: {celula.detalheIda}</Text>
+          <Text style={estilosPdf.detalheMatriz}>V: {celula.detalheVolta}</Text>
+        </>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Matriz triangular inferior (§9.1/§9.2; DEC-107 — correção da TASK-034):
+ * "X" na diagonal, cabeçalhos `Cidade - Nome da Seção` na coluna de linha,
+ * valores em km (a unidade vai para o título do bloco, não para a célula —
+ * RN-013/076). Dividida em blocos de faixa de colunas × pedaço de linhas
+ * (`dividirMatrizEmBlocos`) para caber na largura/altura úteis da A4 com
+ * largura de coluna FIXA — nunca `flex`, causa do desalinhamento reprovado no
+ * parecer da TASK-034. A diferença de semântica da célula vazia/"—" mora no
+ * modelo (`matrizes-pdf.ts`), não aqui.
  */
 function MatrizPdfView({
   matriz,
@@ -455,41 +496,39 @@ function MatrizPdfView({
   matriz: MatrizDistanciasPdf | MatrizSeccionamentoPdf;
 }) {
   return (
-    <View wrap={false}>
-      <Text style={estilosPdf.tituloItinerario}>Serviço {matriz.numeroN}</Text>
-      <View style={estilosPdf.tabela}>
-        <View style={estilosPdf.linhaCabecalho}>
-          <Text style={estilosPdf.celulaCabecalhoMatriz}>Origem/Destino</Text>
-          {matriz.cabecalhos.map((cabecalho) => (
-            <Text key={cabecalho.secaoUuid} style={estilosPdf.celulaMatriz}>
-              {cabecalho.rotulo}
+    <View>
+      {dividirMatrizEmBlocos<CelulaDistanciaPdf | CelulaSeccionamentoPdf>(matriz).map(
+        (bloco, indiceBloco) => (
+          <View key={indiceBloco} wrap={false}>
+            <Text style={estilosPdf.tituloItinerario}>
+              Serviço {matriz.numeroN}
+              {bloco.continuacao ? " (continuação)" : ""}
             </Text>
-          ))}
-        </View>
-        {matriz.linhas.map((linha, indice) => (
-          <View style={estiloLinhaDados(indice)} key={linha.secaoUuid}>
-            <Text style={estilosPdf.celulaCabecalhoMatriz}>{linha.rotulo}</Text>
-            {linha.celulas.map((celula, indiceCelula) => (
+            <View style={estilosPdf.tabelaMatriz}>
               <View
-                key={indiceCelula}
-                style={
-                  celula.tipo === "diagonal"
-                    ? estilosPdf.celulaDiagonal
-                    : estilosPdf.celulaMatriz
-                }
+                style={[estilosPdf.linhaCabecalhoDiagonal, { height: bloco.alturaCabecalho }]}
               >
-                <Text>{celula.texto}</Text>
-                {/* §9.1 — detalhe Ida/Volta do Serviço bidirecional (RN-056). */}
-                {"detalheIda" in celula && celula.detalheIda !== undefined ? (
-                  <Text style={estilosPdf.detalheMatriz}>
-                    Ida {celula.detalheIda} · Volta {celula.detalheVolta}
-                  </Text>
-                ) : null}
+                <View style={estilosPdf.cabecalhoLinhaMatriz}>
+                  <Text>Origem/Destino</Text>
+                </View>
+                {bloco.cabecalhos.map((cabecalho) => (
+                  <View key={cabecalho.secaoUuid} style={estilosPdf.cabecalhoColunaDiagonal}>
+                    <Text style={estilosPdf.rotuloColunaDiagonal}>{cabecalho.rotulo}</Text>
+                  </View>
+                ))}
               </View>
-            ))}
+              {bloco.linhas.map((linha, indice) => (
+                <View style={estiloLinhaDados(indice)} key={linha.secaoUuid}>
+                  <Text style={estilosPdf.cabecalhoLinhaMatriz}>{linha.rotulo}</Text>
+                  {linha.celulas.map((celula, indiceCelula) => (
+                    <CelulaMatrizView key={indiceCelula} celula={celula} />
+                  ))}
+                </View>
+              ))}
+            </View>
           </View>
-        ))}
-      </View>
+        ),
+      )}
     </View>
   );
 }
@@ -631,7 +670,7 @@ export function DocumentoPdfOperacional({
 
       {/* Item 6 — matriz de distâncias por Serviço (§9.1). */}
       <Page size="A4" style={estilosPdf.pagina}>
-        <Text style={estilosPdf.tituloBloco}>Matriz de distâncias</Text>
+        <Text style={estilosPdf.tituloBloco}>Matriz de distâncias (km)</Text>
         {modelo.matrizesDistancias.map((matriz) => (
           <MatrizPdfView key={matriz.servicoUuid} matriz={matriz} />
         ))}
@@ -642,7 +681,7 @@ export function DocumentoPdfOperacional({
       {/* Item 7 — matriz de seccionamento por Serviço (§9.2): pares não
           habilitados com "—". */}
       <Page size="A4" style={estilosPdf.pagina}>
-        <Text style={estilosPdf.tituloBloco}>Matriz de seccionamento</Text>
+        <Text style={estilosPdf.tituloBloco}>Matriz de seccionamento (km)</Text>
         {modelo.matrizesSeccionamento.map((matriz) => (
           <MatrizPdfView key={matriz.servicoUuid} matriz={matriz} />
         ))}

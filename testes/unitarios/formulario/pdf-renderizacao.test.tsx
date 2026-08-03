@@ -101,6 +101,17 @@ function paginasDe(documento: NoPdf): NoPdf[] {
   return documento.filhos.filter((filho) => filho.tipo === "PAGE");
 }
 
+/**
+ * Compara `style` contra um estilo conhecido tolerando o único caso de array
+ * de estilo do documento: `linhaCabecalhoDiagonal` recebe a altura dinâmica do
+ * bloco como `[estilosPdf.linhaCabecalhoDiagonal, { height }]` (§3.4 do plano
+ * de correção da TASK-034).
+ */
+function temEstilo(no: NoPdf, estilo: unknown): boolean {
+  const style = no.props.style;
+  return style === estilo || (Array.isArray(style) && style.includes(estilo));
+}
+
 function modeloDe(documento: unknown): ModeloPdfOperacional {
   return montarModeloPdfOperacional(esquemaDocumentoOperacao.parse(documento), {
     geradoEm: new Date(2026, 6, 31, 14, 5),
@@ -243,7 +254,7 @@ describe("Itens 5–8 do §13.1 (TASK-034) — tabelas horárias, matrizes e ane
 
     for (const pagina of [matrizDistancias, matrizSeccionamento]) {
       const diagonais = descendentes(pagina).filter(
-        (no) => no.props.style === estilosPdf.celulaDiagonal,
+        (no) => no.props.style === estilosPdf.celulaMatrizDiagonal,
       );
       // 3 Seções → 3 células de diagonal por matriz.
       expect(diagonais).toHaveLength(3);
@@ -261,7 +272,99 @@ describe("Itens 5–8 do §13.1 (TASK-034) — tabelas horárias, matrizes e ane
     expect(textoDe(matrizSeccionamento)).toContain(MARCA_PAR_NAO_HABILITADO);
     // A matriz de distâncias é a distância real do trecho: nunca "—".
     expect(textoDe(matrizDistancias)).not.toContain(MARCA_PAR_NAO_HABILITADO);
+    // A unidade agora vive só no título do bloco (DEC-107), não mais na célula.
     expect(textoDe(matrizDistancias)).toContain("km");
+  });
+
+  test("DEC-107 — geometria: toda linha de dados de cada bloco tem o mesmo número de filhos da linha de cabeçalho", () => {
+    const { matrizDistancias, matrizSeccionamento } = paginasDosItens5a8(
+      arvoreDo(modeloDe(documentoExemploMinimo())),
+    );
+
+    for (const pagina of [matrizDistancias, matrizSeccionamento]) {
+      const linhasCabecalho = descendentes(pagina).filter((no) =>
+        temEstilo(no, estilosPdf.linhaCabecalhoDiagonal),
+      );
+      expect(linhasCabecalho.length).toBeGreaterThan(0);
+
+      for (const linhaCabecalho of linhasCabecalho) {
+        // Filhos diretos: o rótulo "Origem/Destino" + uma coluna por cabeçalho.
+        const numeroDeColunas = linhaCabecalho.filhos.length;
+        const tabela = descendentes(pagina).find((no) => no.filhos.includes(linhaCabecalho));
+        if (tabela === undefined) throw new Error("tabela não encontrada");
+        const linhasDeDados = tabela.filhos.filter((filho) => filho !== linhaCabecalho);
+        expect(linhasDeDados.length).toBeGreaterThan(0);
+        for (const linhaDeDados of linhasDeDados) {
+          expect(linhaDeDados.filhos).toHaveLength(numeroDeColunas);
+        }
+      }
+    }
+  });
+
+  test("caso inválido — uma linha triangular sintética (sem preenchimento) é acusada pela mesma varredura", () => {
+    // Poder de detecção: a asserção acima não passa vacuamente. Uma "tabela"
+    // sintética em que a linha 2 só tem 2 células (o modo de falha original,
+    // reprovado no parecer da TASK-034) é detectada.
+    const cabecalho: NoPdf = { tipo: "VIEW", props: {}, filhos: [{} as NoPdf, {} as NoPdf, {} as NoPdf] };
+    const linhaTriangular: NoPdf = { tipo: "VIEW", props: {}, filhos: [{} as NoPdf, {} as NoPdf] };
+    const tabela: NoPdf = { tipo: "VIEW", props: {}, filhos: [cabecalho, linhaTriangular] };
+
+    const linhasDeDados = tabela.filhos.filter((filho) => filho !== cabecalho);
+    expect(linhasDeDados.some((linha) => linha.filhos.length !== cabecalho.filhos.length)).toBe(
+      true,
+    );
+  });
+
+  test("DEC-107 — célula empilhada: Serviço bidirecional traz `I:` e `V:` em `Text` separados, com o estilo do detalhe", () => {
+    const { matrizDistancias } = paginasDosItens5a8(
+      arvoreDo(modeloDe(documentoExemploMinimo())),
+    );
+
+    const detalhes = descendentes(matrizDistancias).filter(
+      (no) => no.tipo === "TEXT" && no.props.style === estilosPdf.detalheMatriz,
+    );
+    expect(detalhes.length).toBeGreaterThan(0);
+    expect(detalhes.some((no) => textoDe(no).startsWith("I: "))).toBe(true);
+    expect(detalhes.some((no) => textoDe(no).startsWith("V: "))).toBe(true);
+    // Nunca na mesma linha de texto (D3 — sem "Ida ... · Volta ...").
+    for (const detalhe of detalhes) {
+      expect(textoDe(detalhe)).not.toContain("·");
+    }
+  });
+
+  test("caso inválido — documento unidirecional não tem `I:`/`V:`, e nenhuma matriz usa a palavra 'Média'", () => {
+    const { matrizDistancias, matrizSeccionamento } = paginasDosItens5a8(
+      arvoreDo(modeloDe(documentoUnidirecional())),
+    );
+
+    for (const pagina of [matrizDistancias, matrizSeccionamento]) {
+      const texto = textoDe(pagina);
+      expect(texto).not.toContain("I: ");
+      expect(texto).not.toContain("V: ");
+      expect(texto).not.toContain("Média");
+      expect(texto).not.toContain("média");
+    }
+  });
+
+  test("DEC-107 — unidade: os títulos das matrizes trazem '(km)'; caso inválido: nenhuma célula de matriz contém 'km'", () => {
+    const documento = documentoExemploMinimo();
+    const paginas = paginasDosItens5a8(arvoreDo(modeloDe(documento)));
+
+    expect(textoDe(paginas.matrizDistancias)).toContain("Matriz de distâncias (km)");
+    expect(textoDe(paginas.matrizSeccionamento)).toContain("Matriz de seccionamento (km)");
+
+    for (const pagina of [paginas.matrizDistancias, paginas.matrizSeccionamento]) {
+      const celulas = descendentes(pagina).filter(
+        (no) =>
+          no.props.style === estilosPdf.celulaMatrizValor ||
+          no.props.style === estilosPdf.celulaMatrizDiagonal ||
+          no.props.style === estilosPdf.celulaMatrizVazia,
+      );
+      expect(celulas.length).toBeGreaterThan(0);
+      for (const celula of celulas) {
+        expect(textoDe(celula)).not.toContain("km");
+      }
+    }
   });
 
   test("o anexo traz a versão detalhada e a relação de Locais com o `n.m` (§13.1 item 8)", () => {
