@@ -1,7 +1,49 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-08-03 (branch `redesign`) — **TASK-128 (fechamento da
-TASK-034): entrega REPROVADA; o desenho das matrizes do PDF permanece na fila.** O commit
+**Atualização mais recente:** 2026-08-03 (branch `redesign`) — **TASK-128, rodada de
+correção: entrega APROVADA COM RESSALVAS; o desenho das matrizes do PDF sai da fila e, com
+ele, a TASK-034 é encerrada (DEC-108).** O commit `a05022d`, fundamentado na **DEC-110**
+(`69d5485`, Q-088 opção 2 "com as recomendações"), entrega as **cinco correções** que o
+parecer anterior exigia, em rodada única: (1) `dividirMatrizEmBlocos` descarta o bloco cujas
+células habitadas sejam só diagonais — o bloco "(continuação)" com um único "X" que aparecia
+em 8, 15 e 22 Seções deixou de existir —, com o critério apoiado em **conteúdo** e não em
+largura de faixa, preservando ao menos um bloco e recalculando `continuacao` **depois** do
+descarte (`matrizes-pdf.ts:290-371`); (2) réguas verticais em `CINZA_500`, desenhadas **em
+escada** e ausentes do triângulo superior vazio (`estilos-pdf.ts:344-397`,
+`fechaEscadaEm` em `documento-pdf-operacional.tsx:520-539`); (3) rótulo de coluna ancorado no
+**rodapé** da célula hospedeira (`bottom: 0`), rente ao próprio "X"; (4) rótulo de linha a
+**170 pt** e centrado verticalmente; (5) rótulo de coluna a **117 pt** com `maxLines: 1` e
+`textOverflow: "ellipsis"` — a garantia de "uma linha" deixa de depender do tamanho do nome
+da Seção. `MAX_COLUNAS_POR_BLOCO` **permanece 7**, como a DEC-110 item 1 decidiu ao **recusar**
+o pedido de elevar para 8. Verificado por medição própria na revisão
+(`_INTERNAL__LAYOUT__DATA_` sobre `DocumentoPdfOperacional`, fixture `documentoExemploMinimo()`):
+as réguas saem onde deveriam (linha final com fechamento à direita, cabeçalho sem grade), e o
+truncamento emite de fato o glifo `ellipsis`, não um corte mudo. O parecer
+`14-REVISOES/TASK-128-20260803.md` registra **checklist 07 com 27 ok, 25 N/A, 1 ressalva e 0
+violados** e três desvios menores, nenhum violando RN Alta ou NEG-xxx: o comentário do
+`MAX_COLUNAS_POR_BLOCO` ficou com a aritmética anterior à DEC-110 (170/117, não 130/150);
+nenhum teste renderiza um bloco de **7 colunas**, de modo que o orçamento de largura que a
+DEC-110 fixou não está guardado; e o JSDoc do `MatrizPdfView` ficou órfão entre os dois
+helpers novos. **Condições de merge:** corrigir o comentário do teto e fazer a **conferência
+visual** do PDF gerado — foi ela que encontrou quatro dos cinco defeitos da rodada anterior, e
+há um ponto a confirmar: o truncamento do rótulo de coluna atinge nomes de tamanho **comum**
+(na própria fixture, "Praia Grande - Rodoviária Praia Grande" sai cortado), consequência
+decidida pela DEC-110 item 3, mas impressa pela primeira vez. A revisão reutilizou o log
+canônico verde (`test:all:verificar`: executor **Claude**, fingerprint `de32a6ea…4b89c8f01f5`,
+identidade `00c21aa5…1336f57e`, `Test Files 113 passed`, `Tests 1590 passed`, E2E `110 passed`,
+ambos com código 0, `Resultado geral: APROVADO`) e rodou `typecheck` e `lint`, ambos limpos; o
+arquivo de diagnóstico usado nas medições foi removido e o log revalidado em seguida.
+**Contagem:** com a **TASK-034 encerrada pela TASK-128**, passam a ser **8 tasks não
+concluídas — 6 executáveis, a TASK-038 com bloqueio parcial e a TASK-040 bloqueada**. A
+**TASK-129** (itinerários do PDF, DEC-109) segue desbloqueada e independente; criada em
+`d53130d`, depois desta contagem, ela **não** altera o total, no mesmo tratamento dado à
+TASK-120. O follow-up de guardar o orçamento de largura por teste cabe nela, que volta aos
+mesmos arquivos. Permanece a pendência de **registro** herdada: a §3 termina na **125** e o
+total "102 tasks concluídas" diverge das linhas da tabela — esta revisão também **não** mexeu
+nisso. **Higiene:** `git status` limpo antes e depois da revisão.
+
+**Histórico anterior (2026-08-03) — TASK-128, 1ª rodada (fechamento da
+TASK-034): entrega REPROVADA.** O commit
 `31ff190`, fundamentado na **DEC-108** (`43bcc5a`, Q-086 opção 2), **encerra o defeito que
 reprovou as duas rodadas anteriores**: o cabeçalho de coluna deixa de ser girado e passa a
 ser escrito horizontalmente na célula de preenchimento acima do próprio "X"
@@ -868,6 +910,8 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | Task | Título resumido |
 |---|---|
 | 033 | PDF operacional: estrutura e identificação (§13.1 itens 1–4 e 9; DEC-104) — aprovada com ressalvas em `14-REVISOES/TASK-033-20260731.md`; ressalvas fechadas em `1a77a85` e revisadas em `14-REVISOES/TASK-033-20260802-fechamento.md` (sem condição de merge remanescente; pendem 2 ressalvas documentais — DEC da estratificação por Serviço e task para o painel da TASK-031) |
+| 034 | PDF operacional: tabelas horárias, matrizes e anexo (§13.1 itens 5–8) — reprovada três vezes no desenho das matrizes (`14-REVISOES/TASK-034-20260803.md`, `-correcao.md`, `-task-128.md`) e **encerrada pela TASK-128** (DEC-108) |
+| 128 | Matrizes do PDF: rótulo de coluna horizontal no triângulo superior, matriz íntegra por página e acabamento (DEC-108/DEC-110) — 1ª rodada `31ff190` reprovada; rodada de correção `a05022d` **aprovada com ressalvas** em `14-REVISOES/TASK-128-20260803.md` (condições de merge: comentário do `MAX_COLUNAS_POR_BLOCO` e conferência visual) |
 
 ### Fase 12 — Qualidade e follow-ups
 
@@ -971,8 +1015,12 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 
 ## 5. Tasks a executar — ordem recomendada
 
-**Estado atual: 9 tasks não concluídas: 7 executáveis, a TASK-038 com bloqueio
-parcial e a TASK-040 bloqueada.** Em 2026-07-31, a **TASK-033 saiu da fila**:
+**Estado atual: 8 tasks não concluídas: 6 executáveis, a TASK-038 com bloqueio
+parcial e a TASK-040 bloqueada.** Em 2026-08-03, a **TASK-034 saiu da fila**: encerrada pela
+**TASK-128** (DEC-108), cuja rodada de correção `a05022d` foi aprovada com ressalvas em
+`14-REVISOES/TASK-128-20260803.md`. A **TASK-129** (itinerários do PDF, DEC-109) foi criada
+depois desta contagem, em `d53130d`, e por isso não altera o total — mesmo tratamento dado à
+TASK-120. Em 2026-07-31, a **TASK-033 saiu da fila**:
 implementada em `32cd8ae` e aprovada com ressalvas em
 `14-REVISOES/TASK-033-20260731.md`; a **TASK-034** fica desbloqueada e herda a
 ordem de blocos, a captura de mapa e a folha de estilos já postas; em 2026-08-02 as
@@ -1115,7 +1163,7 @@ Independentes do ramo do mapa: nada aqui bloqueia ou é bloqueado por ele.
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
 | ~~5~~ | ~~**033** — PDF operacional: estrutura e identificação~~ | **4** | **Concluída em 2026-07-31** (`32cd8ae`), aprovada com ressalvas em `14-REVISOES/TASK-033-20260731.md`. **Ressalvas fechadas em 2026-08-02** (`1a77a85`; `14-REVISOES/TASK-033-20260802-fechamento.md`): condição de merge cumprida, §10 completo no PDF (7 contadores por Serviço + estratificação por faixa por Serviço). Sai da fila. |
-| 6 | **034** — PDF operacional: tabelas horárias e matrizes | **3** | Sobre a 033 — **desbloqueada**. Herda `ORDEM_BLOCOS`, a captura de mapa (DEC-104) e `estilos-pdf.ts`; preenche `tabelas-horarias`/`matriz-distancias`/`matriz-seccionamento`/`anexo-tecnico` **sem reordenar** a constante. A condição de merge da 033 foi cumprida em `1a77a85` — não é mais dever desta task. Ao trazer os horários de saída, **estender** o teste de horas permitidas de `pdf-regras-transversais.test.ts`, que hoje os proíbe. |
+| ~~6~~ | ~~**034** — PDF operacional: tabelas horárias e matrizes~~ | **3** | **Encerrada em 2026-08-03 pela TASK-128** (DEC-108). O corpo dos itens 5–8 foi entregue em `1de7534`; o desenho das matrizes, reprovado três vezes, foi fechado pela rodada de correção `a05022d`, aprovada com ressalvas em `14-REVISOES/TASK-128-20260803.md`. Sai da fila. Segue como **TASK-129** (DEC-109) a reordenação do bloco de itinerário. Registro histórico do escopo original: Sobre a 033 — **desbloqueada**. Herda `ORDEM_BLOCOS`, a captura de mapa (DEC-104) e `estilos-pdf.ts`; preenche `tabelas-horarias`/`matriz-distancias`/`matriz-seccionamento`/`anexo-tecnico` **sem reordenar** a constante. A condição de merge da 033 foi cumprida em `1a77a85` — não é mais dever desta task. Ao trazer os horários de saída, **estender** o teste de horas permitidas de `pdf-regras-transversais.test.ts`, que hoje os proíbe. |
 | 7 | **035** — Comparador: carregamento e validação dos dois arquivos | **3** | |
 | 8 | **036** — Motor de diff por UUID + taxonomia | **5** | Núcleo do Comparador; casamento por UUID e por contexto. |
 | 9 | **037** — Telas de comparação | **4** | Superfície ampla (5 visões/abas). |
