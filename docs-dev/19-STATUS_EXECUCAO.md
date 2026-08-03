@@ -1,7 +1,56 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-08-03 (branch `redesign`) — **TASK-034, rodada de
-correção: entrega novamente REPROVADA; a task permanece na fila.** O commit `1de7534`,
+**Atualização mais recente:** 2026-08-03 (branch `redesign`) — **TASK-128 (fechamento da
+TASK-034): entrega REPROVADA; o desenho das matrizes do PDF permanece na fila.** O commit
+`31ff190`, fundamentado na **DEC-108** (`43bcc5a`, Q-086 opção 2), **encerra o defeito que
+reprovou as duas rodadas anteriores**: o cabeçalho de coluna deixa de ser girado e passa a
+ser escrito horizontalmente na célula de preenchimento acima do próprio "X"
+(`rotuloColunaHospedada` em `matrizes-pdf.ts:249-253`/`278-334`; `rotuloColunaMatriz` em
+`estilos-pdf.ts:371-378`), `MAX_LINHAS_POR_BLOCO` sobe de 16 para 22 com a altura devolvida
+à página, e o `wrap={false}` sobe do bloco para o envelope do **Serviço**. Medido no layout
+real (`_INTERNAL__LAYOUT__DATA_` sobre `DocumentoPdfOperacional`, fixture
+`documentoExemploMinimo()`): os 6 rótulos das duas matrizes saem com `lines.length === 1`
+(contra 3–5 linhas antes), o passo entre colunas é constante em 38 pt
+(`x = 170,0 / 208,0 / 246,0`) em todas as linhas, e **nenhum** nó do documento usa
+`transform`. A limpeza foi completa — `celulaDiagonal`, `cabecalhoColunaDiagonal`,
+`rotuloColunaDiagonal`, `linhaCabecalhoDiagonal`, `alturaCabecalho` e `ALTURA_MAX_CABECALHO`
+não existem mais em `src/` nem em `testes/`. **A reprovação é por defeitos de outra
+natureza**, registrados em `14-REVISOES/TASK-034-20260803-task-128.md` (**checklist 07 com
+25 ok, 25 N/A, 2 ressalvas e 1 violado**), encontrados em conferência visual do responsável
+e confirmados por medição: (1) **bloqueante** — com **8 Seções** (dentro da escala real do
+ROTA) a última faixa tem 1 coluna × 1 linha e o PDF imprime um bloco "(continuação)" cujo
+único conteúdo é a letra "X"; é a consequência aritmética de
+`cabecalhos.length % MAX_COLUNAS_POR_BLOCO === 1` e reaparece em 15 e 22 Seções, e **nenhum
+teste alcança o caso** (a suíte cobre 3, 9 e 30); (2) **não há régua vertical alguma
+separando as colunas**, divergindo da imagem `docs-dev/tabela distancias PDF.jpg` que a
+DEC-108 tornou **normativa**; (3) o rótulo de coluna é ancorado em `top: 0` e fica a até
+**22,4 pt** do seu próprio "X" (medido na linha bidirecional, cuja célula tem 23,1 pt), em
+vez de rente a ele; (4) o rótulo de linha não é centrado verticalmente (`linhaTabela` sem
+`alignItems`) e, a 130 pt, já quebra em 2 linhas com "Praia Grande - Rodoviária Praia
+Grande"; (5) a garantia de "uma linha por rótulo" vale só até ~47 caracteres
+(`rotuloColunaMatriz` com `width: 150` a `fontSize: 7`) — o nome mais longo da fixture mede
+**exatamente 150,0 pt**, passa no limite, e o teste de layout real não guarda a fronteira.
+**Decisão pendente do responsável:** elevar `MAX_COLUNAS_POR_BLOCO` de **7 para 8** foi
+pedido explicitamente, mas está no "Fora de escopo" da TASK-128 e **exige Q-xxx → DEC-xxx**
+antes do código; a aritmética mostra que não é isolada (130 + 8×38 = 434 pt cabem nos 515,3
+pt úteis, mas o rótulo da última coluna passaria a terminar em 586 pt, ~31 pt além da
+margem direita), e ela **não** dispensa a correção (1) — só desloca o caso degenerado para
+9, 17 e 25 Seções. **Encaminhamento:** as correções 1–5 cabem no mesmo recorte de arquivos e
+devem ser uma **rodada de correção da TASK-128**, com dois testes que hoje não existem
+(8 Seções; rótulo longo) e nova conferência visual. A revisão reutilizou o log canônico
+verde (`test:all:verificar`: executor **Claude**, fingerprint `4271874d…28b6aaeb`,
+identidade `00c21aa5…1336f57e`, `Resultado geral: APROVADO`, unitários e E2E com código 0)
+e rodou `typecheck` e `lint`, ambos limpos. **A contagem de pendentes não muda:** seguem
+**9 tasks não concluídas — 7 executáveis (o desenho das matrizes entre elas, agora com os
+defeitos localizados em 4 estilos e 1 filtro), a TASK-038 com bloqueio parcial e a TASK-040
+bloqueada**; a **TASK-129** (itinerários) continua desbloqueada e independente destes
+defeitos. Permanece a pendência de **registro** herdada: a §3 termina na **125** e o total
+"102 tasks concluídas" diverge das linhas da tabela — esta revisão também **não** mexeu
+nisso. **Higiene:** `docs-dev/PLANO-TASK-034-CORRECAO.md` não está mais na árvore de
+trabalho; a pendência de higiene anterior está resolvida.
+
+**Histórico anterior (2026-08-03) — TASK-034, rodada de
+correção: entrega novamente REPROVADA.** O commit `1de7534`,
 fundamentado na **DEC-107** (`7e4f62a`, Q-085 opção 2), **resolve de fato o defeito que
 reprovou a rodada anterior**: `MatrizPdfView` deixa de usar `flex` e passa a largura
 **fixa** por coluna (`celulaMatrizValor`/`Diagonal`/`Vazia` a 38 pt,
