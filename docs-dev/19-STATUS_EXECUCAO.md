@@ -1,7 +1,55 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-08-03 (branch `redesign`) — **TASK-034: entrega
-REPROVADA; a task permanece na fila.** O commit `79dcfe1` escreve os itens 5–8 do Spec 04
+**Atualização mais recente:** 2026-08-03 (branch `redesign`) — **TASK-034, rodada de
+correção: entrega novamente REPROVADA; a task permanece na fila.** O commit `1de7534`,
+fundamentado na **DEC-107** (`7e4f62a`, Q-085 opção 2), **resolve de fato o defeito que
+reprovou a rodada anterior**: `MatrizPdfView` deixa de usar `flex` e passa a largura
+**fixa** por coluna (`celulaMatrizValor`/`Diagonal`/`Vazia` a 38 pt,
+`cabecalhoLinhaMatriz` a 130 pt) e a completar cada linha até `cabecalhos.length` com
+célula de preenchimento — as duas coisas juntas, sem o que a repartição por linha voltaria.
+Entra `dividirMatrizEmBlocos` (`matrizes-pdf.ts`), derivação **pura** de layout que parte a
+matriz em faixa de colunas × pedaço de linhas (7 × 16), com `wrap={false}` por bloco em vez
+da matriz inteira (follow-up antecipado por decisão do responsável); a unidade migra para o
+título ("Matriz de distâncias (km)") e a célula bidirecional empilha `valor`/`I:`/`V:` sem
+o rótulo "Média". **As 4 condições do parecer anterior foram cumpridas**, inclusive o teste
+de geometria que faltava (`pdf-renderizacao.test.tsx` compara a contagem de filhos do
+cabeçalho com a de cada linha de dados — teria reprovado o código antigo) e a reexecução da
+evidência. O modelo triangular semântico não mudou, `formatarKm` (compartilhado com a tela,
+TASK-048) foi preservado, e os estilos do anexo de Locais ficaram intactos. **A reprovação
+desta rodada é por defeito NOVO**, registrado em `14-REVISOES/TASK-034-20260803-correcao.md`
+(**checklist 07 com 26 ok, 25 N/A, 1 ressalva e 1 violado**): o cabeçalho de coluna diagonal
+depende de o rótulo ser **uma linha** — é o que a DEC-107 item 1 decidiu e o que a conta de
+geometria pressupõe —, mas `rotuloColunaDiagonal` (`estilos-pdf.ts:378-390`) é
+`position: absolute` **sem `width`**, e o motor quebra o texto nos 38 pt da coluna **antes**
+de girá-lo. Medido sobre o componente real com `documentoExemploMinimo()`: rótulos em **3, 4
+e 5 linhas** (alturas 26,4 / 35,2 / **44,0 pt**), enquanto o passo perpendicular entre
+colunas vizinhas a 45° é `38 × cos45° ≈ 26,9 pt` — logo **os cabeçalhos adjacentes se
+sobrepõem**, e o cabeçalho da matriz volta a ser ilegível no PDF (**RN-076, Alta**). A
+altura reservada, calculada sobre o rótulo **sem quebra**, fica ~2× maior que o bloco real.
+**Condições para nova submissão:** (1) declarar `width` explícito em `rotuloColunaDiagonal`
+(≈ `ALTURA_MAX_CABECALHO / 0,71`) para o rótulo caber em uma linha; (2) teste que assere
+`lines.length === 1` nos rótulos diagonais — **e isso agora é testável**: `@react-pdf/layout`
++ `@react-pdf/font` rodam em Vitest sobre a árvore de `DocumentoPdfOperacional` e devolvem
+`box`/`lines`, de modo que a afirmação "nenhum teste observa geometria" do parecer anterior
+**não vale mais**; (3) conferência visual do PDF gerado, obrigatória pelo plano e não
+evidenciada; (4) remover `celulaDiagonal`, agora sem consumidor; (5) reexecutar
+`test:all:log`. Follow-ups não impeditivos: reaferir `calcularAlturaCabecalho` e
+`MAX_LINHAS_POR_BLOCO` após a correção; cobrir a renderização de matriz com **mais de um
+bloco** (a fixture tem 3 Seções → 1 bloco, então `continuacao: true` nunca é renderizado);
+e trocar o teste sintético de "poder de detecção" por um que exercite o componente (mesmo
+padrão de espião decorativo da TASK-045). A revisão reutilizou o log canônico verde
+(`test:all:verificar`: executor **Claude**, fingerprint `bcf370a2…963c8624`, identidade
+`00c21aa5…1336f57e`, `Resultado geral: APROVADO`, **1572 unitários em 113 arquivos + 107
+E2E**) e rodou `typecheck` e `lint`, ambos limpos. **A contagem de pendentes não muda:**
+seguem **9 tasks não concluídas — 7 executáveis (a TASK-034 entre elas, com o defeito
+localizado numa única linha de estilo), a TASK-038 com bloqueio parcial e a TASK-040
+bloqueada**. Permanece a pendência de **registro** herdada: a §3 termina na **125** e o
+total "102 tasks concluídas" diverge das linhas da tabela — esta revisão também **não**
+mexeu nisso. **Higiene:** `docs-dev/PLANO-TASK-034-CORRECAO.md` segue não versionado na
+árvore de trabalho e deve ser apagado ao fechar o ciclo, conforme o próprio arquivo declara.
+
+**Histórico anterior (2026-08-03) — TASK-034, 1ª rodada: entrega
+REPROVADA.** O commit `79dcfe1` escreve os itens 5–8 do Spec 04
 §13.1 (tabela horária simples no corpo, matriz de distâncias, matriz de seccionamento e
 anexo técnico) em quatro módulos puros — `tabelas-horarias-pdf.ts`, `matrizes-pdf.ts`,
 `anexo-tecnico-pdf.ts` e o desenho em `documento-pdf-operacional.tsx` —, reusando
