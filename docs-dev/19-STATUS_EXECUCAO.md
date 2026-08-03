@@ -1,6 +1,49 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-08-03 (branch `redesign`) — **TASK-127: ressalvas
+**Atualização mais recente:** 2026-08-03 (branch `redesign`) — **TASK-034: entrega
+REPROVADA; a task permanece na fila.** O commit `79dcfe1` escreve os itens 5–8 do Spec 04
+§13.1 (tabela horária simples no corpo, matriz de distâncias, matriz de seccionamento e
+anexo técnico) em quatro módulos puros — `tabelas-horarias-pdf.ts`, `matrizes-pdf.ts`,
+`anexo-tecnico-pdf.ts` e o desenho em `documento-pdf-operacional.tsx` —, reusando
+`montarBlocosGrade`/`linhasSecoes`/`horarioAbsolutoNaParada` da etapa de edição (a peça
+impressa é a mesma grade da tela) e movendo `ROTULO_DIA` para `montagem-grade.ts`. O
+parecer `14-REVISOES/TASK-034-20260803.md` registra **checklist 07 com 26 itens ok, 25
+N/A, 1 com ressalva e 1 violado** e reprova por **violação de RN-076 (Alta)**: em
+`MatrizPdfView` (`documento-pdf-operacional.tsx:469-491`) cada linha da matriz emite só as
+`i+1` células do triângulo inferior, sem preenchimento à direita, e `flex: 1.4` no
+`@react-pdf` expande para `flexBasis: 0` — logo **cada linha reparte a largura entre as
+próprias células** e nenhuma coluna coincide com seu cabeçalho; a linha 1 centraliza o `X`
+em toda a faixa. O desenho deixa de ser a matriz triangular do §9.1/§13.1 itens 6–7, como
+o responsável constatou ao gerar o PDF. A tela **não** tem o defeito porque emite `<td
+aria-hidden>` vazio no triângulo superior (`etapa-matrizes.tsx:177,265`). Nenhum teste
+observa geometria — `pdf-matrizes.test.ts` exercita o **modelo** e
+`pdf-renderizacao.test.tsx` o **texto** da página —, por isso a suíte fica verde com o
+defeito vivo. **Condições para nova submissão:** (1) preencher cada linha até N colunas e
+harmonizar a largura do cabeçalho de coluna com a das células; (2) teste que assere, na
+árvore renderizada, mesma contagem de colunas em cabeçalho e linhas de dados nas duas
+matrizes; (3) empilhar o detalhe da célula bidirecional em **média / ida / volta**, com o
+rótulo "Média" restrito ao caso bidirecional (RN-056) — pedido do responsável, sem RN
+contrária; (4) reexecutar `test:all:log` (o fingerprint atual expira com a mudança de
+código). Follow-up não impeditivo: o `wrap={false}` da matriz inteira pode cortar Serviços
+com muitas Seções. **O restante da entrega está aderente e bem testado** — RN-075 (as duas
+versões do §13.2), RN-076 quanto a nomes/offsets/Locais/km, RN-054/056/058/059
+(`—` só no seccionamento), RN-061/069/099 (grade por dimensão de Viagem, com a nota de
+fora da semana padrão) e RN-071 (grade vazia vira aviso). O dever herdado da TASK-033 de
+**estender** o teste de horas permitidas às tabelas horárias foi cumprido
+(`pdf-regras-transversais.test.ts:67-85`), e a ressalva que a TASK-127 deixou "a resolver
+na TASK-034" foi fechada por decisão registrada — **DEC-106** (`0ae9319`, Q-084 opção 1:
+Local sem `geolocalizacao_<sentido>` é listado normalmente no anexo, sem bijeção anexo ↔
+mapa) —, não por presunção do implementador. A revisão reutilizou o log canônico verde
+(`test:all:verificar`: executor **Claude**, fingerprint `93ff3c25…2cffe92a`, identidade
+`00c21aa5…1336f57e`, `Resultado geral: APROVADO`, **1560 unitários em 113 arquivos + 106
+E2E**) e rodou `typecheck` e `lint`, ambos limpos. **A contagem de pendentes não muda:**
+seguem **9 tasks não concluídas — 7 executáveis (a TASK-034 entre elas, agora com defeito
+localizado e caminho de correção definido), a TASK-038 com bloqueio parcial e a TASK-040
+bloqueada**. Permanece a pendência de **registro** herdada: a §3 termina na **125** e o
+total "102 tasks concluídas" diverge das linhas da tabela — esta revisão também **não**
+mexeu nisso, para não reconciliar às cegas o registro de outras tasks.
+
+**Histórico anterior (2026-08-03) — TASK-127: ressalvas
 fechadas, condição de merge cumprida, ciclo encerrado.** O commit `15a1d47` fecha a única
 condição de merge do parecer de 2026-08-03: `desenharSimbolos` ganha o parâmetro `escala`
 (default `1`, sem regressão) e passa a multiplicar **tamanhos** — lado do quadrado, raio do
