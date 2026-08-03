@@ -325,20 +325,57 @@ export const estilosPdf = StyleSheet.create({
     alignSelf: "flex-start",
   },
   // Coluna do rótulo de linha (`Cidade - Nome da Seção`), sempre horizontal.
+  // 170 pt (DEC-110 item 2): o nome mais longo da escala real medido no layout
+  // real — "Praia Grande - Rodoviária Praia Grande", 160,2 pt a 9 pt de corpo —
+  // cabe em UMA linha nos 164 pt úteis; a 130 pt quebrava em duas.
+  // `justifyContent: center` centra o rótulo verticalmente na linha (a caixa
+  // estica com a linha; sem ele o texto ficava colado no topo, contra a imagem
+  // normativa da DEC-108).
   cabecalhoLinhaMatriz: {
-    width: 130,
+    width: 170,
     paddingHorizontal: 3,
+    justifyContent: "center",
   },
+  // Réguas verticais entre colunas (DEC-110 item 6): `CINZA_500`, distinto do
+  // `CINZA_200` dos separadores horizontais, e desenhadas EM ESCADA — só nas
+  // células habitadas e na primeira célula de preenchimento à direita da
+  // diagonal, que fecha a escada. O triângulo superior vazio não recebe régua,
+  // como na imagem normativa `docs-dev/tabela distancias PDF.jpg`.
   celulaMatrizValor: {
     width: 38,
     paddingHorizontal: 3,
     textAlign: "center",
+    borderLeftWidth: 1,
+    borderLeftColor: CINZA_500,
+  },
+  // Última célula da linha quando ela é habitada (a linha ocupa a faixa
+  // inteira): fecha a escada pela direita, já que não há célula seguinte.
+  celulaMatrizValorFinal: {
+    width: 38,
+    paddingHorizontal: 3,
+    textAlign: "center",
+    borderLeftWidth: 1,
+    borderLeftColor: CINZA_500,
+    borderRightWidth: 1,
+    borderRightColor: CINZA_500,
   },
   celulaMatrizDiagonal: {
     width: 38,
     paddingHorizontal: 3,
     textAlign: "center",
     color: CINZA_500,
+    borderLeftWidth: 1,
+    borderLeftColor: CINZA_500,
+  },
+  celulaMatrizDiagonalFinal: {
+    width: 38,
+    paddingHorizontal: 3,
+    textAlign: "center",
+    color: CINZA_500,
+    borderLeftWidth: 1,
+    borderLeftColor: CINZA_500,
+    borderRightWidth: 1,
+    borderRightColor: CINZA_500,
   },
   // Célula de preenchimento do triângulo superior (DEC-108) — `position:
   // relative` ancora o rótulo de coluna `absolute` que ela pode hospedar
@@ -348,16 +385,30 @@ export const estilosPdf = StyleSheet.create({
     paddingHorizontal: 3,
     position: "relative",
   },
+  // Preenchimento imediatamente à direita da última célula habitada: recebe a
+  // régua esquerda para fechar o degrau da escada (DEC-110 item 6). É também a
+  // célula que hospeda o rótulo da coluna seguinte (DEC-108 item 1).
+  celulaMatrizVaziaBorda: {
+    width: 38,
+    paddingHorizontal: 3,
+    position: "relative",
+    borderLeftWidth: 1,
+    borderLeftColor: CINZA_500,
+  },
   // Linha de cabeçalho acima da matriz (DEC-108 item 2): sem altura dinâmica
   // — nenhum texto girado, então a linha tem a altura natural de uma linha.
   // Só a primeira coluna da faixa recebe rótulo aqui; as demais nascem dentro
   // do triângulo superior (`rotuloColunaHospedada`).
+  // `minHeight` acomoda o rótulo da coluna 0, que é absoluto e ancorado no
+  // RODAPÉ da célula (DEC-110): sem altura, a célula vazia mediria 0 pt e o
+  // rótulo seria desenhado acima da própria linha, sobre o título do bloco.
   linhaCabecalhoMatriz: {
     flexDirection: "row",
     backgroundColor: CINZA_100,
     borderBottomWidth: 1,
     borderBottomColor: CINZA_200,
     paddingVertical: 4,
+    minHeight: 18,
     fontFamily: "Helvetica-Bold",
     color: CINZA_900,
   },
@@ -366,13 +417,26 @@ export const estilosPdf = StyleSheet.create({
   // os 38 pt da própria coluna) é o que garante `lines.length === 1` — um
   // filho absoluto sem largura própria seria medido contra a coluna estreita
   // e quebraria antes de qualquer rotação (causa da reprovação da TASK-034).
-  // Ancorado no topo-esquerda da célula para transbordar livremente à
-  // direita, sobre as células de preenchimento vizinhas.
+  //
+  // 117 pt (DEC-110 item 3) é o teto aritmético com 7 colunas e rótulo de
+  // linha a 170: o rótulo da ÚLTIMA coluna começa em
+  // `40 + 170 + 6×38 = 438` e termina em `555`, dentro da margem direita
+  // (555,3 pt). Como o contrato JSON não limita o nome da Seção, a garantia de
+  // uma linha não vem da largura e sim de `maxLines: 1` — o excedente é
+  // truncado com reticências (`textOverflow`), nunca quebrado. Ambos são lidos
+  // do ESTILO pelo `@react-pdf/layout` (as props homônimas de `Text` são
+  // ignoradas — verificado no motor).
+  //
+  // Ancorado no rodapé-esquerda da célula (DEC-110/parecer problema 3): o "X"
+  // da própria coluna fica na linha imediatamente abaixo, e `top: 0` deixava o
+  // rótulo a até 22,4 pt dele em linha alta (par bidirecional).
   rotuloColunaMatriz: {
     position: "absolute",
-    top: 0,
+    bottom: 0,
     left: 0,
-    width: 150,
+    width: 117,
+    maxLines: 1,
+    textOverflow: "ellipsis",
     fontSize: 7,
     color: CINZA_900,
   },

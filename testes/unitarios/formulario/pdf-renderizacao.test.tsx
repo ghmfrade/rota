@@ -287,7 +287,11 @@ describe("Itens 5–8 do §13.1 (TASK-034) — tabelas horárias, matrizes e ane
 
     for (const pagina of [matrizDistancias, matrizSeccionamento]) {
       const diagonais = descendentes(pagina).filter(
-        (no) => no.props.style === estilosPdf.celulaMatrizDiagonal,
+        (no) =>
+          no.props.style === estilosPdf.celulaMatrizDiagonal ||
+          // Variante com régua à direita: a diagonal da última linha do bloco,
+          // que fecha a escada por não ter preenchimento à direita (DEC-110).
+          no.props.style === estilosPdf.celulaMatrizDiagonalFinal,
       );
       // 3 Seções → 3 células de diagonal por matriz.
       expect(diagonais).toHaveLength(3);
@@ -390,8 +394,11 @@ describe("Itens 5–8 do §13.1 (TASK-034) — tabelas horárias, matrizes e ane
       const celulas = descendentes(pagina).filter(
         (no) =>
           no.props.style === estilosPdf.celulaMatrizValor ||
+          no.props.style === estilosPdf.celulaMatrizValorFinal ||
           no.props.style === estilosPdf.celulaMatrizDiagonal ||
-          no.props.style === estilosPdf.celulaMatrizVazia,
+          no.props.style === estilosPdf.celulaMatrizDiagonalFinal ||
+          no.props.style === estilosPdf.celulaMatrizVazia ||
+          no.props.style === estilosPdf.celulaMatrizVaziaBorda,
       );
       expect(celulas.length).toBeGreaterThan(0);
       for (const celula of celulas) {
@@ -444,7 +451,10 @@ describe("DEC-108 — rótulo de coluna horizontal no triângulo superior (subst
     async () => {
       const layout = await layoutRealDoDocumento(modeloDe(documentoExemploMinimo()));
       const rotulos = descendentesLayout(layout).filter(
-        (no) => no.type === "TEXT" && no.style?.fontSize === 7 && no.style?.width === 150,
+        (no) =>
+          no.type === "TEXT" &&
+          no.style?.fontSize === 7 &&
+          no.style?.width === estilosPdf.rotuloColunaMatriz.width,
       );
 
       // 3 Seções × 2 matrizes (distâncias + seccionamento) = 6 rótulos de coluna.
@@ -507,6 +517,173 @@ describe("DEC-108 — rótulo de coluna horizontal no triângulo superior (subst
     expect(envelopes).toHaveLength(modelo.matrizesDistancias.length);
     expect(envelopes.length).toBeGreaterThan(1);
   });
+});
+
+// Rodada de correção da TASK-128 (parecer `TASK-034-20260803-task-128.md`,
+// problemas 2 a 5), sob a DEC-110: acabamento da matriz contra a imagem
+// normativa `docs-dev/tabela distancias PDF.jpg`.
+describe("DEC-110 — acabamento da matriz: réguas verticais, ancoragem do rótulo e centragem", () => {
+  /** Documento da fixture mínima com uma Seção de nome longo — o caso que o
+   *  parecer apontou como fronteira não guardada (problema 5). */
+  function documentoComSecaoDeNomeLongo() {
+    const documento = documentoExemploMinimo();
+    documento.autos.secoes[1].municipio = "São José do Rio Preto";
+    documento.autos.secoes[1].nome = "Terminal Rodoviário Central Metropolitano";
+    return documento;
+  }
+
+  test("as réguas verticais são desenhadas em `CINZA_500`, distintas do `CINZA_200` dos separadores horizontais", () => {
+    for (const estilo of [
+      estilosPdf.celulaMatrizValor,
+      estilosPdf.celulaMatrizValorFinal,
+      estilosPdf.celulaMatrizDiagonal,
+      estilosPdf.celulaMatrizDiagonalFinal,
+      estilosPdf.celulaMatrizVaziaBorda,
+    ]) {
+      expect(estilo.borderLeftWidth).toBe(1);
+      expect(estilo.borderLeftColor).toBe(PALETA_PDF.cinza500);
+    }
+    // Preenchimento comum do triângulo superior segue SEM régua: na imagem
+    // normativa o vazio à direita dos rótulos não é quadriculado.
+    expect(estilosPdf.celulaMatrizVazia).not.toHaveProperty("borderLeftWidth");
+    // Caso inválido — a régua não pode vazar para a tabela de Locais do anexo,
+    // que a task manda não tocar.
+    expect(estilosPdf.celulaMatriz).not.toHaveProperty("borderLeftWidth");
+    expect(estilosPdf.celulaCabecalhoMatriz).not.toHaveProperty("borderLeftWidth");
+  });
+
+  test("toda célula habitada da matriz recebe régua, e a escada é fechada à direita da última", () => {
+    const { matrizDistancias } = paginasDosItens5a8(
+      arvoreDo(modeloDe(documentoExemploMinimo())),
+    );
+    const estilosComRegua = new Set<unknown>([
+      estilosPdf.celulaMatrizValor,
+      estilosPdf.celulaMatrizValorFinal,
+      estilosPdf.celulaMatrizDiagonal,
+      estilosPdf.celulaMatrizDiagonalFinal,
+      estilosPdf.celulaMatrizVaziaBorda,
+    ]);
+    const habitadas = descendentes(matrizDistancias).filter(
+      (no) =>
+        no.props.style === estilosPdf.celulaMatrizValor ||
+        no.props.style === estilosPdf.celulaMatrizValorFinal ||
+        no.props.style === estilosPdf.celulaMatrizDiagonal ||
+        no.props.style === estilosPdf.celulaMatrizDiagonalFinal,
+    );
+
+    // 3 Seções → 3 valores (pares 1-0, 2-0, 2-1) + 3 diagonais.
+    expect(habitadas).toHaveLength(6);
+    for (const celula of habitadas) expect(estilosComRegua.has(celula.props.style)).toBe(true);
+
+    // A escada é fechada: a última linha (sem preenchimento à direita) usa a
+    // variante com régua também à direita.
+    expect(
+      descendentes(matrizDistancias).filter(
+        (no) => no.props.style === estilosPdf.celulaMatrizDiagonalFinal,
+      ).length,
+    ).toBeGreaterThan(0);
+    // E o degrau seguinte, quando existe, é o preenchimento que hospeda rótulo.
+    expect(
+      descendentes(matrizDistancias).filter(
+        (no) => no.props.style === estilosPdf.celulaMatrizVaziaBorda,
+      ).length,
+    ).toBeGreaterThan(0);
+  });
+
+  test(
+    "layout real — o rótulo de coluna fica rente ao seu próprio 'X', no rodapé da célula hospedeira (não mais no topo)",
+    async () => {
+      // As caixas do `_INTERNAL__LAYOUT__DATA_` são RELATIVAS ao pai; a
+      // ancoragem se lê, portanto, como "a base do rótulo coincide com a base
+      // da célula que o hospeda". O "X" da coluna está na linha imediatamente
+      // abaixo, logo essa coincidência é o "rente ao próprio X" da imagem
+      // normativa.
+      const layout = await layoutRealDoDocumento(modeloDe(documentoExemploMinimo()));
+      const hospedeiras = descendentesLayout(layout).filter((no) =>
+        (no.children ?? []).some(
+          (filho) =>
+            filho.type === "TEXT" &&
+            filho.style?.width === estilosPdf.rotuloColunaMatriz.width,
+        ),
+      );
+
+      // 3 Seções × 2 matrizes: 2 rótulos hospedados no triângulo + 1 na linha
+      // de cabeçalho, por matriz.
+      expect(hospedeiras).toHaveLength(6);
+      for (const hospedeira of hospedeiras) {
+        const rotulo = (hospedeira.children ?? []).find((filho) => filho.type === "TEXT");
+        if (hospedeira.box === undefined || rotulo?.box === undefined) {
+          throw new Error("rótulo de coluna sem caixa de layout");
+        }
+        expect(
+          Math.abs(rotulo.box.top + rotulo.box.height - hospedeira.box.height),
+        ).toBeLessThan(0.5);
+      }
+
+      // O caso que o parecer mediu: a célula do par bidirecional tem 23,1 pt
+      // (valor + `I:` + `V:`), e com `top: 0` o rótulo ficava a 22,4 pt do
+      // próprio "X". Se ele não estiver aqui, o teste perdeu o poder de
+      // detecção.
+      expect(hospedeiras.some((no) => (no.box?.height ?? 0) > 20)).toBe(true);
+    },
+    30_000,
+  );
+
+  test(
+    "layout real — nome de Seção longo: o rótulo de coluna continua em UMA linha (truncado, nunca quebrado)",
+    async () => {
+      const layout = await layoutRealDoDocumento(modeloDe(documentoComSecaoDeNomeLongo()));
+      const rotulos = descendentesLayout(layout).filter(
+        (no) =>
+          no.type === "TEXT" &&
+          no.style?.fontSize === 7 &&
+          no.style?.width === estilosPdf.rotuloColunaMatriz.width,
+      );
+
+      expect(rotulos).toHaveLength(6);
+      for (const rotulo of rotulos) {
+        expect(rotulo.lines).toHaveLength(1);
+      }
+      // A garantia não vem da largura (o contrato não limita o nome da Seção),
+      // e sim do truncamento declarado no estilo — sem ele, este mesmo nome
+      // ("São José do Rio Preto - Terminal Rodoviário Central Metropolitano",
+      // 162,3 pt medidos a 7 pt) quebraria nos 117 pt da caixa.
+      expect(estilosPdf.rotuloColunaMatriz.maxLines).toBe(1);
+      expect(estilosPdf.rotuloColunaMatriz.textOverflow).toBe("ellipsis");
+    },
+    30_000,
+  );
+
+  test(
+    "layout real — o rótulo de linha é centrado verticalmente na linha da matriz e cabe em uma linha",
+    async () => {
+      const layout = await layoutRealDoDocumento(modeloDe(documentoExemploMinimo()));
+      const caixasDeRotulo = descendentesLayout(layout).filter(
+        (no) =>
+          no.type === "VIEW" && no.style?.width === estilosPdf.cabecalhoLinhaMatriz.width,
+      );
+
+      const comTexto = caixasDeRotulo.filter((caixa) =>
+        (caixa.children ?? []).some((filho) => filho.type === "TEXT"),
+      );
+      expect(comTexto.length).toBeGreaterThan(0);
+
+      for (const caixa of comTexto) {
+        const texto = (caixa.children ?? []).find((filho) => filho.type === "TEXT");
+        if (caixa.box === undefined || texto?.box === undefined) {
+          throw new Error("rótulo de linha sem caixa de layout");
+        }
+        // Caixas relativas ao pai: o centro da caixa do rótulo é `height / 2`.
+        const centroDaCaixa = caixa.box.height / 2;
+        const centroDoTexto = texto.box.top + texto.box.height / 2;
+        expect(Math.abs(centroDoTexto - centroDaCaixa)).toBeLessThan(0.5);
+        // 170 pt (DEC-110 item 2): o nome mais longo da fixture, "Praia Grande
+        // - Rodoviária Praia Grande" (160,2 pt a 9 pt), cabe em uma linha.
+        expect(texto.lines).toHaveLength(1);
+      }
+    },
+    30_000,
+  );
 });
 
 describe("Legenda do itinerário (DEC-105/TASK-127)", () => {

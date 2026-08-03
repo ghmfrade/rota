@@ -457,13 +457,18 @@ function TabelaHorariaPdfView({ tabela }: { tabela: TabelaHorariaPdf }) {
 function CelulaMatrizView({
   celula,
   rotuloColuna,
+  fechaEscada,
 }: {
   celula: CelulaDistanciaPdf | CelulaSeccionamentoPdf | undefined;
   rotuloColuna?: string;
+  /** Esta célula é o degrau que fecha a escada de réguas verticais desta
+   *  linha (DEC-110 item 6): a última habitada, ou o primeiro preenchimento
+   *  logo à direita dela. */
+  fechaEscada: boolean;
 }) {
   if (celula === undefined) {
     return (
-      <View style={estilosPdf.celulaMatrizVazia}>
+      <View style={fechaEscada ? estilosPdf.celulaMatrizVaziaBorda : estilosPdf.celulaMatrizVazia}>
         {rotuloColuna !== undefined ? (
           <Text style={estilosPdf.rotuloColunaMatriz}>{rotuloColuna}</Text>
         ) : null}
@@ -472,13 +477,17 @@ function CelulaMatrizView({
   }
   if (celula.tipo === "diagonal") {
     return (
-      <View style={estilosPdf.celulaMatrizDiagonal}>
+      <View
+        style={
+          fechaEscada ? estilosPdf.celulaMatrizDiagonalFinal : estilosPdf.celulaMatrizDiagonal
+        }
+      >
         <Text>{celula.texto}</Text>
       </View>
     );
   }
   return (
-    <View style={estilosPdf.celulaMatrizValor}>
+    <View style={fechaEscada ? estilosPdf.celulaMatrizValorFinal : estilosPdf.celulaMatrizValor}>
       <Text>{celula.texto}</Text>
       {"detalheIda" in celula && celula.detalheIda !== undefined ? (
         <>
@@ -507,6 +516,29 @@ function CelulaMatrizView({
  * inteira para a página seguinte quando não couber, e só é partida em blocos
  * quando nem uma página inteira comporta.
  */
+/** Última posição habitada (valor ou diagonal) da linha; -1 se nenhuma. */
+function indiceUltimaCelulaHabitada(celulas: readonly unknown[]): number {
+  for (let indice = celulas.length - 1; indice >= 0; indice -= 1) {
+    if (celulas[indice] !== undefined) return indice;
+  }
+  return -1;
+}
+
+/**
+ * A régua vertical desenha a ESCADA da matriz triangular (DEC-110 item 6): a
+ * célula que fecha o degrau é a primeira de preenchimento à direita da última
+ * habitada ou, quando a linha ocupa a faixa inteira e não há preenchimento, a
+ * própria última célula.
+ */
+function fechaEscadaEm(
+  celulas: readonly unknown[],
+  indice: number,
+  ultimaHabitada: number,
+): boolean {
+  if (indice === ultimaHabitada) return ultimaHabitada === celulas.length - 1;
+  return indice === ultimaHabitada + 1;
+}
+
 function MatrizPdfView({
   matriz,
 }: {
@@ -532,22 +564,32 @@ function MatrizPdfView({
                   </View>
                 ))}
               </View>
-              {bloco.linhas.map((linha, indice) => (
-                <View style={estiloLinhaDados(indice)} key={linha.secaoUuid}>
-                  <Text style={estilosPdf.cabecalhoLinhaMatriz}>{linha.rotulo}</Text>
-                  {linha.celulas.map((celula, indiceCelula) => (
-                    <CelulaMatrizView
-                      key={indiceCelula}
-                      celula={celula}
-                      rotuloColuna={
-                        linha.rotuloColunaHospedada?.indiceLocal === indiceCelula
-                          ? linha.rotuloColunaHospedada.rotulo
-                          : undefined
-                      }
-                    />
-                  ))}
-                </View>
-              ))}
+              {bloco.linhas.map((linha, indice) => {
+                const ultimaHabitada = indiceUltimaCelulaHabitada(linha.celulas);
+                return (
+                  <View style={estiloLinhaDados(indice)} key={linha.secaoUuid}>
+                    {/* O rótulo vai num `View` (e não num `Text` estilizado)
+                        para que `justifyContent: center` de
+                        `cabecalhoLinhaMatriz` possa centrá-lo verticalmente na
+                        linha — a caixa estica com a linha, o texto não. */}
+                    <View style={estilosPdf.cabecalhoLinhaMatriz}>
+                      <Text>{linha.rotulo}</Text>
+                    </View>
+                    {linha.celulas.map((celula, indiceCelula) => (
+                      <CelulaMatrizView
+                        key={indiceCelula}
+                        celula={celula}
+                        rotuloColuna={
+                          linha.rotuloColunaHospedada?.indiceLocal === indiceCelula
+                            ? linha.rotuloColunaHospedada.rotulo
+                            : undefined
+                        }
+                        fechaEscada={fechaEscadaEm(linha.celulas, indiceCelula, ultimaHabitada)}
+                      />
+                    ))}
+                  </View>
+                );
+              })}
             </View>
           </View>
         ),

@@ -274,11 +274,24 @@ export interface BlocoMatrizPdf<Celula> {
  * cabeçalho acima da matriz, mostrada pela apresentação a partir de
  * `cabecalhos[0]`. Os demais rótulos são hospedados pela linha imediatamente
  * anterior à sua própria diagonal, dentro deste mesmo bloco.
+ *
+ * Bloco **degenerado** — aquele cujas células habitadas são só diagonais — é
+ * descartado (DEC-110 item 7; Spec 04 §13.3). Ele aparece sempre que a última
+ * faixa tem uma só coluna (`cabecalhos.length % MAX_COLUNAS_POR_BLOCO === 1`,
+ * isto é 8, 15, 22 … Seções): a única linha da faixa é a `c0`, e a única
+ * célula dela dentro da faixa é a própria diagonal. Imprimi-lo custa título e
+ * espaço de página para transportar zero informação. Nada se perde: numa
+ * matriz triangular inferior, a coluna `n−1` só tem a diagonal, e os valores
+ * da linha `n−1` já estão na faixa anterior. O critério é o CONTEÚDO, não a
+ * largura da faixa, para continuar valendo se `MAX_COLUNAS_POR_BLOCO` mudar; e
+ * ao menos um bloco é sempre preservado, para que a matriz de um Serviço com
+ * uma única Seção não desapareça (o contrato não impõe mínimo de Seções).
  */
 export function dividirMatrizEmBlocos<Celula>(
   matriz: MatrizPdf<Celula>,
 ): BlocoMatrizPdf<Celula>[] {
   const blocos: BlocoMatrizPdf<Celula>[] = [];
+  const degenerados = new Set<BlocoMatrizPdf<Celula>>();
 
   for (
     let colunaInicial = 0;
@@ -299,10 +312,18 @@ export function dividirMatrizEmBlocos<Celula>(
       inicioPedaco += MAX_LINHAS_POR_BLOCO
     ) {
       const pedacoLinhas = linhasFaixa.slice(inicioPedaco, inicioPedaco + MAX_LINHAS_POR_BLOCO);
+      // Alguma célula habitada FORA da diagonal? A verificação é feita aqui,
+      // onde a posição local da diagonal é conhecida por construção, e é
+      // estrutural (posição), não semântica: `Celula` é genérico e esta
+      // derivação não conhece a marca "X".
+      let temCelulaDeValor = false;
+
       blocos.push({
         cabecalhos: cabecalhosFaixa,
         indiceColunaInicial: colunaInicial,
-        continuacao: blocos.length > 0,
+        // Definitivo só depois do descarte dos blocos degenerados, abaixo:
+        // o primeiro bloco SOBREVIVENTE nunca sai como "(continuação)".
+        continuacao: false,
         linhas: pedacoLinhas.map((linha, indicePedaco) => {
           // Posição local da própria diagonal desta linha dentro da faixa
           // ("a diagonal cai na posição local i - c0"); a coluna que ela
@@ -310,12 +331,21 @@ export function dividirMatrizEmBlocos<Celula>(
           const diagonalLocal = inicioPedaco + indicePedaco;
           const indiceHospedado = diagonalLocal + 1;
           const cabecalhoHospedado = cabecalhosFaixa[indiceHospedado];
+          const celulas = cabecalhosFaixa.map(
+            (_, indiceNaFaixa) => linha.celulas[colunaInicial + indiceNaFaixa],
+          );
+          if (
+            celulas.some(
+              (celula, indiceNaFaixa) =>
+                celula !== undefined && indiceNaFaixa !== diagonalLocal,
+            )
+          ) {
+            temCelulaDeValor = true;
+          }
           return {
             secaoUuid: linha.secaoUuid,
             rotulo: linha.rotulo,
-            celulas: cabecalhosFaixa.map(
-              (_, indiceNaFaixa) => linha.celulas[colunaInicial + indiceNaFaixa],
-            ),
+            celulas,
             ...(cabecalhoHospedado === undefined
               ? {}
               : {
@@ -327,8 +357,15 @@ export function dividirMatrizEmBlocos<Celula>(
           };
         }),
       });
+
+      if (!temCelulaDeValor) degenerados.add(blocos[blocos.length - 1]);
     }
   }
 
-  return blocos;
+  const habitados = blocos.filter((bloco) => !degenerados.has(bloco));
+  // Matriz inteiramente degenerada (Serviço de uma única Seção) mantém o
+  // primeiro bloco: a matriz não pode simplesmente desaparecer do documento.
+  const mantidos = habitados.length > 0 ? habitados : blocos.slice(0, 1);
+
+  return mantidos.map((bloco, indice) => ({ ...bloco, continuacao: indice > 0 }));
 }

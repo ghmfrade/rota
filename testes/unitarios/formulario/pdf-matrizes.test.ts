@@ -380,4 +380,83 @@ describe("dividirMatrizEmBlocos — layout em blocos (DEC-107)", () => {
       expect(segundoPedaco.linhas.every((l) => l.rotuloColunaHospedada === undefined)).toBe(true);
     });
   });
+
+  // DEC-110 item 7 (parecer `TASK-034-20260803-task-128.md`, problema 1) —
+  // bloco cujas células habitadas são só diagonais não vai para o papel.
+  describe("bloco degenerado — faixa sem nenhuma célula de valor é descartada (DEC-110)", () => {
+    /** Posições habitadas de um bloco, em coordenadas de Seção (não de índice),
+     *  para comparar com a matriz de origem sem depender do particionamento. */
+    function paresHabitados<Celula>(
+      blocos: ReturnType<typeof dividirMatrizEmBlocos<Celula>>,
+    ): Set<string> {
+      const pares = new Set<string>();
+      for (const bloco of blocos) {
+        for (const linha of bloco.linhas) {
+          linha.celulas.forEach((celula, indice) => {
+            if (celula !== undefined) {
+              pares.add(`${linha.secaoUuid}|${bloco.cabecalhos[indice].secaoUuid}`);
+            }
+          });
+        }
+      }
+      return pares;
+    }
+
+    // 8 Seções é o menor caso do resto 1 (`8 % 7 === 1`) e está DENTRO da
+    // escala real do ROTA (11–12 Seções por Serviço). Antes da correção, a
+    // faixa 2 saía com uma coluna, uma linha e uma célula: a diagonal.
+    test("matriz de 8 Seções: a faixa final, que só teria a diagonal, não vira bloco", () => {
+      const blocos = dividirMatrizEmBlocos(matrizSintetica(8));
+
+      expect(blocos).toHaveLength(1);
+      expect(blocos[0].indiceColunaInicial).toBe(0);
+      expect(blocos[0].continuacao).toBe(false);
+    });
+
+    test("nenhum bloco fica sem célula de valor — inclusive nos demais restos 1 (15 e 22 Seções)", () => {
+      for (const quantidade of [3, 8, 9, 15, 22, 30]) {
+        const blocos = dividirMatrizEmBlocos(matrizSintetica(quantidade));
+        for (const bloco of blocos) {
+          expect(
+            bloco.linhas.some((linha) => linha.celulas.some((celula) => celula?.tipo === "valor")),
+          ).toBe(true);
+        }
+      }
+    });
+
+    // A prova de que o descarte não perde informação (RN-054): todo par
+    // habitado da matriz de origem que NÃO é diagonal continua em algum bloco.
+    test("o descarte não perde nenhum par: todas as células de valor da matriz sobrevivem nos blocos", () => {
+      for (const quantidade of [3, 8, 9, 15, 22, 30]) {
+        const matriz = matrizSintetica(quantidade);
+        const sobreviventes = paresHabitados(dividirMatrizEmBlocos(matriz));
+
+        for (const linha of matriz.linhas) {
+          linha.celulas.forEach((celula, indiceColuna) => {
+            if (celula?.tipo === "valor") {
+              const par = `${linha.secaoUuid}|${matriz.cabecalhos[indiceColuna].secaoUuid}`;
+              expect(sobreviventes.has(par)).toBe(true);
+            }
+          });
+        }
+      }
+    });
+
+    test("caso inválido — matriz de uma única Seção (só a diagonal) mantém um bloco: a matriz não desaparece", () => {
+      const blocos = dividirMatrizEmBlocos(matrizSintetica(1));
+
+      expect(blocos).toHaveLength(1);
+      expect(blocos[0].linhas).toHaveLength(1);
+      expect(blocos[0].continuacao).toBe(false);
+    });
+
+    test("caso inválido — o primeiro bloco sobrevivente nunca sai como '(continuação)'", () => {
+      for (const quantidade of [1, 3, 8, 9, 15, 22, 30]) {
+        const blocos = dividirMatrizEmBlocos(matrizSintetica(quantidade));
+
+        expect(blocos[0].continuacao).toBe(false);
+        for (const bloco of blocos.slice(1)) expect(bloco.continuacao).toBe(true);
+      }
+    });
+  });
 });
