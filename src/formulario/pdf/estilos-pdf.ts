@@ -1,20 +1,40 @@
 import { StyleSheet } from "@react-pdf/renderer";
 
-// Folha de estilos do PDF operacional (TASK-033; Spec 04 §13.3 — "legível como
-// tabela operacional de linha de ônibus, tipografia tabular").
+// Folha de estilos do PDF operacional (TASK-033/TASK-126; Spec 04 §13.3 —
+// "legível como tabela operacional de linha de ônibus, tipografia tabular").
 //
 // O PDF não é DOM: as classes Tailwind e os componentes de `shared/ui` não se
 // aplicam aqui, e `@react-pdf` só entende sua própria `StyleSheet`. A proibição
 // de `style=` inline do `docs-dev/18-DESIGN_SYSTEM.md` vale para a UI web; o
-// equivalente aqui é concentrar toda a aparência do PDF neste arquivo, em vez de
-// espalhá-la pelo componente. Os valores espelham os tokens do doc 18 (cinzas,
-// azul de destaque) transcritos como literais, porque o PDF não lê CSS.
+// equivalente aqui é concentrar toda a aparência do PDF neste arquivo, em vez
+// de espalhá-la pelo componente. Os valores são os tokens do doc 18 §2,
+// transcritos como literais porque o PDF não lê CSS/`@theme`.
 
-const CINZA_900 = "#111827";
-const CINZA_700 = "#374151";
-const CINZA_500 = "#6b7280";
-const CINZA_200 = "#e5e7eb";
-const AZUL_700 = "#1d4ed8";
+/** Paleta do PDF — cada valor é o mesmo hex do token `--color-*` do doc 18 §2. */
+export const PALETA_PDF = {
+  cinza900: "#0f172a",
+  cinza700: "#334155",
+  cinza500: "#64748b",
+  cinza200: "#e2e8f0",
+  cinza100: "#f1f5f9",
+  cinza50: "#f8fafc",
+  azul900: "#1e3a5f",
+  azul700: "#1d4ed8",
+  azul600: "#2563eb",
+  azul100: "#dbeafe",
+} as const;
+
+const {
+  cinza900: CINZA_900,
+  cinza700: CINZA_700,
+  cinza500: CINZA_500,
+  cinza200: CINZA_200,
+  cinza100: CINZA_100,
+  cinza50: CINZA_50,
+  azul900: AZUL_900,
+  azul700: AZUL_700,
+  azul100: AZUL_100,
+} = PALETA_PDF;
 
 export const estilosPdf = StyleSheet.create({
   pagina: {
@@ -25,20 +45,39 @@ export const estilosPdf = StyleSheet.create({
     color: CINZA_900,
     fontFamily: "Helvetica",
   },
+  // Capa (§13.1 item 1) — página própria (§13.3, "uma página por bloco
+  // lógico"): título, código em corpo destacado, pares rótulo-valor, selo.
+  paginaCapa: {
+    paddingTop: 96,
+    paddingBottom: 56,
+    paddingHorizontal: 40,
+    fontSize: 9,
+    color: CINZA_900,
+    fontFamily: "Helvetica",
+  },
   tituloDocumento: {
-    fontSize: 20,
+    fontSize: 16,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 16,
+    color: CINZA_500,
+    marginBottom: 8,
+  },
+  codigoCapa: {
+    fontSize: 28,
+    fontFamily: "Helvetica-Bold",
+    color: CINZA_900,
+    marginBottom: 28,
   },
   tituloBloco: {
     fontSize: 13,
     fontFamily: "Helvetica-Bold",
+    color: CINZA_900,
     marginBottom: 6,
     marginTop: 14,
   },
   tituloItinerario: {
     fontSize: 11,
     fontFamily: "Helvetica-Bold",
+    color: CINZA_900,
     marginBottom: 4,
     marginTop: 12,
   },
@@ -53,6 +92,35 @@ export const estilosPdf = StyleSheet.create({
   valorIdentificacao: {
     flex: 1,
     fontFamily: "Helvetica-Bold",
+    color: CINZA_900,
+  },
+  // Pares rótulo-valor da capa — linha mais espaçada que a identificação dos
+  // blocos de Serviço, para a página isolada não parecer uma tabela comprimida.
+  linhaCapa: {
+    flexDirection: "row",
+    marginBottom: 10,
+  },
+  rotuloCapa: {
+    width: 160,
+    color: CINZA_500,
+    fontSize: 10,
+  },
+  valorCapa: {
+    flex: 1,
+    fontSize: 10,
+    color: CINZA_900,
+  },
+  seloStatus: {
+    alignSelf: "flex-start",
+    backgroundColor: AZUL_100,
+    color: AZUL_900,
+    fontFamily: "Helvetica-Bold",
+    fontSize: 9,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    marginTop: 8,
+    textTransform: "uppercase",
   },
   rotuloContagem: {
     color: CINZA_700,
@@ -69,12 +137,33 @@ export const estilosPdf = StyleSheet.create({
     borderBottomColor: CINZA_200,
     paddingVertical: 3,
   },
-  linhaCabecalho: {
+  // Zebra: só as linhas de dados ímpares recebem o fundo — cabeçalho e total
+  // têm estilo próprio, para as três faixas ficarem distinguíveis (TASK-126).
+  linhaTabelaZebra: {
     flexDirection: "row",
     borderBottomWidth: 1,
     borderBottomColor: CINZA_200,
     paddingVertical: 3,
+    backgroundColor: CINZA_50,
+  },
+  linhaCabecalho: {
+    flexDirection: "row",
+    backgroundColor: CINZA_100,
+    borderBottomWidth: 1,
+    borderBottomColor: CINZA_200,
+    paddingVertical: 4,
     fontFamily: "Helvetica-Bold",
+    color: CINZA_900,
+  },
+  // Linha de total: distinta do cabeçalho (borda superior mais forte, sem
+  // fundo) — antes reusava `linhaCabecalho` (observação 4 do parecer TASK-033).
+  linhaTotal: {
+    flexDirection: "row",
+    borderTopWidth: 1.5,
+    borderTopColor: CINZA_900,
+    paddingVertical: 4,
+    fontFamily: "Helvetica-Bold",
+    color: CINZA_900,
   },
   celula: {
     flex: 1,
@@ -86,9 +175,17 @@ export const estilosPdf = StyleSheet.create({
     flex: 2.4,
     paddingHorizontal: 3,
   },
+  // Larguras proporcionais da tabela de resumo por Serviço (8 colunas):
+  // "Serviço" precisa de mais espaço que as 7 colunas numéricas, que dividem o
+  // restante igualmente (TASK-126 — nada de `flex: 1` uniforme).
+  celulaServico: {
+    flex: 1.6,
+    paddingHorizontal: 3,
+  },
   subtituloBloco: {
     fontSize: 10,
     fontFamily: "Helvetica-Bold",
+    color: CINZA_900,
     marginTop: 10,
     marginBottom: 4,
   },
@@ -139,5 +236,11 @@ export const estilosPdf = StyleSheet.create({
     paddingTop: 6,
     fontSize: 7,
     color: CINZA_500,
+  },
+  // Primeira linha do rodapé: schema/geração à esquerda, "Página X de Y"
+  // (TASK-126) à direita, na mesma linha.
+  rodapeLinha: {
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
 });

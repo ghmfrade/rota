@@ -88,6 +88,18 @@ describe("capturarMapasDoDocumento (DEC-104)", () => {
   });
 });
 
+describe("Dimensão de captura (TASK-126 — legibilidade de impressão)", () => {
+  test("a resolução sobe para ~1400×840, preservando a proporção 5:3 da DEC-104", async () => {
+    const { LARGURA_CAPTURA, ALTURA_CAPTURA } = await import(
+      "@/formulario/pdf/captura-mapa-pdf"
+    );
+
+    expect(LARGURA_CAPTURA).toBe(1400);
+    expect(ALTURA_CAPTURA).toBe(840);
+    expect(LARGURA_CAPTURA / ALTURA_CAPTURA).toBeCloseTo(1000 / 600, 5);
+  });
+});
+
 describe("gerarPdfOperacional", () => {
   test("as imagens capturadas chegam ao modelo renderizado", async () => {
     const doc = documento();

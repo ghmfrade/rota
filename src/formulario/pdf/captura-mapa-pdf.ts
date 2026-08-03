@@ -32,12 +32,17 @@ import {
 // tela: não é superfície de UI (a proibição de estilo inline do doc 18 vale para
 // os componentes), é o alvo de render do MapLibre.
 
-/** Dimensões da captura, em pixels de canvas. Proporção pensada para A4 retrato. */
-export const LARGURA_CAPTURA = 1000;
-export const ALTURA_CAPTURA = 600;
+/**
+ * Dimensões da captura, em pixels de canvas. Proporção 5:3 pensada para A4
+ * retrato, preservada da TASK-033; TASK-126 sobe a resolução de 1000×600 para
+ * ~1400×840 (de ~140 dpi para ~195 dpi na largura útil da página, §13.3 —
+ * legibilidade de impressão), sem alterar o enquadramento da DEC-104.
+ */
+export const LARGURA_CAPTURA = 1400;
+export const ALTURA_CAPTURA = 840;
 
 /** Margem entre a rota e as bordas da imagem, em pixels (enquadramento DEC-104). */
-export const MARGEM_ENQUADRAMENTO = 40;
+export const MARGEM_ENQUADRAMENTO = 56;
 
 /** Teto de espera pelo mapa ficar ocioso; estourou, a captura falha (tolerada). */
 export const TIMEOUT_CAPTURA_MS = 15_000;

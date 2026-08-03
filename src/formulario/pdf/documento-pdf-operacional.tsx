@@ -9,21 +9,35 @@ import {
   type ModeloPdfOperacional,
 } from "./modelo-pdf-operacional";
 
-// Renderizador @react-pdf do PDF operacional (TASK-033; Spec 04 §13.1).
-// Componente burro: desenha o modelo já montado por `modelo-pdf-operacional.ts`
-// — nenhuma regra de negócio, nenhuma contagem, nenhum acesso ao documento
-// bruto. Os itens 5–8 do §13.1 (tabelas horárias, matrizes e anexo técnico)
-// entram aqui na TASK-034, entre os itinerários e o rodapé.
+// Renderizador @react-pdf do PDF operacional (TASK-033/TASK-126; Spec 04
+// §13.1). Componente burro: desenha o modelo já montado por
+// `modelo-pdf-operacional.ts` — nenhuma regra de negócio, nenhuma contagem,
+// nenhum acesso ao documento bruto. Os itens 5–8 do §13.1 (tabelas horárias,
+// matrizes e anexo técnico) entram aqui na TASK-034, entre os itinerários e o
+// rodapé.
+//
+// Paginação (§13.3 — "uma página por bloco lógico quando possível"): a capa
+// ocupa `Page` própria; o resumo abre outra `Page` (que também recebe os
+// blocos de Serviço); os itinerários ficam em uma terceira `Page`. Dentro de
+// cada `Page`, `wrap={false}` em cada bloco de Serviço/itinerário impede que
+// um único bloco seja partido ao meio — se não couber no restante da página,
+// o `@react-pdf` o empurra inteiro para a próxima, que é o "quando couber".
 
 function Rodape({ modelo }: { modelo: ModeloPdfOperacional }) {
-  // §13.1 item 9 — fixo em todas as páginas: `versao_schema`, data/hora e o
-  // aviso de fronteira com o SEI (RN-077).
+  // §13.1 item 9 — fixo em todas as páginas: `versao_schema`, data/hora,
+  // numeração "Página X de Y" (TASK-126) e o aviso de fronteira com o SEI
+  // (RN-077).
   return (
     <View style={estilosPdf.rodape} fixed>
-      <Text>
-        Versão do schema: {modelo.rodape.versaoSchema} · Gerado em{" "}
-        {modelo.rodape.geradoEm}
-      </Text>
+      <View style={estilosPdf.rodapeLinha}>
+        <Text>
+          Versão do schema: {modelo.rodape.versaoSchema} · Gerado em{" "}
+          {modelo.rodape.geradoEm}
+        </Text>
+        <Text
+          render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
+        />
+      </View>
       <Text>{modelo.rodape.aviso}</Text>
     </View>
   );
@@ -38,19 +52,32 @@ function LinhaIdentificacao({ rotulo, valor }: { rotulo: string; valor: string }
   );
 }
 
+/** RN-069/NEG-018 — o rótulo da semana padrão repetido junto de cada grupo de
+ * tabelas de contagem, para não se separar delas quando o resumo paginar. */
+function NotaSemanaPadrao({ rotulo }: { rotulo: string }) {
+  return (
+    <Text style={estilosPdf.rotuloContagem}>
+      Todas as contagens consideram a {rotulo}.
+    </Text>
+  );
+}
+
+/** Estilo da linha de dados, alternando zebra (TASK-126 — cabeçalho, zebra e
+ * total agora são visualmente distintos, sem `flex: 1` uniforme). */
+function estiloLinhaDados(indice: number) {
+  return indice % 2 === 1 ? estilosPdf.linhaTabelaZebra : estilosPdf.linhaTabela;
+}
+
 function BlocoResumoPdf({ resumo }: { resumo: BlocoResumo }) {
   return (
     <View>
       <Text style={estilosPdf.tituloBloco}>Resumo do Autos</Text>
-      {/* RN-069/NEG-018 — contagem sem rótulo é proibida, na tela e no PDF. */}
-      <Text style={estilosPdf.rotuloContagem}>
-        Todas as contagens consideram a {resumo.rotuloSemanaPadrao}.
-      </Text>
+      <NotaSemanaPadrao rotulo={resumo.rotuloSemanaPadrao} />
 
       {/* Os 7 contadores por Serviço do §10 — nenhum a menos. */}
       <View style={estilosPdf.tabela}>
-        <View style={estilosPdf.linhaCabecalho}>
-          <Text style={estilosPdf.celula}>Serviço</Text>
+        <View style={estilosPdf.linhaCabecalho} wrap={false}>
+          <Text style={estilosPdf.celulaServico}>Serviço</Text>
           <Text style={estilosPdf.celulaNumerica}>Viagens Ida</Text>
           <Text style={estilosPdf.celulaNumerica}>Viagens Volta</Text>
           <Text style={estilosPdf.celulaNumerica}>Viagens total</Text>
@@ -59,9 +86,9 @@ function BlocoResumoPdf({ resumo }: { resumo: BlocoResumo }) {
           <Text style={estilosPdf.celulaNumerica}>Opções Volta</Text>
           <Text style={estilosPdf.celulaNumerica}>Opções total</Text>
         </View>
-        {resumo.porServico.map((linha) => (
-          <View style={estilosPdf.linhaTabela} key={linha.servicoUuid}>
-            <Text style={estilosPdf.celula}>{linha.numeroN}</Text>
+        {resumo.porServico.map((linha, indice) => (
+          <View style={estiloLinhaDados(indice)} key={linha.servicoUuid} wrap={false}>
+            <Text style={estilosPdf.celulaServico}>{linha.numeroN}</Text>
             <Text style={estilosPdf.celulaNumerica}>{linha.viagensIda}</Text>
             <Text style={estilosPdf.celulaNumerica}>{linha.viagensVolta}</Text>
             <Text style={estilosPdf.celulaNumerica}>{linha.viagensTotal}</Text>
@@ -73,8 +100,8 @@ function BlocoResumoPdf({ resumo }: { resumo: BlocoResumo }) {
         ))}
         {/* §10 "Por Autos": só as duas somas existem neste nível — as demais
             colunas ficam com "—" em vez de um número que a spec não define. */}
-        <View style={estilosPdf.linhaCabecalho}>
-          <Text style={estilosPdf.celula}>Total do Autos</Text>
+        <View style={estilosPdf.linhaTotal} wrap={false}>
+          <Text style={estilosPdf.celulaServico}>Total do Autos</Text>
           <Text style={estilosPdf.celulaNumerica}>—</Text>
           <Text style={estilosPdf.celulaNumerica}>—</Text>
           <Text style={estilosPdf.celulaNumerica}>{resumo.totalViagensSemana}</Text>
@@ -91,15 +118,16 @@ function BlocoResumoPdf({ resumo }: { resumo: BlocoResumo }) {
           total do Autos abre o bloco, nomeado como total, e cada Serviço vem
           em seguida em tabela própria. */}
       <Text style={estilosPdf.tituloBloco}>Estratificação por faixa de horário</Text>
+      <NotaSemanaPadrao rotulo={resumo.rotuloSemanaPadrao} />
       <Text style={estilosPdf.subtituloBloco}>{ROTULO_FAIXA_TOTAL_AUTOS}</Text>
       <View style={estilosPdf.tabela}>
-        <View style={estilosPdf.linhaCabecalho}>
+        <View style={estilosPdf.linhaCabecalho} wrap={false}>
           <Text style={estilosPdf.celulaFaixa}>Faixa</Text>
           <Text style={estilosPdf.celulaNumerica}>Viagens</Text>
           <Text style={estilosPdf.celulaNumerica}>Opções de deslocamento</Text>
         </View>
-        {resumo.porFaixa.map((faixa) => (
-          <View style={estilosPdf.linhaTabela} key={faixa.rotulo}>
+        {resumo.porFaixa.map((faixa, indice) => (
+          <View style={estiloLinhaDados(indice)} key={faixa.rotulo} wrap={false}>
             <Text style={estilosPdf.celulaFaixa}>{faixa.rotulo}</Text>
             <Text style={estilosPdf.celulaNumerica}>{faixa.viagensSemana}</Text>
             <Text style={estilosPdf.celulaNumerica}>{faixa.opcoesDeslocamento}</Text>
@@ -112,13 +140,14 @@ function BlocoResumoPdf({ resumo }: { resumo: BlocoResumo }) {
           <Text style={estilosPdf.subtituloBloco}>
             Serviço {servico.numeroN} — por faixa de horário
           </Text>
+          <NotaSemanaPadrao rotulo={resumo.rotuloSemanaPadrao} />
           {/* Pares compráveis não depende de Viagem: é o mesmo em todas as
               faixas, então aparece uma vez em vez de repetir sete linhas. */}
           <Text style={estilosPdf.notaTabela}>
             Pares compráveis: {servico.paresCompraveis} (invariante entre faixas).
           </Text>
           <View style={estilosPdf.tabela}>
-            <View style={estilosPdf.linhaCabecalho}>
+            <View style={estilosPdf.linhaCabecalho} wrap={false}>
               <Text style={estilosPdf.celulaFaixa}>Faixa</Text>
               <Text style={estilosPdf.celulaNumerica}>Viagens Ida</Text>
               <Text style={estilosPdf.celulaNumerica}>Viagens Volta</Text>
@@ -127,8 +156,8 @@ function BlocoResumoPdf({ resumo }: { resumo: BlocoResumo }) {
               <Text style={estilosPdf.celulaNumerica}>Opções Volta</Text>
               <Text style={estilosPdf.celulaNumerica}>Opções total</Text>
             </View>
-            {servico.faixas.map((faixa) => (
-              <View style={estilosPdf.linhaTabela} key={faixa.rotulo}>
+            {servico.faixas.map((faixa, indice) => (
+              <View style={estiloLinhaDados(indice)} key={faixa.rotulo} wrap={false}>
                 <Text style={estilosPdf.celulaFaixa}>{faixa.rotulo}</Text>
                 <Text style={estilosPdf.celulaNumerica}>{faixa.viagensIda}</Text>
                 <Text style={estilosPdf.celulaNumerica}>{faixa.viagensVolta}</Text>
@@ -176,7 +205,7 @@ function BlocoServicoPdf({ servico }: { servico: BlocoServico }) {
 function BlocoItinerarioPdf({ itinerario }: { itinerario: BlocoItinerario }) {
   const paragrafo = paragrafoDaDescricao(itinerario);
   return (
-    <View>
+    <View wrap={false}>
       {/* (a) título */}
       <Text style={estilosPdf.tituloItinerario}>{itinerario.titulo}</Text>
       {/* (b) sequência resumida de Seções, ligada por seta */}
@@ -228,20 +257,35 @@ export function DocumentoPdfOperacional({
 }) {
   return (
     <Document title={`${modelo.capa.titulo} — ${modelo.capa.codigo}`}>
-      {/* Item 1 — capa/identificação; itens 2 e 3 na sequência do §13.1 */}
-      <Page size="A4" style={estilosPdf.pagina}>
+      {/* Item 1 — capa/identificação, em página própria (§13.3). */}
+      <Page size="A4" style={estilosPdf.paginaCapa}>
         <Text style={estilosPdf.tituloDocumento}>{modelo.capa.titulo}</Text>
-        <LinhaIdentificacao rotulo="Autos" valor={modelo.capa.codigo} />
-        <LinhaIdentificacao rotulo="Empresa" valor={modelo.capa.empresa} />
-        <LinhaIdentificacao rotulo="Tipo" valor={modelo.capa.tipo} />
-        <LinhaIdentificacao rotulo="Status" valor={modelo.capa.status} />
+        <Text style={estilosPdf.codigoCapa}>{modelo.capa.codigo}</Text>
+        <View style={estilosPdf.linhaCapa}>
+          <Text style={estilosPdf.rotuloCapa}>Empresa</Text>
+          <Text style={estilosPdf.valorCapa}>{modelo.capa.empresa}</Text>
+        </View>
+        <View style={estilosPdf.linhaCapa}>
+          <Text style={estilosPdf.rotuloCapa}>Tipo</Text>
+          <Text style={estilosPdf.valorCapa}>{modelo.capa.tipo}</Text>
+        </View>
+        <View style={estilosPdf.linhaCapa}>
+          <Text style={estilosPdf.rotuloCapa}>Status</Text>
+          <Text style={estilosPdf.seloStatus}>{modelo.capa.status}</Text>
+        </View>
         {modelo.capa.data ? (
-          <LinhaIdentificacao
-            rotulo={modelo.capa.rotuloData}
-            valor={modelo.capa.data}
-          />
+          <View style={estilosPdf.linhaCapa}>
+            <Text style={estilosPdf.rotuloCapa}>{modelo.capa.rotuloData}</Text>
+            <Text style={estilosPdf.valorCapa}>{modelo.capa.data}</Text>
+          </View>
         ) : null}
 
+        <Rodape modelo={modelo} />
+      </Page>
+
+      {/* Item 2 — resumo, começa em página nova (§13.3); item 3 — Serviços,
+          na sequência, cada bloco pulando de página quando não couber. */}
+      <Page size="A4" style={estilosPdf.pagina}>
         <BlocoResumoPdf resumo={modelo.resumo} />
 
         <Text style={estilosPdf.tituloBloco}>Serviços</Text>
@@ -252,7 +296,7 @@ export function DocumentoPdfOperacional({
         <Rodape modelo={modelo} />
       </Page>
 
-      {/* Item 4 — itinerários por Serviço e sentido */}
+      {/* Item 4 — itinerários por Serviço e sentido, em página própria. */}
       <Page size="A4" style={estilosPdf.pagina}>
         <Text style={estilosPdf.tituloBloco}>Itinerários</Text>
         {modelo.itinerarios.map((itinerario) => (
