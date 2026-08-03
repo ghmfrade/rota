@@ -86,6 +86,27 @@ describe("capturarMapasDoDocumento (DEC-104)", () => {
     expect(imagens.size).toBe(0);
     expect(falhas).toHaveLength(2);
   });
+
+  test("TASK-127/DEC-105 — o capturador injetado recebe os símbolos numerados do PRÓPRIO itinerário", async () => {
+    const doc = documento();
+    const simbolosRecebidos: { sentido: string; tipos: string[]; rotulos: (string | undefined)[] }[] = [];
+
+    await capturarMapasDoDocumento(doc, async (geometria, simbolos) => {
+      simbolosRecebidos.push({
+        sentido: simbolosRecebidos.length === 0 ? "ida" : "volta",
+        tipos: simbolos.map((s) => s.tipo),
+        rotulos: simbolos.map((s) => s.rotulo),
+      });
+      return "data:image/png;base64,MAPA";
+    });
+
+    // Ida do exemplo mínimo: Seção A, Seção B, Local (após B), Seção C → 1º, 2º, 2.1, 3º.
+    expect(simbolosRecebidos[0].tipos).toEqual(["secao", "secao", "local", "secao"]);
+    expect(simbolosRecebidos[0].rotulos).toEqual(["1º", "2º", "2.1", "3º"]);
+    // Volta do exemplo mínimo não tem Local: só Seções, série própria.
+    expect(simbolosRecebidos[1].tipos).toEqual(["secao", "secao", "secao"]);
+    expect(simbolosRecebidos[1].rotulos).toEqual(["1º", "2º", "3º"]);
+  });
 });
 
 describe("Dimensão de captura (TASK-126 — legibilidade de impressão)", () => {
@@ -172,6 +193,11 @@ describe("gerarPdfOperacional", () => {
       true,
     );
     expect(modeloRenderizado?.capa.codigo).toBe("0000");
+    // DEC-105 — falha de captura NÃO leva a legenda junto: ela é derivada das
+    // paradas, independente de a imagem ter vindo.
+    expect(modeloRenderizado?.itinerarios.every((i) => i.legendaSecoes.length > 0)).toBe(
+      true,
+    );
   });
 
   test("nome sugerido do arquivo identifica o Autos", () => {

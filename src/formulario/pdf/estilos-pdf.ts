@@ -230,6 +230,45 @@ export const estilosPdf = StyleSheet.create({
     marginBottom: 8,
     color: CINZA_500,
   },
+  // Legenda vertical do bloco de itinerário (DEC-105; TASK-127) — só Seções
+  // (RN-076), símbolo numerado + `Cidade - Nome`, ligados por conector azul.
+  legendaItinerario: {
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  legendaLinha: {
+    flexDirection: "row",
+  },
+  // Coluna do símbolo + conector, largura fixa para o nome alinhar em coluna.
+  legendaColunaSimbolo: {
+    width: 18,
+    alignItems: "center",
+  },
+  // Mesma cor/forma do quadrado de Seção da DEC-069, em escala de legenda.
+  legendaSimbolo: {
+    width: 13,
+    height: 13,
+    backgroundColor: AZUL_700,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  legendaNumero: {
+    fontSize: 6,
+    fontFamily: "Helvetica-Bold",
+    color: CINZA_50,
+  },
+  // Conector vertical entre um símbolo e o próximo — some no último item.
+  legendaConector: {
+    width: 1.5,
+    height: 10,
+    backgroundColor: AZUL_700,
+    marginTop: 1,
+  },
+  legendaNome: {
+    flex: 1,
+    paddingLeft: 6,
+    paddingBottom: 8,
+  },
   rodape: {
     position: "absolute",
     bottom: 24,

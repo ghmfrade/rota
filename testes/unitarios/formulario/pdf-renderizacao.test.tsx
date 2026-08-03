@@ -193,6 +193,66 @@ describe("RN-077 — aviso de fronteira com o SEI em todas as páginas", () => {
   });
 });
 
+describe("Legenda do itinerário (DEC-105/TASK-127)", () => {
+  test("cada bloco de itinerário renderiza a legenda com o rótulo e o nome de cada Seção", () => {
+    const modelo = modeloDe(documentoBidirecionalMultiServico());
+    const documento = arvoreDo(modelo);
+    const paginaItinerarios = paginasDe(documento)[3];
+    const texto = textoDe(paginaItinerarios);
+
+    for (const bloco of modelo.itinerarios) {
+      for (const item of bloco.legendaSecoes) {
+        expect(texto).toContain(item.rotulo);
+        expect(texto).toContain(item.nome);
+      }
+    }
+  });
+
+  test("a legenda é renderizada mesmo SEM imagem de mapa — DEC-104 não bloqueia a legenda", () => {
+    // Nenhuma fixture destes testes passa `obterImagemDoItinerario`: todo
+    // bloco já sai sem `imagemMapa`, e ainda assim a legenda aparece — é a
+    // mesma tolerância a falha de captura da DEC-104.
+    const modelo = modeloDe(documentoUnidirecional());
+    expect(modelo.itinerarios.every((i) => i.imagemMapa === undefined)).toBe(true);
+    expect(modelo.itinerarios.every((i) => i.legendaSecoes.length > 0)).toBe(true);
+
+    const paginaItinerarios = paginasDe(arvoreDo(modelo))[3];
+    expect(textoDe(paginaItinerarios)).toContain(modelo.itinerarios[0].legendaSecoes[0].nome);
+  });
+
+  test("nenhum nome de Local aparece na legenda", () => {
+    // Insere um Local direto no objeto (sem repassar por
+    // `esquemaDocumentoOperacao.parse`, que exigiria recompor `trechos` e
+    // `horarios_paradas` — irrelevante para esta asserção sobre a legenda) e
+    // monta o modelo diretamente: `montarModeloPdfOperacional` só lê a forma
+    // do documento, não valida estrutura.
+    const documento = documentoBidirecionalMultiServico();
+    const servicoComLocal = documento.autos.servicos[0];
+    servicoComLocal.locais = [
+      {
+        uuid: "77777777-0000-4000-8000-000000000099",
+        nome: "Local Que Não Pode Vazar",
+        municipio: "Santos",
+        geolocalizacao_ida: { latitude: -23.96, longitude: -46.33 },
+      },
+    ];
+    servicoComLocal.itinerarios[0].paradas = [
+      servicoComLocal.itinerarios[0].paradas[0],
+      { ordem: 2, local_uuid: servicoComLocal.locais[0].uuid },
+      ...servicoComLocal.itinerarios[0].paradas
+        .slice(1)
+        .map((p) => ({ ...p, ordem: p.ordem + 1 })),
+    ];
+
+    const modelo = montarModeloPdfOperacional(documento, {
+      geradoEm: new Date(2026, 6, 31, 14, 5),
+    });
+    const paginaItinerarios = paginasDe(arvoreDo(modelo))[3];
+
+    expect(textoDe(paginaItinerarios)).not.toContain("Local Que Não Pode Vazar");
+  });
+});
+
 describe("Tabelas por faixa de horário — grupo íntegro, nunca partido", () => {
   function gruposIntegros(documento: NoPdf): NoPdf[] {
     return descendentes(documento).filter(

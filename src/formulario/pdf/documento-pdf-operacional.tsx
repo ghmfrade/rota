@@ -8,6 +8,7 @@ import {
   type BlocoServico,
   type ModeloPdfOperacional,
 } from "./modelo-pdf-operacional";
+import type { ItemLegendaSecao } from "./legenda-itinerario";
 
 // Renderizador @react-pdf do PDF operacional (TASK-033/TASK-126; Spec 04
 // §13.1). Componente burro: desenha o modelo já montado por
@@ -236,6 +237,34 @@ function BlocoServicoPdf({ servico }: { servico: BlocoServico }) {
   );
 }
 
+/**
+ * Legenda vertical do bloco de itinerário (DEC-105; §13.1 item 4d) — só
+ * Seções (RN-076), símbolo numerado (mesma cor/forma do quadrado da DEC-069,
+ * em escala de legenda) + `Cidade - Nome`, ligados por um conector azul entre
+ * itens consecutivos. Renderizada mesmo sem `imagemMapa`: falha de captura
+ * (DEC-104) não impede a legenda.
+ */
+function LegendaItinerarioPdf({ legenda }: { legenda: ItemLegendaSecao[] }) {
+  if (legenda.length === 0) return null;
+  return (
+    <View style={estilosPdf.legendaItinerario}>
+      {legenda.map((item, indice) => (
+        <View key={item.rotulo} style={estilosPdf.legendaLinha} wrap={false}>
+          <View style={estilosPdf.legendaColunaSimbolo}>
+            <View style={estilosPdf.legendaSimbolo}>
+              <Text style={estilosPdf.legendaNumero}>{item.rotulo}</Text>
+            </View>
+            {indice < legenda.length - 1 ? (
+              <View style={estilosPdf.legendaConector} />
+            ) : null}
+          </View>
+          <Text style={estilosPdf.legendaNome}>{item.nome}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function BlocoItinerarioPdf({
   itinerario,
   quebraPagina,
@@ -286,6 +315,9 @@ function BlocoItinerarioPdf({
           Imagem do mapa indisponível para este itinerário.
         </Text>
       )}
+      {/* Legenda das Seções numeradas no mapa acima (DEC-105) — renderizada
+          independentemente de `imagemMapa` ter vindo. */}
+      <LegendaItinerarioPdf legenda={itinerario.legendaSecoes} />
     </View>
   );
 }

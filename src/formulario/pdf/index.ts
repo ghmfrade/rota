@@ -7,6 +7,7 @@
 // componente. Pelo mesmo motivo, `captura-mapa-pdf.ts` é exportado sem que o
 // `maplibre-gl` seja carregado (o import dele também é dinâmico).
 
+export * from "./legenda-itinerario";
 export * from "./modelo-pdf-operacional";
 export * from "./captura-mapa-pdf";
 export * from "./gerar-pdf-operacional";

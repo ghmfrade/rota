@@ -11,9 +11,16 @@ import {
   linhaDaGeometria,
   linhasParaGeoJson,
 } from "@/shared/mapa/geometria";
+import { numerarItinerario, type SimboloParada } from "./legenda-itinerario";
+import {
+  desenharSimbolos,
+  paraSimboloProjetado,
+  type SimboloProjetado,
+} from "./simbolos-mapa-pdf";
 
 // Captura da imagem do mapa de cada itinerário para o PDF operacional
-// (Spec 04 §13.1 item 4d; Spec 01 §8; DEC-104).
+// (Spec 04 §13.1 item 4d; Spec 01 §8; DEC-104), com os símbolos de Seção/Local
+// compostos sobre o traçado (DEC-105 — TASK-127).
 //
 // DEC-104: a captura acontece SOB DEMANDA, no momento da geração — o canvas da
 // etapa Itinerários não existe na etapa Exportação, e um documento apenas
@@ -82,13 +89,68 @@ function criarContainerOculto(largura: number, altura: number): HTMLDivElement {
 }
 
 /**
+ * Projeta os símbolos numerados (coordenadas geográficas) para pixels do
+ * canvas do mapa. `mapa.project` devolve pixels CSS do contêiner; a escala
+ * para pixels do canvas fica a cargo do chamador (devicePixelRatio).
+ */
+function projetarSimbolos(
+  mapa: import("maplibre-gl").Map,
+  simbolos: readonly SimboloParada[],
+): SimboloProjetado[] {
+  return simbolos.map((simbolo) => {
+    const ponto = mapa.project([simbolo.longitude, simbolo.latitude]);
+    return paraSimboloProjetado(simbolo, ponto);
+  });
+}
+
+/**
+ * Compõe os símbolos sobre o canvas já capturado: um canvas novo, do MESMO
+ * tamanho em pixels do canvas do mapa (não da largura CSS — DEC-104 já roda
+ * em devicePixelRatio), recebe o traçado e os símbolos desenhados por cima
+ * (`simbolos-mapa-pdf.ts`). A escala dos símbolos usa `canvas.width / largura`
+ * porque `mapa.project` devolve pixels CSS, não pixels de canvas.
+ */
+function compornImagemComSimbolos(
+  canvasBase: HTMLCanvasElement,
+  simbolosProjetados: readonly SimboloProjetado[],
+  largura: number,
+): string {
+  const canvasComposto = document.createElement("canvas");
+  canvasComposto.width = canvasBase.width;
+  canvasComposto.height = canvasBase.height;
+  const ctx = canvasComposto.getContext("2d");
+  if (!ctx) {
+    throw new Error("Canvas 2D indisponível para compor os símbolos do PDF.");
+  }
+
+  ctx.drawImage(canvasBase, 0, 0);
+
+  const escala = canvasBase.width / largura;
+  const escalados = simbolosProjetados.map((simbolo) => ({
+    ...simbolo,
+    x: simbolo.x * escala,
+    y: simbolo.y * escala,
+  }));
+  desenharSimbolos(ctx, escalados, {
+    larguraMoldura: canvasComposto.width,
+    alturaMoldura: canvasComposto.height,
+  });
+
+  return canvasComposto.toDataURL("image/png");
+}
+
+/**
  * Captura a imagem de um itinerário: mapa oculto, rota congelada desenhada,
- * enquadrada pelos seus limites, canvas capturado como data-URI PNG.
- * Rejeita quando a geometria não tem limites, o mapa não fica ocioso a tempo ou
- * o canvas não é capturável — o chamador trata a falha como lacuna tolerada.
+ * enquadrada pelos seus limites, canvas capturado como data-URI PNG — com os
+ * símbolos numerados de Seção/Local compostos por cima (DEC-105). Rejeita
+ * quando a geometria não tem limites, o mapa não fica ocioso a tempo ou o
+ * canvas não é capturável — o chamador trata a falha como lacuna tolerada
+ * (DEC-104). Falha ao compor os símbolos (contexto 2D indisponível) não
+ * derruba a captura: cai para o traçado puro, pela mesma tolerância.
  */
 export async function capturarMapaDaRota(
   geometria: LineString,
+  simbolos: readonly SimboloParada[] = [],
   opcoes: OpcoesCapturaMapa = {},
 ): Promise<string> {
   const largura = opcoes.largura ?? LARGURA_CAPTURA;
@@ -157,7 +219,19 @@ export async function capturarMapaDaRota(
       });
     });
 
-    return capturarImagemMapa(mapa);
+    if (simbolos.length === 0) {
+      return capturarImagemMapa(mapa);
+    }
+    try {
+      const canvasBase = mapa.getCanvas();
+      if (!canvasBase) return capturarImagemMapa(mapa);
+      const projetados = projetarSimbolos(mapa, simbolos);
+      return compornImagemComSimbolos(canvasBase, projetados, largura);
+    } catch {
+      // Composição falhou (contexto 2D indisponível): a falha é tolerada
+      // (DEC-104) — cai para o traçado puro, sem símbolos.
+      return capturarImagemMapa(mapa);
+    }
   } finally {
     mapa?.remove();
     container.remove();
@@ -186,14 +260,19 @@ export function chaveImagem(
 }
 
 /**
- * Captura, um a um, o mapa de todos os itinerários do documento. Sequencial de
- * propósito: cada mapa é criado e destruído antes do próximo, evitando N
- * contextos WebGL simultâneos. `capturar` é injetável para teste (nada de WebGL
- * nem de tiles reais em Vitest).
+ * Captura, um a um, o mapa de todos os itinerários do documento — com os
+ * símbolos de Seção/Local numerados (DEC-105), derivados das paradas do
+ * PRÓPRIO itinerário (`legenda-itinerario.ts`). Sequencial de propósito: cada
+ * mapa é criado e destruído antes do próximo, evitando N contextos WebGL
+ * simultâneos. `capturar` é injetável para teste (nada de WebGL nem de tiles
+ * reais em Vitest).
  */
 export async function capturarMapasDoDocumento(
   documento: DocumentoOperacao,
-  capturar: (geometria: LineString) => Promise<string> = (g) => capturarMapaDaRota(g),
+  capturar: (
+    geometria: LineString,
+    simbolos: readonly SimboloParada[],
+  ) => Promise<string> = (g, s) => capturarMapaDaRota(g, s),
 ): Promise<ResultadoCapturaDoDocumento> {
   const imagens = new Map<string, string>();
   const falhas: ResultadoCapturaDoDocumento["falhas"] = [];
@@ -201,7 +280,13 @@ export async function capturarMapasDoDocumento(
   for (const servico of documento.autos.servicos) {
     for (const itinerario of servico.itinerarios) {
       try {
-        const imagem = await capturar(itinerario.rota.geometria);
+        const { simbolos } = numerarItinerario(
+          itinerario,
+          servico.uuid,
+          documento.autos.secoes,
+          servico.locais,
+        );
+        const imagem = await capturar(itinerario.rota.geometria, simbolos);
         imagens.set(chaveImagem(servico.uuid, itinerario.sentido), imagem);
       } catch {
         falhas.push({

@@ -16,6 +16,11 @@ import {
 // de `secoes` reexporta o editor React, e este módulo é puro — o modelo do PDF
 // não deve arrastar componente de mapa nem de UI.
 import { nomeExibicaoSecao } from "@/formulario/secoes/fluxos-secao";
+import {
+  numerarItinerario,
+  type IdentificadorLocal,
+  type ItemLegendaSecao,
+} from "./legenda-itinerario";
 
 // Modelo estrutural do PDF operacional (TASK-033; Spec 04 §13.1) — módulo
 // PURO: converte um `DocumentoOperacao` na sequência de blocos que o
@@ -166,6 +171,18 @@ export interface BlocoItinerario {
   descricaoItens: ItemDescricaoPdf[];
   /** (d) data-URI da captura do mapa; ausente quando a captura não veio (DEC-104). */
   imagemMapa?: string;
+  /**
+   * Legenda vertical do bloco — só Seções, numeradas e ligadas por conector
+   * (DEC-105; RN-076). Preenchida independentemente de `imagemMapa`: falha de
+   * captura não impede a legenda de ser renderizada.
+   */
+  legendaSecoes: ItemLegendaSecao[];
+  /**
+   * Identificadores hierárquicos (`1.1`, `1.2`…) dos Locais deste
+   * Serviço/sentido, prontos para o anexo técnico da TASK-034 referenciar
+   * (DEC-105; §13.1 item 8b). Não aparecem em nenhuma superfície do corpo.
+   */
+  identificadoresLocais: IdentificadorLocal[];
 }
 
 /** Separador entre os itens do parágrafo da descrição (§13.4). */
@@ -388,6 +405,14 @@ function montarItinerarios(
     );
     for (const itinerario of ordenados) {
       const imagem = obterImagem?.(servico.uuid, itinerario.sentido);
+      // DEC-105: numeração hierárquica derivada das mesmas paradas, por
+      // Serviço/sentido — independente de a captura do mapa ter vindo ou não.
+      const { legendaSecoes, identificadoresLocais } = numerarItinerario(
+        itinerario,
+        servico.uuid,
+        documento.autos.secoes,
+        servico.locais,
+      );
       blocos.push({
         servicoUuid: servico.uuid,
         sentido: itinerario.sentido,
@@ -396,6 +421,8 @@ function montarItinerarios(
         descricaoTexto: itinerario.rota.descricao_itinerario.texto,
         descricaoItens: itensDaDescricao(itinerario),
         ...(imagem ? { imagemMapa: imagem } : {}),
+        legendaSecoes,
+        identificadoresLocais,
       });
     }
   }

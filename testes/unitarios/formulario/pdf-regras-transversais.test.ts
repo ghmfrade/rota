@@ -118,6 +118,33 @@ describe("RN-031/RN-076 — Locais não aparecem no corpo, só no anexo técnico
     expect(sequencia.split(" → ")).toHaveLength(paradasDeSecao);
     expect(paradasDeSecao).toBeLessThan(itinerario.paradas.length);
   });
+
+  test("TASK-127/DEC-105 — a legenda vertical do bloco só lista Seções, na mesma contagem da sequência", () => {
+    const documento = documentoExemploMinimo();
+    const modelo = modeloDe(documento);
+
+    for (const bloco of modelo.itinerarios) {
+      expect(bloco.legendaSecoes).toHaveLength(bloco.sequenciaSecoes.split(" → ").length);
+      for (const item of bloco.legendaSecoes) {
+        const secao = documento.autos.secoes.find(
+          (s) => item.nome === `${s.municipio} - ${s.nome}`,
+        );
+        expect(secao, `legenda com nome fora do padrão: ${item.nome}`).toBeDefined();
+      }
+    }
+  });
+
+  test("TASK-127/DEC-105 — o identificador do Local expõe só a UUID, nunca o nome, no modelo do PDF", () => {
+    const documento = documentoExemploMinimo();
+    const local = documento.autos.servicos[0].locais[0];
+
+    const modelo = modeloDe(documento);
+    const blocoIda = modelo.itinerarios.find((i) => i.sentido === "ida");
+
+    expect(blocoIda?.identificadoresLocais).toEqual([
+      { localUuid: local.uuid, identificador: "2.1" },
+    ]);
+  });
 });
 
 describe("RN-076 — nomes de Seção sempre no padrão Cidade - Nome", () => {
