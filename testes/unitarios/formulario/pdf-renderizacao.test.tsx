@@ -1,6 +1,7 @@
-import { isValidElement, type ReactElement, type ReactNode } from "react";
+import { cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { describe, expect, test } from "vitest";
-import { renderToBuffer } from "@react-pdf/renderer";
+import { Document, Page, pdf, renderToBuffer, Text, View } from "@react-pdf/renderer";
+import type { DocumentProps, OnRenderProps } from "@react-pdf/renderer";
 import { DocumentoPdfOperacional } from "@/formulario/pdf/documento-pdf-operacional";
 import { estilosPdf, PALETA_PDF } from "@/formulario/pdf/estilos-pdf";
 import {
@@ -101,21 +102,52 @@ function paginasDe(documento: NoPdf): NoPdf[] {
   return documento.filhos.filter((filho) => filho.tipo === "PAGE");
 }
 
-/**
- * Compara `style` contra um estilo conhecido tolerando o único caso de array
- * de estilo do documento: `linhaCabecalhoDiagonal` recebe a altura dinâmica do
- * bloco como `[estilosPdf.linhaCabecalhoDiagonal, { height }]` (§3.4 do plano
- * de correção da TASK-034).
- */
-function temEstilo(no: NoPdf, estilo: unknown): boolean {
-  const style = no.props.style;
-  return style === estilo || (Array.isArray(style) && style.includes(estilo));
-}
-
 function modeloDe(documento: unknown): ModeloPdfOperacional {
   return montarModeloPdfOperacional(esquemaDocumentoOperacao.parse(documento), {
     geradoEm: new Date(2026, 6, 31, 14, 5),
   });
+}
+
+// --- Layout REAL (DEC-108 — geometria do rótulo de coluna) ----------------
+//
+// A árvore de elementos acima (NoPdf) prova ESTRUTURA (quantas células, qual
+// estilo), mas não geometria: `transform` não afeta o layout, e uma quebra de
+// linha só existe depois que `@react-pdf/layout` mede o texto contra a
+// largura disponível — foi assim que o parecer da TASK-034 mediu a quebra do
+// cabeçalho diagonal (`docs-dev/14-REVISOES/TASK-034-20260803-correcao.md`,
+// problema 1). O layout real só fica disponível no `onRender` do `Document`
+// (`_INTERNAL__LAYOUT__DATA_`, interno do `@react-pdf/renderer`), então é
+// preciso renderizar de verdade — daí o `pdf(...).toBuffer()`.
+interface NoLayout {
+  type: string;
+  style?: Record<string, unknown>;
+  box?: { top: number; left: number; width: number; height: number };
+  lines?: { string: string }[];
+  children?: NoLayout[];
+}
+
+function descendentesLayout(no: NoLayout): NoLayout[] {
+  return [no, ...(no.children ?? []).flatMap(descendentesLayout)];
+}
+
+interface OnRenderComLayoutReal extends OnRenderProps {
+  _INTERNAL__LAYOUT__DATA_?: NoLayout;
+}
+
+async function layoutReal(elemento: ReactElement<DocumentProps>): Promise<NoLayout> {
+  let layout: NoLayout | undefined;
+  const clonado = cloneElement(elemento, {
+    onRender: (params: OnRenderComLayoutReal) => {
+      layout = params._INTERNAL__LAYOUT__DATA_;
+    },
+  });
+  await pdf(clonado).toBuffer();
+  if (layout === undefined) throw new Error("layout real não capturado pelo onRender");
+  return layout;
+}
+
+async function layoutRealDoDocumento(modelo: ModeloPdfOperacional): Promise<NoLayout> {
+  return layoutReal(DocumentoPdfOperacional({ modelo }) as ReactElement<DocumentProps>);
 }
 
 describe("DocumentoPdfOperacional — renderização (RN-074)", () => {
@@ -211,18 +243,19 @@ describe("RN-077 — aviso de fronteira com o SEI em todas as páginas", () => {
   });
 });
 
-describe("Itens 5–8 do §13.1 (TASK-034) — tabelas horárias, matrizes e anexo", () => {
-  /** As `Page` novas, na ordem do §13.1: 5, 6, 7 e 8. */
-  function paginasDosItens5a8(documento: NoPdf) {
-    const paginas = paginasDe(documento);
-    return {
-      tabelasHorarias: paginas[4],
-      matrizDistancias: paginas[5],
-      matrizSeccionamento: paginas[6],
-      anexo: paginas[7],
-    };
-  }
+/** As `Page` do §13.1, na ordem: 5, 6, 7 e 8 (usada também pelos testes de
+ * DEC-108, fora do describe original da TASK-034). */
+function paginasDosItens5a8(documento: NoPdf) {
+  const paginas = paginasDe(documento);
+  return {
+    tabelasHorarias: paginas[4],
+    matrizDistancias: paginas[5],
+    matrizSeccionamento: paginas[6],
+    anexo: paginas[7],
+  };
+}
 
+describe("Itens 5–8 do §13.1 (TASK-034) — tabelas horárias, matrizes e anexo", () => {
   test("a tabela horária do corpo traz as sete colunas de dia e nenhum Local (RN-075/076)", () => {
     const documento = documentoExemploMinimo();
     const local = documento.autos.servicos[0].locais[0];
@@ -276,19 +309,19 @@ describe("Itens 5–8 do §13.1 (TASK-034) — tabelas horárias, matrizes e ane
     expect(textoDe(matrizDistancias)).toContain("km");
   });
 
-  test("DEC-107 — geometria: toda linha de dados de cada bloco tem o mesmo número de filhos da linha de cabeçalho", () => {
+  test("DEC-108 — geometria: toda linha de dados de cada bloco tem o mesmo número de filhos da linha de cabeçalho", () => {
     const { matrizDistancias, matrizSeccionamento } = paginasDosItens5a8(
       arvoreDo(modeloDe(documentoExemploMinimo())),
     );
 
     for (const pagina of [matrizDistancias, matrizSeccionamento]) {
-      const linhasCabecalho = descendentes(pagina).filter((no) =>
-        temEstilo(no, estilosPdf.linhaCabecalhoDiagonal),
+      const linhasCabecalho = descendentes(pagina).filter(
+        (no) => no.props.style === estilosPdf.linhaCabecalhoMatriz,
       );
       expect(linhasCabecalho.length).toBeGreaterThan(0);
 
       for (const linhaCabecalho of linhasCabecalho) {
-        // Filhos diretos: o rótulo "Origem/Destino" + uma coluna por cabeçalho.
+        // Filhos diretos: a célula vazia do canto + uma coluna por cabeçalho.
         const numeroDeColunas = linhaCabecalho.filhos.length;
         const tabela = descendentes(pagina).find((no) => no.filhos.includes(linhaCabecalho));
         if (tabela === undefined) throw new Error("tabela não encontrada");
@@ -379,6 +412,100 @@ describe("Itens 5–8 do §13.1 (TASK-034) — tabelas horárias, matrizes e ane
     expect(texto).toContain(local.nome);
     expect(texto).toContain("2.1");
     expect(texto).toContain(local.municipio);
+  });
+});
+
+describe("DEC-108 — rótulo de coluna horizontal no triângulo superior (substitui o cabeçalho diagonal da DEC-107 item 1)", () => {
+  test("nenhum nó do documento usa `transform` — o cabeçalho diagonal da DEC-107 item 1 não sobrevive", () => {
+    const documento = arvoreDo(modeloDe(documentoBidirecionalMultiServico()));
+
+    for (const no of descendentes(documento)) {
+      const style = no.props.style;
+      const estilos = Array.isArray(style) ? style : [style];
+      for (const estilo of estilos) {
+        if (estilo !== null && typeof estilo === "object") {
+          expect("transform" in (estilo as Record<string, unknown>)).toBe(false);
+        }
+      }
+    }
+  });
+
+  test("'Origem/Destino' não aparece mais no canto das matrizes (a imagem de referência dispensa o rótulo)", () => {
+    const { matrizDistancias, matrizSeccionamento } = paginasDosItens5a8(
+      arvoreDo(modeloDe(documentoExemploMinimo())),
+    );
+
+    expect(textoDe(matrizDistancias)).not.toContain("Origem/Destino");
+    expect(textoDe(matrizSeccionamento)).not.toContain("Origem/Destino");
+  });
+
+  test(
+    "layout real — todo rótulo de coluna das duas matrizes sai em uma única linha, sem quebra (o defeito que reprovou a DEC-107 item 1)",
+    async () => {
+      const layout = await layoutRealDoDocumento(modeloDe(documentoExemploMinimo()));
+      const rotulos = descendentesLayout(layout).filter(
+        (no) => no.type === "TEXT" && no.style?.fontSize === 7 && no.style?.width === 150,
+      );
+
+      // 3 Seções × 2 matrizes (distâncias + seccionamento) = 6 rótulos de coluna.
+      expect(rotulos).toHaveLength(6);
+      for (const rotulo of rotulos) {
+        expect(rotulo.lines).toHaveLength(1);
+      }
+    },
+    30_000,
+  );
+
+  test(
+    "caso inválido — o mesmo rótulo, forçado a caber nos 38 pt de uma coluna, quebra em várias linhas (poder de detecção do layout real)",
+    async () => {
+      // Prova que a medição acima ACUSARIA a quebra se ela existisse — é a
+      // mesma técnica que produziu a evidência do parecer da TASK-034
+      // (`docs-dev/14-REVISOES/TASK-034-20260803-correcao.md`, problema 1):
+      // "Praia Grande - Rodoviária Praia Grande" (38 caracteres) quebra em
+      // várias linhas quando medido contra 38 pt, e sai numa só linha contra
+      // os 150 pt de `rotuloColunaMatriz` (teste acima).
+      const layout = await layoutReal(
+        <Document>
+          <Page size="A4">
+            <View style={{ width: 38 }}>
+              <Text style={{ fontSize: 7 }}>
+                Praia Grande - Rodoviária Praia Grande
+              </Text>
+            </View>
+          </Page>
+        </Document>,
+      );
+      const texto = descendentesLayout(layout).find((no) => no.type === "TEXT");
+
+      expect(texto?.lines?.length).toBeGreaterThan(1);
+    },
+    30_000,
+  );
+
+  test("integridade de página — a matriz de cada Serviço fica sob um envelope `wrap={false}` que contém o(s) bloco(s), também `wrap={false}` (DEC-108 item 5)", () => {
+    const modelo = modeloDe(documentoBidirecionalMultiServico());
+    const { matrizDistancias } = paginasDosItens5a8(arvoreDo(modelo));
+
+    function envolveBlocoIntegro(no: NoPdf): boolean {
+      return (
+        no.tipo === "VIEW" &&
+        no.props.wrap === false &&
+        no.filhos.some(
+          (filho) =>
+            filho.tipo === "VIEW" &&
+            filho.props.wrap === false &&
+            descendentes(filho).some((d) => d.props.style === estilosPdf.tabelaMatriz),
+        )
+      );
+    }
+
+    const envelopes = descendentes(matrizDistancias).filter(envolveBlocoIntegro);
+
+    // Um envelope por Serviço (fixture multi-Serviço) — nunca um único
+    // `wrap={false}` para o documento inteiro nem a ausência dele.
+    expect(envelopes).toHaveLength(modelo.matrizesDistancias.length);
+    expect(envelopes.length).toBeGreaterThan(1);
   });
 });
 

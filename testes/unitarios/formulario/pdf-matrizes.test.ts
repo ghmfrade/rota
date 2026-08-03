@@ -1,6 +1,5 @@
 import { describe, expect, test } from "vitest";
 import {
-  ALTURA_MAX_CABECALHO,
   dividirMatrizEmBlocos,
   MARCA_DIAGONAL,
   MARCA_PAR_NAO_HABILITADO,
@@ -244,8 +243,11 @@ describe("dividirMatrizEmBlocos — layout em blocos (DEC-107)", () => {
     expect(faixa2.continuacao).toBe(true);
   });
 
-  test("matriz de 20 Seções: a faixa 1 parte em pedaços de ≤16 linhas, cabeçalhos iguais e continuação nos seguintes", () => {
-    const blocos = dividirMatrizEmBlocos(matrizSintetica(20));
+  // 30 Seções (sintéticas — nenhuma fixture do projeto chega perto: um
+  // Serviço real do ROTA tem no máximo ~12 Seções) força a quebra por LINHAS
+  // dentro da faixa 1 com o novo teto de 22 (DEC-108, sem cabeçalho diagonal).
+  test("matriz de 30 Seções: a faixa 1 parte em pedaços de ≤22 linhas, cabeçalhos iguais e continuação nos seguintes", () => {
+    const blocos = dividirMatrizEmBlocos(matrizSintetica(30));
 
     const daFaixa1 = blocos.filter((bloco) => bloco.indiceColunaInicial === 0);
     expect(daFaixa1.length).toBeGreaterThan(1);
@@ -258,12 +260,12 @@ describe("dividirMatrizEmBlocos — layout em blocos (DEC-107)", () => {
     for (const bloco of daFaixa1.slice(1)) {
       expect(bloco.continuacao).toBe(true);
     }
-    // 20 linhas na faixa 1, pedaços de 16 → 16 + 4.
-    expect(daFaixa1.map((b) => b.linhas.length)).toEqual([16, 4]);
+    // 30 linhas na faixa 1, pedaços de 22 → 22 + 8.
+    expect(daFaixa1.map((b) => b.linhas.length)).toEqual([22, 8]);
   });
 
   test("toda linha de todo bloco tem o mesmo número de células do cabeçalho do bloco", () => {
-    for (const quantidade of [3, 9, 20]) {
+    for (const quantidade of [3, 9, 30]) {
       const blocos = dividirMatrizEmBlocos(matrizSintetica(quantidade));
       for (const bloco of blocos) {
         for (const linha of bloco.linhas) {
@@ -299,24 +301,83 @@ describe("dividirMatrizEmBlocos — layout em blocos (DEC-107)", () => {
     expect(linha8?.celulas[1]?.tipo).toBe("diagonal");
   });
 
-  test("alturaCabecalho cresce com o rótulo mais longo e respeita o teto", () => {
-    const matrizCurta = matrizSintetica(2);
-    const matrizLonga: MatrizPdf<CelulaSintetica> = {
-      ...matrizCurta,
-      cabecalhos: [
-        { secaoUuid: "a", rotulo: "AB" },
-        {
-          secaoUuid: "b",
-          rotulo: "Município Muito Extenso - Nome de Seção Bastante Comprido Demais",
-        },
-      ],
-    };
+  // DEC-108 item 1 — rótulo de coluna hospedado na célula de preenchimento
+  // `(linha j−1, coluna j)`; item 2 — a primeira coluna da faixa não tem
+  // hospedeiro dentro do bloco (vai para a linha de cabeçalho).
+  describe("rotuloColunaHospedada — posição do rótulo de coluna dentro do triângulo superior (DEC-108)", () => {
+    test("matriz de 3 Seções: cada linha hospeda o rótulo da coluna seguinte à própria diagonal; a última linha não hospeda nada", () => {
+      const [bloco] = dividirMatrizEmBlocos(matrizSintetica(3));
 
-    const [blocoCurto] = dividirMatrizEmBlocos(matrizCurta);
-    const [blocoLongo] = dividirMatrizEmBlocos(matrizLonga);
+      expect(bloco.linhas[0].rotuloColunaHospedada).toEqual({
+        indiceLocal: 1,
+        rotulo: bloco.cabecalhos[1].rotulo,
+      });
+      expect(bloco.linhas[1].rotuloColunaHospedada).toEqual({
+        indiceLocal: 2,
+        rotulo: bloco.cabecalhos[2].rotulo,
+      });
+      // Linha 2 (última): a coluna 3 não existe — nenhum rótulo para hospedar.
+      expect(bloco.linhas[2].rotuloColunaHospedada).toBeUndefined();
+      // A coluna 0 não é hospedada por nenhuma linha (DEC-108 item 2): cabe à
+      // apresentação usar `cabecalhos[0]` na linha de cabeçalho.
+      expect(bloco.linhas.some((l) => l.rotuloColunaHospedada?.indiceLocal === 0)).toBe(false);
+    });
 
-    expect(blocoLongo.alturaCabecalho).toBeGreaterThan(blocoCurto.alturaCabecalho);
-    expect(blocoLongo.alturaCabecalho).toBeLessThanOrEqual(ALTURA_MAX_CABECALHO);
-    expect(blocoCurto.alturaCabecalho).toBeLessThanOrEqual(ALTURA_MAX_CABECALHO);
+    test("matriz de 9 Seções: cada faixa só hospeda os rótulos das SUAS próprias colunas (colunas fora da faixa nunca aparecem numa linha)", () => {
+      const [faixa1, faixa2] = dividirMatrizEmBlocos(matrizSintetica(9));
+
+      // Faixa 1 (colunas 0-6): linhas 0-5 hospedam as colunas 1-6; linhas 6-8
+      // (cuja diagonal cai fora da faixa ou cuja coluna seguinte também) não
+      // hospedam nada nesta faixa.
+      for (let i = 0; i < 6; i++) {
+        expect(faixa1.linhas[i].rotuloColunaHospedada).toEqual({
+          indiceLocal: i + 1,
+          rotulo: faixa1.cabecalhos[i + 1].rotulo,
+        });
+      }
+      for (let i = 6; i < faixa1.linhas.length; i++) {
+        expect(faixa1.linhas[i].rotuloColunaHospedada).toBeUndefined();
+      }
+
+      // Faixa 2 (colunas 7-8): a coluna 7 (primeira da faixa) não é hospedada
+      // por nenhuma linha; a coluna 8 é hospedada pela linha da Seção 7.
+      const linha7 = faixa2.linhas.find((l) => l.secaoUuid === "secao-7");
+      const linha8 = faixa2.linhas.find((l) => l.secaoUuid === "secao-8");
+      expect(linha7?.rotuloColunaHospedada).toEqual({
+        indiceLocal: 1,
+        rotulo: faixa2.cabecalhos[1].rotulo,
+      });
+      expect(linha8?.rotuloColunaHospedada).toBeUndefined();
+    });
+
+    test("caso inválido — nenhum bloco hospeda rótulo de coluna fora do próprio intervalo (indiceLocal sempre < cabecalhos.length)", () => {
+      for (const quantidade of [3, 9, 30]) {
+        const blocos = dividirMatrizEmBlocos(matrizSintetica(quantidade));
+        for (const bloco of blocos) {
+          for (const linha of bloco.linhas) {
+            if (linha.rotuloColunaHospedada !== undefined) {
+              expect(linha.rotuloColunaHospedada.indiceLocal).toBeLessThan(
+                bloco.cabecalhos.length,
+              );
+              expect(linha.rotuloColunaHospedada.indiceLocal).toBeGreaterThan(0);
+            }
+          }
+        }
+      }
+    });
+
+    // Matriz sintética grande o bastante para partir a MESMA faixa de colunas
+    // em pedaços de linhas (inalcançável com Serviços reais, no máximo ~12
+    // Seções) — prova que o segundo pedaço não duplica nem inventa rótulo: os
+    // hospedeiros da faixa já se esgotam no primeiro pedaço, e o segundo só
+    // repete o cabeçalho (item da apresentação, não deste módulo).
+    test("faixa partida em pedaços de linhas: o segundo pedaço não hospeda nenhum rótulo (já hospedados no primeiro)", () => {
+      const [primeiroPedaco, segundoPedaco] = dividirMatrizEmBlocos(matrizSintetica(30)).filter(
+        (bloco) => bloco.indiceColunaInicial === 0,
+      );
+
+      expect(primeiroPedaco.linhas.some((l) => l.rotuloColunaHospedada !== undefined)).toBe(true);
+      expect(segundoPedaco.linhas.every((l) => l.rotuloColunaHospedada === undefined)).toBe(true);
+    });
   });
 });

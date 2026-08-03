@@ -450,15 +450,25 @@ function TabelaHorariaPdfView({ tabela }: { tabela: TabelaHorariaPdf }) {
  * Uma célula de dados da matriz (§9.1/§9.2): diagonal "X", preenchimento
  * vazio (fora do triângulo — nunca "—", DEC-107 §3.3) ou valor. O detalhe
  * Ida/Volta do Serviço bidirecional (RN-056) empilha em linhas próprias,
- * abreviado `I:`/`V:`, nunca junto do valor adotado (D3/D4 da DEC-107).
+ * abreviado `I:`/`V:`, nunca junto do valor adotado (D3/D4 da DEC-107). Uma
+ * célula de preenchimento pode hospedar o rótulo horizontal da coluna
+ * seguinte à diagonal da própria linha (DEC-108 item 1).
  */
 function CelulaMatrizView({
   celula,
+  rotuloColuna,
 }: {
   celula: CelulaDistanciaPdf | CelulaSeccionamentoPdf | undefined;
+  rotuloColuna?: string;
 }) {
   if (celula === undefined) {
-    return <View style={estilosPdf.celulaMatrizVazia} />;
+    return (
+      <View style={estilosPdf.celulaMatrizVazia}>
+        {rotuloColuna !== undefined ? (
+          <Text style={estilosPdf.rotuloColunaMatriz}>{rotuloColuna}</Text>
+        ) : null}
+      </View>
+    );
   }
   if (celula.tipo === "diagonal") {
     return (
@@ -481,14 +491,21 @@ function CelulaMatrizView({
 }
 
 /**
- * Matriz triangular inferior (§9.1/§9.2; DEC-107 — correção da TASK-034):
- * "X" na diagonal, cabeçalhos `Cidade - Nome da Seção` na coluna de linha,
- * valores em km (a unidade vai para o título do bloco, não para a célula —
- * RN-013/076). Dividida em blocos de faixa de colunas × pedaço de linhas
+ * Matriz triangular inferior (§9.1/§9.2; DEC-108 — correção da TASK-034):
+ * "X" na diagonal, cabeçalhos `Cidade - Nome da Seção` na coluna de linha e
+ * escritos horizontalmente dentro do próprio triângulo superior, valores em
+ * km (a unidade vai para o título do bloco, não para a célula — RN-013/076).
+ * Dividida em blocos de faixa de colunas × pedaço de linhas
  * (`dividirMatrizEmBlocos`) para caber na largura/altura úteis da A4 com
  * largura de coluna FIXA — nunca `flex`, causa do desalinhamento reprovado no
  * parecer da TASK-034. A diferença de semântica da célula vazia/"—" mora no
- * modelo (`matrizes-pdf.ts`), não aqui.
+ * modelo (`matrizes-pdf.ts`), não aqui. A linha de cabeçalho acima da tabela
+ * só mostra o rótulo da **primeira** coluna da faixa (DEC-108 item 2); os
+ * demais nascem dentro do triângulo, na linha que cada um hospeda
+ * (`rotuloColunaHospedada`). O envelope `wrap={false}` sobe do bloco para o
+ * Serviço inteiro (DEC-108 item 5): a matriz de um mesmo Serviço migra
+ * inteira para a página seguinte quando não couber, e só é partida em blocos
+ * quando nem uma página inteira comporta.
  */
 function MatrizPdfView({
   matriz,
@@ -496,7 +513,7 @@ function MatrizPdfView({
   matriz: MatrizDistanciasPdf | MatrizSeccionamentoPdf;
 }) {
   return (
-    <View>
+    <View wrap={false}>
       {dividirMatrizEmBlocos<CelulaDistanciaPdf | CelulaSeccionamentoPdf>(matriz).map(
         (bloco, indiceBloco) => (
           <View key={indiceBloco} wrap={false}>
@@ -505,15 +522,13 @@ function MatrizPdfView({
               {bloco.continuacao ? " (continuação)" : ""}
             </Text>
             <View style={estilosPdf.tabelaMatriz}>
-              <View
-                style={[estilosPdf.linhaCabecalhoDiagonal, { height: bloco.alturaCabecalho }]}
-              >
-                <View style={estilosPdf.cabecalhoLinhaMatriz}>
-                  <Text>Origem/Destino</Text>
-                </View>
-                {bloco.cabecalhos.map((cabecalho) => (
-                  <View key={cabecalho.secaoUuid} style={estilosPdf.cabecalhoColunaDiagonal}>
-                    <Text style={estilosPdf.rotuloColunaDiagonal}>{cabecalho.rotulo}</Text>
+              <View style={estilosPdf.linhaCabecalhoMatriz}>
+                <View style={estilosPdf.cabecalhoLinhaMatriz} />
+                {bloco.cabecalhos.map((cabecalho, indiceNaFaixa) => (
+                  <View key={cabecalho.secaoUuid} style={estilosPdf.celulaMatrizVazia}>
+                    {indiceNaFaixa === 0 ? (
+                      <Text style={estilosPdf.rotuloColunaMatriz}>{cabecalho.rotulo}</Text>
+                    ) : null}
                   </View>
                 ))}
               </View>
@@ -521,7 +536,15 @@ function MatrizPdfView({
                 <View style={estiloLinhaDados(indice)} key={linha.secaoUuid}>
                   <Text style={estilosPdf.cabecalhoLinhaMatriz}>{linha.rotulo}</Text>
                   {linha.celulas.map((celula, indiceCelula) => (
-                    <CelulaMatrizView key={indiceCelula} celula={celula} />
+                    <CelulaMatrizView
+                      key={indiceCelula}
+                      celula={celula}
+                      rotuloColuna={
+                        linha.rotuloColunaHospedada?.indiceLocal === indiceCelula
+                          ? linha.rotuloColunaHospedada.rotulo
+                          : undefined
+                      }
+                    />
                   ))}
                 </View>
               ))}

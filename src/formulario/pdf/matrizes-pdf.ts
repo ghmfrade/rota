@@ -205,29 +205,38 @@ export function montarMatrizesSeccionamento(
   );
 }
 
-// --- Layout em blocos (correção da TASK-034; DEC-107) ----------------------
+// --- Layout em blocos (correção da TASK-034; DEC-108) -----------------------
 //
 // O modelo triangular acima é a verdade semântica e não muda. A derivação
 // abaixo é PURA apresentação: parte a matriz em faixas de colunas e pedaços de
 // linhas que cabem numa página A4 com largura de coluna FIXA (não `flex`,
-// causa do desalinhamento reprovado no parecer da TASK-034) e cabeçalho
-// diagonal a 45° (DEC-107). Ver `docs-dev/PLANO-TASK-034-CORRECAO.md` §3.1.
+// causa do desalinhamento reprovado no parecer da TASK-034) e posiciona o
+// rótulo de cada coluna na própria célula de preenchimento (DEC-108, que
+// revogou o cabeçalho diagonal da DEC-107 item 1). Ver
+// `docs-dev/PLANO-TASK-034-CORRECAO.md` §3.1.
 
 /** Largura útil ≈ 515 pt (A4 − paddings de `estilosPdf.pagina`); 130 (rótulo
- * de linha) + 7×38 = 396 pt, sobrando ~119 pt para o texto diagonal da última
- * coluna transbordar sem sair da página. */
+ * de linha) + 7×38 = 396 pt, sobrando ~119 pt para o rótulo horizontal da
+ * última coluna transbordar sem sair da página (DEC-108 item 1). */
 export const MAX_COLUNAS_POR_BLOCO = 7;
 
-/** Altura útil ≈ 745 pt; linha bidirecional ≈ 32 pt, 16×32 = 512 pt, que somado
- * ao título e ao teto do cabeçalho diagonal ainda cabe numa A4. */
-export const MAX_LINHAS_POR_BLOCO = 16;
+/** Altura útil ≈ 745 pt; sem o cabeçalho diagonal (DEC-108 revoga a reserva de
+ * altura da DEC-107), sobra título (~20 pt) + linha de cabeçalho (~14 pt) +
+ * 22 linhas de dados a ≈ 32 pt (pior caso: célula bidirecional empilhada). Um
+ * Serviço real do ROTA tem no máximo ~12 Seções — este teto é rede de
+ * segurança para matriz sintética grande, não dimensionado por caso real. */
+export const MAX_LINHAS_POR_BLOCO = 22;
 
-/** Teto do cabeçalho diagonal (§3.4 do plano de correção). */
-export const ALTURA_MAX_CABECALHO = 130;
-
-/** `fontSize` de `estilosPdf.rotuloColunaDiagonal` — mantido em sincronia
- * manualmente (o PDF não lê o objeto de estilo neste módulo puro). */
-const FONT_SIZE_ROTULO_DIAGONAL = 8;
+/**
+ * Rótulo de coluna hospedado na célula de preenchimento de uma linha
+ * (DEC-108 item 1): a coluna `j` é escrita na célula `(linha j−1, coluna j)`,
+ * ou seja, na primeira célula de preenchimento à direita da própria diagonal
+ * da linha. `indiceLocal` é a posição dentro de `celulas` deste bloco.
+ */
+export interface RotuloColunaHospedado {
+  indiceLocal: number;
+  rotulo: string;
+}
 
 export interface LinhaBlocoMatrizPdf<Celula> {
   secaoUuid: string;
@@ -237,6 +246,10 @@ export interface LinhaBlocoMatrizPdf<Celula> {
    *  seccionamento — a semântica de "—" continua exclusiva do triângulo
    *  inferior real). */
   celulas: (Celula | undefined)[];
+  /** Presente quando esta linha hospeda o rótulo da coluna seguinte à sua
+   *  diagonal (DEC-108 item 1); ausente na última linha de cada faixa, cuja
+   *  diagonal não tem célula de preenchimento à direita neste bloco. */
+  rotuloColunaHospedada?: RotuloColunaHospedado;
 }
 
 export interface BlocoMatrizPdf<Celula> {
@@ -247,25 +260,6 @@ export interface BlocoMatrizPdf<Celula> {
   linhas: LinhaBlocoMatrizPdf<Celula>[];
   /** Título ganha " (continuação)" a partir do segundo bloco. */
   continuacao: boolean;
-  /** Altura reservada para o cabeçalho diagonal (§3.4 do plano). */
-  alturaCabecalho: number;
-}
-
-/** Estimativa de largura de texto em Helvetica (avanço médio ≈ 0,5×fontSize
- * por caractere) — inferência controlada, documentada no plano de correção;
- * não há medição real de fonte disponível neste módulo puro. */
-function estimarLarguraTexto(texto: string, fontSize: number): number {
-  return texto.length * fontSize * 0.5;
-}
-
-/** `altura = min(teto, larguraEstimada × 0,71 + 6)` — 0,71 ≈ sen(45°),
- * projeção vertical do rótulo girado a 45°; 6 pt de folga. */
-function calcularAlturaCabecalho(rotulos: readonly string[]): number {
-  const maiorLargura = rotulos.reduce(
-    (maior, rotulo) => Math.max(maior, estimarLarguraTexto(rotulo, FONT_SIZE_ROTULO_DIAGONAL)),
-    0,
-  );
-  return Math.min(ALTURA_MAX_CABECALHO, maiorLargura * 0.71 + 6);
 }
 
 /**
@@ -274,6 +268,12 @@ function calcularAlturaCabecalho(rotulos: readonly string[]): number {
  * de índice `< c0` não têm nenhuma célula habitada (estariam inteiramente no
  * triângulo superior) e são omitidas. Matriz pequena (≤ `MAX_COLUNAS_POR_BLOCO`
  * Seções, ≤ `MAX_LINHAS_POR_BLOCO` linhas) devolve exatamente 1 bloco.
+ *
+ * O rótulo da **primeira** coluna de cada faixa não tem linha anterior dentro
+ * da própria faixa para hospedá-lo (DEC-108 item 2) — cabe à linha de
+ * cabeçalho acima da matriz, mostrada pela apresentação a partir de
+ * `cabecalhos[0]`. Os demais rótulos são hospedados pela linha imediatamente
+ * anterior à sua própria diagonal, dentro deste mesmo bloco.
  */
 export function dividirMatrizEmBlocos<Celula>(
   matriz: MatrizPdf<Celula>,
@@ -292,9 +292,6 @@ export function dividirMatrizEmBlocos<Celula>(
     // Linhas de índice < colunaInicial ficariam inteiramente no triângulo
     // superior desta faixa (nenhuma célula habitada) — omitidas (D2).
     const linhasFaixa = matriz.linhas.slice(colunaInicial);
-    const alturaCabecalho = calcularAlturaCabecalho(
-      cabecalhosFaixa.map((cabecalho) => cabecalho.rotulo),
-    );
 
     for (
       let inicioPedaco = 0;
@@ -306,14 +303,29 @@ export function dividirMatrizEmBlocos<Celula>(
         cabecalhos: cabecalhosFaixa,
         indiceColunaInicial: colunaInicial,
         continuacao: blocos.length > 0,
-        alturaCabecalho,
-        linhas: pedacoLinhas.map((linha) => ({
-          secaoUuid: linha.secaoUuid,
-          rotulo: linha.rotulo,
-          celulas: cabecalhosFaixa.map(
-            (_, indiceNaFaixa) => linha.celulas[colunaInicial + indiceNaFaixa],
-          ),
-        })),
+        linhas: pedacoLinhas.map((linha, indicePedaco) => {
+          // Posição local da própria diagonal desta linha dentro da faixa
+          // ("a diagonal cai na posição local i - c0"); a coluna que ela
+          // hospeda é a seguinte (DEC-108 item 1).
+          const diagonalLocal = inicioPedaco + indicePedaco;
+          const indiceHospedado = diagonalLocal + 1;
+          const cabecalhoHospedado = cabecalhosFaixa[indiceHospedado];
+          return {
+            secaoUuid: linha.secaoUuid,
+            rotulo: linha.rotulo,
+            celulas: cabecalhosFaixa.map(
+              (_, indiceNaFaixa) => linha.celulas[colunaInicial + indiceNaFaixa],
+            ),
+            ...(cabecalhoHospedado === undefined
+              ? {}
+              : {
+                  rotuloColunaHospedada: {
+                    indiceLocal: indiceHospedado,
+                    rotulo: cabecalhoHospedado.rotulo,
+                  },
+                }),
+          };
+        }),
       });
     }
   }

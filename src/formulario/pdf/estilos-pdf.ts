@@ -311,27 +311,20 @@ export const estilosPdf = StyleSheet.create({
     color: CINZA_500,
     textAlign: "center",
   },
-  celulaDiagonal: {
-    flex: 1.4,
-    paddingHorizontal: 3,
-    textAlign: "center",
-    color: CINZA_500,
-  },
   // Matriz triangular do PDF (correção da TASK-034; DEC-107) — largura FIXA
   // por coluna, nunca `flex`: o `flex` reparte a largura DENTRO de cada linha,
   // então linhas com números de células diferentes (o triângulo) nunca
   // alinhavam sob o mesmo cabeçalho (causa do desalinhamento reprovado no
   // parecer). Estilos exclusivos desta matriz — não confundir com
-  // `celulaMatriz`/`celulaCabecalhoMatriz`/`celulaDiagonal` acima, que
-  // continuam servindo só a tabela de Locais do anexo técnico.
+  // `celulaMatriz`/`celulaCabecalhoMatriz` acima, que continuam servindo só a
+  // tabela de Locais do anexo técnico.
   tabelaMatriz: {
     borderTopWidth: 1,
     borderTopColor: CINZA_200,
     marginBottom: 8,
     alignSelf: "flex-start",
   },
-  // Coluna do rótulo de linha (`Cidade - Nome da Seção`), que continua
-  // horizontal — só os cabeçalhos de COLUNA giram (D6).
+  // Coluna do rótulo de linha (`Cidade - Nome da Seção`), sempre horizontal.
   cabecalhoLinhaMatriz: {
     width: 130,
     paddingHorizontal: 3,
@@ -347,42 +340,41 @@ export const estilosPdf = StyleSheet.create({
     textAlign: "center",
     color: CINZA_500,
   },
+  // Célula de preenchimento do triângulo superior (DEC-108) — `position:
+  // relative` ancora o rótulo de coluna `absolute` que ela pode hospedar
+  // (`rotuloColunaMatriz`); sem rótulo, permanece vazia como antes.
   celulaMatrizVazia: {
     width: 38,
     paddingHorizontal: 3,
+    position: "relative",
   },
-  // Linha de cabeçalho com altura reservada (vinda do bloco — `alturaCabecalho`
-  // é o único valor de estilo dinâmico do documento, ver o comentário no
-  // componente) para os rótulos diagonais não serem cortados.
-  linhaCabecalhoDiagonal: {
+  // Linha de cabeçalho acima da matriz (DEC-108 item 2): sem altura dinâmica
+  // — nenhum texto girado, então a linha tem a altura natural de uma linha.
+  // Só a primeira coluna da faixa recebe rótulo aqui; as demais nascem dentro
+  // do triângulo superior (`rotuloColunaHospedada`).
+  linhaCabecalhoMatriz: {
     flexDirection: "row",
     backgroundColor: CINZA_100,
     borderBottomWidth: 1,
     borderBottomColor: CINZA_200,
+    paddingVertical: 4,
     fontFamily: "Helvetica-Bold",
     color: CINZA_900,
   },
-  // Contêiner de cada coluna do cabeçalho — `position: relative` ancora o
-  // rótulo `absolute` dentro dos 38 pt da própria coluna, não da linha
-  // inteira; a altura vem do `stretch` padrão do Yoga (herda a altura fixada
-  // em `linhaCabecalhoDiagonal`).
-  cabecalhoColunaDiagonal: {
-    width: 38,
-    position: "relative",
-  },
-  // Rótulo do cabeçalho de coluna girado a 45° (D6). `transform` não afeta o
-  // layout (só a pintura) — por isso a altura da linha é reservada à parte, e
-  // o rótulo é ancorado no canto inferior esquerdo da própria coluna
-  // (`transformOriginX/Y`) para subir para a direita sem empurrar nada.
-  rotuloColunaDiagonal: {
+  // Rótulo horizontal da coluna (DEC-108 item 1 — substitui o cabeçalho
+  // diagonal da DEC-107 item 1): **sem** `transform`. `width` fixo (maior que
+  // os 38 pt da própria coluna) é o que garante `lines.length === 1` — um
+  // filho absoluto sem largura própria seria medido contra a coluna estreita
+  // e quebraria antes de qualquer rotação (causa da reprovação da TASK-034).
+  // Ancorado no topo-esquerda da célula para transbordar livremente à
+  // direita, sobre as células de preenchimento vizinhas.
+  rotuloColunaMatriz: {
     position: "absolute",
-    bottom: 0,
+    top: 0,
     left: 0,
-    fontSize: 8,
+    width: 150,
+    fontSize: 7,
     color: CINZA_900,
-    transformOriginX: "0%",
-    transformOriginY: "100%",
-    transform: "rotate(-45deg)",
   },
   rodape: {
     position: "absolute",
