@@ -80,6 +80,22 @@ export const estilosPdf = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 3,
   },
+  // A coluna "Faixa" carrega rótulo + intervalo ("Entre-pico almoço
+  // (11:00–13:59)") e não cabe na largura das colunas numéricas.
+  celulaFaixa: {
+    flex: 2.4,
+    paddingHorizontal: 3,
+  },
+  subtituloBloco: {
+    fontSize: 10,
+    fontFamily: "Helvetica-Bold",
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  notaTabela: {
+    color: CINZA_500,
+    marginBottom: 4,
+  },
   celulaNumerica: {
     flex: 1,
     paddingHorizontal: 3,

@@ -10,6 +10,7 @@ import {
   contarServico,
   FAIXAS_HORARIO,
   ROTULO_SEMANA_PADRAO,
+  rotuloFaixaComIntervalo,
 } from "@/shared/contagens";
 // Import profundo deliberado (precedente: `pendencias/pendencias.ts`): o índice
 // de `secoes` reexporta o editor React, e este módulo é puro — o modelo do PDF
@@ -74,6 +75,7 @@ export interface BlocoCapa {
   data: string;
 }
 
+/** Os 7 contadores por Serviço do §10 — nenhum a menos. */
 export interface LinhaResumoServico {
   servicoUuid: string;
   numeroN: string;
@@ -81,13 +83,36 @@ export interface LinhaResumoServico {
   viagensVolta: number;
   viagensTotal: number;
   paresCompraveis: number;
+  opcoesIda: number;
+  opcoesVolta: number;
   opcoesDeslocamento: number;
 }
 
+/** Uma faixa do §10 na estratificação do total do Autos (2 contadores). */
 export interface LinhaResumoFaixa {
   rotulo: string;
   viagensSemana: number;
   opcoesDeslocamento: number;
+}
+
+/** Uma faixa do §10 na estratificação de um Serviço (contadores do Serviço). */
+export interface LinhaResumoFaixaServico extends LinhaResumoFaixa {
+  viagensIda: number;
+  viagensVolta: number;
+  opcoesIda: number;
+  opcoesVolta: number;
+}
+
+/**
+ * Estratificação por faixa de um Serviço (§10: "por Serviço e no total do
+ * Autos"). `paresCompraveis` fica fora das linhas porque não depende de Viagem:
+ * é o mesmo valor em todas as faixas — repeti-lo em sete linhas seria ruído.
+ */
+export interface EstratificacaoServico {
+  servicoUuid: string;
+  numeroN: string;
+  paresCompraveis: number;
+  faixas: LinhaResumoFaixaServico[];
 }
 
 /** §13.1 item 2 — contadores do §10, sempre rotulados (RN-069/NEG-018). */
@@ -96,8 +121,14 @@ export interface BlocoResumo {
   porServico: LinhaResumoServico[];
   totalViagensSemana: number;
   totalOpcoesDeslocamento: number;
+  /** Estratificação do **total do Autos** — vem primeiro, e é rotulada como tal. */
   porFaixa: LinhaResumoFaixa[];
+  /** Estratificação **por Serviço**, depois do total (§10). */
+  porFaixaPorServico: EstratificacaoServico[];
 }
+
+/** Deixa explícito que a primeira tabela de faixas é a do Autos inteiro (§10). */
+export const ROTULO_FAIXA_TOTAL_AUTOS = "Total do Autos — por faixa de horário";
 
 /** §13.1 item 3 — um bloco por Serviço, com resumo próprio. */
 export interface BlocoServico {
@@ -135,6 +166,44 @@ export interface BlocoItinerario {
   descricaoItens: ItemDescricaoPdf[];
   /** (d) data-URI da captura do mapa; ausente quando a captura não veio (DEC-104). */
   imagemMapa?: string;
+}
+
+/** Separador entre os itens do parágrafo da descrição (§13.4). */
+export const SEPARADOR_DESCRICAO = ", ";
+
+/**
+ * Ponto final do parágrafo da descrição. O texto congelado
+ * (`compor-descricao.ts`) termina em ponto e o painel da UI o mantém; o PDF,
+ * que remonta o parágrafo a partir de `itens` para realçar as Seções (§13.4),
+ * precisa recolocá-lo para não entregar frase sem fechamento.
+ */
+export const PONTO_FINAL_DESCRICAO = ".";
+
+/**
+ * Como o parágrafo do item 4c deve ser composto. Duas origens: o normal é
+ * `itens` (o §13.4 manda usá-los para o realce); sem itens — descrição
+ * congelada de documento antigo, ou composta só como texto — cai no
+ * `descricao_itinerario.texto`, para o bloco não ficar mudo.
+ */
+export type ParagrafoDescricao =
+  | {
+      origem: "itens";
+      itens: ItemDescricaoPdf[];
+      separador: string;
+      pontoFinal: string;
+    }
+  | { origem: "texto-congelado"; texto: string };
+
+export function paragrafoDaDescricao(bloco: BlocoItinerario): ParagrafoDescricao {
+  if (bloco.descricaoItens.length === 0) {
+    return { origem: "texto-congelado", texto: bloco.descricaoTexto };
+  }
+  return {
+    origem: "itens",
+    itens: bloco.descricaoItens,
+    separador: SEPARADOR_DESCRICAO,
+    pontoFinal: PONTO_FINAL_DESCRICAO,
+  };
 }
 
 /** §13.1 item 9 — rodapé técnico. */
@@ -210,7 +279,12 @@ export function sequenciaDeSecoes(
   secoes: readonly Secao[],
 ): string {
   const porUuid = indicePorUuid(secoes);
-  return itinerario.paradas
+  // A Spec 02 §10 exige `paradas` ordenado por `ordem`, mas o PDF ordena
+  // defensivamente antes de ler, como já fazem `motor-montagem.ts`,
+  // `montagem-grade.ts` e `redistribuicao-offsets.ts`: a travessia é o que a
+  // peça operacional afirma, e ela não pode depender da ordem do array.
+  return [...itinerario.paradas]
+    .sort((a, b) => a.ordem - b.ordem)
     .filter((parada) => parada.secao_uuid !== undefined)
     .map((parada) => porUuid.get(parada.secao_uuid as string))
     .filter((secao): secao is Secao => secao !== undefined)
@@ -245,6 +319,7 @@ function montarResumo(documento: DocumentoOperacao): BlocoResumo {
   const porFaixa = contarAutosPorFaixa(documento.autos);
   return {
     rotuloSemanaPadrao: ROTULO_SEMANA_PADRAO,
+    // Os 7 contadores por Serviço do §10, na mesma ordem da spec.
     porServico: contagens.porServico.map((c) => ({
       servicoUuid: c.servicoUuid,
       numeroN: c.numeroN,
@@ -252,14 +327,37 @@ function montarResumo(documento: DocumentoOperacao): BlocoResumo {
       viagensVolta: c.volta.viagensSemana,
       viagensTotal: c.totalViagensSemana,
       paresCompraveis: c.paresCompraveis,
+      opcoesIda: c.ida.opcoesDeslocamento,
+      opcoesVolta: c.volta.opcoesDeslocamento,
       opcoesDeslocamento: c.totalOpcoesDeslocamento,
     })),
     totalViagensSemana: contagens.totalViagensSemana,
     totalOpcoesDeslocamento: contagens.totalOpcoesDeslocamento,
+    // §10 — os 2 contadores do Autos, estratificados. O rótulo de cada faixa
+    // carrega o intervalo da spec ("Pico manhã (05:00–08:59)").
     porFaixa: FAIXAS_HORARIO.map((faixa) => ({
-      rotulo: faixa.rotulo,
+      rotulo: rotuloFaixaComIntervalo(faixa),
       viagensSemana: porFaixa.totais[faixa.id].viagensSemana,
       opcoesDeslocamento: porFaixa.totais[faixa.id].opcoesDeslocamento,
+    })),
+    // §10 — "por Serviço e no total do Autos": a mesma estratificação, agora
+    // com os contadores do Serviço. Vem DEPOIS do total, que abre o bloco.
+    porFaixaPorServico: contagens.porServico.map((c) => ({
+      servicoUuid: c.servicoUuid,
+      numeroN: c.numeroN,
+      paresCompraveis: c.paresCompraveis,
+      faixas: FAIXAS_HORARIO.map((faixa) => {
+        const naFaixa = porFaixa.porServico[c.servicoUuid][faixa.id];
+        return {
+          rotulo: rotuloFaixaComIntervalo(faixa),
+          viagensIda: naFaixa.ida.viagensSemana,
+          viagensVolta: naFaixa.volta.viagensSemana,
+          viagensSemana: naFaixa.totalViagensSemana,
+          opcoesIda: naFaixa.ida.opcoesDeslocamento,
+          opcoesVolta: naFaixa.volta.opcoesDeslocamento,
+          opcoesDeslocamento: naFaixa.totalOpcoesDeslocamento,
+        };
+      }),
     })),
   };
 }

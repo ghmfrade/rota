@@ -65,6 +65,26 @@ describe("RN-076 — offsets não aparecem em lugar nenhum do PDF", () => {
     const textos = textosDoModelo(modeloDe(documentoExemploMinimo()));
     expect(textos.some((t) => t.includes("08:00:00"))).toBe(false);
   });
+
+  test("os horários dos rótulos de faixa são os limites da spec, não partidas", () => {
+    // Única ocorrência legítima de hora no resumo: o intervalo de cada faixa,
+    // que a tabela do §10 traz na coluna "Intervalo". São limites fixos da
+    // spec — nunca o `horario_saida` de uma Viagem.
+    const resumo = modeloDe(documentoExemploMinimo()).resumo;
+    const horariosNosRotulos = resumo.porFaixa.flatMap(
+      (faixa) => faixa.rotulo.match(/\d{2}:\d{2}/g) ?? [],
+    );
+
+    expect(horariosNosRotulos).toEqual([
+      "00:00", "04:59",
+      "05:00", "08:59",
+      "09:00", "10:59",
+      "11:00", "13:59",
+      "14:00", "16:59",
+      "17:00", "19:59",
+      "20:00", "23:59",
+    ]);
+  });
 });
 
 describe("RN-031/RN-076 — Locais não aparecem no corpo, só no anexo técnico", () => {

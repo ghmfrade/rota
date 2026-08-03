@@ -4,8 +4,10 @@ import {
   contarAutos,
   contarAutosPorFaixa,
   contarServico,
+  FAIXAS_HORARIO,
   paresCompraveis,
   ROTULO_SEMANA_PADRAO,
+  rotuloFaixaComIntervalo,
   viagensSemana,
 } from "@/shared/contagens";
 import type { Itinerario, Servico, Viagem } from "@/shared/contrato";
@@ -95,6 +97,27 @@ describe("classificarFaixa (Spec 04 §10) — 7 faixas cobrindo 00:00–23:59", 
     ["23:59:00", "noite"],
   ] as const)("%s → %s", (horario, faixaEsperada) => {
     expect(classificarFaixa(horario)).toBe(faixaEsperada);
+  });
+});
+
+describe("rotuloFaixaComIntervalo (Spec 04 §10) — rótulo + coluna Intervalo", () => {
+  test("compõe o rótulo com o intervalo da própria constante", () => {
+    expect(rotuloFaixaComIntervalo(FAIXAS_HORARIO[0])).toBe("Madrugada (00:00–04:59)");
+    expect(rotuloFaixaComIntervalo(FAIXAS_HORARIO[2])).toBe(
+      "Entre-pico manhã (09:00–10:59)",
+    );
+  });
+
+  test("as 7 faixas compõem sem lacuna: o fim de uma antecede o início da próxima", () => {
+    for (const faixa of FAIXAS_HORARIO) {
+      const rotulo = rotuloFaixaComIntervalo(faixa);
+      expect(rotulo.startsWith(faixa.rotulo)).toBe(true);
+      expect(rotulo).toContain(`${faixa.inicio}–${faixa.fim}`);
+      // Todo horário do intervalo classifica na própria faixa (coerência entre
+      // o rótulo exibido e `classificarFaixa`, que é quem conta de verdade).
+      expect(classificarFaixa(`${faixa.inicio}:00`)).toBe(faixa.id);
+      expect(classificarFaixa(`${faixa.fim}:00`)).toBe(faixa.id);
+    }
   });
 });
 

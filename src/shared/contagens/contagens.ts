@@ -25,6 +25,16 @@ export const FAIXAS_HORARIO = [
 
 export type IdFaixaHorario = (typeof FAIXAS_HORARIO)[number]["id"];
 
+export type FaixaHorario = (typeof FAIXAS_HORARIO)[number];
+
+// Spec 04 §10 — a tabela de faixas da spec tem duas colunas, "Faixa" e
+// "Intervalo". Exibir só o rótulo deixa o leitor do PDF sem saber o que é
+// "Entre-pico manhã". Fonte única do texto composto: o intervalo é derivado de
+// `inicio`/`fim` da própria constante, nunca redigitado por quem exibe.
+export function rotuloFaixaComIntervalo(faixa: FaixaHorario): string {
+  return `${faixa.rotulo} (${faixa.inicio}–${faixa.fim})`;
+}
+
 // RN-069/NEG-018 — rótulo obrigatório em qualquer exibição de contagem
 // (tela e PDF — Spec 04 §11 item 9/§13.3). Fonte única: consumido por
 // servicos e resumo, nunca redeclarado.
