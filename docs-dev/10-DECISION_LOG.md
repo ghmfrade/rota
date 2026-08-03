@@ -1619,3 +1619,54 @@ paradas) cobertos por unitário puro; o desenho é verificado contra um contexto
 (dona — mapa e legenda numerados) e **TASK-034**, que passa a referenciar os
 identificadores `1.1`, `1.2`… na relação de Locais do anexo técnico; TASK-126
 (identidade visual do PDF) é independente desta decisão.
+
+## DEC-106 — Local sem geolocalização do sentido é listado normalmente no anexo técnico do PDF
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, **opção 1
+da Q-084** (dada explicitamente na aprovação do plano da TASK-034 e reafirmada
+por `/registrar-decisao` nesta conversa); Spec 04 §13.1 item 8b, §13.2; RN-031,
+RN-036, RN-076; DEC-105 · **Data:** 2026-08-03
+
+**Decisão:** a relação de **Locais comuns** do anexo técnico (§13.1 item 8b)
+lista **todo** Local referenciado pelas paradas do itinerário, com seu
+identificador hierárquico `n.m` (DEC-105), nome e município — **inclusive** o
+Local que não tenha `geolocalizacao_<sentido>` daquele sentido e que, por isso,
+não recebe símbolo desenhado no mapa do corpo. **Não há bijeção exigida entre a
+relação do anexo e os símbolos do mapa:** o anexo é a relação de Locais do
+Serviço/sentido, e o identificador é a **posição no itinerário**, não uma
+promessa de que exista um símbolo correspondente. Descartadas a opção 2
+(marcação "sem ponto neste sentido") e a opção 3 (omitir o Local do anexo).
+
+**Motivo:** o §13.1 item 8b pede literalmente "nome, município, **posição no
+itinerário**" — nunca "símbolo". Omitir o Local (opção 3) perderia dado que
+existe no documento; marcá-lo (opção 2) descreveria na peça operacional um
+estado que a validação estrutural já proíbe. A tensão com a DEC-105 item 4
+("ligando cada Local do anexo ao símbolo correspondente no mapa") é aparente e
+fica resolvida por esta leitura: aquela frase descreve o **uso** do
+identificador no caso normal, não uma invariante de existência do símbolo. O
+caso é, além disso, **inalcançável em documento válido** — a RN-036 recusa a
+referência sem geolocalização do sentido na importação
+(`validacoes-estruturais.ts`) e a pendência bloqueante "sem rota" fecha o gate
+da RN-078 —, de modo que a decisão fixa o comportamento defensivo sem afetar
+nenhuma saída real.
+
+**Consequências:** resolve a **Q-084**. **Nenhuma alteração de spec** — a
+decisão apenas escolhe entre leituras do §13.1 item 8b já existente. **Nenhuma
+mudança de contrato JSON**: a relação do anexo é artefato de renderização,
+derivado de `paradas[].ordem` e dos Locais do Serviço. **Nenhum recálculo** e
+nenhum impacto no Comparador, nas contagens ou nas RN de horários. A **DEC-105
+permanece válida** e não é superada: sua parte 4 continua governando a legenda
+do corpo (só Seções) e a numeração hierárquica; esta DEC apenas explicita que o
+identificador do anexo não pressupõe símbolo desenhado. Nenhuma task é
+desbloqueada — a **TASK-034** já foi entregue sob esta decisão.
+
+**Impacto em implementação:** **RN:** nenhuma muda de texto; a **RN-031** e a
+**RN-076** são confirmadas (Local só no anexo) e a **RN-036** continua sendo a
+regra que torna o caso inalcançável em documento válido. **Módulos:**
+`src/formulario/pdf/anexo-tecnico-pdf.ts` (implementado) e
+`src/formulario/pdf/legenda-itinerario.ts` (fonte dos identificadores `n.m`, sem
+mudança). **Testes:** cobertos por
+`testes/unitarios/formulario/pdf-anexo-tecnico.test.ts` — Local sem
+`geolocalizacao_ida` continua listado com seu `n.m`, e parada apontando para
+Local inexistente não vira linha. **Tasks:** **TASK-034** (entregue sob esta
+decisão); nenhuma outra afetada.

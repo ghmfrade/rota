@@ -1504,8 +1504,10 @@ anexo.
 Serviço/sentido, não a legenda do mapa; omitir perderia dado do documento e a
 marcação da opção 2 descreveria um estado que a validação estrutural já proíbe.
 
-**Decisão:** **Opção 1**, dada explicitamente pelo responsável pelo domínio na
-aprovação do plano da TASK-034 (2026-08-03) e implementada em
-`src/formulario/pdf/anexo-tecnico-pdf.ts`, com teste dedicado. **Falta o registro
-formal como DEC-xxx** em `10-DECISION_LOG.md`, que depende de `/registrar-decisao`
-pelo responsável.
+**Decisão:** **Decidida (DEC-106, 2026-08-03).** Opção 1: o anexo lista **todo**
+Local referenciado pelas paradas, com seu identificador `n.m`, nome e município —
+inclusive o Local sem `geolocalizacao_<sentido>`, que não recebe símbolo no mapa;
+não há bijeção exigida entre a relação do anexo e os símbolos da imagem. A
+DEC-105 permanece válida e não é superada. Implementada em
+`src/formulario/pdf/anexo-tecnico-pdf.ts` (TASK-034), com teste dedicado. Ver
+DEC-106.
