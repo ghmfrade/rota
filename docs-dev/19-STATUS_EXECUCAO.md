@@ -1,7 +1,41 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-08-02 (branch `redesign`) — **TASK-033: ressalvas
-fechadas, aprovada com ressalvas documentais.** O commit `1a77a85` cumpre a condição de
+**Atualização mais recente:** 2026-08-02 (branch `redesign`) — **TASK-126: concluída e
+aprovada com ressalvas, com uma condição de merge.** O commit `0c22040` troca a paleta
+de `src/formulario/pdf/estilos-pdf.ts` pelos hex canônicos do `18-DESIGN_SYSTEM.md` §2
+(saem os cinzas do Tailwind default `#374151`/`#6b7280`/`#e5e7eb`), dá `Page` própria à
+capa com código destacado, pares rótulo-valor e selo de status, separa cabeçalho ×
+zebra × linha de total com larguras proporcionais (`celulaServico` 1.6, `celulaFaixa`
+2.4 contra `celulaNumerica` 1), acrescenta `Página X de Y` ao rodapé `fixed` e sobe a
+captura de 1000×600 para 1400×840 com a margem de enquadramento escalada de 40 para
+56 px — mesmo fator 1,4, o que preserva de fato o enquadramento da DEC-104.
+`modelo-pdf-operacional.ts` **não aparece no diff**: nenhum conteúdo, contador, rótulo
+ou posição de `ORDEM_BLOCOS` muda. O parecer `14-REVISOES/TASK-126-20260802.md`
+registra **checklist 07 com 20 itens ok, 30 N/A e nenhum item violado**, RN-074/076/
+069/078/015/013 atendidas e reutiliza o log canônico verde (`test:all:verificar`:
+executor **Claude**, fingerprint `2e9ab831…65bc29`, identidade `498d7fa6…9176`,
+`Resultado geral: APROVADO`, 1468 unitários + 111 E2E); `typecheck`, `lint` e
+`check:rastreabilidade` limpos nesta revisão. **Condição de merge (uma):** cobrir a
+RN-077 com o teste dedicado que a própria task exige — asserção, sobre o PDF
+**renderizado**, de que o aviso de fronteira com o SEI e a numeração aparecem em todas
+as páginas físicas; o teste novo conta `/Type /Page` e explicitamente delega a
+verificação do rodapé ao teste do **modelo**, que assere um único objeto `rodape` e
+nada diz sobre repetição por página. O comportamento está correto hoje (`fixed` nas
+três `Page`), mas a regressão que a TASK-034 pode introduzir ao acrescentar `Page` para
+os itens 5–8 passaria verde. **Follow-up a resolver antes da TASK-034:** fechar por
+escrito a leitura de "uma página por bloco lógico" — o critério de aceite pedia que
+cada itinerário começasse em página nova ("um itinerário por página"), e a entrega usa
+só `wrap={false}`, que impede partir um bloco mas não o faz começar em página nova;
+hoje a releitura mora apenas num comentário de código, sem DEC. Follow-ups menores:
+teste do ramo capa-sem-data e âncora da proporcionalidade resolução × margem. A
+TASK-126 nasceu depois da contagem de tasks não concluídas (como as TASK-121..125 e a
+TASK-127) e, portanto, **não a altera**: seguem **9 tasks não concluídas — 7
+executáveis, a TASK-038 com bloqueio parcial e a TASK-040 bloqueada**. A **TASK-127**
+continua independente e herda a folha de estilos já corrigida; a **TASK-034** segue
+desbloqueada e passa a escrever sobre a folha nova.
+
+**Histórico anterior (2026-08-02) — TASK-033: ressalvas
+fechadas, aprovada com ressalvas documentais:** O commit `1a77a85` cumpre a condição de
 merge do parecer de 2026-07-31 (as colunas "Opções de deslocamento — Ida/Volta" entram
 no resumo do §13.1 item 2, completando os 7 contadores por Serviço do §10), acrescenta
 a **estratificação por faixa por Serviço** que o §10 exige além do total do Autos, faz
