@@ -1,7 +1,58 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-08-03 (branch `redesign`) — **TASK-127: aprovada com
-ressalvas, uma condição de merge aberta; a task NÃO é marcada como concluída.** O commit
+**Atualização mais recente:** 2026-08-03 (branch `redesign`) — **TASK-127: ressalvas
+fechadas, condição de merge cumprida, ciclo encerrado.** O commit `15a1d47` fecha a única
+condição de merge do parecer de 2026-08-03: `desenharSimbolos` ganha o parâmetro `escala`
+(default `1`, sem regressão) e passa a multiplicar **tamanhos** — lado do quadrado, raio do
+círculo, halo, espaçamento e corpo das fontes (`simbolos-mapa-pdf.ts:39-41,111-181`) —,
+enquanto `comporImagemComSimbolos` (renomeado do erro de digitação
+`compornImagemComSimbolos`) passa a mesma razão `canvasBase.width / largura` que já
+corrigia as coordenadas (`captura-mapa-pdf.ts:136-147`); o símbolo passa a ocupar fração
+constante da imagem em qualquer `devicePixelRatio`. Junto vieram: cobertura nova do caminho
+de composição, antes com **zero** testes — `pdf-composicao-simbolos.test.ts` exercita
+`projetarSimbolos`/`comporImagemComSimbolos` com **canvas falso** (`document.createElement`
+espionado) e contexto 2D de registro, sem WebGL nem tile em Vitest (doc 08 §7); e a
+reancoragem de dois testes na fixture canônica do exemplo mínimo da Spec 02 §15, revalidada
+por `esquemaDocumentoOperacao.parse`. `numerarItinerario` foi alinhada a `sequenciaDeSecoes`
+(`modelo-pdf-operacional.ts:294-310`, que filtra só por Seção inexistente): a numeração
+passa a depender de a Seção/Local **existir**, e a geolocalização do sentido governa só o
+desenho — a legenda deixa de perder itens e o ordinal deixa de deslizar. `modelo-pdf-operacional.ts`,
+`documento-pdf-operacional.tsx` e `estilos-pdf.ts` ficam **fora** do diff. O parecer
+`14-REVISOES/TASK-127-20260803-fechamento.md` registra **checklist 07 com 23 itens ok,
+27 N/A, nenhum violado e 3 com ressalva**, reutiliza o log canônico verde
+(`test:all:verificar`: executor **Claude**, fingerprint `69374a3b…82d554b7`, identidade
+`f216d04b…3d6e1b32e0`, `Resultado geral: APROVADO`, **1520 unitários em 110 arquivos +
+111 E2E**) e reporta `typecheck`, `lint` e `check:rastreabilidade` limpos. A revisão
+**provou por execução** que os testes de escala falham contra `497cfe4` (9 falhas, entre
+elas `expected 34 to be 68`), o que descarta asserção tautológica. **Sem condição de merge
+remanescente.** **Ressalva a resolver na TASK-034:** o alinhamento foi estendido também ao
+ramo do **Local**, além do que a ressalva pedia — um Local sem `geolocalizacao_<sentido>`
+agora **recebe** identificador `n.m` sem ter símbolo no mapa
+(`legenda-itinerario.ts:117-139`), o que atende melhor o caso inválido da task e o §13.1
+item 8b ("posição no itinerário"), mas tensiona a DEC-105 item 4, que descreve o
+identificador do anexo como ligado ao "símbolo correspondente no mapa"; a TASK-034 deve
+decidir explicitamente como o anexo trata Local sem ponto, em vez de presumir bijeção
+anexo ↔ mapa. Caso inalcançável em documento válido — a RN-036 recusa na importação
+(`validacoes-estruturais.ts:169-201`) e a pendência bloqueante "sem rota"
+(`pendencias.ts:169-176`) fecha o gate da RN-078. Ressalvas menores, não impeditivas: o
+teste de "Seção sem geolocalização" exercita, na verdade, "Seção sem entrada para o
+Serviço" (helper com `servicos: []`), e as fixtures ad hoc foram substituídas só nos dois
+testes apontados. A **violação de escopo do `eeb6204` está encerrada**: `a830a16` registra
+a correção como defeito pós-entrega já aplicado da TASK-117
+(`06-BACKLOG_INICIAL.md:6681-6693`), pela via que o parecer indicou e o responsável
+escolheu — sem reverter. **Pendência de registro:** a §3 deste documento não acompanha os
+ciclos fechados — a tabela de executadas termina na **125** (nem a TASK-126 nem a TASK-127
+têm linha) e o total "102 tasks concluídas" já diverge das 113 linhas da tabela; a revisão
+deliberadamente **não** alterou tabela nem total, para não reconciliar às cegas o registro
+de outra task. A contagem de pendentes **não muda** (a TASK-127 nasceu depois dela, como a
+TASK-126 e as TASK-121..125): seguem **9 tasks não concluídas — 7 executáveis, a TASK-038
+com bloqueio parcial e a TASK-040 bloqueada**. A **TASK-034** segue desbloqueada, consome
+os `identificadoresLocais` (`n.m`) na relação de Locais do anexo (§13.1 item 8b) — que
+**não** aparecem em nenhuma superfície do corpo, conforme teste dedicado — e herda a
+ressalva do Local sem ponto acima.
+
+**Histórico anterior (2026-08-03) — TASK-127, primeira entrega: aprovada com
+ressalvas e uma condição de merge (cumprida em `15a1d47`, acima).** O commit
 `497cfe4` implementa a DEC-105: `src/formulario/pdf/legenda-itinerario.ts` (modelo puro da
 numeração — Seções `1º`, `2º`…, Locais `n.m` prefixados pela Seção imediatamente anterior,
 ordenado por `paradas[].ordem`, derivado **por itinerário**, o que faz o reinício por
