@@ -21,6 +21,17 @@ import {
   type IdentificadorLocal,
   type ItemLegendaSecao,
 } from "./legenda-itinerario";
+import {
+  montarTabelasHorarias,
+  type TabelaHorariaPdf,
+} from "./tabelas-horarias-pdf";
+import {
+  montarMatrizesDistancias,
+  montarMatrizesSeccionamento,
+  type MatrizDistanciasPdf,
+  type MatrizSeccionamentoPdf,
+} from "./matrizes-pdf";
+import { montarAnexoTecnico, type BlocoAnexoTecnico } from "./anexo-tecnico-pdf";
 
 // Modelo estrutural do PDF operacional (TASK-033; Spec 04 §13.1) — módulo
 // PURO: converte um `DocumentoOperacao` na sequência de blocos que o
@@ -33,11 +44,11 @@ import {
 // contagens de `shared/contagens`; nunca chama OSRM nem recalcula (RN-015,
 // NEG-019). Contagens nunca são reimplementadas aqui (RN-072).
 //
-// Escopo desta task: itens 1, 2, 3, 4 e 9 do §13.1. Os itens 5–8 (tabelas
-// horárias, matriz de distâncias, matriz de seccionamento e anexo técnico) são
-// da TASK-034 e entram como blocos próprios entre `itinerarios` e `rodape` —
-// por isso a ordem do §13.1 mora numa constante única (`ORDEM_BLOCOS`), e não
-// espalhada pelo componente.
+// A TASK-033 entregou os itens 1, 2, 3, 4 e 9 do §13.1; a TASK-034 acrescentou
+// os itens 5–8 (tabelas horárias, matriz de distâncias, matriz de
+// seccionamento e anexo técnico), cada um montado por um módulo puro próprio e
+// apenas agregado aqui, nas posições que `ORDEM_BLOCOS` já reservava — a ordem
+// do §13.1 mora nessa constante única, não espalhada pelo componente.
 
 /** Título fixo da capa (§13.1 item 1). Não há ativo de logotipo no projeto. */
 export const TITULO_PDF = "ROTA — Tabela Operacional";
@@ -49,10 +60,7 @@ export const AVISO_SEI =
 /** Separador da sequência resumida de Seções (§13.1 item 4b). */
 export const SETA_SEQUENCIA = " → ";
 
-/**
- * Ordem dos blocos do §13.1. Os itens 5–8 constam da ordem mesmo sem
- * implementação nesta task: a TASK-034 os preenche sem reordenar nada.
- */
+/** Ordem dos blocos do §13.1 — a peça inteira, itens 1 a 9. */
 export const ORDEM_BLOCOS = [
   "capa",
   "resumo",
@@ -236,6 +244,14 @@ export interface ModeloPdfOperacional {
   resumo: BlocoResumo;
   servicos: BlocoServico[];
   itinerarios: BlocoItinerario[];
+  /** §13.1 item 5 — versão simples, no corpo (RN-075; DEC-086). */
+  tabelasHorarias: TabelaHorariaPdf[];
+  /** §13.1 item 6 — uma por Serviço (§9.1). */
+  matrizesDistancias: MatrizDistanciasPdf[];
+  /** §13.1 item 7 — uma por Serviço (§9.2). */
+  matrizesSeccionamento: MatrizSeccionamentoPdf[];
+  /** §13.1 item 8 — versão detalhada + relação de Locais, sem horários. */
+  anexoTecnico: BlocoAnexoTecnico;
   rodape: BlocoRodape;
 }
 
@@ -444,6 +460,12 @@ export function montarModeloPdfOperacional(
     resumo: montarResumo(documento),
     servicos: documento.autos.servicos.map(montarServico),
     itinerarios: montarItinerarios(documento, opcoes.obterImagemDoItinerario),
+    // Itens 5–8 (TASK-034). A versão simples fica no corpo e a detalhada, no
+    // anexo (RN-075); as matrizes são lidas congeladas (RN-015).
+    tabelasHorarias: montarTabelasHorarias(documento, "simples"),
+    matrizesDistancias: montarMatrizesDistancias(documento),
+    matrizesSeccionamento: montarMatrizesSeccionamento(documento),
+    anexoTecnico: montarAnexoTecnico(documento),
     rodape: {
       versaoSchema: documento.versao_schema,
       geradoEm: formatarDataHora(opcoes.geradoEm ?? new Date()),

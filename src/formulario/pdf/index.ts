@@ -8,6 +8,9 @@
 // `maplibre-gl` seja carregado (o import dele também é dinâmico).
 
 export * from "./legenda-itinerario";
+export * from "./tabelas-horarias-pdf";
+export * from "./matrizes-pdf";
+export * from "./anexo-tecnico-pdf";
 export * from "./modelo-pdf-operacional";
 export * from "./captura-mapa-pdf";
 export * from "./gerar-pdf-operacional";

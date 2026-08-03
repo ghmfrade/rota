@@ -65,6 +65,7 @@ import {
   montarBlocosDiasComuns,
   montarBlocosFeriados,
   montarBlocosGrade,
+  ROTULO_DIA,
   seletorAlvoFocoCelulaGrade,
   type AlvoFocoCelulaGrade,
   type BlocoGrade,
@@ -91,16 +92,6 @@ import {
 // (Spec 04 §8.3/§8.4). TASK-106: apresentação tabular compacta, campo textual
 // sem seletor nativo, ordenação temporal, seleção por UUID, ações no hover e
 // navegação Tab (dia seguinte) / Enter (Seção inferior).
-
-const ROTULO_DIA: Record<DiaSemana, string> = {
-  segunda: "SEG",
-  terca: "TER",
-  quarta: "QUA",
-  quinta: "QUI",
-  sexta: "SEX",
-  sabado: "SAB",
-  domingo: "DOM",
-};
 
 const DESLOCAMENTO_RELATIVO_PADRAO = "00:10";
 

@@ -3,11 +3,17 @@ import { montarModeloPdfOperacional } from "@/formulario/pdf/modelo-pdf-operacio
 import { esquemaDocumentoOperacao, type DocumentoOperacao } from "@/shared/contrato";
 import { documentoExemploMinimo } from "../../fixtures";
 
-// TASK-033 — regras transversais do PDF (RN-076; Spec 04 §13.3/§13.4) e
-// ausência de R$ (RN-013/NEG-017). São as asserções NEGATIVAS da categoria 7 de
-// `docs-dev/08-TEST_STRATEGY.md`: o que o PDF nunca pode conter. A varredura
+// TASK-033/TASK-034 — regras transversais do PDF (RN-076; Spec 04 §13.3/§13.4)
+// e ausência de R$ (RN-013/NEG-017). São as asserções NEGATIVAS da categoria 7
+// de `docs-dev/08-TEST_STRATEGY.md`: o que o PDF nunca pode conter. A varredura
 // percorre TODO o modelo, não só os campos que a task lembrou de olhar — assim
-// um bloco novo (TASK-034) que vaze R$ ou offset quebra este teste.
+// um bloco novo que vaze R$ ou offset quebra este teste.
+//
+// A única fronteira interna é a do §13.1 item 8b: Locais aparecem **no anexo
+// técnico** e em lugar nenhum do corpo. Por isso a varredura de Locais usa
+// `textosDoCorpo`, que exclui `anexoTecnico` — e um teste positivo dedicado
+// exige que o Local esteja lá dentro, impedindo que a exclusão vire desculpa
+// para o anexo perder o dado.
 
 function textosDoModelo(valor: unknown, acumulado: string[] = []): string[] {
   if (typeof valor === "string") acumulado.push(valor);
@@ -17,6 +23,14 @@ function textosDoModelo(valor: unknown, acumulado: string[] = []): string[] {
     Object.values(valor).forEach((item) => textosDoModelo(item, acumulado));
   }
   return acumulado;
+}
+
+/** Todo o modelo MENOS o anexo técnico — o "corpo" do §13.1 (itens 1 a 7). */
+function textosDoCorpo(modelo: ReturnType<typeof modeloDe>): string[] {
+  const corpo = Object.fromEntries(
+    Object.entries(modelo).filter(([chave]) => chave !== "anexoTecnico"),
+  );
+  return textosDoModelo(corpo);
 }
 
 function modeloDe(documento: DocumentoOperacao) {
@@ -59,11 +73,27 @@ describe("RN-076 — offsets não aparecem em lugar nenhum do PDF", () => {
     expect(textos.some((t) => /offset/i.test(t))).toBe(false);
   });
 
-  test("horários de saída também não aparecem nos blocos desta task", () => {
-    // Horário é matéria da tabela horária (§13.2 — TASK-034); a estrutura e a
-    // identificação não exibem partida nenhuma.
+  test("nenhum horário aparece no formato HH:MM:SS do JSON — só HH:MM (§8.1)", () => {
+    // A TASK-034 trouxe horários legítimos (as tabelas do §13.2), mas sempre em
+    // HH:MM. Um HH:MM:SS no modelo denunciaria horário cru do JSON — o mesmo
+    // formato em que os offsets são gravados.
     const textos = textosDoModelo(modeloDe(documentoExemploMinimo()));
+
+    expect(textos.some((t) => /\d{2}:\d{2}:\d{2}/.test(t))).toBe(false);
     expect(textos.some((t) => t.includes("08:00:00"))).toBe(false);
+  });
+
+  test("os horários dos blocos de identificação continuam ausentes", () => {
+    // Horário é matéria exclusiva das tabelas horárias e do anexo: capa,
+    // resumo, Serviços e itinerários não exibem partida nenhuma.
+    const modelo = modeloDe(documentoExemploMinimo());
+    const textos = textosDoModelo({
+      capa: modelo.capa,
+      servicos: modelo.servicos,
+      itinerarios: modelo.itinerarios,
+    });
+
+    expect(textos.some((t) => /\d{2}:\d{2}/.test(t))).toBe(false);
   });
 
   test("os horários dos rótulos de faixa são os limites da spec, não partidas", () => {
@@ -94,7 +124,7 @@ describe("RN-031/RN-076 — Locais não aparecem no corpo, só no anexo técnico
     expect(local.nome).toBe("Ponto de Embarque Praia"); // guarda da fixture
 
     const modelo = modeloDe(documento);
-    const textos = textosDoModelo(modelo);
+    const textos = textosDoCorpo(modelo);
 
     expect(textos.some((t) => t.includes(local.nome))).toBe(false);
     for (const itinerario of modelo.itinerarios) {
@@ -132,6 +162,22 @@ describe("RN-031/RN-076 — Locais não aparecem no corpo, só no anexo técnico
         expect(secao, `legenda com nome fora do padrão: ${item.nome}`).toBeDefined();
       }
     }
+  });
+
+  test("TASK-034 — o Local está no anexo técnico: a exclusão do corpo não pode virar omissão", () => {
+    // Contraprova do teste acima: se a varredura do corpo passasse porque o
+    // Local sumiu do modelo inteiro, esta asserção falharia.
+    const documento = documentoExemploMinimo();
+    const local = documento.autos.servicos[0].locais[0];
+
+    const anexo = modeloDe(documento).anexoTecnico;
+    const linhas = anexo.locaisPorItinerario.flatMap((bloco) => bloco.locais);
+
+    expect(linhas.some((linha) => linha.nome === local.nome)).toBe(true);
+    // §13.1 item 8b — sem horários de passagem no anexo.
+    expect(
+      textosDoModelo(anexo.locaisPorItinerario).some((t) => /\d{2}:\d{2}/.test(t)),
+    ).toBe(false);
   });
 
   test("TASK-127/DEC-105 — o identificador do Local expõe só a UUID, nunca o nome, no modelo do PDF", () => {

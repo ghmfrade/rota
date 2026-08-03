@@ -17,6 +17,7 @@ export {
   montarBlocosFeriados,
   montarBlocosGrade,
   horarioAbsolutoNaParada,
+  ROTULO_DIA,
   type AlvoFocoCelulaGrade,
   type DiaSemana,
   type EstadoCelulaGrade,

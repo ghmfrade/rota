@@ -269,6 +269,54 @@ export const estilosPdf = StyleSheet.create({
     paddingLeft: 6,
     paddingBottom: 8,
   },
+  // Tabelas horárias (§13.2, TASK-034): grade Seções × dias. A coluna da Seção
+  // carrega `Cidade - Nome` e é bem mais larga que as 7 colunas de horário,
+  // que têm largura fixa conhecida (HH:MM) e dividem o resto igualmente.
+  celulaSecaoHoraria: {
+    flex: 2.6,
+    paddingHorizontal: 3,
+  },
+  celulaHorario: {
+    flex: 1,
+    paddingHorizontal: 3,
+    textAlign: "center",
+  },
+  // Separador entre blocos (posições ordinais de partida — §8.1): a borda
+  // superior mais forte impede que dois blocos consecutivos sejam lidos como
+  // uma única viagem de muitas Seções.
+  blocoHorario: {
+    borderTopWidth: 1,
+    borderTopColor: CINZA_500,
+  },
+  avisoGradeVazia: {
+    color: CINZA_500,
+    marginBottom: 8,
+  },
+  // Matrizes (§9.1/§9.2): triangular inferior. A coluna de cabeçalho de linha
+  // repete o padrão `Cidade - Nome`; as células de valor são estreitas e
+  // centradas, como na tela.
+  celulaCabecalhoMatriz: {
+    flex: 2.6,
+    paddingHorizontal: 3,
+  },
+  celulaMatriz: {
+    flex: 1.4,
+    paddingHorizontal: 3,
+    textAlign: "center",
+  },
+  // Detalhe Ida/Volta do par bidirecional (§9.1) — na tela é expansível; no
+  // papel fica sob o valor adotado, em corpo menor.
+  detalheMatriz: {
+    fontSize: 6,
+    color: CINZA_500,
+    textAlign: "center",
+  },
+  celulaDiagonal: {
+    flex: 1.4,
+    paddingHorizontal: 3,
+    textAlign: "center",
+    color: CINZA_500,
+  },
   rodape: {
     position: "absolute",
     bottom: 24,

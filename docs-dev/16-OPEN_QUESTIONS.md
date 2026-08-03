@@ -1472,3 +1472,40 @@ numeração **hierárquica** dos Locais (`1.1`, `1.2`… para os Locais posterio
 Seção `1º`), rótulo do Local desenhado **ao lado** do círculo no mapa (não
 dentro) e o mesmo identificador **referenciado no anexo técnico** que detalha os
 Locais. Ver DEC-105.
+
+## Q-084 — Local sem geolocalização do sentido: entra na relação de Locais do anexo técnico?
+
+**Contexto:** Levantada na análise da **TASK-034**, a partir da ressalva
+registrada no fechamento da TASK-127 (`19-STATUS_EXECUCAO.md`). A **DEC-105 item
+4** liga o identificador `n.m` da relação de Locais do anexo ao "símbolo
+correspondente no mapa" do corpo. A numeração implementada em
+`legenda-itinerario.ts` depende só de o Local **existir** — não de ele ter
+`geolocalizacao_<sentido>` —, então um Local sem ponto naquele sentido recebe
+identificador sem ter símbolo desenhado. O anexo precisa de comportamento
+definido para esse caso.
+
+**Spec relacionada:** Spec 04 §13.1 item 8b ("nome, município, posição no
+itinerário"), §13.2; RN-031 (Local pertence ao Serviço), RN-036 (integridade da
+geolocalização por sentido), RN-076 (Locais só no anexo); DEC-105.
+
+**Impacto se não decidir:** ou o anexo lista um Local sem contraparte visual no
+mapa (tensionando a DEC-105), ou omite silenciosamente um Local que existe no
+documento. O caso é **inalcançável em documento válido** — a RN-036 recusa na
+importação (`validacoes-estruturais.ts`) e a pendência bloqueante "sem rota"
+fecha o gate da RN-078 —, então o impacto prático é nulo; a decisão evita que a
+implementação escolha sozinha.
+
+**Opções:** 1 — **listar** o Local com seu `n.m`, sem qualquer promessa de
+bijeção anexo ↔ mapa (o item 8b pede "posição no itinerário", nunca "símbolo");
+2 — listar com marcação explícita "sem ponto neste sentido"; 3 — omitir do
+anexo.
+
+**Recomendação técnica:** opção **1** — o anexo é a relação de Locais do
+Serviço/sentido, não a legenda do mapa; omitir perderia dado do documento e a
+marcação da opção 2 descreveria um estado que a validação estrutural já proíbe.
+
+**Decisão:** **Opção 1**, dada explicitamente pelo responsável pelo domínio na
+aprovação do plano da TASK-034 (2026-08-03) e implementada em
+`src/formulario/pdf/anexo-tecnico-pdf.ts`, com teste dedicado. **Falta o registro
+formal como DEC-xxx** em `10-DECISION_LOG.md`, que depende de `/registrar-decisao`
+pelo responsável.

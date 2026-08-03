@@ -9,19 +9,29 @@ import {
   type ModeloPdfOperacional,
 } from "./modelo-pdf-operacional";
 import type { ItemLegendaSecao } from "./legenda-itinerario";
+import {
+  AVISO_GRADE_VAZIA,
+  type GradeHorariaPdf,
+  type TabelaHorariaPdf,
+} from "./tabelas-horarias-pdf";
+import type {
+  MatrizDistanciasPdf,
+  MatrizSeccionamentoPdf,
+} from "./matrizes-pdf";
+import type { BlocoAnexoTecnico, BlocoLocaisAnexo } from "./anexo-tecnico-pdf";
 
-// Renderizador @react-pdf do PDF operacional (TASK-033/TASK-126; Spec 04
+// Renderizador @react-pdf do PDF operacional (TASK-033/126/127/034; Spec 04
 // §13.1). Componente burro: desenha o modelo já montado por
 // `modelo-pdf-operacional.ts` — nenhuma regra de negócio, nenhuma contagem,
-// nenhum acesso ao documento bruto. Os itens 5–8 do §13.1 (tabelas horárias,
-// matrizes e anexo técnico) entram aqui na TASK-034, entre os itinerários e o
-// rodapé.
+// nenhum acesso ao documento bruto.
 //
 // Paginação (§13.3 — "uma página por bloco lógico quando possível"): a capa
 // ocupa `Page` própria; o resumo abre outra `Page`; os Serviços abrem a
-// terceira; os itinerários, a quarta. Dentro de cada `Page`, `wrap={false}`
-// em cada bloco impede que ele seja partido ao meio — se não couber no
-// restante da página, o `@react-pdf` o empurra inteiro para a próxima.
+// terceira; os itinerários, a quarta; e a TASK-034 acrescenta uma `Page` por
+// bloco lógico dos itens 5, 6, 7 e 8 — oito ao todo. Dentro de cada `Page`,
+// `wrap={false}` em cada bloco impede que ele seja partido ao meio — se não
+// couber no restante da página, o `@react-pdf` o empurra inteiro para a
+// próxima.
 //
 // Uso da prop `break` (ressalva 1 do parecer da TASK-126):
 // - **Itinerários: um por página.** `break` a partir do segundo bloco — é o
@@ -322,6 +332,224 @@ function BlocoItinerarioPdf({
   );
 }
 
+/**
+ * Uma grade horária (§13.2/§8.1): cabeçalho SEG…DOM e um grupo por bloco —
+ * a n-ésima partida do dia.
+ *
+ * Integridade × altura: o número de blocos é ilimitado (N Viagens por dia),
+ * então a grade inteira NÃO pode virar um único `wrap={false}` — seria um
+ * bloco maior que a página, como já documentado para a tabela de resumo por
+ * Serviço (TASK-126). O grupo íntegro é (título + nota + cabeçalho + primeiro
+ * bloco), que garante que a tabela nunca comece com o cabeçalho órfão no pé de
+ * uma página; cada bloco seguinte é íntegro por si.
+ */
+function CabecalhoDias({ colunas }: { colunas: readonly string[] }) {
+  return (
+    <View style={estilosPdf.linhaCabecalho}>
+      <Text style={estilosPdf.celulaSecaoHoraria}>Seção</Text>
+      {colunas.map((coluna) => (
+        <Text key={coluna} style={estilosPdf.celulaHorario}>
+          {coluna}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
+function GradeHorariaPdfView({
+  grade,
+  colunas,
+}: {
+  grade: GradeHorariaPdf;
+  colunas: readonly string[];
+}) {
+  const titulo = (
+    <>
+      <Text style={estilosPdf.subtituloBloco}>{grade.rotulo}</Text>
+      {/* RN-069/NEG-018 — feriado e excepcional ficam fora da semana padrão;
+          a nota acompanha a grade, como a legenda equivalente da tela. */}
+      {grade.notaForaDasContagens ? (
+        <Text style={estilosPdf.notaTabela}>{grade.notaForaDasContagens}</Text>
+      ) : null}
+    </>
+  );
+
+  // RN-071 — grade sem Viagem é válida (pode ser intencional): imprime o aviso
+  // em vez de sumir, para o leitor não tomar a ausência por documento truncado.
+  if (grade.vazia) {
+    return (
+      <View wrap={false}>
+        {titulo}
+        <Text style={estilosPdf.avisoGradeVazia}>{AVISO_GRADE_VAZIA}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      <View wrap={false}>
+        {titulo}
+        <View style={estilosPdf.tabela}>
+          <CabecalhoDias colunas={colunas} />
+          <LinhasDoBloco bloco={grade.blocos[0]} indiceBloco={0} />
+        </View>
+      </View>
+      {grade.blocos.slice(1).map((bloco, indice) => (
+        <View key={indice} style={estilosPdf.tabela} wrap={false}>
+          <LinhasDoBloco bloco={bloco} indiceBloco={indice + 1} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function LinhasDoBloco({
+  bloco,
+  indiceBloco,
+}: {
+  bloco: { linhas: { secao: string; horarios: string[] }[] };
+  indiceBloco: number;
+}) {
+  return (
+    <View style={estilosPdf.blocoHorario}>
+      {bloco.linhas.map((linha, indice) => (
+        <View style={estiloLinhaDados(indice)} key={`${indiceBloco}-${linha.secao}-${indice}`}>
+          <Text style={estilosPdf.celulaSecaoHoraria}>{linha.secao}</Text>
+          {linha.horarios.map((horario, indiceDia) => (
+            <Text key={indiceDia} style={estilosPdf.celulaHorario}>
+              {horario}
+            </Text>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** Todas as grades de um Serviço/sentido (§13.2), na ordem comum → feriado →
+ * excepcionais, sempre em tabelas separadas (§13.3). */
+function TabelaHorariaPdfView({ tabela }: { tabela: TabelaHorariaPdf }) {
+  return (
+    <View>
+      <Text style={estilosPdf.tituloItinerario}>{tabela.titulo}</Text>
+      {tabela.grades.map((grade) => (
+        <GradeHorariaPdfView
+          key={grade.tabelaExcepcionalUuid ?? grade.tipo}
+          grade={grade}
+          colunas={tabela.colunas}
+        />
+      ))}
+    </View>
+  );
+}
+
+/**
+ * Matriz triangular inferior (§9.1/§9.2): "X" na diagonal, cabeçalhos
+ * `Cidade - Nome da Seção`, valores em km — nunca R$ (RN-013/076). As duas
+ * matrizes compartilham a forma; a diferença de semântica da célula vazia mora
+ * no modelo (`matrizes-pdf.ts`), não aqui.
+ */
+function MatrizPdfView({
+  matriz,
+}: {
+  matriz: MatrizDistanciasPdf | MatrizSeccionamentoPdf;
+}) {
+  return (
+    <View wrap={false}>
+      <Text style={estilosPdf.tituloItinerario}>Serviço {matriz.numeroN}</Text>
+      <View style={estilosPdf.tabela}>
+        <View style={estilosPdf.linhaCabecalho}>
+          <Text style={estilosPdf.celulaCabecalhoMatriz}>Origem/Destino</Text>
+          {matriz.cabecalhos.map((cabecalho) => (
+            <Text key={cabecalho.secaoUuid} style={estilosPdf.celulaMatriz}>
+              {cabecalho.rotulo}
+            </Text>
+          ))}
+        </View>
+        {matriz.linhas.map((linha, indice) => (
+          <View style={estiloLinhaDados(indice)} key={linha.secaoUuid}>
+            <Text style={estilosPdf.celulaCabecalhoMatriz}>{linha.rotulo}</Text>
+            {linha.celulas.map((celula, indiceCelula) => (
+              <View
+                key={indiceCelula}
+                style={
+                  celula.tipo === "diagonal"
+                    ? estilosPdf.celulaDiagonal
+                    : estilosPdf.celulaMatriz
+                }
+              >
+                <Text>{celula.texto}</Text>
+                {/* §9.1 — detalhe Ida/Volta do Serviço bidirecional (RN-056). */}
+                {"detalheIda" in celula && celula.detalheIda !== undefined ? (
+                  <Text style={estilosPdf.detalheMatriz}>
+                    Ida {celula.detalheIda} · Volta {celula.detalheVolta}
+                  </Text>
+                ) : null}
+              </View>
+            ))}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/** §13.1 item 8b — Locais comuns por Serviço/sentido, SEM horários e SEM
+ * offsets; a posição no itinerário é o identificador `n.m` da DEC-105. */
+function LocaisDoAnexoPdfView({ bloco }: { bloco: BlocoLocaisAnexo }) {
+  return (
+    <View wrap={false}>
+      <Text style={estilosPdf.tituloItinerario}>{bloco.titulo}</Text>
+      {bloco.locais.length === 0 ? (
+        <Text style={estilosPdf.avisoGradeVazia}>
+          Nenhum Local comum neste itinerário.
+        </Text>
+      ) : (
+        <View style={estilosPdf.tabela}>
+          <View style={estilosPdf.linhaCabecalho}>
+            <Text style={estilosPdf.celulaMatriz}>Posição</Text>
+            <Text style={estilosPdf.celulaCabecalhoMatriz}>Local</Text>
+            <Text style={estilosPdf.celulaCabecalhoMatriz}>Município</Text>
+          </View>
+          {bloco.locais.map((local, indice) => (
+            <View style={estiloLinhaDados(indice)} key={local.localUuid}>
+              <Text style={estilosPdf.celulaMatriz}>{local.identificador}</Text>
+              <Text style={estilosPdf.celulaCabecalhoMatriz}>{local.nome}</Text>
+              <Text style={estilosPdf.celulaCabecalhoMatriz}>{local.municipio}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function AnexoTecnicoPdfView({ anexo }: { anexo: BlocoAnexoTecnico }) {
+  return (
+    <View>
+      <Text style={estilosPdf.tituloBloco}>Anexo técnico</Text>
+      <Text style={estilosPdf.subtituloBloco}>
+        Tabela horária detalhada — horários de passagem por Seção
+      </Text>
+      {anexo.tabelasDetalhadas.map((tabela) => (
+        <TabelaHorariaPdfView
+          key={`${tabela.servicoUuid}-${tabela.sentido}`}
+          tabela={tabela}
+        />
+      ))}
+      <Text style={estilosPdf.subtituloBloco}>Relação de Locais comuns</Text>
+      {/* RN-075/076 — sem horários de passagem e sem offsets: eles permanecem
+          dado interno do JSON (§13.1 item 8b). */}
+      {anexo.locaisPorItinerario.map((bloco) => (
+        <LocaisDoAnexoPdfView
+          key={`${bloco.servicoUuid}-${bloco.sentido}`}
+          bloco={bloco}
+        />
+      ))}
+    </View>
+  );
+}
+
 export function DocumentoPdfOperacional({
   modelo,
 }: {
@@ -383,6 +611,48 @@ export function DocumentoPdfOperacional({
             quebraPagina={indice > 0}
           />
         ))}
+
+        <Rodape modelo={modelo} />
+      </Page>
+
+      {/* Item 5 — tabela horária, versão simples (§13.2): só os horários de
+          saída de cada Viagem, por dia (RN-075; DEC-086). */}
+      <Page size="A4" style={estilosPdf.pagina}>
+        <Text style={estilosPdf.tituloBloco}>Tabela horária — horários de saída</Text>
+        {modelo.tabelasHorarias.map((tabela) => (
+          <TabelaHorariaPdfView
+            key={`${tabela.servicoUuid}-${tabela.sentido}`}
+            tabela={tabela}
+          />
+        ))}
+
+        <Rodape modelo={modelo} />
+      </Page>
+
+      {/* Item 6 — matriz de distâncias por Serviço (§9.1). */}
+      <Page size="A4" style={estilosPdf.pagina}>
+        <Text style={estilosPdf.tituloBloco}>Matriz de distâncias</Text>
+        {modelo.matrizesDistancias.map((matriz) => (
+          <MatrizPdfView key={matriz.servicoUuid} matriz={matriz} />
+        ))}
+
+        <Rodape modelo={modelo} />
+      </Page>
+
+      {/* Item 7 — matriz de seccionamento por Serviço (§9.2): pares não
+          habilitados com "—". */}
+      <Page size="A4" style={estilosPdf.pagina}>
+        <Text style={estilosPdf.tituloBloco}>Matriz de seccionamento</Text>
+        {modelo.matrizesSeccionamento.map((matriz) => (
+          <MatrizPdfView key={matriz.servicoUuid} matriz={matriz} />
+        ))}
+
+        <Rodape modelo={modelo} />
+      </Page>
+
+      {/* Item 8 — anexo técnico: tabela horária detalhada + relação de Locais. */}
+      <Page size="A4" style={estilosPdf.pagina}>
+        <AnexoTecnicoPdfView anexo={modelo.anexoTecnico} />
 
         <Rodape modelo={modelo} />
       </Page>

@@ -9,6 +9,11 @@ import {
   ROTULO_FAIXA_TOTAL_AUTOS,
   type ModeloPdfOperacional,
 } from "@/formulario/pdf/modelo-pdf-operacional";
+import { AVISO_GRADE_VAZIA } from "@/formulario/pdf/tabelas-horarias-pdf";
+import {
+  MARCA_DIAGONAL,
+  MARCA_PAR_NAO_HABILITADO,
+} from "@/formulario/pdf/matrizes-pdf";
 import { esquemaDocumentoOperacao } from "@/shared/contrato";
 import { FAIXAS_HORARIO, rotuloFaixaComIntervalo } from "@/shared/contagens";
 import {
@@ -116,14 +121,16 @@ describe("DocumentoPdfOperacional — renderização (RN-074)", () => {
     30_000,
   );
 
-  test("o componente emite exatamente as 4 `Page` dos blocos lógicos (§13.3)", () => {
-    // Capa, resumo, Serviços e itinerários — cada bloco lógico do §13.1 em
-    // `Page` própria. Igualdade exata, não piso: acrescentar ou remover uma
-    // `Page` (a TASK-034 escreve os itens 5–8 aqui) tem de falhar este teste.
+  test("o componente emite exatamente as 8 `Page` dos blocos lógicos (§13.3)", () => {
+    // Um bloco lógico do §13.1 por `Page`: capa (1), resumo (2), Serviços (3),
+    // itinerários (4), tabela horária simples (5), matriz de distâncias (6),
+    // matriz de seccionamento (7) e anexo técnico (8) — a TASK-034 acrescentou
+    // as quatro últimas. Igualdade exata, não piso: acrescentar ou remover uma
+    // `Page` tem de falhar este teste.
     expect(paginasDe(arvoreDo(modeloDe(documentoBidirecionalMultiServico())))).toHaveLength(
-      4,
+      8,
     );
-    expect(paginasDe(arvoreDo(modeloDe(documentoUnidirecional())))).toHaveLength(4);
+    expect(paginasDe(arvoreDo(modeloDe(documentoUnidirecional())))).toHaveLength(8);
   });
 
   test(
@@ -190,6 +197,85 @@ describe("RN-077 — aviso de fronteira com o SEI em todas as páginas", () => {
       (no) => no.tipo === "VIEW" && no.props.fixed === true,
     );
     expect(rodapes).toHaveLength(0);
+  });
+});
+
+describe("Itens 5–8 do §13.1 (TASK-034) — tabelas horárias, matrizes e anexo", () => {
+  /** As `Page` novas, na ordem do §13.1: 5, 6, 7 e 8. */
+  function paginasDosItens5a8(documento: NoPdf) {
+    const paginas = paginasDe(documento);
+    return {
+      tabelasHorarias: paginas[4],
+      matrizDistancias: paginas[5],
+      matrizSeccionamento: paginas[6],
+      anexo: paginas[7],
+    };
+  }
+
+  test("a tabela horária do corpo traz as sete colunas de dia e nenhum Local (RN-075/076)", () => {
+    const documento = documentoExemploMinimo();
+    const local = documento.autos.servicos[0].locais[0];
+    const { tabelasHorarias } = paginasDosItens5a8(arvoreDo(modeloDe(documento)));
+
+    const texto = textoDe(tabelasHorarias);
+    for (const dia of ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"]) {
+      expect(texto).toContain(dia);
+    }
+    expect(texto).not.toContain(local.nome);
+    // Versão simples: só a Seção de partida, nunca as intermediárias (DEC-086).
+    expect(texto).toContain("Santos - Terminal Central");
+    expect(texto).not.toContain("São Vicente - Terminal Norte");
+  });
+
+  test("grade sem Viagem imprime o aviso, em vez de tabela vazia (RN-071)", () => {
+    // A Volta da fixture não tem Viagem de feriado.
+    const { tabelasHorarias } = paginasDosItens5a8(
+      arvoreDo(modeloDe(documentoExemploMinimo())),
+    );
+
+    expect(textoDe(tabelasHorarias)).toContain(AVISO_GRADE_VAZIA);
+  });
+
+  test("as duas matrizes saem triangulares, com 'X' na diagonal (§9)", () => {
+    const { matrizDistancias, matrizSeccionamento } = paginasDosItens5a8(
+      arvoreDo(modeloDe(documentoExemploMinimo())),
+    );
+
+    for (const pagina of [matrizDistancias, matrizSeccionamento]) {
+      const diagonais = descendentes(pagina).filter(
+        (no) => no.props.style === estilosPdf.celulaDiagonal,
+      );
+      // 3 Seções → 3 células de diagonal por matriz.
+      expect(diagonais).toHaveLength(3);
+      for (const diagonal of diagonais) expect(textoDe(diagonal)).toBe(MARCA_DIAGONAL);
+    }
+  });
+
+  test("só a matriz de seccionamento usa o travessão de par não habilitado", () => {
+    const documento = documentoExemploMinimo();
+    documento.autos.servicos[0].matriz_seccionamento = [];
+    const { matrizDistancias, matrizSeccionamento } = paginasDosItens5a8(
+      arvoreDo(modeloDe(documento)),
+    );
+
+    expect(textoDe(matrizSeccionamento)).toContain(MARCA_PAR_NAO_HABILITADO);
+    // A matriz de distâncias é a distância real do trecho: nunca "—".
+    expect(textoDe(matrizDistancias)).not.toContain(MARCA_PAR_NAO_HABILITADO);
+    expect(textoDe(matrizDistancias)).toContain("km");
+  });
+
+  test("o anexo traz a versão detalhada e a relação de Locais com o `n.m` (§13.1 item 8)", () => {
+    const documento = documentoExemploMinimo();
+    const local = documento.autos.servicos[0].locais[0];
+    const { anexo } = paginasDosItens5a8(arvoreDo(modeloDe(documento)));
+
+    const texto = textoDe(anexo);
+    // (a) detalhada: as Seções intermediárias, ausentes do corpo, aparecem aqui.
+    expect(texto).toContain("São Vicente - Terminal Norte");
+    // (b) Locais com identificador e município, sem horário de passagem.
+    expect(texto).toContain(local.nome);
+    expect(texto).toContain("2.1");
+    expect(texto).toContain(local.municipio);
   });
 });
 

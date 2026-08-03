@@ -5,6 +5,23 @@ import type { GradeDestinoViagem } from "./copias-grade";
 export type DiaSemana = Viagem["dia_semana"];
 
 /**
+ * Rótulo curto de cada coluna da grade (Spec 04 §8.1 — "os sete dias da semana
+ * SEG…DOM"). Mora aqui, no módulo puro da montagem, porque a mesma grade é
+ * desenhada em duas superfícies: a tela (`etapa-viagens.tsx`) e a tabela
+ * horária do PDF (§13.2, TASK-034). Um segundo dicionário divergiria em
+ * silêncio.
+ */
+export const ROTULO_DIA: Record<DiaSemana, string> = {
+  segunda: "SEG",
+  terca: "TER",
+  quarta: "QUA",
+  quinta: "QUI",
+  sexta: "SEX",
+  sabado: "SAB",
+  domingo: "DOM",
+};
+
+/**
  * Estado de uma célula da grade (Spec 04 §8.1): "existente" tem a Viagem
  * daquele dia/posição; "criavel" é a ÚNICA posição por dia onde preencher a
  * 1ª Seção cria a próxima Viagem (Spec 04 §8.2); "indisponivel" é além dessa
