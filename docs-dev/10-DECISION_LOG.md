@@ -1727,3 +1727,141 @@ ausência da palavra "Média" e célula unidirecional sem detalhe. **Tasks:**
 `docs-dev/14-REVISOES/TASK-034-20260803.md`); **TASK-048** não é afetada;
 TASK-037/039 (matrizes comparativas do Comparador) permanecem regidas pela
 Spec 05, sem herança automática desta decisão.
+
+## DEC-108 — Matrizes do PDF: rótulo de coluna horizontal dentro do triângulo superior (substitui o item 1 da DEC-107)
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, **opção 2
+da Q-086** (dada explicitamente em conversa de 2026-08-03, com imagem de
+referência `docs-dev/tabela distancias PDF.jpg`, e confirmada por
+`/registrar-decisao`); Spec 04 §9.1, §9.2, §13.1 itens 6–7, §13.3; RN-076,
+RN-054, RN-056, RN-058/RN-059, RN-013 · **Data:** 2026-08-03
+
+**Decisão:** o **item 1 da DEC-107** (cabeçalho de coluna na diagonal a 45°) fica
+**substituído**. Nas duas matrizes do PDF operacional (§13.1 itens 6 e 7):
+
+1. o **rótulo da coluna `j`** é escrito **horizontalmente** na célula
+   **imediatamente acima do seu próprio "X"** — isto é, na posição
+   `(linha j−1, coluna j)` do triângulo superior —, alinhado à esquerda e livre
+   para **transbordar à direita** sobre as células vazias daquela linha;
+2. o rótulo da **coluna 0** fica numa **linha de cabeçalho acima** da matriz,
+   sobre a coluna 0;
+3. **nenhum texto do documento é girado**: deixam de existir o cabeçalho
+   diagonal, a altura reservada para ele e a estimativa de largura de fonte que a
+   sustentava;
+4. permanecem **intactos** os itens **2, 3 e 4 da DEC-107** — unidade no título
+   do bloco ("Matriz de distâncias (km)"), célula bidirecional empilhada em
+   `valor` / `I: <valor>` / `V: <valor>` sem o rótulo "Média", forma
+   **triangular inferior**, **"X"** na diagonal, padrão `Cidade - Nome da Seção`,
+   ausência de **R$** (RN-013/RN-076) e "—" **exclusivo** da matriz de
+   seccionamento (RN-058/RN-059);
+5. a matriz de um mesmo **Serviço** não é partida entre páginas: se não couber no
+   espaço restante, migra **inteira** para a página seguinte. Quando não couber
+   **nem numa página inteira**, permanece a quebra em blocos com cabeçalho
+   repetido e título em "(continuação)" — a integridade é garantida por bloco,
+   nunca cortando conteúdo.
+
+**Motivo:** o cabeçalho diagonal decidido na DEC-107 não se sustentou na prática.
+O rótulo é medido contra a largura da própria coluna (38 pt) **antes** de ser
+girado — `transform` não participa do layout —, quebrando em 3 a 5 linhas
+(medido sobre o componente real com a fixture do projeto: alturas de 26,4, 35,2 e
+44,0 pt), e a espessura resultante excede o passo perpendicular entre colunas
+vizinhas a 45° (`38 × cos45° ≈ 26,9 pt`), sobrepondo cabeçalhos. Ver
+`docs-dev/14-REVISOES/TASK-034-20260803-correcao.md`, problema 1. A correção
+possível dentro da DEC-107 (declarar `width` explícito) mantém texto girado, que
+continua difícil de ler e consome altura de página. O rótulo horizontal **remove
+a causa em vez de contorná-la**: sem texto girado não há quebra nem sobreposição
+a administrar, some a inferência de métrica de fonte, a altura antes reservada
+volta para a página, e o espaço usado — o triângulo superior — já estava vazio.
+
+**Consequências:** resolve a **Q-086** e **substitui o item 1 da DEC-107**, que
+deixa de valer (os itens 2, 3 e 4 seguem vigentes). **Nenhuma alteração de spec:**
+a RN-076 fixa a forma triangular inferior, o "X", o padrão `Cidade - Nome da
+Seção`, km e a ausência de R$ — tudo preservado; o §9.1 continua governando a
+**tela** sem mudança (a etapa Matrizes, TASK-048, não é tocada). **Nenhuma
+mudança de contrato JSON**, nenhum recálculo (RN-015), nenhum impacto nas
+matrizes comparativas do Comparador (Spec 05), nas contagens ou nas RN de
+horários.
+
+**Impacto em implementação:** desbloqueia a **TASK-128**, que passa a ser o
+caminho de fechamento do desenho das matrizes do PDF; a **TASK-034** permanece
+reprovada e é encerrada por ela. Módulos: `src/formulario/pdf/matrizes-pdf.ts`
+(derivação de layout; remoção de `alturaCabecalho`, `ALTURA_MAX_CABECALHO` e da
+estimativa de fonte), `estilos-pdf.ts` (remoção dos estilos do cabeçalho diagonal
+e de `celulaDiagonal`, órfã desde `1de7534`) e `documento-pdf-operacional.tsx`
+(`MatrizPdfView`, `CelulaMatrizView`, envelope `wrap={false}` por Serviço).
+**RN:** nenhuma RN muda de texto — RN-076 continua sendo a regra verificada, e o
+critério de revisão passa a incluir "nenhum nó com `transform`" e "todo rótulo de
+coluna em uma única linha", verificáveis por `@react-pdf/layout` em Vitest.
+**Tasks:** **TASK-128** (desbloqueada); **TASK-048** não é afetada;
+TASK-037/TASK-039 (matrizes comparativas) permanecem regidas pela Spec 05, sem
+herança automática desta decisão.
+
+---
+
+## DEC-109 — Bloco de itinerário do PDF: mapa primeiro, lista numerada de Seções e supressão da sequência por seta
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, **opção 2
+da Q-087** (dada explicitamente em conversa de 2026-08-03 e confirmada por
+`/registrar-decisao`), **com a alteração do Spec 04 §13.1 item 4 já aplicada pelo
+responsável** antes do registro; Spec 04 §13.1 item 4, §13.3, §13.4; Spec 01 §8;
+RN-076, RN-031, RN-044, RN-015 · **Data:** 2026-08-03
+
+**Decisão:** no bloco de itinerário do **PDF operacional**, por Serviço e sentido:
+
+1. a ordem passa a ser **(a) título → (b) imagem do mapa → (c) lista numerada de
+   Seções → (d) descrição textual por vias**, conforme o §13.1 item 4 **já
+   alterado**;
+2. a **sequência resumida de Seções ligada por seta** (`Cidade A - Seção A →
+   Cidade B - Seção B`) **deixa de existir**: é substituída pela **lista
+   numerada** na ordem das Seções do itinerário e sentido em pauta, cujo número é
+   o mesmo que marca a Seção no mapa (DEC-105);
+3. a **imagem do mapa** ocupa a **largura útil** da página (largura da página
+   menos as margens laterais) e recebe uma **altura máxima**, encolhendo
+   proporcionalmente quando o bloco precisar do espaço — caso dos Serviços com
+   muitas Seções;
+4. **integridade de página:** **título, mapa e lista numerada de Seções ficam
+   sempre na mesma página**, como unidade inquebrável; **a descrição textual por
+   vias pode quebrar** para a página seguinte quando necessário;
+5. as **Seções realçadas dentro da descrição por vias permanecem** (§13.4): a
+   supressão vale **somente** para a sequência por seta. Locais comuns continuam
+   **fora** da lista numerada e da descrição, aparecendo no **mapa** (§13.1 item
+   4b, DEC-105) e no **anexo técnico** (§13.1 item 8b) — RN-031, RN-044.
+
+**Motivo:** o bloco listava as Seções **duas vezes** — a sequência por seta do
+antigo item 4b e a legenda vertical numerada entregue pela TASK-127 (DEC-105) —,
+e o leitor só encontrava o mapa depois de um parágrafo longo de vias. A lista
+numerada supera a sequência por seta porque carrega o número que casa com o
+símbolo no mapa, tornando a leitura mapa↔lista imediata; manter as duas é
+redundância pura. Quanto ao item 5: as Seções na descrição **não são uma lista** —
+são os marcos que fazem a sequência de vias ler como itinerário (`Seção A, Rua X,
+Avenida Y, Seção B`); removê-las deixaria uma enumeração de ruas sem âncora e
+contrariaria o §13.4 sem ganho. Quanto ao item 4: o mapa em largura plena mais
+título, lista e parágrafo pode exceder a altura útil da página, e o bloco é hoje
+inquebrável — o corte silencioso é o modo de falha que já reprovou a TASK-034
+duas vezes; fixar a unidade em título+mapa+lista e liberar a descrição resolve
+sem sacrificar a leitura.
+
+**Consequências:** resolve a **Q-087** e sua sub-questão. **A alteração de spec
+exigida já foi aplicada pelo responsável** no `docs/specs/04-formulario-ux-pdf.md`
+§13.1 item 4 (nova ordem; lista numerada no lugar da sequência por seta; mapa com
+"seções numeradas e locais comuns") — a decisão **não** antecede a spec, a segue.
+O §13.4 permanece **inalterado** e continua governando a descrição. **Nenhuma
+mudança de contrato JSON**, nenhum recálculo (RN-015), nenhuma alteração na
+captura do mapa, nos símbolos numerados ou na numeração hierárquica `n.m`
+(TASK-126/TASK-127; DEC-104/DEC-105). O painel equivalente da UI (§7.4 e §11)
+**não** é afetado.
+
+**Impacto em implementação:** desbloqueia a **TASK-129**. Módulos:
+`src/formulario/pdf/documento-pdf-operacional.tsx` (`BlocoItinerarioPdf`: ordem
+dos filhos, remoção do `Text` da sequência por seta, envelope de integridade
+título+mapa+lista), `modelo-pdf-operacional.ts` (`sequenciaSecoes` deixa de ser
+composta se ficar sem consumidor — conferir a UI antes de remover) e
+`estilos-pdf.ts` (altura máxima da imagem; estilo órfão de `sequenciaSecoes`).
+**RN:** nenhuma RN muda de texto; RN-076, RN-031 e RN-044 continuam sendo as
+regras verificadas. **Derivados a atualizar quando o responsável pedir:**
+`docs-dev/03-TRACEABILITY_MATRIX.md` e `docs-dev/01-RULE_INDEX.md`, nas linhas que
+citam o §13.1 item 4 pela ordem antiga ou pela sequência por seta. **Tasks:**
+**TASK-129** (desbloqueada); **TASK-128** é independente, mas as duas tocam
+`documento-pdf-operacional.tsx` e `estilos-pdf.ts` — se implementadas em
+sequência, a segunda revalida a suíte de PDF inteira; **TASK-039** (PDF
+comparativo) permanece regida pela Spec 05, sem herança automática.

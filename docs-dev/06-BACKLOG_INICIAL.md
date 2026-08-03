@@ -8277,7 +8277,7 @@ DEC-069, já em uso na etapa de mapa.
 
 ---
 
-## TASK-128 — Matrizes do PDF: rótulo de coluna horizontal no triângulo superior e tabela do Serviço íntegra na página — **BLOQUEADA (Q-086)**
+## TASK-128 — Matrizes do PDF: rótulo de coluna horizontal no triângulo superior e tabela do Serviço íntegra na página — **desbloqueada (DEC-108)**
 
 ## Objetivo
 
@@ -8452,19 +8452,17 @@ no título e a célula empilhada `valor`/`I:`/`V:` (DEC-107 itens 2, 3 e 4).
   intenção.
 - **Regressão nos ganhos da TASK-034:** o alinhamento por largura fixa e o preenchimento
   são a correção que custou duas rodadas — os testes que os travam não podem ser afrouxados.
-- **Depende da Q-086:** implementar antes da decisão registrada contraria a DEC-107 item 1,
-  que está viva.
+- **DEC-107 item 1 substituído:** a DEC-108 revoga o cabeçalho diagonal; conferir que nenhum
+  vestígio dele (estilo, constante ou teste) sobreviva ao refator.
 
 ## Perguntas em aberto
 
-- **Q-086** — cabeçalho diagonal (DEC-107 item 1) × rótulo horizontal no triângulo
-  superior. **Direção já indicada pelo responsável (opção 2, com imagem de referência
-  `docs-dev/tabela distancias PDF.jpg`); a task nasce bloqueada até o registro por
-  `/registrar-decisao`.**
+- Nenhuma — **Q-086 decidida pela opção 2 (DEC-108)**, que substitui o item 1 da DEC-107.
+  Imagem de referência normativa: `docs-dev/tabela distancias PDF.jpg`.
 
 ---
 
-## TASK-129 — PDF: mapa no topo do bloco de itinerário, lista numerada de Seções e descrição por vias — **BLOQUEADA (Q-087)**
+## TASK-129 — PDF: mapa no topo do bloco de itinerário, lista numerada de Seções e descrição por vias — **desbloqueada (DEC-109)**
 
 ## Objetivo
 
@@ -8554,6 +8552,11 @@ acrescenta é *garanti-la por teste* e resolver a consequência de altura descri
 - [ ] Itinerário **sem** imagem de mapa (falha de captura, DEC-104) continua imprimindo o
       aviso no lugar da imagem, seguido da lista numerada e da descrição — a ausência da
       imagem não suprime nem reordena o resto.
+- [ ] **Título, mapa e lista numerada de Seções ficam sempre na mesma página**, como
+      unidade inquebrável; **a descrição por vias pode quebrar** para a página seguinte
+      (DEC-109 item 4).
+- [ ] A imagem do mapa tem **altura máxima**, encolhendo proporcionalmente quando o bloco
+      precisar do espaço — Serviço com muitas Seções não estoura a página (DEC-109 item 3).
 - [ ] O bloco de itinerário continua começando em página própria a partir do segundo
       (`break`), sem conteúdo cortado.
 
@@ -8597,19 +8600,20 @@ acrescenta é *garanti-la por teste* e resolver a consequência de altura descri
   margens da imagem/lista).
 - Alterar: `testes/unitarios/formulario/pdf-renderizacao.test.tsx` e os testes de modelo do
   PDF que assertam a sequência por seta.
-- **Pré-requisito fora do repositório de código:** alteração do **Spec 04 §13.1 item 4**
-  pelo responsável (`docs/specs/**` é read-only para quem implementa).
+- **Pré-requisito já cumprido:** o **Spec 04 §13.1 item 4** foi alterado pelo responsável
+  (`docs/specs/**` permanece read-only para quem implementa).
 
 ## Riscos
 
-- **Altura do bloco:** `BlocoItinerarioPdf` é `wrap={false}`. Com o mapa em largura máxima
-  (≈ 515 pt de largura; captura 1400×840 ⇒ ≈ 309 pt de altura), mais título, lista numerada
-  (uma linha por Seção) e o parágrafo de vias, um Serviço com muitas Seções pode exceder a
-  altura útil (≈ 745 pt) e ser **cortado em silêncio** — o mesmo modo de falha que reprovou
-  a TASK-034 duas vezes. Decidir e testar o comportamento (limitar a altura da imagem,
-  permitir quebra após o mapa, ou ambos) faz parte da task.
-- **Spec alterada antes do código:** se a Spec 04 §13.1 item 4 não for alterada primeiro, a
-  implementação viola texto literal de spec — a task não pode começar antes disso.
+- **Altura do bloco:** `BlocoItinerarioPdf` é hoje `wrap={false}` inteiro. Com o mapa em
+  largura máxima (≈ 515 pt; captura 1400×840 ⇒ ≈ 309 pt de altura), mais título, lista
+  numerada (uma linha por Seção) e o parágrafo de vias, um Serviço com muitas Seções
+  excederia a altura útil (≈ 745 pt) e seria **cortado em silêncio** — o mesmo modo de falha
+  que reprovou a TASK-034 duas vezes. A **DEC-109 itens 3 e 4** fecha o comportamento (teto
+  de altura no mapa + unidade título/mapa/lista, com a descrição livre para quebrar); o
+  risco remanescente é implementá-lo sem teste que prove a não-quebra e a não-perda.
+- **Spec já alterada:** o Spec 04 §13.1 item 4 foi alterado pelo responsável antes do
+  registro da DEC-109 — conferir o texto vigente ao implementar, não o desta task.
 - **`sequenciaSecoes` pode ter outros consumidores** além do PDF: conferir antes de
   remover do modelo, e manter se a UI usar.
 - **Interação com a TASK-128:** independentes (blocos diferentes do documento), mas as duas
@@ -8618,10 +8622,8 @@ acrescenta é *garanti-la por teste* e resolver a consequência de altura descri
 
 ## Perguntas em aberto
 
-- **Q-087** — ordem do bloco de itinerário e supressão da sequência por seta, **incluindo a
-  sub-questão** sobre as Seções realçadas dentro da descrição. **Direção já indicada pelo
-  responsável (opção 2); a task nasce bloqueada até a alteração da Spec 04 §13.1 item 4 e o
-  registro por `/registrar-decisao`.**
+- Nenhuma — **Q-087 decidida pela opção 2 (DEC-109)**, sub-questão inclusa (as Seções
+  realçadas na descrição permanecem) e Spec 04 §13.1 item 4 já alterado pelo responsável.
 
 ---
 

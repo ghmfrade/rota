@@ -1597,8 +1597,12 @@ que a RN-076 de fato fixa (triangular inferior, "X", padrão de nome, km, sem R$
 permanece. A opção 3 criaria dois formatos no mesmo documento, prejudicando a comparação
 entre Serviços.
 
-**Decisão:** **Em aberto.** Direção já indicada pelo responsável (opção 2, com imagem de
-referência); falta o registro formal por `/registrar-decisao`. Bloqueia a **TASK-128**.
+**Decisão:** **Decidida (DEC-108, 2026-08-03).** Opção 2 — rótulo de coluna **horizontal**
+na célula imediatamente acima do próprio "X" (posição `(linha j−1, coluna j)`), transbordando
+à direita sobre o triângulo superior; rótulo da coluna 0 na linha de cabeçalho acima; **nenhum
+texto girado**. Imagem de referência do responsável: `docs-dev/tabela distancias PDF.jpg`.
+**Substitui o item 1 da DEC-107**; os itens 2, 3 e 4 daquela decisão seguem vigentes. Inclui a
+integridade de página da matriz por Serviço. Desbloqueia a **TASK-128**. Ver DEC-108.
 
 ---
 
@@ -1651,6 +1655,10 @@ sem ganho.
 Q-086 quanto ao precedente de adaptação de mídia; a diferença é que aqui há alteração de
 texto literal de spec, então a Spec 04 deve ser alterada **antes** do código.
 
-**Decisão:** **Em aberto.** Direção já indicada pelo responsável (opção 2); faltam a
-alteração da Spec 04 §13.1 item 4 e o registro por `/registrar-decisao`. Bloqueia a
-**TASK-129**.
+**Decisão:** **Decidida (DEC-109, 2026-08-03).** Opção 2 — ordem (a) título, (b) mapa,
+(c) lista numerada de Seções, (d) descrição por vias; a sequência por seta deixa de existir.
+**Sub-questão decidida:** a supressão vale **somente** para a sequência por seta — as Seções
+realçadas dentro da descrição **permanecem** (§13.4, inalterado). Acrescentado pelo
+responsável: mapa com **altura máxima**, e **título + mapa + lista numerada na mesma
+página**, podendo a descrição quebrar. **A alteração do Spec 04 §13.1 item 4 já foi aplicada
+pelo responsável** antes do registro. Desbloqueia a **TASK-129**. Ver DEC-109.
