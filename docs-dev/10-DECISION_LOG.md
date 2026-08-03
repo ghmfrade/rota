@@ -1865,3 +1865,83 @@ citam o §13.1 item 4 pela ordem antiga ou pela sequência por seta. **Tasks:**
 `documento-pdf-operacional.tsx` e `estilos-pdf.ts` — se implementadas em
 sequência, a segunda revalida a suíte de PDF inteira; **TASK-039** (PDF
 comparativo) permanece regida pela Spec 05, sem herança automática.
+
+---
+
+## DEC-110 — Orçamento de largura das matrizes do PDF: 7 colunas por bloco, rótulo de linha a 170 pt e rótulo de coluna a 118 pt com truncamento
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, **opção 2
+da Q-088** (dada explicitamente em conversa de 2026-08-03 — "Q-088 com as suas
+recomendações" — e confirmada por `/registrar-decisao`); Spec 04 §9.1, §13.1
+itens 6–7, §13.3; RN-076, RN-054, RN-013; DEC-107 itens 2–4; DEC-108 ·
+**Data:** 2026-08-03
+
+**Decisão:** o orçamento de largura das duas matrizes do PDF operacional
+(§13.1 itens 6 e 7) fica fixado assim:
+
+1. **`MAX_COLUNAS_POR_BLOCO` permanece 7.** O pedido de elevar para 8 fica
+   **recusado**: não resolve o bloco degenerado (só desloca o caso de 8 para 9,
+   17 e 25 Seções), não elimina o segundo bloco na escala real do ROTA (11–12
+   Seções por Serviço) e custa 30,7 pt de invasão da margem direita.
+2. **Rótulo de linha (`cabecalhoLinhaMatriz`) passa de 130 para ~170 pt**, para
+   que os nomes `Cidade - Nome da Seção` da escala real caiam em **uma linha**,
+   como na imagem normativa da DEC-108.
+3. **Rótulo de coluna (`rotuloColunaMatriz`) passa de 150 para ~118 pt**, com
+   **truncamento por reticências** do que exceder a largura. Como o contrato JSON
+   **não limita** o tamanho do nome de Seção (`nome: z.string().min(1)`), "uma
+   linha sempre" só é obtível por truncamento ou por redução de fonte; escolhe-se
+   o truncamento, que preserva a legibilidade do que sobra e é verificável por
+   teste. A `fontSize: 7` permanece.
+4. O critério **"todo rótulo de coluna ocupa uma única linha"** passa a valer
+   **sem exceção**, inclusive para nome longo — a garantia deixa de ser
+   aritmética de largura e passa a ser o truncamento.
+
+Ficam também registradas, por adoção explícita das demais recomendações da
+"Análise da Task", três definições da **rodada de correção da TASK-128**:
+
+5. as cinco correções do parecer `TASK-034-20260803-task-128.md` são feitas em
+   **uma única rodada** (não em duas), por mexerem nos mesmos estilos e exigirem
+   uma só conferência visual;
+6. as **réguas verticais** entre colunas usam **`CINZA_500`** (paleta do
+   `docs-dev/18` §2), distinguindo-se do `CINZA_200` dos separadores
+   horizontais, e são desenhadas **em escada** — nas células de valor, na
+   diagonal e na célula de preenchimento que hospeda rótulo —, nunca como grade
+   sobre o triângulo superior vazio, que na imagem normativa não tem réguas;
+7. o descarte do **bloco degenerado** (bloco cujas células habitadas sejam só
+   diagonais) preserva **ao menos um bloco**: matriz de uma única Seção continua
+   sendo impressa, já que o contrato não impõe mínimo de Seções.
+
+**Motivo:** os três pedidos abertos na conferência visual — mais colunas, rótulo
+de linha mais largo e rótulo de coluna sem quebra — competem pelos mesmos
+515,3 pt de largura útil e **não cabem juntos**. Hoje o rótulo da última coluna
+termina a 7,3 pt da margem direita: qualquer alargamento do rótulo de linha, ou
+qualquer coluna a mais, o joga para fora. Decidir uma dimensão de cada vez foi
+o que produziu três rodadas reprovadas na TASK-034/TASK-128; esta decisão fecha
+a conta inteira de uma vez. Entre truncar e diminuir a fonte, truncar mantém os
+7 pt de corpo já aprovados e não reintroduz o problema de legibilidade que
+motivou a DEC-108.
+
+**Consequências:** resolve a **Q-088**. **Nenhuma alteração de spec:** a RN-076
+fixa forma triangular inferior, "X" na diagonal, padrão `Cidade - Nome da
+Seção`, km e ausência de R$ — tudo preservado; §9.1 continua governando a
+**tela** sem mudança (etapa Matrizes, TASK-048, não é tocada). **Nenhuma mudança
+de contrato JSON** e nenhum limite de tamanho de nome é criado — o truncamento é
+**exclusivamente de apresentação no PDF**, o dado permanece íntegro no JSON e na
+tela. Nenhum recálculo (RN-015). Os itens 2, 3 e 4 da DEC-107 e os itens 1, 2 e
+5 da DEC-108 permanecem vigentes e intocados.
+
+**Impacto em implementação:** desbloqueia a **rodada de correção da TASK-128**
+(itens 4, 5 e 6 do parecer). Módulos: `src/formulario/pdf/estilos-pdf.ts`
+(larguras de `cabecalhoLinhaMatriz` e `rotuloColunaMatriz`, truncamento, réguas
+verticais, estilos de linha próprios da matriz),
+`src/formulario/pdf/matrizes-pdf.ts` (descarte do bloco degenerado;
+`MAX_COLUNAS_POR_BLOCO` **inalterado**) e
+`src/formulario/pdf/documento-pdf-operacional.tsx` (`MatrizPdfView`,
+`CelulaMatrizView`). **RN:** nenhuma RN muda de texto — RN-076 continua sendo a
+regra verificada, e o critério de revisão passa a incluir "todo rótulo de coluna
+em uma única linha **inclusive com nome longo**" e "nenhum bloco de matriz sem
+célula de valor", ambos verificáveis em Vitest (o primeiro por
+`@react-pdf/layout`). **Tasks:** **TASK-128** (rodada de correção); **TASK-048**
+não é afetada; **TASK-129** toca os mesmos arquivos e, se implementada em
+sequência, revalida a suíte de PDF inteira; TASK-037/TASK-039 (matrizes
+comparativas) permanecem regidas pela Spec 05, sem herança automática.

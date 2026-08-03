@@ -1662,3 +1662,63 @@ realçadas dentro da descrição **permanecem** (§13.4, inalterado). Acrescenta
 responsável: mapa com **altura máxima**, e **título + mapa + lista numerada na mesma
 página**, podendo a descrição quebrar. **A alteração do Spec 04 §13.1 item 4 já foi aplicada
 pelo responsável** antes do registro. Desbloqueia a **TASK-129**. Ver DEC-109.
+
+---
+
+## Q-088 — Orçamento de largura das matrizes do PDF: colunas por bloco, largura do rótulo de linha e garantia de "uma linha" no rótulo de coluna
+
+**Contexto:** Levantada em 2026-08-03 na conferência visual do PDF gerado pela **TASK-128**
+(parecer `docs-dev/14-REVISOES/TASK-034-20260803-task-128.md`, reprovado — problemas 4, 5 e
+6). Três pedidos independentes disputam a mesma largura útil de **515,3 pt** (A4 menos os
+paddings de `estilosPdf.pagina`): (a) elevar `MAX_COLUNAS_POR_BLOCO` de **7 para 8**, pedido
+explícito do responsável e hoje listado em "Fora de escopo" da TASK-128; (b) alargar
+`cabecalhoLinhaMatriz` (130 pt), onde "Praia Grande - Rodoviária Praia Grande" já quebra em
+duas linhas, contra a imagem normativa da DEC-108; (c) garantir que **todo** rótulo de coluna
+saia em **uma linha** — hoje `rotuloColunaMatriz` tem `width: 150` a `fontSize: 7`, o que
+comporta ~47 caracteres, e o contrato JSON **não limita** o tamanho do nome de Seção
+(`nome: z.string().min(1)` em `src/shared/contrato/esquema.ts`), de modo que **nenhuma largura
+fixa** garante o critério.
+
+Aritmética que instrui a decisão (largura útil 515,3 pt; margem direita em 555,3 pt):
+
+- hoje: `130 + 7×38 = 396 pt`; o rótulo da última coluna começa em `40 + 130 + 6×38 = 398` e
+  termina em **548 pt** — apenas **7,3 pt** de folga até a margem;
+- alargar o rótulo de linha empurra o último rótulo de coluna para **fora da margem** já com
+  7 colunas;
+- com **8** colunas: `130 + 8×38 = 434 pt` cabem, mas o rótulo da última coluna terminaria em
+  **586 pt**, 30,7 pt além da margem; para manter 150 pt de rótulo de coluna, o rótulo de
+  linha teria de cair para **≤ 99 pt**.
+
+**Spec relacionada:** Spec 04 §9.1, §13.1 itens 6–7, §13.3; RN-076 (matrizes triangulares
+inferiores, `Cidade - Nome da Seção`, em km, sem R$); DEC-107 itens 2–4; DEC-108 itens 1 e 2.
+
+**Impacto se não decidir:** a rodada de correção da TASK-128 fecha o bloco degenerado, as
+réguas verticais e a ancoragem do rótulo, mas os rótulos continuam quebrando em nomes reais
+longos e o pedido das 8 colunas fica pendente — com risco concreto de uma quinta rodada
+mexendo numa dimensão de cada vez, que é exatamente o modo de falha das três primeiras.
+
+**Opções:**
+1. **Congelar a repartição atual** (130 / 38 / 150 e 7 colunas) e aceitar quebra em 2 linhas
+   para nome longo, no rótulo de linha e no de coluna. Nenhuma largura muda; o critério "uma
+   linha" passa a valer, explicitamente, só para nomes até ~47 caracteres.
+2. **Manter 7 colunas e reequilibrar:** rótulo de linha ~170 pt (uma linha para os nomes da
+   escala real) e rótulo de coluna reduzido a ~118 pt **com truncamento por reticências** do
+   que exceder. Cumpre a imagem normativa nos dois rótulos; nome muito longo aparece cortado,
+   nunca quebrado.
+3. **Elevar para 8 colunas** (`MAX_COLUNAS_POR_BLOCO = 8`), com rótulo de linha ≤ 100 pt e
+   rótulo de coluna ~119 pt, ambos com truncamento.
+4. **Reduzir a fonte do rótulo de coluna** de 7 para 6 pt, mantendo 7 colunas e 150 pt de
+   largura (~55 caracteres em uma linha), sem truncamento.
+
+**Recomendação técnica:** opção **2**. Como o contrato não limita o nome da Seção, "uma linha
+sempre" só é obtível por truncamento ou por redução de fonte; entre as duas, o truncamento
+preserva a legibilidade do que sobra e é verificável por teste. Elevar para 8 colunas
+(opção 3) **não** resolve o bloco degenerado — apenas desloca o caso de 8 para 9, 17 e 25
+Seções — e, na escala real do ROTA (11–12 Seções por Serviço), não elimina o segundo bloco;
+é o item de menor retorno pelo maior custo de largura.
+
+**Decisão:** **Decidida (DEC-110, 2026-08-03).** Opção 2, "com as recomendações" — o
+responsável adotou explicitamente a recomendação técnica desta Q e as demais recomendações da
+"Análise da Task" da rodada de correção da TASK-128: rodada única (as cinco correções juntas),
+réguas verticais em `CINZA_500` e preservação de ao menos um bloco no descarte do bloco
+degenerado. `MAX_COLUNAS_POR_BLOCO` **permanece 7**. Ver DEC-110.
