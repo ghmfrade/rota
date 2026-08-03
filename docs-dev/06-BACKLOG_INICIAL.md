@@ -8277,4 +8277,352 @@ DEC-069, já em uso na etapa de mapa.
 
 ---
 
+## TASK-128 — Matrizes do PDF: rótulo de coluna horizontal no triângulo superior e tabela do Serviço íntegra na página — **BLOQUEADA (Q-086)**
+
+## Objetivo
+
+Ao final, o cabeçalho de coluna das duas matrizes do PDF é escrito **horizontalmente
+dentro do triângulo superior vazio** — o rótulo da coluna `j` na célula imediatamente
+acima do seu próprio "X" —, sem nenhum texto girado; e a matriz de um mesmo Serviço
+**nunca** é partida entre páginas: se não couber no espaço restante, migra inteira para a
+página seguinte.
+
+## Contexto
+
+A TASK-034 foi reprovada duas vezes no desenho das matrizes. A segunda rodada
+(`1de7534`) corrigiu o alinhamento na raiz — largura fixa por coluna e célula de
+preenchimento no triângulo superior — mas o cabeçalho diagonal da **DEC-107 item 1** não
+se sustenta: `rotuloColunaDiagonal` é `position: absolute` sem `width`, o motor quebra o
+rótulo nos 38 pt da coluna **antes** de girá-lo (3 a 5 linhas medidas sobre o componente
+real), e a espessura resultante (26,4 / 35,2 / 44,0 pt) excede o passo perpendicular entre
+colunas vizinhas a 45° (`38 × cos45° ≈ 26,9 pt`), sobrepondo cabeçalhos. Ver
+`docs-dev/14-REVISOES/TASK-034-20260803-correcao.md`, problema 1.
+
+O responsável apresentou outra solução em imagem de referência
+(`docs-dev/tabela distancias PDF.jpg`): o triângulo superior, hoje só preenchimento vazio,
+recebe os nomes das colunas na horizontal. Isso remove a causa estrutural em vez de
+contorná-la — sem texto girado não há quebra nem sobreposição a administrar — e devolve à
+página a altura hoje reservada ao cabeçalho diagonal.
+
+O segundo ponto vem da mesma leitura do PDF gerado: hoje o `wrap={false}` está em cada
+**bloco** de matriz (`documento-pdf-operacional.tsx`), não na matriz do **Serviço**, de
+modo que os blocos de um mesmo Serviço podem cair em páginas diferentes, partindo a
+tabela ao meio.
+
+Toda a base necessária já existe e **não muda**: o modelo triangular (`MatrizPdf`), a
+largura fixa por coluna, as células de preenchimento, `dividirMatrizEmBlocos`, a unidade
+no título e a célula empilhada `valor`/`I:`/`V:` (DEC-107 itens 2, 3 e 4).
+
+## Fora de escopo
+
+- **Qualquer alteração no modelo semântico** `MatrizPdf`/`LinhaMatrizPdf`: quem é
+  diagonal, quem é `—`, quem tem valor e a garantia da RN-054 continuam onde estão.
+- **Reverter as decisões vivas da DEC-107** (itens 2, 3 e 4): a unidade permanece no
+  título, a célula bidirecional permanece empilhada em `valor`/`I:`/`V:` sem "Média", e o
+  "—" permanece exclusivo do seccionamento.
+- **A matriz de distâncias na tela** (etapa Matrizes, TASK-048) e `formatarKm`,
+  compartilhado com ela — o PDF continua com seu formatador próprio.
+- As tabelas horárias, o anexo técnico e os itinerários do PDF (a reordenação do bloco de
+  itinerário é a **TASK-129**).
+- A tabela de Locais do anexo, que continua usando `celulaMatriz`/`celulaCabecalhoMatriz`
+  — **não** alterar esses dois estilos.
+- Aumentar ou diminuir `MAX_COLUNAS_POR_BLOCO`/`MAX_LINHAS_POR_BLOCO` além do reajuste que
+  a remoção do cabeçalho diagonal tornar aritmeticamente necessário.
+- Qualquer alteração no contrato JSON.
+
+## Specs fonte
+
+- Spec 04 §9.1 (matriz de distâncias: triangular inferior, "X" na diagonal, km)
+- Spec 04 §9.2 (matriz de seccionamento: pares não habilitados com "—")
+- Spec 04 §13.1 itens 6 e 7 (as duas matrizes no PDF, no formato de §9.1/§9.2)
+- Spec 04 §13.3 ("uma página por bloco lógico quando possível"; nomes sempre no padrão
+  `Cidade - Nome da Seção`; km, sem R$)
+
+## Regras envolvidas
+
+- **RN-076** — matrizes triangulares inferiores, `Cidade - Nome da Seção`, em km, sem R$.
+- **RN-054** — uma entrada por par não-ordenado de Seções distintas (nenhuma célula do
+  triângulo inferior fica vazia por omissão).
+- **RN-056** — `valor_adotado_de_distancia` e o detalhe Ida/Volta só no bidirecional.
+- **RN-058 / RN-059** — "—" é par não habilitado, exclusivo da matriz de seccionamento.
+- **RN-013** — nenhum valor monetário.
+- **RN-015** — matrizes congeladas são lidas, nunca recalculadas.
+
+## Entidades afetadas
+
+- Seção (rótulos de linha e coluna), Serviço (uma matriz por Serviço). Nenhuma entidade é
+  criada, alterada ou persistida — a task é de apresentação.
+
+## Ferramentas afetadas
+
+- [x] Formulário (apenas o gerador de PDF)
+- [ ] Comparador
+- [ ] Ingestor
+- [x] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] O rótulo da coluna `j` é renderizado **horizontalmente** na célula `(linha j−1,
+      coluna j)` — imediatamente acima do "X" da própria coluna —, alinhado à esquerda e
+      livre para transbordar à direita sobre as células vazias do triângulo superior.
+- [ ] O rótulo da **coluna 0** é renderizado numa linha de cabeçalho acima da matriz,
+      sobre a coluna 0.
+- [ ] **Nenhum** texto do documento usa `transform: rotate` — `rotuloColunaDiagonal`,
+      `cabecalhoColunaDiagonal`, `linhaCabecalhoDiagonal`, `alturaCabecalho` e
+      `ALTURA_MAX_CABECALHO` deixam de existir, com eles a estimativa de largura de fonte.
+- [ ] Todo rótulo de coluna ocupa **uma única linha** (`lines.length === 1` no layout).
+- [ ] A forma triangular permanece: toda linha de dados tem exatamente
+      `bloco.cabecalhos.length` células, o "X" na diagonal e o preenchimento vazio fora do
+      triângulo (o rótulo ocupa a célula de preenchimento, mas não altera a contagem).
+- [ ] A matriz de um mesmo Serviço não é partida entre páginas: se não couber no espaço
+      restante, migra **inteira** para a página seguinte.
+- [ ] Serviço cuja matriz não cabe **nem** numa página inteira continua sendo partido em
+      blocos (`dividirMatrizEmBlocos`), com o cabeçalho repetido e o título em
+      "(continuação)" — a integridade é garantida por bloco, nunca cortando conteúdo.
+- [ ] Permanecem verdes, sem alteração de expectativa: unidade no título, célula empilhada
+      `valor`/`I:`/`V:` sem "Média", "—" só no seccionamento, ausência de R$ e de
+      `HH:MM:SS`, Locais só no anexo.
+- [ ] `celulaDiagonal`, sem consumidor desde `1de7534`, é removida.
+
+## Casos válidos
+
+- Serviço com **3 Seções** (fixture `documentoExemploMinimo()`): um bloco; linha de
+  cabeçalho com o rótulo da coluna 0; "Santa Isabel - 2" na linha 0 à direita do "X";
+  "São Paulo - …" na linha 1 à direita do "X".
+- Serviço **bidirecional**: célula com `valor` / `I:` / `V:` empilhados (inalterado).
+- Serviço **unidirecional**: célula só com o valor adotado (RN-056).
+- Serviço com **9 Seções**: dois blocos por faixa de colunas; em cada bloco o rótulo da
+  primeira coluna da faixa vai na linha de cabeçalho e os demais no triângulo superior
+  local.
+- Matriz do Serviço que **cabe** no espaço restante: impressa ali, sem página nova.
+- Matriz do Serviço que **não cabe** no espaço restante mas cabe numa página: migra
+  inteira para a página seguinte, sem partir.
+
+## Casos inválidos
+
+- Rótulo de coluna que **quebre em mais de uma linha** → o teste de layout falha (é o
+  defeito que reprovou a rodada anterior; a asserção deve ser explícita).
+- Célula de preenchimento que traga `—` em qualquer das duas matrizes → falha: "—" é
+  informação exclusiva do seccionamento (RN-058/RN-059) e nunca preenchimento.
+- Linha de dados com número de células diferente do cabeçalho do bloco → falha (garantia
+  de alinhamento herdada da TASK-034, não pode regredir).
+- Qualquer "R$" ou "km" dentro de célula de matriz → falha (RN-013; unidade no título).
+- Matriz de um Serviço partida entre duas páginas → falha.
+
+## Testes esperados
+
+- **Unitários:** derivação de layout — posição do rótulo de coluna (`(j−1, j)`; coluna 0
+  na linha de cabeçalho) para matrizes sintéticas de 3, 9 e 20 Seções; contagem de células
+  por linha igual à do cabeçalho; preenchimento nunca vira `MARCA_PAR_NAO_HABILITADO`;
+  diagonal na posição local `i − c0`.
+- **Integração:** N/A.
+- **E2E:** N/A (o PDF não é DOM).
+- **Snapshot/contrato JSON:** N/A — a task não toca o contrato.
+- **PDF:** sobre a árvore renderizada, (a) nenhum nó com `transform`; (b) **layout real**
+  via `@react-pdf/layout` + `@react-pdf/font` — todo rótulo de coluna com
+  `lines.length === 1` (padrão demonstrado em
+  `docs-dev/14-REVISOES/TASK-034-20260803-correcao.md`, problema 1); (c) toda linha de
+  dados com o mesmo número de filhos do cabeçalho; (d) integridade de página da matriz do
+  Serviço; (e) regressão: `pdf-regras-transversais.test.ts` e `pdf-tabelas-horarias.test.ts`
+  **sem alteração de expectativa** — se precisarem mudar, é escopo vazando.
+
+## Arquivos prováveis
+
+- Alterar: `src/formulario/pdf/matrizes-pdf.ts` (derivação de layout: posição do rótulo;
+  remoção de `alturaCabecalho`/`ALTURA_MAX_CABECALHO`/estimativa de fonte).
+- Alterar: `src/formulario/pdf/estilos-pdf.ts` (remover os estilos do cabeçalho diagonal e
+  `celulaDiagonal`; estilo do rótulo horizontal no triângulo superior).
+- Alterar: `src/formulario/pdf/documento-pdf-operacional.tsx` (`MatrizPdfView`,
+  `CelulaMatrizView`; `wrap={false}` no envelope do Serviço).
+- Alterar: `testes/unitarios/formulario/pdf-matrizes.test.ts`,
+  `testes/unitarios/formulario/pdf-renderizacao.test.tsx`.
+
+## Riscos
+
+- **Transbordo do rótulo à direita:** com poucas colunas restantes no triângulo superior,
+  o rótulo da penúltima/última coluna pode ultrapassar a borda útil. Mitigar com a folga
+  já existente à direita da tabela (`tabelaMatriz` usa `alignSelf: "flex-start"`) e
+  conferir na conferência visual.
+- **Última coluna sem célula acima do "X":** o rótulo da coluna `n−1` fica na linha `n−2`;
+  a matriz de 2 Seções é o caso mínimo a exercitar.
+- **Integridade de página × blocos:** `wrap={false}` no Serviço inteiro reintroduz, em
+  escala maior, o risco de corte silencioso que motivou a quebra em blocos. A regra de
+  precedência (Serviço íntegro quando couber; senão, blocos) precisa de teste, não só de
+  intenção.
+- **Regressão nos ganhos da TASK-034:** o alinhamento por largura fixa e o preenchimento
+  são a correção que custou duas rodadas — os testes que os travam não podem ser afrouxados.
+- **Depende da Q-086:** implementar antes da decisão registrada contraria a DEC-107 item 1,
+  que está viva.
+
+## Perguntas em aberto
+
+- **Q-086** — cabeçalho diagonal (DEC-107 item 1) × rótulo horizontal no triângulo
+  superior. **Direção já indicada pelo responsável (opção 2, com imagem de referência
+  `docs-dev/tabela distancias PDF.jpg`); a task nasce bloqueada até o registro por
+  `/registrar-decisao`.**
+
+---
+
+## TASK-129 — PDF: mapa no topo do bloco de itinerário, lista numerada de Seções e descrição por vias — **BLOQUEADA (Q-087)**
+
+## Objetivo
+
+Ao final, o bloco de itinerário do PDF apresenta, nesta ordem: título, **imagem do mapa**
+ocupando a largura útil da página, **lista numerada de Seções** na ordem do itinerário e
+**descrição textual por vias** — sem a sequência de Seções ligada por seta, que hoje
+duplica a lista numerada.
+
+## Contexto
+
+O bloco de itinerário hoje segue a ordem literal do **Spec 04 §13.1 item 4**: (a) título,
+(b) sequência de Seções por seta, (c) descrição por vias, (d) mapa — e, depois do mapa, a
+**legenda vertical numerada** entregue pela TASK-127 (DEC-105), que lista as Seções na
+ordem do itinerário com o mesmo número que as marca no mapa
+(`documento-pdf-operacional.tsx:290-334`). O resultado é que **as Seções são listadas duas
+vezes** no mesmo bloco, e o leitor encontra o mapa depois de um parágrafo longo de vias, em
+vez de começar por ele.
+
+O responsável pediu a inversão: mapa primeiro, depois a lista numerada de Seções, depois as
+vias — observando que não é preciso repetir a lista de Seções. A legenda numerada supera a
+sequência por seta, porque carrega o número que casa com o símbolo no mapa; é ela que
+permanece.
+
+Quanto à largura do mapa: `estilosPdf.imagemMapa` já usa `width: "100%"` com
+`objectFit: "contain"`, e a captura sai em `LARGURA_CAPTURA = 1400` px
+(`captura-mapa-pdf.ts`), portanto **a largura máxima já é a esperada** — o que a task
+acrescenta é *garanti-la por teste* e resolver a consequência de altura descrita nos riscos.
+
+## Fora de escopo
+
+- **Alterar a captura do mapa** (`captura-mapa-pdf.ts`), os símbolos numerados
+  (`simbolos-mapa-pdf.ts`), a numeração hierárquica `n.m` ou a composição de imagem —
+  tudo entregue pelas TASK-126/127 (DEC-104/DEC-105).
+- **Alterar o conteúdo da legenda** (quais itens entram, texto, ordem): só a **posição**
+  dela no bloco muda. Locais continuam fora da legenda e do corpo (RN-031, RN-076).
+- **Alterar o texto congelado** `rota.descricao_itinerario` ou sua composição
+  (`compor-descricao.ts`) — a task só muda onde o parágrafo aparece.
+- **Remover as Seções realçadas de dentro da descrição por vias**: o §13.4 as exige como
+  marcos (ver a sub-questão da Q-087) — a supressão vale só para a sequência por seta.
+- O painel equivalente da UI (etapa de mapa §7.4 e Revisão §11) — a task é só do PDF.
+- As matrizes do PDF (**TASK-128**), as tabelas horárias e o anexo técnico.
+- Qualquer alteração no contrato JSON.
+
+## Specs fonte
+
+- Spec 04 §13.1 item 4 (composição e ordem do bloco de itinerário) — **é o texto que a
+  Q-087 propõe alterar**
+- Spec 04 §13.3 ("uma página por bloco lógico quando possível")
+- Spec 04 §13.4 (renderização da descrição por vias: parágrafo corrido, Seções em
+  destaque, Locais nunca)
+- Spec 01 §8 (imagem do mapa capturada do canvas)
+
+## Regras envolvidas
+
+- **RN-076** — `Cidade - Nome da Seção` em todo rótulo; Locais fora do corpo do PDF.
+- **RN-031** — Local não é Seção: não entra na lista numerada nem na descrição.
+- **RN-044** — Locais fora da descrição textual do itinerário.
+- **RN-015** — a descrição e a rota são congeladas: lidas, nunca recompostas no PDF.
+
+## Entidades afetadas
+
+- Seção (lista numerada), Serviço e sentido (um bloco por par). Nenhuma entidade criada ou
+  alterada — a task é de apresentação.
+
+## Ferramentas afetadas
+
+- [x] Formulário (apenas o gerador de PDF)
+- [ ] Comparador
+- [ ] Ingestor
+- [x] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] A ordem dos filhos do bloco de itinerário é, exatamente: título → imagem do mapa →
+      lista numerada de Seções → descrição por vias.
+- [ ] A **sequência de Seções ligada por seta** (`sequenciaSecoes`) não aparece mais em
+      nenhuma página do PDF.
+- [ ] A imagem do mapa ocupa a largura útil da página (largura da `Page` menos o
+      `paddingHorizontal` de `estilosPdf.pagina`), verificado no **layout real**, não só
+      pela declaração `width: "100%"`.
+- [ ] A lista numerada de Seções mantém, item a item, o número que marca a Seção no mapa
+      (DEC-105) e o padrão `Cidade - Nome da Seção` (RN-076).
+- [ ] Nenhum Local aparece na lista numerada nem na descrição (RN-031, RN-044).
+- [ ] A descrição por vias continua parágrafo corrido com as Seções realçadas (§13.4),
+      inalterada em conteúdo.
+- [ ] Itinerário **sem** imagem de mapa (falha de captura, DEC-104) continua imprimindo o
+      aviso no lugar da imagem, seguido da lista numerada e da descrição — a ausência da
+      imagem não suprime nem reordena o resto.
+- [ ] O bloco de itinerário continua começando em página própria a partir do segundo
+      (`break`), sem conteúdo cortado.
+
+## Casos válidos
+
+- Serviço bidirecional: dois blocos (Ida e Volta), cada um na nova ordem.
+- Itinerário com mapa capturado: imagem no topo, na largura útil.
+- Itinerário com Locais no percurso: eles aparecem **apenas** no anexo técnico — nem na
+  lista numerada, nem na descrição.
+- Itinerário com descrição longa (muitas vias): parágrafo corrido quebra em várias linhas,
+  depois do mapa e da lista.
+
+## Casos inválidos
+
+- Presença da sequência por seta em qualquer página → falha.
+- Local na lista numerada ou na descrição → falha (RN-031, RN-044).
+- Imagem de mapa mais estreita que a largura útil → falha.
+- Falha de captura tratada como erro (bloco vazio, exceção) em vez do aviso da DEC-104 →
+  falha.
+
+## Testes esperados
+
+- **Unitários:** montagem do bloco de itinerário — ausência de `sequenciaSecoes` no modelo
+  ou no desenho; lista numerada preservando rótulos e ordem; Locais ausentes.
+- **Integração:** N/A.
+- **E2E:** N/A (o PDF não é DOM).
+- **Snapshot/contrato JSON:** N/A.
+- **PDF:** (a) ordem dos filhos do bloco na árvore renderizada, por estilo/tipo de nó;
+  (b) **layout real** via `@react-pdf/layout` — largura da `Image` igual à largura útil da
+  página; (c) itinerário sem `imagemMapa` → aviso presente e ordem preservada; (d)
+  regressão: legenda com os mesmos itens/rótulos de hoje e `pdf-regras-transversais.test.ts`
+  sem alteração de expectativa.
+
+## Arquivos prováveis
+
+- Alterar: `src/formulario/pdf/documento-pdf-operacional.tsx` (`BlocoItinerarioPdf`: ordem
+  dos filhos; remoção do `Text` da sequência por seta).
+- Alterar: `src/formulario/pdf/modelo-pdf-operacional.ts` (deixar de compor
+  `sequenciaSecoes`, se ficar sem consumidor).
+- Alterar: `src/formulario/pdf/estilos-pdf.ts` (remover `sequenciaSecoes` se órfã; ajustar
+  margens da imagem/lista).
+- Alterar: `testes/unitarios/formulario/pdf-renderizacao.test.tsx` e os testes de modelo do
+  PDF que assertam a sequência por seta.
+- **Pré-requisito fora do repositório de código:** alteração do **Spec 04 §13.1 item 4**
+  pelo responsável (`docs/specs/**` é read-only para quem implementa).
+
+## Riscos
+
+- **Altura do bloco:** `BlocoItinerarioPdf` é `wrap={false}`. Com o mapa em largura máxima
+  (≈ 515 pt de largura; captura 1400×840 ⇒ ≈ 309 pt de altura), mais título, lista numerada
+  (uma linha por Seção) e o parágrafo de vias, um Serviço com muitas Seções pode exceder a
+  altura útil (≈ 745 pt) e ser **cortado em silêncio** — o mesmo modo de falha que reprovou
+  a TASK-034 duas vezes. Decidir e testar o comportamento (limitar a altura da imagem,
+  permitir quebra após o mapa, ou ambos) faz parte da task.
+- **Spec alterada antes do código:** se a Spec 04 §13.1 item 4 não for alterada primeiro, a
+  implementação viola texto literal de spec — a task não pode começar antes disso.
+- **`sequenciaSecoes` pode ter outros consumidores** além do PDF: conferir antes de
+  remover do modelo, e manter se a UI usar.
+- **Interação com a TASK-128:** independentes (blocos diferentes do documento), mas as duas
+  tocam `documento-pdf-operacional.tsx` e `estilos-pdf.ts` — se implementadas em sequência,
+  a segunda revalida a suíte inteira do PDF.
+
+## Perguntas em aberto
+
+- **Q-087** — ordem do bloco de itinerário e supressão da sequência por seta, **incluindo a
+  sub-questão** sobre as Seções realçadas dentro da descrição. **Direção já indicada pelo
+  responsável (opção 2); a task nasce bloqueada até a alteração da Spec 04 §13.1 item 4 e o
+  registro por `/registrar-decisao`.**
+
+---
+
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.

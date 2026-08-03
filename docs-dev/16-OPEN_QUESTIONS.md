@@ -1550,3 +1550,107 @@ prejudicando a comparação entre Serviços.
 **Decisão:** **Decidida (DEC-107, 2026-08-03).** Opção 2, com o detalhe da célula
 empilhado em três linhas (valor adotado / `I:` / `V:`), nunca na mesma linha e
 sem o rótulo "Média". Ver DEC-107.
+
+---
+
+## Q-086 — Cabeçalho de coluna das matrizes do PDF: diagonal a 45° ou rótulo horizontal dentro do triângulo superior?
+
+**Contexto:** Levantada em 2026-08-03 pelo responsável, ao rever o PDF gerado após a
+rodada de correção da **TASK-034** (parecer
+`docs-dev/14-REVISOES/TASK-034-20260803-correcao.md`, reprovado). A **DEC-107 item 1**
+decidiu o cabeçalho de coluna "na diagonal, a 45°, subindo, **sem quebra de linha**". Na
+prática o rótulo quebra em 3–5 linhas dentro dos 38 pt da coluna e os cabeçalhos vizinhos
+se sobrepõem; a correção conhecida (declarar `width` explícito) mantém o texto girado,
+que continua difícil de ler e consome altura de página. O responsável apresentou uma
+alternativa em imagem de referência — `docs-dev/tabela distancias PDF.jpg` —, que aproveita
+o **triângulo superior vazio** (hoje só preenchimento) para escrever o nome da coluna
+**horizontalmente**: o rótulo da coluna `j` fica na célula **imediatamente acima do seu
+próprio "X"**, isto é em `(linha j−1, coluna j)`, alinhado à esquerda e transbordando para
+a direita sobre as células vazias; o rótulo da coluna 0 fica numa linha de cabeçalho acima
+da matriz. Nenhum texto é girado e nenhuma altura precisa ser reservada.
+
+**Spec relacionada:** Spec 04 §9, §9.1, §9.2, §13.1 itens 6–7, §13.3; RN-076 (matrizes
+triangulares inferiores, `Cidade - Nome da Seção`, em km, sem R$); DEC-107 (que esta Q
+propõe substituir no item 1).
+
+**Impacto se não decidir:** a TASK-034 fica sem caminho de fechamento — a correção da
+DEC-107 e a da imagem de referência são mutuamente exclusivas, e implementar uma sabendo
+que o responsável quer a outra desperdiça a rodada.
+
+**Opções:**
+1. **Manter a DEC-107 item 1** — cabeçalho diagonal, corrigido com `width` explícito no
+   rótulo (≈ `ALTURA_MAX_CABECALHO / 0,71`) para caber em uma linha e não sobrepor.
+2. **Substituir o item 1 da DEC-107** pelo layout da imagem de referência: rótulo de
+   coluna **horizontal**, na célula acima do "X" da própria coluna, transbordando à
+   direita sobre o triângulo superior vazio; o rótulo da coluna 0 numa linha de cabeçalho
+   acima; nenhum texto girado; some a altura reservada do cabeçalho diagonal. Permanecem
+   intactos a forma triangular inferior, o "X" na diagonal, o padrão
+   `Cidade - Nome da Seção`, a unidade no título e a célula empilhada `valor`/`I:`/`V:`
+   (DEC-107 itens 2, 3 e 4).
+3. Formato variável — diagonal só quando o Serviço exceder N Seções.
+
+**Recomendação técnica:** opção **2**. Ela remove a causa estrutural do defeito em vez de
+contorná-la (não há texto girado, logo não há quebra nem sobreposição a administrar),
+elimina a estimativa de largura de fonte que hoje é inferência controlada, devolve à
+página a altura antes reservada para o cabeçalho, e **usa espaço que já estava vazio**. O
+que a RN-076 de fato fixa (triangular inferior, "X", padrão de nome, km, sem R$)
+permanece. A opção 3 criaria dois formatos no mesmo documento, prejudicando a comparação
+entre Serviços.
+
+**Decisão:** **Em aberto.** Direção já indicada pelo responsável (opção 2, com imagem de
+referência); falta o registro formal por `/registrar-decisao`. Bloqueia a **TASK-128**.
+
+---
+
+## Q-087 — Bloco de itinerário do PDF: mapa primeiro e supressão da sequência de Seções por seta
+
+**Contexto:** Levantada em 2026-08-03 pelo responsável, ao rever o PDF operacional. O
+**Spec 04 §13.1 item 4** fixa, *"nesta ordem"*: (a) título; (b) **sequência resumida de
+Seções ligadas por seta** (`Cidade A - Seção A → Cidade B - Seção B`); (c) descrição
+textual por vias; (d) imagem do mapa. O responsável quer o **mapa primeiro**, ocupando a
+largura útil da página, seguido da **lista numerada de Seções** (1ª, 2ª, 3ª…) e só então
+da lista de vias — observando que **não é preciso repetir a lista de Seções**. A
+observação tem base concreta: a **legenda vertical numerada** entregue pela TASK-127
+(DEC-105) já lista as Seções na ordem do itinerário, com o mesmo número que marca cada
+uma no mapa (`legenda-itinerario.ts`, renderizada em
+`documento-pdf-operacional.tsx:260-277`). Hoje o bloco imprime **as duas** listas — a
+sequência por seta do item 4b **e** a legenda numerada —, uma logo depois da outra.
+
+**Spec relacionada:** Spec 04 §13.1 item 4 (ordem e composição do bloco), §13.3 ("uma
+página por bloco lógico quando possível"), §13.4 (renderização da descrição por vias);
+Spec 01 §8 (captura do mapa); RN-076; DEC-104 (falha de captura tolerada), DEC-105
+(numeração hierárquica e legenda).
+
+**Impacto se não decidir:** a implementação escolheria sozinha contrariar uma ordem que a
+spec enumera literalmente — exatamente o que o princípio 2 do `docs-dev/04` proíbe.
+**Atenção:** diferentemente da Q-085/DEC-107, que adaptou *formato* sem contrariar texto
+literal, esta Q **altera a ordem e a composição enumeradas no §13.1 item 4** — se a opção
+2 ou 3 for adotada, **a Spec 04 precisa ser alterada antes do código**, e a alteração é
+ato do responsável (`docs/specs/**` é read-only para quem implementa).
+
+**Opções:**
+1. **Manter o §13.1 item 4 ao pé da letra** — ordem (a)(b)(c)(d), com a sequência por seta
+   e a legenda numerada convivendo.
+2. **Reordenar e suprimir o item 4b** — ordem passa a (a) título, (d) mapa na largura
+   máxima útil, legenda numerada de Seções, (c) descrição por vias. A sequência por seta
+   sai por redundância com a legenda numerada, que a supera (traz o número que casa com o
+   símbolo no mapa). **Exige alterar a Spec 04 §13.1 item 4.**
+3. **Reordenar mantendo o item 4b** — mesma ordem da opção 2, mas a sequência por seta
+   permanece. Exige alterar a Spec 04 quanto à ordem, não quanto à composição.
+
+**Sub-questão (a decidir junto):** "não repetir a lista de Seções" refere-se **apenas** à
+sequência por seta do item 4b, ou também às **Seções realçadas dentro da descrição por
+vias**? O §13.4 manda a descrição trazer "Seções com destaque visual, distinguindo os
+marcos das vias".
+**Recomendação:** apenas o item 4b. As Seções na descrição não são uma lista — são os
+marcos que tornam a sequência de vias legível como itinerário (`Seção A, Rua X, Avenida Y,
+Seção B`); removê-las deixaria uma enumeração de ruas sem âncora, e contrariaria o §13.4
+sem ganho.
+
+**Recomendação técnica:** opção **2**, com a sub-questão resolvida como acima. Ver
+Q-086 quanto ao precedente de adaptação de mídia; a diferença é que aqui há alteração de
+texto literal de spec, então a Spec 04 deve ser alterada **antes** do código.
+
+**Decisão:** **Em aberto.** Direção já indicada pelo responsável (opção 2); faltam a
+alteração da Spec 04 §13.1 item 4 e o registro por `/registrar-decisao`. Bloqueia a
+**TASK-129**.
