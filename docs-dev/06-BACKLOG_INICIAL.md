@@ -6678,6 +6678,19 @@ entrada decidida na DEC-093.
 
 - Nenhuma — Q-071 decidida (DEC-093).
 
+## Correção pós-entrega
+
+- `eeb6204` (2026-08-03, fora do escopo original da TASK-127, sinalizada pelo
+  responsável e registrada como ressalva de processo em
+  `14-REVISOES/TASK-127-20260803.md`): a superfície de hover "Ações da
+  viagem", no mesmo `z-50` do `MenuFlutuante`, interceptava o clique em
+  "Copiar para outro dia" no menu do cabeçalho do dia — defeito desta task.
+  Corrigido chamando `ocultarAcoesDaViagem()` ao abrir o menu do dia
+  (`src/formulario/viagens/etapa-viagens.tsx:851`), mesmo precedente já usado
+  ao entrar em célula vazia/criável (`:344,1184,1529,1557`). Coberto pelo E2E
+  preexistente `testes/e2e/etapa-viagens.spec.ts:1714`; sem RN nem NEG
+  violada.
+
 ---
 
 ## TASK-118 — Impedir duplicatas acidentais na geração de Viagens por headway — **desbloqueada (DEC-094)**
