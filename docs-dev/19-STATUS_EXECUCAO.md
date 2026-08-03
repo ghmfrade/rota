@@ -1,6 +1,46 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-08-02 (branch `redesign`) — **TASK-126: ressalvas
+**Atualização mais recente:** 2026-08-03 (branch `redesign`) — **TASK-127: aprovada com
+ressalvas, uma condição de merge aberta; a task NÃO é marcada como concluída.** O commit
+`497cfe4` implementa a DEC-105: `src/formulario/pdf/legenda-itinerario.ts` (modelo puro da
+numeração — Seções `1º`, `2º`…, Locais `n.m` prefixados pela Seção imediatamente anterior,
+ordenado por `paradas[].ordem`, derivado **por itinerário**, o que faz o reinício por
+sentido ser consequência estrutural e não contador reiniciado à mão) e
+`simbolos-mapa-pdf.ts` (quadrado azul `#1d4ed8` com número dentro, círculo verde `#16a34a`
+com rótulo ao lado, testados contra contexto 2D falso — nunca WebGL nem tiles em Vitest);
+`captura-mapa-pdf.ts` projeta as paradas e compõe os símbolos sobre o canvas capturado;
+`modelo-pdf-operacional.ts` expõe `legendaSecoes` e `identificadoresLocais` por bloco, e a
+legenda vertical com conector azul entra em `estilos-pdf.ts`/`documento-pdf-operacional.tsx`.
+`sequenciaDeSecoes` não muda e nenhum arquivo de contrato entra no diff. O parecer
+`14-REVISOES/TASK-127-20260803.md` registra **checklist 07 com 24 itens ok, 27 N/A, 1
+violado e 3 com ressalva**, reutiliza o log canônico verde (`test:all:verificar`: executor
+**Claude**, fingerprint `3c6dfc9e…ddb0723`, identidade `f216d04b…3d6e1b32e0`,
+`Resultado geral: APROVADO`, **1507 unitários + 111 E2E**) e reporta `typecheck`, `lint` e
+`check:rastreabilidade` limpos. **Condição de merge (uma):** o tamanho dos símbolos é
+constante em pixels de canvas (`LADO_QUADRADO_SECAO`, `RAIO_CIRCULO_LOCAL` e os corpos de
+fonte em `simbolos-mapa-pdf.ts:18-35`) enquanto o canvas do MapLibre segue o
+`devicePixelRatio` — `compornImagemComSimbolos` aplica a `escala` só às **coordenadas**
+(`captura-mapa-pdf.ts:128-137`), de modo que em tela HiDPI os símbolos e o número da Seção
+saem com metade do tamanho relativo pretendido, contra o objetivo de legibilidade da task;
+a correção é aplicar a mesma escala aos tamanhos, com teste do caminho de composição, hoje
+**sem cobertura alguma**. **Violação de escopo registrada:** o commit `eeb6204` altera
+`etapa-viagens.tsx:851` (`ocultarAcoesDaViagem()` ao abrir o menu do dia) para corrigir
+defeito da **TASK-117** — fora do escopo desta task, sinalizado pelo responsável, em commit
+próprio, coberto pelo E2E preexistente `etapa-viagens.spec.ts:1714` (verde no log) e sem RN
+ou NEG violada; ressalva de **processo**, não impeditiva. **Follow-ups antes da TASK-034:**
+alinhar `numerarItinerario` e `sequenciaDeSecoes` no caso defensivo de Seção sem
+geolocalização do sentido (hoje a primeira pula e desloca a numeração, a segunda mantém —
+divergência inalcançável na prática pela RN-036/RN-026 na validação estrutural e pela
+pendência bloqueante "sem rota", mas latente no mesmo bloco da página); cobrir
+`projetarSimbolos`/`compornImagemComSimbolos`; corrigir o nome `compornImagemComSimbolos`;
+reaproveitar fixtures canônicas nos testes de legenda e renderização. A contagem de
+pendentes **não muda** (a TASK-127 nasceu depois dela, como a TASK-126 e as TASK-121..125):
+seguem **9 tasks não concluídas — 7 executáveis, a TASK-038 com bloqueio parcial e a
+TASK-040 bloqueada**. A **TASK-034** segue desbloqueada e passa a consumir os
+`identificadoresLocais` (`n.m`) produzidos aqui na relação de Locais do anexo (§13.1 item
+8b) — que **não** aparecem em nenhuma superfície do corpo, conforme teste dedicado.
+
+**Histórico anterior (2026-08-02) — TASK-126: ressalvas
 fechadas, condição de merge cumprida, ciclo encerrado.** O commit `ab7cc9c` fecha a única
 condição de merge do parecer de 2026-08-02: a RN-077 passa a ter teste dedicado que
 assere, `Page` a `Page`, exatamente um rodapé `fixed` contendo o `AVISO_SEI` literal, com
