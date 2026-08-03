@@ -41,8 +41,17 @@ import {
 export const LARGURA_CAPTURA = 1400;
 export const ALTURA_CAPTURA = 840;
 
+/**
+ * Margem entre a rota e as bordas da imagem, como **fração da largura** da
+ * captura. O enquadramento da DEC-104 é relativo: subir a resolução sem subir a
+ * margem na mesma proporção encostaria a rota na borda. Derivar a margem da
+ * largura, em vez de fixar dois números que precisam ser mantidos em razão
+ * constante à mão, torna o acoplamento impossível de quebrar por descuido.
+ */
+export const FRACAO_MARGEM_ENQUADRAMENTO = 0.04;
+
 /** Margem entre a rota e as bordas da imagem, em pixels (enquadramento DEC-104). */
-export const MARGEM_ENQUADRAMENTO = 56;
+export const MARGEM_ENQUADRAMENTO = LARGURA_CAPTURA * FRACAO_MARGEM_ENQUADRAMENTO;
 
 /** Teto de espera pelo mapa ficar ocioso; estourou, a captura falha (tolerada). */
 export const TIMEOUT_CAPTURA_MS = 15_000;

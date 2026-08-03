@@ -33,6 +33,7 @@ const {
   cinza50: CINZA_50,
   azul900: AZUL_900,
   azul700: AZUL_700,
+  azul600: AZUL_600,
   azul100: AZUL_100,
 } = PALETA_PDF;
 
@@ -182,10 +183,13 @@ export const estilosPdf = StyleSheet.create({
     flex: 1.6,
     paddingHorizontal: 3,
   },
+  // Terceiro nível da hierarquia tipográfica (§13.3): abaixo de `tituloBloco`
+  // em corpo e distinto dele em cor — o azul primário do doc 18 §2 marca o
+  // subtítulo sem competir com o título, que fica no cinza mais escuro.
   subtituloBloco: {
     fontSize: 10,
     fontFamily: "Helvetica-Bold",
-    color: CINZA_900,
+    color: AZUL_600,
     marginTop: 10,
     marginBottom: 4,
   },

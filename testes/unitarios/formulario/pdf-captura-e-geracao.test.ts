@@ -98,6 +98,18 @@ describe("Dimensão de captura (TASK-126 — legibilidade de impressão)", () =>
     expect(ALTURA_CAPTURA).toBe(840);
     expect(LARGURA_CAPTURA / ALTURA_CAPTURA).toBeCloseTo(1000 / 600, 5);
   });
+
+  test("a margem do enquadramento (DEC-104) é derivada da largura, não um número solto", async () => {
+    const { LARGURA_CAPTURA, MARGEM_ENQUADRAMENTO, FRACAO_MARGEM_ENQUADRAMENTO } =
+      await import("@/formulario/pdf/captura-mapa-pdf");
+
+    // Enquadramento RELATIVO: mudar a resolução sem mudar a margem encostaria
+    // a rota na borda. A margem é a mesma fração da largura em qualquer
+    // resolução, e o valor efetivo continua o de 1400 px (56).
+    expect(FRACAO_MARGEM_ENQUADRAMENTO).toBeCloseTo(0.04, 6);
+    expect(MARGEM_ENQUADRAMENTO).toBe(LARGURA_CAPTURA * FRACAO_MARGEM_ENQUADRAMENTO);
+    expect(MARGEM_ENQUADRAMENTO).toBe(56);
+  });
 });
 
 describe("gerarPdfOperacional", () => {

@@ -17,11 +17,22 @@ import {
 // rodapé.
 //
 // Paginação (§13.3 — "uma página por bloco lógico quando possível"): a capa
-// ocupa `Page` própria; o resumo abre outra `Page` (que também recebe os
-// blocos de Serviço); os itinerários ficam em uma terceira `Page`. Dentro de
-// cada `Page`, `wrap={false}` em cada bloco de Serviço/itinerário impede que
-// um único bloco seja partido ao meio — se não couber no restante da página,
-// o `@react-pdf` o empurra inteiro para a próxima, que é o "quando couber".
+// ocupa `Page` própria; o resumo abre outra `Page`; os Serviços abrem a
+// terceira; os itinerários, a quarta. Dentro de cada `Page`, `wrap={false}`
+// em cada bloco impede que ele seja partido ao meio — se não couber no
+// restante da página, o `@react-pdf` o empurra inteiro para a próxima.
+//
+// Uso da prop `break` (ressalva 1 do parecer da TASK-126):
+// - **Itinerários: um por página.** `break` a partir do segundo bloco — é o
+//   caso válido explícito da task ("um itinerário por página"). Nunca no
+//   primeiro, que já abre a `Page`: `break` no primeiro filho geraria uma
+//   página em branco.
+// - **Blocos de Serviço: `break` deliberadamente NÃO usado.** Um bloco de
+//   Serviço são seis pares rótulo-valor (~6 linhas); forçar página nova a cada
+//   um produziria páginas 90% vazias, o oposto da legibilidade de peça
+//   operacional que o §13.3 pede. O "quando couber" do critério é atendido
+//   dando `Page` própria ao conjunto dos Serviços e mantendo cada bloco
+//   íntegro com `wrap={false}`.
 
 function Rodape({ modelo }: { modelo: ModeloPdfOperacional }) {
   // §13.1 item 9 — fixo em todas as páginas: `versao_schema`, data/hora,
@@ -68,6 +79,24 @@ function estiloLinhaDados(indice: number) {
   return indice % 2 === 1 ? estilosPdf.linhaTabelaZebra : estilosPdf.linhaTabela;
 }
 
+/**
+ * §13.1 item 2 — resumo do Autos.
+ *
+ * Integridade das tabelas por faixa de horário: cada estratificação é um grupo
+ * `wrap={false}` que envolve **subtítulo + nota da RN-069 + cabeçalho + as 7
+ * linhas**. Antes, o `wrap={false}` estava em cada linha isolada: nenhuma linha
+ * era partida ao meio, mas a tabela podia quebrar *entre* linhas, deixando
+ * subtítulo e cabeçalho numa página e o resto na seguinte. Com o grupo íntegro,
+ * a tabela que não couber no restante da página migra inteira para a próxima.
+ *
+ * A altura do grupo é limitada e conhecida: as faixas são as **7 fixas** da
+ * Spec 04 §10 (`FAIXAS_HORARIO`), então nenhum grupo pode estourar uma A4. Se
+ * a spec passar a definir mais faixas, esta premissa precisa ser reavaliada.
+ *
+ * A tabela de resumo POR SERVIÇO (a primeira) segue com `wrap={false}` por
+ * linha, e não por grupo: ela tem uma linha por Serviço — N ilimitado —, e
+ * agrupá-la inteira poderia produzir um bloco maior que a página.
+ */
 function BlocoResumoPdf({ resumo }: { resumo: BlocoResumo }) {
   return (
     <View>
@@ -119,24 +148,29 @@ function BlocoResumoPdf({ resumo }: { resumo: BlocoResumo }) {
           em seguida em tabela própria. */}
       <Text style={estilosPdf.tituloBloco}>Estratificação por faixa de horário</Text>
       <NotaSemanaPadrao rotulo={resumo.rotuloSemanaPadrao} />
-      <Text style={estilosPdf.subtituloBloco}>{ROTULO_FAIXA_TOTAL_AUTOS}</Text>
-      <View style={estilosPdf.tabela}>
-        <View style={estilosPdf.linhaCabecalho} wrap={false}>
-          <Text style={estilosPdf.celulaFaixa}>Faixa</Text>
-          <Text style={estilosPdf.celulaNumerica}>Viagens</Text>
-          <Text style={estilosPdf.celulaNumerica}>Opções de deslocamento</Text>
-        </View>
-        {resumo.porFaixa.map((faixa, indice) => (
-          <View style={estiloLinhaDados(indice)} key={faixa.rotulo} wrap={false}>
-            <Text style={estilosPdf.celulaFaixa}>{faixa.rotulo}</Text>
-            <Text style={estilosPdf.celulaNumerica}>{faixa.viagensSemana}</Text>
-            <Text style={estilosPdf.celulaNumerica}>{faixa.opcoesDeslocamento}</Text>
+
+      {/* Grupo íntegro: subtítulo + tabela nunca se separam nem quebram entre
+          páginas (ver o comentário do componente). */}
+      <View wrap={false}>
+        <Text style={estilosPdf.subtituloBloco}>{ROTULO_FAIXA_TOTAL_AUTOS}</Text>
+        <View style={estilosPdf.tabela}>
+          <View style={estilosPdf.linhaCabecalho}>
+            <Text style={estilosPdf.celulaFaixa}>Faixa</Text>
+            <Text style={estilosPdf.celulaNumerica}>Viagens</Text>
+            <Text style={estilosPdf.celulaNumerica}>Opções de deslocamento</Text>
           </View>
-        ))}
+          {resumo.porFaixa.map((faixa, indice) => (
+            <View style={estiloLinhaDados(indice)} key={faixa.rotulo}>
+              <Text style={estilosPdf.celulaFaixa}>{faixa.rotulo}</Text>
+              <Text style={estilosPdf.celulaNumerica}>{faixa.viagensSemana}</Text>
+              <Text style={estilosPdf.celulaNumerica}>{faixa.opcoesDeslocamento}</Text>
+            </View>
+          ))}
+        </View>
       </View>
 
       {resumo.porFaixaPorServico.map((servico) => (
-        <View key={servico.servicoUuid}>
+        <View key={servico.servicoUuid} wrap={false}>
           <Text style={estilosPdf.subtituloBloco}>
             Serviço {servico.numeroN} — por faixa de horário
           </Text>
@@ -147,7 +181,7 @@ function BlocoResumoPdf({ resumo }: { resumo: BlocoResumo }) {
             Pares compráveis: {servico.paresCompraveis} (invariante entre faixas).
           </Text>
           <View style={estilosPdf.tabela}>
-            <View style={estilosPdf.linhaCabecalho} wrap={false}>
+            <View style={estilosPdf.linhaCabecalho}>
               <Text style={estilosPdf.celulaFaixa}>Faixa</Text>
               <Text style={estilosPdf.celulaNumerica}>Viagens Ida</Text>
               <Text style={estilosPdf.celulaNumerica}>Viagens Volta</Text>
@@ -157,7 +191,7 @@ function BlocoResumoPdf({ resumo }: { resumo: BlocoResumo }) {
               <Text style={estilosPdf.celulaNumerica}>Opções total</Text>
             </View>
             {servico.faixas.map((faixa, indice) => (
-              <View style={estiloLinhaDados(indice)} key={faixa.rotulo} wrap={false}>
+              <View style={estiloLinhaDados(indice)} key={faixa.rotulo}>
                 <Text style={estilosPdf.celulaFaixa}>{faixa.rotulo}</Text>
                 <Text style={estilosPdf.celulaNumerica}>{faixa.viagensIda}</Text>
                 <Text style={estilosPdf.celulaNumerica}>{faixa.viagensVolta}</Text>
@@ -202,10 +236,16 @@ function BlocoServicoPdf({ servico }: { servico: BlocoServico }) {
   );
 }
 
-function BlocoItinerarioPdf({ itinerario }: { itinerario: BlocoItinerario }) {
+function BlocoItinerarioPdf({
+  itinerario,
+  quebraPagina,
+}: {
+  itinerario: BlocoItinerario;
+  quebraPagina: boolean;
+}) {
   const paragrafo = paragrafoDaDescricao(itinerario);
   return (
-    <View wrap={false}>
+    <View wrap={false} break={quebraPagina}>
       {/* (a) título */}
       <Text style={estilosPdf.tituloItinerario}>{itinerario.titulo}</Text>
       {/* (b) sequência resumida de Seções, ligada por seta */}
@@ -283,11 +323,16 @@ export function DocumentoPdfOperacional({
         <Rodape modelo={modelo} />
       </Page>
 
-      {/* Item 2 — resumo, começa em página nova (§13.3); item 3 — Serviços,
-          na sequência, cada bloco pulando de página quando não couber. */}
+      {/* Item 2 — resumo, em página própria (§13.3). */}
       <Page size="A4" style={estilosPdf.pagina}>
         <BlocoResumoPdf resumo={modelo.resumo} />
 
+        <Rodape modelo={modelo} />
+      </Page>
+
+      {/* Item 3 — Serviços, em página própria; cada bloco íntegro, sem
+          `break` por Serviço (ver a nota de paginação no topo do arquivo). */}
+      <Page size="A4" style={estilosPdf.pagina}>
         <Text style={estilosPdf.tituloBloco}>Serviços</Text>
         {modelo.servicos.map((servico) => (
           <BlocoServicoPdf key={servico.servicoUuid} servico={servico} />
@@ -296,13 +341,14 @@ export function DocumentoPdfOperacional({
         <Rodape modelo={modelo} />
       </Page>
 
-      {/* Item 4 — itinerários por Serviço e sentido, em página própria. */}
+      {/* Item 4 — itinerários por Serviço e sentido, um por página. */}
       <Page size="A4" style={estilosPdf.pagina}>
         <Text style={estilosPdf.tituloBloco}>Itinerários</Text>
-        {modelo.itinerarios.map((itinerario) => (
+        {modelo.itinerarios.map((itinerario, indice) => (
           <BlocoItinerarioPdf
             key={`${itinerario.servicoUuid}-${itinerario.sentido}`}
             itinerario={itinerario}
+            quebraPagina={indice > 0}
           />
         ))}
 
