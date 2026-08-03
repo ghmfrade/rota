@@ -839,6 +839,16 @@ export function EtapaViagens({
     dia: DiaSemana,
     grade: GradeDaTela,
   ) {
+    // O menu do dia cai logo abaixo do cabeçalho e é mais largo que uma coluna,
+    // então cobre a faixa onde a superfície de hover da Viagem ("Ações da
+    // viagem") flutua. As duas usam o mesmo nível de empilhamento (`z-50` do
+    // `MenuFlutuante` e de `empilhamento="prioritaria"`), de modo que a
+    // superfície deixada aberta pelo hover anterior fica por cima do menu e
+    // intercepta o clique nos itens. Abrir o menu do dia dispensa a superfície:
+    // ela é afordância de hover de UMA Viagem, e a operação de dia inteiro
+    // assume o comando — mesma intenção do `ocultarAcoesDaViagem` já aplicado
+    // ao entrar numa célula vazia/criável.
+    ocultarAcoesDaViagem();
     const caixa = evento.currentTarget.getBoundingClientRect();
     definirMenuDiaAberto({
       dia,
