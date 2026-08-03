@@ -1,7 +1,33 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-07-31 (branch `redesign`) — **TASK-033
-concluída e aprovada com ressalvas.** O commit `32cd8ae` cria o subsistema
+**Atualização mais recente:** 2026-08-02 (branch `redesign`) — **TASK-033: ressalvas
+fechadas, aprovada com ressalvas documentais.** O commit `1a77a85` cumpre a condição de
+merge do parecer de 2026-07-31 (as colunas "Opções de deslocamento — Ida/Volta" entram
+no resumo do §13.1 item 2, completando os 7 contadores por Serviço do §10), acrescenta
+a **estratificação por faixa por Serviço** que o §10 exige além do total do Autos, faz
+o rótulo de cada faixa carregar o intervalo da spec por helper único em
+`shared/contagens` (`rotuloFaixaComIntervalo`), fecha o parágrafo da descrição com o
+ponto final do texto congelado (composição extraída para a função pura
+`paragrafoDaDescricao`, com fallback para `descricao_itinerario.texto`) e ordena
+`sequenciaDeSecoes` por `paradas[].ordem`. O parecer
+`14-REVISOES/TASK-033-20260802-fechamento.md` registra **checklist 07 sem item
+violado**, RN-074/072/076/069/077 atendidas com teste — inclusive o guarda transversal,
+que saiu **mais forte**: as horas dos rótulos de faixa são fixadas por asserção positiva
+exaustiva, sem afrouxar a proibição de offsets e `horario_saida` — e reutiliza o log
+canônico verde (`test:all:verificar`: executor **Claude**, fingerprint `00e3fbfc…5a9cea`,
+identidade `498d7fa6…9176`); `typecheck`, `lint` e `check:rastreabilidade` limpos.
+**Nenhuma condição de merge remanescente.** Duas ressalvas **documentais**, a resolver
+antes do próximo ciclo de PDF: (1) registrar como DEC a decisão que autorizou a
+estratificação por Serviço — hoje ela consta só na mensagem de commit, sem entrada em
+`10-DECISION_LOG.md`; (2) abrir task para a mesma estratificação no painel de Revisão
+(`resumo-operacional.tsx`, TASK-031), que segue só com o total do Autos — a assimetria
+tela × PDF do §10 apenas trocou de lado. Larguras de coluna (o resumo foi a 8 colunas
+`flex: 1`) e repetição do rótulo da RN-069 na paginação já são critério de aceite da
+**TASK-126**; a **TASK-034**, ao trazer as tabelas horárias, precisará **estender** o
+teste de horas permitidas, que hoje proíbe `horario_saida` no PDF.
+
+**Histórico anterior (2026-07-31) — TASK-033, primeira entrega, aprovada com
+ressalvas:** O commit `32cd8ae` cria o subsistema
 `src/formulario/pdf/` (modelo puro + renderizador `@react-pdf` + captura de mapa
 sob demanda da DEC-104 + orquestração), acrescenta os helpers puros de limites em
 `src/shared/mapa/geometria.ts` e a ação "Gerar PDF operacional" na etapa
@@ -543,7 +569,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 
 | Task | Título resumido |
 |---|---|
-| 033 | PDF operacional: estrutura e identificação (§13.1 itens 1–4 e 9; DEC-104) — aprovada com ressalvas em `14-REVISOES/TASK-033-20260731.md`; condição de merge: as colunas "Opções de deslocamento — Ida/Volta" no resumo (§10) |
+| 033 | PDF operacional: estrutura e identificação (§13.1 itens 1–4 e 9; DEC-104) — aprovada com ressalvas em `14-REVISOES/TASK-033-20260731.md`; ressalvas fechadas em `1a77a85` e revisadas em `14-REVISOES/TASK-033-20260802-fechamento.md` (sem condição de merge remanescente; pendem 2 ressalvas documentais — DEC da estratificação por Serviço e task para o painel da TASK-031) |
 
 ### Fase 12 — Qualidade e follow-ups
 
@@ -651,7 +677,10 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 parcial e a TASK-040 bloqueada.** Em 2026-07-31, a **TASK-033 saiu da fila**:
 implementada em `32cd8ae` e aprovada com ressalvas em
 `14-REVISOES/TASK-033-20260731.md`; a **TASK-034** fica desbloqueada e herda a
-ordem de blocos, a captura de mapa e a folha de estilos já postas. Em 2026-07-30, a **TASK-120 foi concluída e
+ordem de blocos, a captura de mapa e a folha de estilos já postas; em 2026-08-02 as
+ressalvas da 033 foram fechadas (`1a77a85`), então a 034 **não** herda mais a condição
+de merge das colunas de opções — mas herda o dever de **estender** o teste de horas
+permitidas de `pdf-regras-transversais.test.ts` ao trazer as tabelas horárias. Em 2026-07-30, a **TASK-120 foi concluída e
 aprovada com ressalvas** (`caec734`; `14-REVISOES/TASK-120-20260730.md`): criada
 após esta contagem pela DEC-099, nunca entrou na fila e por isso não altera o
 total; a ação única `Copiar (sobrescrever)` substitui o par
@@ -787,8 +816,8 @@ Independentes do ramo do mapa: nada aqui bloqueia ou é bloqueado por ele.
 
 | # | Task | Complex. | Observação |
 |:---:|---|:---:|---|
-| ~~5~~ | ~~**033** — PDF operacional: estrutura e identificação~~ | **4** | **Concluída em 2026-07-31** (`32cd8ae`), aprovada com ressalvas em `14-REVISOES/TASK-033-20260731.md`. Sai da fila. |
-| 6 | **034** — PDF operacional: tabelas horárias e matrizes | **3** | Sobre a 033 — **desbloqueada**. Herda `ORDEM_BLOCOS`, a captura de mapa (DEC-104) e `estilos-pdf.ts`; preenche `tabelas-horarias`/`matriz-distancias`/`matriz-seccionamento`/`anexo-tecnico` **sem reordenar** a constante. Deve resolver junto a condição de merge da 033 (colunas "Opções de deslocamento — Ida/Volta" no resumo). |
+| ~~5~~ | ~~**033** — PDF operacional: estrutura e identificação~~ | **4** | **Concluída em 2026-07-31** (`32cd8ae`), aprovada com ressalvas em `14-REVISOES/TASK-033-20260731.md`. **Ressalvas fechadas em 2026-08-02** (`1a77a85`; `14-REVISOES/TASK-033-20260802-fechamento.md`): condição de merge cumprida, §10 completo no PDF (7 contadores por Serviço + estratificação por faixa por Serviço). Sai da fila. |
+| 6 | **034** — PDF operacional: tabelas horárias e matrizes | **3** | Sobre a 033 — **desbloqueada**. Herda `ORDEM_BLOCOS`, a captura de mapa (DEC-104) e `estilos-pdf.ts`; preenche `tabelas-horarias`/`matriz-distancias`/`matriz-seccionamento`/`anexo-tecnico` **sem reordenar** a constante. A condição de merge da 033 foi cumprida em `1a77a85` — não é mais dever desta task. Ao trazer os horários de saída, **estender** o teste de horas permitidas de `pdf-regras-transversais.test.ts`, que hoje os proíbe. |
 | 7 | **035** — Comparador: carregamento e validação dos dois arquivos | **3** | |
 | 8 | **036** — Motor de diff por UUID + taxonomia | **5** | Núcleo do Comparador; casamento por UUID e por contexto. |
 | 9 | **037** — Telas de comparação | **4** | Superfície ampla (5 visões/abas). |
