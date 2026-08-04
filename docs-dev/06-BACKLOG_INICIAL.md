@@ -8627,4 +8627,634 @@ acrescenta é *garanti-la por teste* e resolver a consequência de altura descri
 
 ---
 
+# TASK-130 — Abreviação de nome de via para caber no nome sugerido de Parada (módulo puro)
+
+> ✅ **Desbloqueada — Q-090 decidida (DEC-112, 2026-08-04).**
+
+## Objetivo
+
+Existe uma função pura `abreviarNomeDeVia(nome, limite)` que transforma o nome cru de uma via
+("Rua Francisco Aureliano Paiva") no rótulo curto usado como **sugestão** de nome de
+Seção/Local ("R. Franci. Aureli. Paiva"), respeitando o alvo de 25 caracteres. Sem UI, sem
+rede, sem contrato JSON.
+
+## Contexto
+
+A Q-090 (opção 1) decidiu que o campo de nome da linha-formulário de criação (TASK-095,
+DEC-077) nasce pré-preenchido com o nome da via mais próxima obtida do OSRM `/nearest`
+(TASK-131) e consumido pela UI (TASK-133). Esta task isola só a transformação de texto —
+determinística, testável sem mock e sem tocar em nenhum fluxo existente. É a primeira das
+quatro porque as outras dependem dela e ela não depende de nenhuma.
+
+A estratégia de abreviação foi ditada pelo responsável: abreviar **igualitariamente** entre as
+palavras; **palavras de até 5 caracteres nunca são abreviadas** e nenhuma abreviação desce
+abaixo de 5 caracteres; **se não houver como caber**, aí sim reduz abaixo de 5 nas **duas
+primeiras** palavras, preferencialmente na primeira.
+
+## Fora de escopo
+
+- Chamar OSRM ou qualquer serviço (TASK-131).
+- Qualquer alteração de UI, do formulário inline ou do mapa (TASK-132/133).
+- Aplicar a abreviação a nomes **já existentes** de Seção/Local (no documento, nas tabelas,
+  nas matrizes ou no PDF) — a função só serve à sugestão no momento da criação. Nenhum nome
+  gravado é reescrito.
+- Impor limite de 25 caracteres na digitação, no schema (`nome: z.string().min(1)`) ou na
+  validação — o limite é alvo da sugestão, nunca regra de contrato (Q-090, sub-questão *b*).
+- Reaproveitar/alterar a limpeza de nomes de via da descrição textual (RN-045,
+  `compor-descricao.ts`) — matéria vizinha, fluxo diferente, permanece intocada.
+- Padrão `Cidade - Nome da Seção` (RN-076): a cidade é derivada (Spec 03 §2.3) e **não** entra
+  nos 25 caracteres nem na função.
+
+## Specs fonte
+
+- Spec 04 §7.1 — nome da Seção é do usuário; município derivado, somente-leitura; padrão
+  `Cidade - Nome da Seção`.
+- Spec 04 §7.2 — mesma UX para Local.
+- Q-090 (opção 1 respondida) — origem da sugestão e do alvo de 25 caracteres.
+
+## Regras envolvidas
+
+- **RN-076** — o rótulo exibido é `Cidade - Nome da Seção`; a função produz **só** a parte do
+  nome, jamais concatena município.
+- **RN-045** — limpeza de nomes de via (regra vizinha, do fluxo da descrição): serve de
+  referência para "padronizar espaços" e "não inventar nomes", mas **não é reimplementada nem
+  alterada** aqui.
+- **RN-096** — a sugestão é estado efêmero de UI; nada disso é persistido pela função.
+
+## Entidades afetadas
+
+- Nenhuma. Função de texto, sem entidade de domínio. (Consumida depois na criação de **Seção**
+  e **Local**.)
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] `abreviarNomeDeVia(nome, limite = 25)` é **pura**: mesma entrada ⇒ mesma saída, sem
+      `fetch`, sem `Date`, sem `Math.random`.
+- [ ] Espaços são normalizados (colapsados, aparados) e vírgulas/pontuação de borda removidas
+      antes de qualquer contagem.
+- [ ] A **primeira palavra**, quando é tipo de logradouro conhecido, é substituída pela sigla
+      da tabela abaixo (comparação sem acento e sem caixa); tipo desconhecido é tratado como
+      palavra comum.
+- [ ] Tabela de tipos (fechada nesta task): `Rua`→`R.`, `Avenida`→`Av.`, `Rodovia`→`Rod.`,
+      `Estrada`→`Estr.`, `Praça`→`Pç.`, `Alameda`→`Al.`, `Travessa`→`Tv.`, `Largo`→`Lgo.`,
+      `Marginal`→`Marg.`, `Viaduto`→`Vd.`, `Via`→`Via`.
+- [ ] Se o resultado já cabe no limite, é devolvido **sem nenhuma abreviação** das demais
+      palavras.
+- [ ] Não cabendo, aplica-se o **maior corte L ≥ 5** que faça caber: toda palavra com
+      comprimento ≥ L+2 vira `primeiros L caracteres + "."`; palavras menores ficam intactas.
+      Escolhe-se o **maior** L possível (a menor abreviação que resolve).
+- [ ] Nenhuma palavra de **5 caracteres ou menos** é abreviada nesta etapa, e nenhuma
+      abreviação produz raiz menor que 5 caracteres nesta etapa.
+- [ ] Se nem `L = 5` couber, reduz-se abaixo de 5 **só** na primeira palavra do corpo (4, 3,
+      2, 1 caractere + ponto, nessa ordem, parando assim que couber) e, esgotada a primeira,
+      na segunda — nunca na terceira em diante.
+- [ ] Esgotadas as reduções, o resultado é **truncado** no limite, aparando espaço/ponto
+      solto no fim.
+- [ ] `nome` vazio, só espaços ou `undefined` ⇒ devolve string vazia (o chamador decide o
+      aviso — TASK-133).
+- [ ] O `limite` é parâmetro com default 25; nenhum número mágico espalhado.
+
+## Casos válidos
+
+- `"Avenida Paulista"` ⇒ `"Av. Paulista"` (12 caracteres — cabe, nada é abreviado).
+- `"Rua Francisco Aureliano Paiva"` (29) ⇒ `"R. Franci. Aureli. Paiva"` (24) — `L = 7` daria
+  26 e não cabe; `L = 6` cabe e é o maior possível.
+- `"Rodovia Presidente Castelo Branco"` (33) ⇒ `"Rod. Presi. Caste. Branco"` (25) — desce até
+  `L = 5`, exatamente no limite; `Branco` (6) não é abreviado porque abreviá-lo em `L = 5` não
+  encurtaria.
+- `"Avenida Engenheiro Luís Carlos Berrini"` (38) ⇒ com `L = 5` daria 29 (não cabe) ⇒ reduz a
+  primeira palavra do corpo abaixo de 5 até caber: `"Av. E. Luís Carlos Berri."` (25).
+- `"  Rua   dos  Andradas "` ⇒ `"R. dos Andradas"` — espaços normalizados, conectivo `dos`
+  intacto (≤ 5).
+- `"Praça da Sé"` ⇒ `"Pç. da Sé"` (acento preservado na saída; a insensibilidade a acento vale
+  só para **reconhecer** o tipo).
+- Via de nome não-logradouro, `"Anhanguera"` ⇒ `"Anhanguera"` (cabe; tipo desconhecido não
+  vira sigla).
+
+## Casos inválidos
+
+- `""`, `"   "`, `undefined` ⇒ `""` — nunca lança, nunca devolve `"undefined"` nem
+  marcador genérico ("Via sem nome"), coerente com RN-045 ("vias sem nome são omitidas").
+- Nome patologicamente longo de uma palavra só (ex.: 60 caracteres sem espaço) ⇒ truncado
+  em 25, sem exceção e sem string maior que o limite.
+- Saída maior que `limite` em **qualquer** entrada ⇒ falha (propriedade a testar).
+- Abreviação de palavra com 5 caracteres ou menos ⇒ falha.
+
+## Testes esperados
+
+- **Unitários** (`testes/unitarios/formulario/abreviar-nome-de-via.test.ts`): cada caso válido
+  e inválido acima, com a contagem de caracteres explícita na asserção; tabela de tipos
+  (todos os 11 pares, com e sem acento/caixa); teste de **propriedade** simples sobre uma
+  lista de ~30 nomes reais de via — a saída nunca excede o limite e nunca abrevia palavra
+  ≤ 5 fora da etapa de exceção.
+- **Integração / E2E / PDF / snapshot JSON:** N/A (módulo puro, sem UI e sem contrato).
+
+## Arquivos prováveis
+
+- Criar: `src/formulario/nomeacao/abreviar-nome-de-via.ts` e `src/formulario/nomeacao/index.ts`
+  (módulo novo dentro de `formulario/`, sem dependência de `shared/` além de tipos — não é
+  regra compartilhada com o Comparador, `docs-dev/13`).
+- Criar: `testes/unitarios/formulario/abreviar-nome-de-via.test.ts`.
+
+## Dependências
+
+- Nenhuma task — desbloqueada pela DEC-112.
+
+## Riscos
+
+- **Inventar vocabulário:** a tabela de tipos de logradouro não vem de spec — é inferência
+  registrada aqui e fechada em 11 pares. Ampliá-la em tempo de implementação é invenção de
+  regra (`docs-dev/04` princípio 2); ampliação futura exige nova task.
+- **Confundir com RN-045:** a tentação de "unificar" com a limpeza da descrição textual
+  quebraria a descrição congelada (RN-046). São fluxos distintos.
+- **Acento e `length`:** nomes com acento devem ser contados por caractere visível; cuidado com
+  normalização Unicode ao cortar prefixos (`"São"`, `"Pça"`), sob pena de cortar no meio de um
+  par base+diacrítico.
+
+## Perguntas em aberto
+
+- Nenhuma — **Q-090 decidida pela opção 1 (DEC-112)**, com as duas sub-questões inclusas.
+
+---
+
+# TASK-131 — Cliente OSRM `/nearest`: via mais próxima de uma coordenada
+
+> ✅ **Desbloqueada — Q-090 decidida (DEC-112, 2026-08-04).**
+
+## Objetivo
+
+Existe um cliente fino `consultarViaMaisProxima(ponto, opcoes)` sobre o serviço `/nearest` do
+OSRM, que devolve o **nome da via** mais próxima de uma coordenada (e a distância até ela),
+com falha **não bloqueante**. Nada no cálculo de rota, distância ou descrição muda.
+
+## Contexto
+
+Decisão da Q-090 (opção 1): a fonte do endereço sugerido é o **OSRM já contratado**
+(`urlBaseOsrm`, DEC-029), não um geocodificador novo. O `/nearest` é um serviço distinto do
+`/route` já implementado (`cliente-osrm.ts`, RN-047) e precisa de cliente próprio, com
+política de falha oposta: enquanto a indisponibilidade do `/route` é **bloqueante** por
+RN-048, uma sugestão de nome que não veio é apenas uma sugestão que não veio.
+
+## Fora de escopo
+
+- Tocar em `solicitarRota`, `montarUrlOsrm`, `extrair-rota`, `falhas-osrm` ou qualquer
+  comportamento de RN-047/048/050/051. O `/route` continua exatamente como está.
+- Usar a coordenada **encaixada** (`waypoints[].location`) para mover Seção/Local: a Parada
+  nasce na coordenada clicada/digitada, sob as regras de 350 m de sempre (RN-027/RN-032).
+  O campo pode ser lido e devolvido, mas nenhum fluxo o consome nesta task nem na TASK-132/133.
+- Abreviar o nome (TASK-130) ou exibir qualquer coisa (TASK-133).
+- Cache, fila, rate-limit próprio, retry — o `/route` tem 1 retry por RN-048; aqui **não há
+  retry** (falha silenciosa é aceitável e barata).
+- Qualquer uso do `/nearest` fora da criação de Parada (ex.: validar paradas existentes,
+  "encaixar tudo na via") — seria mudança de regra de negócio.
+
+## Specs fonte
+
+- Spec 01 §8 — OSRM público como serviço de roteamento do projeto.
+- Spec 03 §3.2 — forma da requisição OSRM (perfil `driving`, coordenadas `lon,lat`); o
+  `/nearest` **segue o mesmo padrão de URL**, mas não é contratado por esta seção — é o que a
+  Q-090 autoriza.
+- Spec 03 §3.5 — política de falhas do OSRM (referência do que **não** se aplica aqui).
+- Spec 04 §7.3 — indicador de carregamento nos gestos que chamam OSRM.
+
+## Regras envolvidas
+
+- **RN-047** — forma da requisição (perfil `driving`, `lon,lat`): seguida por analogia,
+  **não alterada**.
+- **RN-048** — indisponibilidade do OSRM é bloqueante **para a rota**. Esta chamada não produz
+  rota, não produz `matriz_distancias` e **não pode** bloquear exportação: a falha aqui é
+  informativa (Q-090, sub-questão *a*).
+- **RN-049** — mensagem de erro não menciona tarifa.
+- **RN-052** — abrir JSON não chama OSRM: a consulta só ocorre em gesto explícito de criação
+  (nunca ao importar, nunca ao renderizar lista).
+- **RN-096** — resultado é efêmero, nunca persistido no documento.
+
+## Entidades afetadas
+
+- Nenhuma entidade do contrato. O retorno não entra em `rota`, `trechos`, `paradas` nem
+  `descricao_itinerario`.
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador (RN-080: o Comparador nunca chama OSRM — nada aqui é importável por ele)
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] `consultarViaMaisProxima(ponto, { baseUrl?, fetchFn?, timeoutMs? })` monta
+      `GET {base}/nearest/v1/driving/{lon},{lat}?number=1`, com a **mesma** resolução de base
+      URL do `/route` (`urlBaseOsrm`, DEC-029 — override → env → demo).
+- [ ] Devolve um resultado **discriminado**: `{ ok: true, via?: string, distanciaM: number }`
+      ou `{ ok: false, motivo: "rede" | "semResposta" }`.
+- [ ] `code !== "Ok"`, lista de waypoints vazia, `name` vazio/ausente ⇒ `{ ok: false, motivo:
+      "semResposta" }` — **nunca** um nome inventado.
+- [ ] Erro de rede, HTTP ≠ 2xx, JSON inválido ou timeout ⇒ `{ ok: false, motivo: "rede" }`,
+      **sem retry** e **sem exceção propagada** ao chamador.
+- [ ] Timeout próprio, menor que o do `/route` (**5 s**, constante exportada) — uma sugestão
+      de nome não pode segurar a UI por 15 s.
+- [ ] `fetchFn` injetável; **nenhum** teste toca a rede real.
+- [ ] `cliente-osrm.ts` e os testes de `/route` permanecem **byte a byte** inalterados.
+
+## Casos válidos
+
+- Resposta `{"code":"Ok","waypoints":[{"name":"Rua Francisco Aureliano Paiva","distance":12.4,
+  "location":[-47.45,-23.5]}]}` ⇒ `{ ok: true, via: "Rua Francisco Aureliano Paiva",
+  distanciaM: 12.4 }`.
+- Ponto em rodovia sem nome mapeado (`"name": ""`) ⇒ `{ ok: false, motivo: "semResposta" }`.
+- `baseUrl` sobrescrita por `NEXT_PUBLIC_OSRM_BASE_URL` ⇒ URL montada sobre ela.
+
+## Casos inválidos
+
+- `fetch` que rejeita (offline) ⇒ `{ ok:false, motivo:"rede" }`, **uma única** chamada
+  (asserção de contagem: sem retry).
+- Resposta que demora além do timeout ⇒ `{ ok:false, motivo:"rede" }`, `AbortController`
+  acionado.
+- `{"code":"InvalidQuery"}` ⇒ `{ ok:false, motivo:"semResposta" }`.
+- Qualquer falha desta chamada que bloqueie exportação, gere pendência bloqueante ou apague
+  rota já calculada ⇒ falha (regressão contra RN-048 no sentido inverso).
+
+## Testes esperados
+
+- **Unitários** (`testes/unitarios/formulario/nearest-osrm.test.ts`): montagem da URL (ordem
+  `lon,lat`, `number=1`, base configurável); cada caso válido e inválido acima com `fetchFn`
+  mockado; contagem de chamadas = 1 na falha de rede; timeout com temporizador fake.
+- **Regressão:** a suíte de `cliente-osrm` / `url-osrm` roda inalterada.
+- **Integração / E2E / PDF / snapshot JSON:** N/A.
+
+## Arquivos prováveis
+
+- Criar: `src/formulario/roteamento/nearest-osrm.ts`; exportar em
+  `src/formulario/roteamento/index.ts` (única linha alterada em arquivo existente).
+- Criar: `testes/unitarios/formulario/nearest-osrm.test.ts`.
+
+## Dependências
+
+- Nenhuma task — desbloqueada pela DEC-112. Paralelizável com a TASK-130.
+
+## Riscos
+
+- **Contaminar a política de falha do `/route`:** reusar `falhas-osrm.ts` arrastaria a
+  semântica bloqueante da RN-048 para uma chamada que não pode bloquear nada. Tipo de retorno
+  próprio, deliberadamente.
+- **Volume no demo público:** a DEC-029 dimensionou ~350 requisições/mês. Uma chamada por
+  criação de Parada e por clique em "Atualizar ponto" é da mesma ordem de grandeza do que já
+  se gasta em recálculo — mas a TASK-133 não pode disparar consulta a cada tecla digitada.
+- **`name` do OSRM ≠ endereço:** vem sem número de porta e às vezes com a referência (`"Rua X;
+  SP-270"`); a TASK-130 recebe o que vier, sem inventar.
+
+## Perguntas em aberto
+
+- Nenhuma — **Q-090 decidida pela opção 1 (DEC-112)**, com as duas sub-questões inclusas.
+
+---
+
+# TASK-132 — Latitude e longitude editáveis na criação de Seção/Local, com reposicionamento do ponto pendente
+
+> ✅ **Desbloqueada — Q-090 decidida (DEC-112, 2026-08-04).**
+
+## Objetivo
+
+A linha-formulário de criação de Seção/Local passa a mostrar **latitude** e **longitude** já
+preenchidas com o ponto clicado e editáveis; um botão reposiciona o marcador pendente
+(círculo âmbar) na coordenada digitada, e é **essa** coordenada que a Seção/Local usa ao ser
+criada — com a rota recalculada passando por ela.
+
+## Contexto
+
+Hoje (TASK-095, DEC-077) a linha-formulário só tem o campo de nome: a coordenada é a do
+clique direito, invisível e inalterável. O responsável pediu ajuste fino numérico antes de
+confirmar, com pré-visualização no mapa. A infraestrutura já existe quase inteira: o host
+guarda `criacaoInline = { tipo, posicao, posicaoNaLinha }` e já passa `posicaoCriacaoPendente`
+ao `EditorMapaItinerario`, que desenha o marcador `novo-ponto-pendente` na cor de alerta
+(`#d97706`) — mover o marcador é mover esse estado.
+
+**Decidido na Q-090:** a **âncora de inserção na lista** (`posicaoNaLinha`, calculada no
+clique por `indiceInsercaoParaPosicao`) **não é recalculada** ao editar a coordenada. A Parada
+continua entrando entre as mesmas Paradas; só o ponto muda — e a rota, ao ser recalculada por
+RN-052, passa a percorrer o novo ponto. Isso vale igualmente na criação **entre** Seções/
+Locais (clique sobre a linha) e na criação solta (clique fora da linha, Parada vai para o fim
+por RN-034/035).
+
+## Fora de escopo
+
+- Pré-preencher o **nome** (TASK-133) e chamar `/nearest` (TASK-131).
+- Encaixar a coordenada digitada na via mais próxima — a coordenada é usada **literalmente**.
+- Recalcular `posicaoNaLinha` / reordenar a Parada em função da coordenada editada (decisão
+  da Q-090).
+- Editar latitude/longitude de Seção/Local **já criados** (a edição de ponto existente segue
+  sendo o arrasto no mapa — Spec 04 §7.3 item 4, TASK-078/DEC-079).
+- Afrouxar 350 m (RN-027/RN-032), derivação de município (Spec 03 §2.3) ou a recusa "fora de
+  SP": a coordenada digitada passa **pelas mesmas** validações de `criarSecaoNoPonto`/
+  `criarLocalNoPonto`, no mesmo ponto do fluxo.
+- Redesenhar a linha-formulário, o menu de criação ou a tabela lateral; alterar
+  `data-testid`/`aria-*` existentes (`form-criar-secao`, `nome-secao-input`,
+  `confirmar-criar-secao`, `form-criar-local`, `nome-local-input`,
+  `confirmar-criar-local` são intocáveis — `docs-dev/18`).
+
+## Specs fonte
+
+- Spec 04 §7.1 — geolocalização é o ponto clicado, por Serviço e sentido; município derivado
+  somente-leitura.
+- Spec 04 §7.2 — Local nasce unidirecional, com a geolocalização do sentido em edição.
+- Spec 04 §7.3 itens 2, 4 e 5 — inserir Parada em ordem; alterar coordenada dispara
+  revalidação e recálculo da rota, com indicador de carregamento.
+- Spec 03 §2.3 — município por ponto-em-polígono.
+- Spec 03 §7.2 / §7.4 — 350 m por centroide (Seção) e pareado (Local).
+- Q-090 — âncora de inserção preservada.
+
+## Regras envolvidas
+
+- **RN-027** — 350 m por centroide cumulativo na Seção: a coordenada digitada é candidata
+  como qualquer outra; recusa mantém a mensagem existente.
+- **RN-032** — 350 m pareado do Local.
+- **RN-034 / RN-035** — ordem 1-based sem lacunas, extremos sempre Seção: preservados; a
+  edição de coordenada não muda posição na lista.
+- **RN-036** — Parada referencia geolocalização do sentido.
+- **RN-052** — editar recalcula: confirmar a criação com a coordenada editada dispara o
+  recálculo normal da rota (é o mesmo caminho de hoje, com outro ponto).
+- **RN-005 / RN-004** — a Seção/Local criada continua nascendo com UUID nova e única; nada de
+  reaproveitar UUID por coincidência de coordenada.
+- **RN-096** — latitude/longitude em edição são estado efêmero; nada é persistido antes do
+  "Criar".
+
+## Entidades afetadas
+
+- **Seção** (`secao.servicos[].geolocalizacao_ida/volta`) e **Local**
+  (`geolocalizacao_ida/volta`), no momento da criação. **Parada** e **Itinerário**
+  indiretamente (posição inalterada, rota recalculada).
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato — sem campo novo)
+
+## Critérios de aceite
+
+- [ ] A linha-formulário de criação exibe **sempre** dois campos numéricos, `Latitude` e
+      `Longitude`, pré-preenchidos com a coordenada do clique, com **6 casas decimais**.
+- [ ] "Sempre" inclui: criação de Seção, criação de Local, clique **sobre** a linha (inserção
+      entre Paradas) e clique **fora** da linha (Parada ao fim) — nos quatro casos os campos
+      aparecem preenchidos.
+- [ ] Um botão **"Atualizar ponto"** (variante secundária) valida os dois campos e move o
+      marcador pendente do mapa para a nova coordenada, sem criar nada.
+- [ ] Valor não numérico, vazio, latitude fora de [-90, 90] ou longitude fora de [-180, 180]
+      ⇒ mensagem de erro no lugar já existente (`mensagem-recusa-criacao-inline`), marcador
+      **não** se move, campos preservam o que o usuário digitou.
+- [ ] Confirmar ("Criar Seção"/"Criar Local") usa a **coordenada corrente dos campos**, mesmo
+      que "Atualizar ponto" não tenha sido clicado — o que está no campo é o que vale.
+- [ ] A coordenada editada passa pelas validações de sempre: fora de SP ⇒ mensagem existente
+      (`MENSAGEM_FORA_DE_SP_SECAO`/`_LOCAL`); > 350 m ⇒ recusa de sempre; nada de caminho
+      alternativo.
+- [ ] A posição da Parada na lista é **idêntica** à que teria com a coordenada original do
+      clique (`posicaoNaLinha` intocada), inclusive quando a coordenada editada fica longe da
+      linha da rota.
+- [ ] Após criar, a rota é recalculada e **passa pela coordenada editada** (mesmo caminho
+      RN-052 de hoje).
+- [ ] Cancelar descarta coordenada e nome; reabrir o formulário em outro ponto repõe os
+      campos com o novo clique (nenhum resíduo do anterior).
+- [ ] O painel cresce **no máximo uma linha**: os dois campos ficam lado a lado, na mesma
+      faixa horizontal, e o botão "Atualizar ponto" divide a linha dos botões existentes.
+      Nenhum `style=` inline; componentes de `src/shared/ui` e tokens (`docs-dev/18`).
+- [ ] Novos `data-testid`: `latitude-criacao-input`, `longitude-criacao-input`,
+      `atualizar-ponto-criacao`. Os existentes ficam inalterados.
+
+## Casos válidos
+
+- Clique fora da linha em (-23.500000, -47.450000) ⇒ campos com esses valores; digitar
+  latitude `-23.501200` e clicar "Atualizar ponto" ⇒ marcador âmbar salta ~130 m ao sul;
+  "Criar Seção" ⇒ Seção criada em (-23.501200, -47.450000), última Parada do itinerário.
+- Clique **sobre a linha** entre as Paradas 2 e 3 ⇒ formulário abre entre as linhas 2 e 3 da
+  tabela; alterar longitude para um ponto 400 m ao lado da linha ⇒ a Parada nasce **na
+  posição 3**, e a rota recalculada faz o desvio até ela.
+- Criação de **Local** no sentido Volta ⇒ mesmos campos; Local nasce unidirecional
+  (DEC-075/076) com a geolocalização da Volta na coordenada digitada.
+- Digitar a mesma coordenada do clique e clicar "Atualizar ponto" ⇒ nenhuma mudança visível,
+  nenhum erro.
+
+## Casos inválidos
+
+- Latitude `abc`, `""`, `-91`, longitude `181` ⇒ erro exibido, marcador parado, criação não
+  ocorre.
+- Coordenada válida mas **fora de SP** ⇒ mensagem existente de fora de SP no "Criar", nada
+  criado (comportamento de hoje preservado).
+- Coordenada que viola os 350 m do cluster da Seção reutilizada ⇒ recusa de sempre com o nome
+  da Seção (RN-027).
+- Parada nova assumir posição diferente da âncora do clique por causa da coordenada digitada
+  ⇒ falha (contraria a Q-090).
+- Campos aparecendo apenas na criação solta e não na criação entre Paradas ⇒ falha.
+
+## Testes esperados
+
+- **Unitários** (`testes/unitarios/formulario/etapa-itinerarios-criacao-inline.test.tsx` ou
+  arquivo novo irmão): validação e parsing das coordenadas (tabela de entradas boas e ruins);
+  `posicaoCriacaoPendente` propagada com o valor editado; `criarSecaoNoPonto`/
+  `criarLocalNoPonto` recebendo o ponto editado, não o clicado; âncora de inserção inalterada
+  após edição.
+- **E2E** (`testes/e2e/`): abrir criação sobre a linha, editar latitude, "Atualizar ponto",
+  criar, e verificar a **ordem** das linhas na tabela lateral + a coordenada do marcador.
+  OSRM **mockado** (`docs-dev/13`), nunca a instância real.
+- **Regressão:** os testes atuais da criação inline (TASK-095) passam sem alteração de
+  expectativa, exceto onde o layout novo exigir seletor adicional.
+- **Snapshot/contrato JSON:** N/A (nenhum campo novo — RN-010).
+- **PDF:** N/A.
+
+## Arquivos prováveis
+
+- Alterar: `src/formulario/itinerarios/etapa-itinerarios.tsx` (estado da criação inline,
+  `renderizarLinhaFormularioCriacao`, `confirmarCriacaoInline`, `iniciarCriacaoParada`).
+- Possivelmente criar: `src/formulario/itinerarios/coordenada-criacao.ts` (parsing/validação
+  pura das duas strings ⇒ `Coordenada`), para manter a lógica testável fora do componente.
+- Testes correspondentes em `testes/unitarios/formulario/` e `testes/e2e/`.
+
+## Dependências
+
+- **TASK-095** (criação inline) — já implementada.
+- Independente das TASK-130/131. A **TASK-133 depende desta**.
+
+## Riscos
+
+- **Espaço da janela:** o pedido explícito foi "não descaracterizar nem aumentar muito" o
+  painel. Dois campos empilhados somariam ~3 linhas; a solução é a faixa horizontal única. Se
+  a largura da tabela lateral não comportar os dois campos lado a lado, é preferível reduzir a
+  precisão exibida a quebrar a linha.
+- **Ponto longe da linha:** coordenada digitada a quilômetros da rota gera desvio grande e
+  recálculo pesado — é o comportamento pedido, mas vale conferir que a recusa de 350 m e a
+  mensagem de OSRM continuam legíveis nesse caso.
+- **Fuga de escopo para "encaixar na via":** tentador usar o `/nearest` da TASK-131 para
+  corrigir a coordenada digitada. Não é o pedido, e mudaria silenciosamente o ponto do
+  usuário.
+- **Locale numérico:** usuário brasileiro pode digitar vírgula decimal. Aceitar vírgula como
+  separador decimal é inferência razoável, mas precisa estar coberta por teste — ou ser
+  recusada com mensagem clara. Decidir **na análise**, não na implementação.
+
+## Perguntas em aberto
+
+- Nenhuma — **Q-090 decidida pela opção 1 (DEC-112)**, com as duas sub-questões inclusas. A sub-decisão sobre vírgula
+  decimal fica registrada como ponto a fechar na "Análise da Task".
+
+---
+
+# TASK-133 — Nome de Seção/Local sugerido pela via mais próxima na criação
+
+> ✅ **Desbloqueada — Q-090 decidida (DEC-112, 2026-08-04).**
+
+## Objetivo
+
+Ao abrir a linha-formulário de criação, o campo de nome nasce preenchido com o nome
+abreviado da via mais próxima do ponto (ex.: `R. Franci. Aureli. Paiva`), editável; clicar
+"Atualizar ponto" recarrega a sugestão para a nova coordenada. Falha da consulta deixa o
+campo vazio com aviso — nunca impede a criação.
+
+## Contexto
+
+Fecha o pedido do responsável. Consome os três blocos anteriores: `/nearest` (TASK-131) para
+o nome cru, `abreviarNomeDeVia` (TASK-130) para caber em 25 caracteres, e os campos de
+coordenada (TASK-132) como gatilho de recarga. A sugestão é **conveniência**: Spec 04 §7.1
+mantém o nome como campo do usuário, e a Q-090 registrou que o valor é editável e nunca
+obrigatório.
+
+## Fora de escopo
+
+- Alterar a função de abreviação ou o cliente `/nearest` (TASK-130/131 são fechadas).
+- Sugerir nome para Seção/Local **já existentes**, renomear em massa, ou sugerir ao arrastar
+  um marcador — a sugestão só existe na linha-formulário de criação.
+- Sugerir no **reuso** de Seção existente (painel de reuso — a Seção já tem nome; RN-076).
+- Preencher o município: continua derivado e somente-leitura (Spec 03 §2.3).
+- Impedir nomes repetidos, validar tamanho no schema, ou bloquear "Criar" por causa da
+  sugestão.
+- Consultar `/nearest` a cada tecla digitada nos campos de coordenada.
+
+## Specs fonte
+
+- Spec 04 §7.1 — nome digitado pelo usuário (a sugestão é editável e não retira a digitação);
+  padrão `Cidade - Nome da Seção`.
+- Spec 04 §7.2 — Local.
+- Spec 04 §7.3 — gestos que chamam OSRM exibem indicador de carregamento.
+- Spec 03 §3.5 — categorias de falha do OSRM (referência da mensagem, sem bloqueio aqui).
+- Q-090 (opção 1) — origem da sugestão, política de falha e alvo de 25 caracteres.
+
+## Regras envolvidas
+
+- **RN-048** — a indisponibilidade bloqueante vale para a **rota**; a sugestão de nome falha
+  em silêncio informativo, sem gerar pendência nem bloquear exportação.
+- **RN-049** — mensagem de erro não menciona tarifa.
+- **RN-052** — abrir JSON não chama OSRM: a consulta ocorre só no gesto de criação.
+- **RN-076** — o campo contém **apenas** o nome; a cidade é prefixada na exibição, não gravada.
+- **RN-096** — sugestão é efêmera até o "Criar".
+
+## Entidades afetadas
+
+- **Seção** e **Local** (campo `nome`, no momento da criação).
+
+## Ferramentas afetadas
+
+- [x] Formulário
+- [ ] Comparador
+- [ ] Ingestor
+- [ ] PDF
+- [ ] JSON (contrato)
+
+## Critérios de aceite
+
+- [ ] Ao abrir a linha-formulário (Seção **ou** Local, sobre a linha **ou** fora dela), a
+      consulta `/nearest` é disparada para a coordenada do clique e o campo de nome é
+      preenchido com `abreviarNomeDeVia(via, 25)`.
+- [ ] O preenchimento automático na abertura só ocorre com o campo **vazio** — nunca sobrescreve
+      o que o usuário já digitou.
+- [ ] Clicar **"Atualizar ponto"** (TASK-132) com coordenada válida **recarrega** a sugestão e
+      **sobrescreve** o campo de nome — é o gesto explícito pedido pelo responsável.
+- [ ] Enquanto a consulta está em curso há indicador de carregamento e o botão "Criar" não
+      fica travado por ela: o usuário pode digitar o nome e criar sem esperar (chegando a
+      resposta depois, ela **não** sobrescreve o que ele digitou).
+- [ ] Falha (`rede`) ou ausência de via (`semResposta`) ⇒ campo permanece vazio e um aviso
+      discreto, não bloqueante, aparece na linha-formulário; "Criar" continua disponível
+      assim que houver nome digitado.
+- [ ] Nenhuma consulta é disparada ao digitar nos campos de coordenada — só na abertura e no
+      clique do botão.
+- [ ] Resposta obsoleta (usuário clicou "Atualizar ponto" duas vezes, ou fechou o formulário)
+      é **descartada**: nunca preenche o campo de um formulário já cancelado ou de outra
+      coordenada.
+- [ ] Cancelar limpa nome, aviso e consulta pendente.
+- [ ] Novo `data-testid`: `aviso-sugestao-nome`. Os existentes ficam inalterados.
+
+## Casos válidos
+
+- Clique em ponto sobre a Rua Francisco Aureliano Paiva ⇒ campo abre com
+  `R. Franci. Aureli. Paiva`; usuário aceita e clica "Criar Seção" ⇒ Seção com esse nome,
+  exibida como `Sorocaba - R. Franci. Aureli. Paiva` (RN-076).
+- Usuário substitui a sugestão por `Terminal Central` e cria ⇒ vale o que ele digitou.
+- Usuário digita nova latitude, clica "Atualizar ponto" ⇒ marcador move **e** o nome vira a
+  sugestão do novo ponto, sobrescrevendo a anterior.
+- Criação entre Paradas (clique sobre a linha) ⇒ mesma sugestão, mesma posição de inserção.
+
+## Casos inválidos
+
+- OSRM fora do ar ⇒ campo vazio + aviso; criar com nome digitado à mão **funciona**; a
+  exportação **não** é bloqueada e nenhuma pendência nova aparece (RN-048 no sentido inverso).
+- `/nearest` responde depois de o usuário ter digitado o nome ⇒ o digitado **prevalece**.
+- `/nearest` responde depois do "Cancelar" ⇒ nada acontece (sem `setState` em formulário
+  fechado).
+- Consulta disparada ao importar JSON, ao trocar de Serviço/sentido ou ao renderizar a tabela
+  ⇒ falha (RN-052).
+- Sugestão gravada com a cidade embutida (`"Sorocaba - R. ..."`) ⇒ falha (RN-076).
+
+## Testes esperados
+
+- **Unitários** (`testes/unitarios/formulario/sugestao-nome-criacao.test.tsx`): preenchimento
+  na abertura com `/nearest` mockado; não sobrescrever digitação; sobrescrever no botão;
+  descarte de resposta obsoleta (duas consultas, a primeira resolvendo por último); falha
+  `rede`/`semResposta` ⇒ aviso e campo vazio; contagem de chamadas (1 na abertura, +1 por
+  clique, 0 ao digitar coordenada).
+- **E2E:** criar Seção aceitando a sugestão, com `/nearest` e `/route` **mockados**, e conferir
+  o rótulo na tabela lateral.
+- **Regressão:** com o mock de `/nearest` falhando, toda a suíte de criação inline (TASK-095)
+  e o gate de exportação continuam verdes — prova de que a sugestão não é bloqueante.
+- **Snapshot/contrato JSON:** N/A (nenhum campo novo).
+- **PDF:** N/A.
+
+## Arquivos prováveis
+
+- Alterar: `src/formulario/itinerarios/etapa-itinerarios.tsx` (estado da sugestão, disparo,
+  descarte de resposta obsoleta, aviso).
+- Possivelmente criar: `src/formulario/nomeacao/sugerir-nome-de-parada.ts` — orquestração pura
+  `consultarViaMaisProxima` + `abreviarNomeDeVia`, para o componente ficar magro.
+- Testes correspondentes.
+
+## Dependências
+
+- **TASK-130** (abreviação), **TASK-131** (`/nearest`), **TASK-132** (campos de coordenada e
+  botão "Atualizar ponto"). É a última das quatro.
+
+## Riscos
+
+- **Sobrescrever digitação:** o modo de falha mais provável é a resposta assíncrona apagar o
+  que o usuário digitou enquanto esperava. Coberto por aceite e teste específico.
+- **Consulta em cascata:** ligar a sugestão ao `onChange` das coordenadas geraria uma
+  requisição por tecla no demo público (DEC-029). O aceite proíbe.
+- **Confundir aviso com pendência:** o aviso é local à linha-formulário; se for parar no
+  painel de pendências (§11), vira bloqueio de exportação e contraria a Q-090.
+- **Nome sugerido idêntico para duas Seções vizinhas:** duas Paradas na mesma rua nascem com o
+  mesmo nome. Não há RN de unicidade de nome e a task **não** inventa uma — mas vale observar
+  na revisão se o usuário percebe o que precisa renomear.
+
+## Perguntas em aberto
+
+- Nenhuma — **Q-090 decidida pela opção 1 (DEC-112)**, com as duas sub-questões inclusas.
+
+---
+
 **Primeira task:** TASK-001; **primeira task de valor de negócio:** TASK-003 (schema do contrato) — é a fundação de tudo e o melhor ponto de partida para validar o processo spec-driven.
