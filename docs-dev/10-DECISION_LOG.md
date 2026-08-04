@@ -2028,3 +2028,99 @@ linhas que descrevem o §13.1 item 4 pela ordem antiga. **Tasks:** **TASK-129**
 (escopo ampliado por esta decisão); **TASK-128** não é afetada, embora toque os
 mesmos arquivos; **TASK-039** (PDF comparativo) permanece regida pela Spec 05,
 sem herança automática.
+
+## DEC-112 — Nome de Seção/Local sugerido pela via mais próxima via OSRM `/nearest`, sem geocodificador novo
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, **opção 1 da
+Q-090** (dada explicitamente em conversa de 2026-08-04, com as três sub-decisões
+respondidas na mesma conversa e confirmada por `/registrar-decisao`); Spec 04
+§7.1, §7.2, §7.3; Spec 03 §2.3, §3.2, §3.5; Spec 01 §8; DEC-029; DEC-077;
+RN-047, RN-048, RN-052, RN-076, RN-096 · **Data:** 2026-08-04
+
+**Decisão:** na **linha-formulário de criação** de Seção/Local do mapa da etapa
+de itinerários (DEC-077):
+
+1. **A fonte do nome sugerido é o OSRM já contratado, serviço `/nearest`**
+   (`urlBaseOsrm`, DEC-029 — mesma base URL configurável do `/route`). **Nenhum
+   geocodificador novo** entra no projeto: Nominatim/OSM (opção 2 da Q-090) fica
+   **recusado** por ser dependência externa nova, sem SLA e com política de uso
+   própria. Consequência aceita e explícita: a sugestão traz o **nome da via**,
+   **não** o número de porta — `"Rua Francisco Aureliano Paiva, 657"` do exemplo
+   original vira `"R. Franci. Aureli. Paiva"`.
+2. **A sugestão é conveniência, nunca regra.** O campo continua sendo do usuário
+   (Spec 04 §7.1): o valor sugerido é **editável**, não obrigatório, e o
+   pré-preenchimento automático na abertura só ocorre com o campo vazio — nunca
+   sobrescreve digitação. O gesto explícito de recarregar (botão que reposiciona
+   o ponto) **sobrescreve** o campo: é o que o usuário pediu ao clicar.
+3. **Falha não bloqueia** (sub-questão *a* da Q-090). Indisponibilidade,
+   timeout, `code != Ok` ou via sem nome ⇒ **campo vazio + aviso discreto na
+   própria linha-formulário**, e a criação segue normalmente. Esta chamada
+   **não** gera pendência no painel (§11), **não** bloqueia exportação e **não**
+   herda a política bloqueante da RN-048 — que continua valendo integralmente
+   para o `/route` e para a rota. Sem retry, com timeout próprio menor que o do
+   `/route`.
+4. **Os 25 caracteres são alvo da abreviação, com truncamento final** (sub-questão
+   *b* da Q-090) — **não** são limite de digitação, **não** viram validação e
+   **não** tocam o schema (`nome: z.string().min(1)` permanece). Nomes já
+   gravados nunca são reescritos. A estratégia de abreviação é a ditada pelo
+   responsável: reduzir **igualitariamente** entre as palavras; palavras de até
+   **5 caracteres nunca são abreviadas** e nenhuma abreviação desce abaixo de 5;
+   só quando não houver como caber é que se reduz abaixo de 5 nas **duas
+   primeiras** palavras, com preferência à primeira; esgotado isso, trunca.
+   O `Cidade -` do padrão RN-076 é derivado (Spec 03 §2.3) e **não** entra na
+   contagem nem no campo.
+5. **Latitude e longitude editáveis na criação, com a âncora de inserção
+   preservada.** A linha-formulário passa a exibir sempre os dois campos
+   pré-preenchidos com a coordenada do clique, e um botão que reposiciona o
+   marcador provisório na coordenada digitada. Ao editar a coordenada, a
+   **posição da Parada na lista permanece a calculada no clique original**
+   (`posicaoNaLinha`): a coordenada editada muda **onde a Parada fica no mapa** —
+   e a rota recalculada (RN-052) passa a percorrer o novo ponto —, **não entre
+   quais Paradas ela entra**. Vale igualmente na criação entre Paradas (clique
+   sobre a linha) e na criação solta (Parada ao fim, RN-034/035).
+6. **A coordenada digitada é usada literalmente.** O `/nearest` devolve também a
+   coordenada encaixada na malha viária; ela **não** é usada para mover o ponto
+   do usuário. Todas as validações de sempre continuam no mesmo lugar do fluxo:
+   350 m por centroide (RN-027), 350 m pareado do Local (RN-032), recusa fora de
+   SP e derivação de município por ponto-em-polígono (Spec 03 §2.3).
+
+**Motivo:** o pedido nasceu do exemplo com número de porta, que só um
+geocodificador reverso entrega; o responsável preferiu **não** introduzir serviço
+externo novo e aceitar a sugestão sem número, aproveitando um serviço da
+instância OSRM que o projeto já consome e já sabe mockar nos testes. O ganho de
+usabilidade — não digitar do zero o nome de cada Parada — é preservado, e o custo
+arquitetural fica em zero dependências novas. As sub-decisões seguem o mesmo
+princípio: nada que seja conveniência de digitação pode virar bloqueio de
+exportação (3) nem regra de contrato (4).
+
+**Consequências:** resolve a **Q-090**. **Desbloqueia as TASK-130, TASK-131,
+TASK-132 e TASK-133**, que nasceram bloqueadas por ela. Não altera o contrato
+JSON — nenhum campo novo, RN-008..015 intocadas — nem o Comparador (RN-080: nunca
+chama OSRM). Não cria fluxo, status nem persistência (NEG-001..019 preservados).
+**Aponta uma alteração de spec para o responsável aplicar** (`docs/specs/**` é
+read-only para quem implementa): a Spec 04 §7.1 diz hoje, secamente, "**Nome** —
+digitado pelo usuário", e §7.2 remete a ela para o Local; convém acrescentar que
+o campo pode **nascer com uma sugestão editável** derivada da via mais próxima,
+sem deixar de ser campo do usuário. Enquanto o texto não for alterado, esta DEC é
+a fonte de verdade da sugestão, e a leitura literal do §7.1 não deve ser tratada
+como conflito.
+
+**Impacto em implementação:** **RN:** nenhuma RN muda de texto. RN-048 ganha um
+limite de alcance explícito (é bloqueante para a **rota**, não para esta
+consulta) e RN-052 continua valendo — a consulta só ocorre em gesto de criação,
+nunca ao importar JSON ou renderizar. RN-076, RN-027, RN-032, RN-034/035 e
+RN-096 são verificadas sem alteração. **Módulos:**
+`src/formulario/nomeacao/abreviar-nome-de-via.ts` (novo, função pura — TASK-130);
+`src/formulario/roteamento/nearest-osrm.ts` (novo cliente fino, retorno próprio,
+sem tocar `cliente-osrm.ts`/`url-osrm.ts`/`falhas-osrm.ts` — TASK-131);
+`src/formulario/itinerarios/etapa-itinerarios.tsx` (campos de coordenada, botão
+de reposicionamento e sugestão — TASK-132/133), possivelmente com
+`coordenada-criacao.ts` e `sugerir-nome-de-parada.ts` extraídos para manter a
+lógica testável fora do componente. **Testes:** OSRM sempre mockado
+(`docs-dev/13`), inclusive o `/nearest`; a suíte de criação inline (TASK-095)
+deve continuar verde **com o mock do `/nearest` falhando** — é a prova de que a
+sugestão não é bloqueante. **Derivados a atualizar quando o responsável pedir:**
+`docs-dev/01-RULE_INDEX.md` (nota de alcance na RN-048) e
+`docs-dev/03-TRACEABILITY_MATRIX.md` (linha do Spec 04 §7.1). **Tasks:**
+TASK-130..133 desbloqueadas; TASK-095 (criação inline) e TASK-078/079 (arrasto e
+lista unificada) não são afetadas.

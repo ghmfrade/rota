@@ -1772,3 +1772,52 @@ limiar em **12 Seções**, leitura **coluna a coluna**, teto do mapa na **altura
 (≈ 309 pt)** e, sobretudo, **ordem de sacrifício invertida em relação à DEC-109 item 4** —
 dividir em colunas, depois **quebrar a unidade**, e **reduzir o mapa só em último caso**. Ver
 DEC-111.
+
+## Q-090 — Pré-preenchimento do nome de Seção/Local pelo endereço mais próximo: existe? de que fonte?
+
+**Contexto:** Levantada em 2026-08-04 ao quebrar em tasks (TASK-130..133) o pedido do
+responsável de que o campo de nome da linha-formulário de criação (TASK-095/DEC-077) nasça
+pré-preenchido com o endereço do ponto clicado, abreviado para caber em 25 caracteres. Dois
+pontos exigem decisão, porque **nenhuma spec fala em endereço**:
+
+1. **A spec diz o contrário do pedido em literalidade.** Spec 04 §7.1: "**Nome** — digitado
+   pelo usuário". Um valor sugerido, **editável e não obrigatório**, não retira do usuário a
+   digitação, mas é comportamento novo que a spec não prevê — não pode ser inventado por quem
+   implementa (`docs-dev/04` princípio 2).
+2. **A fonte do endereço é dependência externa.** O ROTA não tem geocodificador. O único
+   serviço externo aprovado é o OSRM (DEC-025/DEC-029, `router.project-osrm.org`), e a Spec 03
+   §3 só contrata o serviço `/route`. Endereço com **número de porta** ("Rua Francisco
+   Aureliano Paiva, 657", exemplo do responsável) exigiria um geocodificador reverso novo
+   (Nominatim/OSM), com política de uso própria (1 req/s, `User-Agent` identificável), sem SLA
+   — dependência que `docs-dev/13` obriga a decidir antes, não durante.
+
+**Spec relacionada:** Spec 04 §7.1 (nome digitado; município derivado somente-leitura), §7.2
+(Local), §7.3 (mapa e recálculo); Spec 03 §2.3 (município por ponto-em-polígono), §3.2/§3.5
+(contrato e falhas do OSRM); Spec 01 §8. RN-047, RN-048, RN-045, RN-027, RN-032, RN-052,
+RN-096. DEC-029 (OSRM demo), DEC-077 (criação inline).
+
+**Impacto se não decidir:** as TASK-130..133 ficam sem regra de origem — sintoma de escopo
+inventado; e a escolha errada da fonte introduz um serviço externo novo (Nominatim) em
+regime de uso que o projeto não avaliou.
+
+**Opções:**
+1. **OSRM `/nearest` (serviço já contratado, mesma base URL, DEC-029).** Devolve o **nome da
+   via** mais próxima e a coordenada encaixada na malha. Não devolve número de porta.
+2. **Nominatim reverse (OSM), serviço externo novo.** Devolve rua **e número**, como no
+   exemplo. Custo: dependência nova, sem SLA, política de uso do OSM.
+3. **Não pré-preencher** — manter o campo vazio, como hoje.
+
+**Sub-questões:** (a) o que fazer quando a fonte falha ou não retorna via; (b) os 25
+caracteres são limite de exibição/sugestão ou limite duro do campo.
+
+**Decisão:** **Decidida (DEC-112, 2026-08-04).** Opção **1 (OSRM `/nearest`)**: sem
+geocodificador novo, sem número de porta — Nominatim recusado por ser dependência externa
+nova sem SLA. A sugestão é **editável** e **nunca bloqueia** a criação: falha ou ausência de
+via ⇒ campo vazio + aviso discreto na própria linha-formulário, sem pendência e sem bloqueio
+de exportação (sub-questão *a*); os 25 caracteres são **alvo da abreviação com truncamento
+final**, não limite de digitação nem validação de schema (sub-questão *b*). Decidido também
+que, ao editar latitude/longitude na criação, a **âncora de inserção na lista permanece a do
+clique original** — a coordenada editada muda onde a Parada fica no mapa (e a rota
+recalculada passa por lá), não entre quais Paradas ela entra; e que a coordenada digitada é
+usada **literalmente**, sem encaixe na via. Ver DEC-112, que **desbloqueia as
+TASK-130..133** e aponta a alteração de redação sugerida para a Spec 04 §7.1.
