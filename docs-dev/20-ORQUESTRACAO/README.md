@@ -264,20 +264,28 @@ Efeito colateral desejável: em vez de N interrupções espalhadas, uma sessão 
 - Nada de contexto trafega entre fases **exceto** o `session_id` análise→implementação e
   análise-de-correção→correção. Todas as demais fases leem artefatos do disco — que é o que as
   skills já mandam fazer.
-- **`--max-turns` por fase.** Um *turno* é uma resposta do modelo mais as ferramentas que ela
-  chama; o limite é a trava anti-loop **dentro de um processo**, e não tem relação com
-  `--max-correcoes` (§5). Fase que bate o teto termina incompleta e vira `PARAR` — o teto
-  existe para impedir que uma fase perdida consuma a corrida inteira, não para apertar o
-  trabalho legítimo. Ponto de partida a calibrar com o custo real registrado no ledger:
+- **Teto por fase, em duas camadas.** A CLI instalada (2.1.221) **não tem `--max-turns`** — foi
+  verificado no `--help`. O teto é montado com o que existe:
+  1. **Timeout de parede**, que mata a árvore de processos (`taskkill /T /F` no Windows). É a
+     trava dura: nenhum processo da corrida sobrevive ao orquestrador desistir dele.
+  2. **Teto de turnos conferido depois**, lendo `num_turns` do JSON de resultado. Estourou =
+     a fase se enrolou = `PARAR`. Não impede o gasto daquela fase, mas impede que a corrida
+     continue em cima de uma fase que perdeu o rumo.
 
-  | Fase | Teto | Por quê |
-  |---|---|---|
-  | Análise | 30 | leitura de specs e RN, sem edição |
-  | Implementação | 90 | edita, roda teste direcionado, lint, typecheck, build, suíte final |
-  | Análise da correção | 25 | lê parecer e specs citadas |
-  | Correção | 60 | escopo restrito às ressalvas |
-  | Revisão | 60 | checklist `07` item a item, parecer, `19` |
-  | Veredito | 8 | lê parecer + `--stat`, devolve JSON |
+  Um *turno* é uma resposta do modelo mais as ferramentas que ela chama; nada disso tem
+  relação com `--max-correcoes` (§5). Valores iniciais, a calibrar pelo custo real do ledger:
+
+  | Fase | Turnos | Timeout | Por quê |
+  |---|---|---|---|
+  | Análise | 30 | 20 min | leitura de specs e RN, sem edição |
+  | Implementação | 90 | 75 min | edita, teste direcionado, lint, typecheck, build, suíte final |
+  | Análise da correção | 25 | 20 min | lê parecer e specs citadas |
+  | Correção | 60 | 60 min | escopo restrito às ressalvas |
+  | Revisão | 60 | 45 min | checklist `07` item a item, parecer, `19` |
+  | Veredito | 8 | 10 min | lê parecer + `--stat`, devolve JSON |
+
+- **`--budget-usd`** além do `--budget-turnos`: o JSON de resultado traz `total_cost_usd` por
+  fase, então o custo real é acumulado no ledger e comparado a cada fase.
 - O analisador de verdito recebe parecer + `--stat`, jamais o diff completo.
 - **Budget global da corrida** no ledger (turnos totais e/ou custo e/ou tempo de parede).
   Atingido → `PARAR` com relatório do que ficou pronto.
@@ -288,16 +296,26 @@ Efeito colateral desejável: em vez de N interrupções espalhadas, uma sessão 
 ## 10. Interface
 
 ```
-node scripts/orquestrar-tasks.mjs --de TASK-131 --ate TASK-138 [opções]
+npm run orquestrar -- --de TASK-130 --ate TASK-133 [opções]
+node scripts/orquestrar-tasks.mjs --de TASK-130 --ate TASK-133 [opções]
 
   --tasks TASK-131,TASK-134,TASK-140   lista explícita, alternativa a --de/--ate
+  --executar                           EXECUTA DE VERDADE (sem isto, é ensaio)
+  --ensaio                             imprime o plano e não executa nada (PADRÃO)
   --parar-na-primeira                  (padrão) primeira parada encerra a corrida
   --pular-bloqueadas                   segue para a próxima task independente
   --max-correcoes 3                    (padrão 3; teto rígido, não configurável acima disso)
-  --budget-turnos 600                  budget global da corrida
-  --ensaio                             imprime o plano da corrida e não executa nada
+  --budget-turnos 600                  budget global de turnos
+  --budget-usd 25                      budget global de custo
+  --permissoes acceptEdits             (padrão) ou bypassPermissions
   --retomar <id-da-corrida>            continua do ledger, da fase onde parou
+
+  ROTA_CLAUDE_CLI=<caminho>            executável do Claude Code, se fora do PATH
 ```
+
+**O ensaio é o padrão, e isso é deliberado:** o comando sem `--executar` nunca gasta um token.
+Gastar exige um ato explícito, porque o erro caro aqui (disparar a fila errada) é silencioso e
+só aparece na fatura.
 
 A ordem de execução respeita `docs-dev/19-STATUS_EXECUCAO.md`: se a ordem registrada lá
 contradiz o intervalo pedido, o script **avisa e para**, não reordena por conta própria.
@@ -360,10 +378,58 @@ lacunas e existe o risco de pular uma dependência não declarada no `19`. **Pad
    exclusivo do humano, via `/registrar-decisao`.
 4. **`relatorio.md` é pós-corrida**, não pré (§10); o pré é o `--ensaio`.
 
-### Ainda em aberto
+### Ainda em aberto (revisado após a implementação)
 
 - Budget global padrão (`--budget-turnos`) — só dá para calibrar com o custo real da primeira
   corrida; sugestão de partida: rodar a primeira sem budget e medir.
 - Portão opcional `--aprovar-planos`: imprimir as N análises no início da corrida e esperar um
   ok único antes de qualquer implementação. Mitiga o risco "plano ruim passou na triagem"
   (§12) ao custo de uma interrupção por corrida. **Não incluído** até você pedir.
+
+---
+
+## 14. O que a implementação acrescentou ao desenho
+
+Escrito em `scripts/orquestrar-tasks.mjs` (Node ESM puro, sem dependências) mais três skills
+novas. Decisões tomadas na implementação, todas no sentido de não gastar token à toa e não
+destruir trabalho:
+
+- **Ensaio é o padrão.** Gastar exige `--executar` (§10).
+- **Preflight que recusa correr:** working tree sujo, branch `main`/`master`, ou `node_modules`
+  ausente abortam antes de qualquer processo. Working tree sujo é recusa, não aviso — a corrida
+  jamais mistura trabalho manual em curso com commits automáticos.
+- **Trava de corrida** (`corridas/.trava`): duas corridas simultâneas brigariam pela porta 3100
+  e invalidariam o fingerprint do `test:all:verificar` (§8).
+- **Triagem antes da fase cara.** A análise (opus, barata) escreve um sinal JSON; o script lê e
+  só então gasta a implementação (sonnet, cara). Task bloqueada, ambiguidade nova ou inferência
+  de alto impacto param **antes** de implementar. O prompt manda: *"na dúvida entre true e
+  false, escreva true"*.
+- **Sinais em arquivo, não em prosa.** Cada fase escreve um JSON pequeno num caminho que o
+  script indica; o roteamento lê o arquivo, nunca interpreta o texto da conversa. Sinal ausente
+  ou malformado = `PARAR`.
+- **Nenhuma skill existente foi tocada.** As instruções extras (escrever o sinal, não pedir
+  aprovação) vão como sufixo do prompt que invoca a skill.
+- **`--allowedTools` explícito.** O `settings.json` do projeto só libera leitura de git; sem
+  liberar `git add`/`git commit` a fase travaria num prompt de permissão que ninguém
+  responderia. Modo padrão `acceptEdits`; `bypassPermissions` é opt-in. Em qualquer modo o hook
+  `protect-specs` continua valendo — `docs/specs/**` segue read-only.
+- **Timeout que mata a árvore de processos**, já que a CLI não tem `--max-turns` (§9).
+- **Diff-guard** comparando arquivos tocados contra os previstos na análise (§6).
+- **Dependências lidas por oração, não por linha.** A seção "Dependências" do backlog é prosa:
+  a mesma linha diz *"Independente das TASK-130/131"* e *"a TASK-133 depende desta"*. O parser
+  descarta orações que negam ou invertem a relação e, onde o texto é ambíguo, conta como
+  dependência — errar para mais só faz pular uma task que talvez pudesse rodar; errar para
+  menos faz rodar sobre base quebrada.
+- **Nada de reset automático.** Quando para, para e conta: o ledger guarda o SHA anterior a
+  cada task para você desfazer manualmente se quiser.
+- **`corridas/` no `.gitignore`** — registro efêmero, como o `ultimo-test-all.log`.
+
+### Verificado até aqui
+
+Sintaxe, `--ajuda`, ensaio real sobre a fila TASK-130..133 com as dependências corretas, e as
+recusas: working tree sujo, `--max-correcoes` acima do teto, task inexistente, intervalo
+invertido, ausência de argumentos. `npm run lint` limpo.
+
+**Não verificado:** nenhuma corrida real foi executada — o caminho de execução (`--executar`)
+nunca rodou uma fase. A primeira corrida de verdade deve ser de **uma task só**
+(`--tasks TASK-130`), com budget curto, e acompanhada.

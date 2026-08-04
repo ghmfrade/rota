@@ -21,6 +21,10 @@ playwright-report/
 .env.local
 *.log
 
+# Corridas do orquestrador (docs-dev/20): ledger, sinais e relatorio sao registro
+# de execucao efemero, como o ultimo-test-all.log — nunca fonte de verdade.
+docs-dev/20-ORQUESTRACAO/corridas/
+
 # Sistema operacional
 .DS_Store
 Thumbs.db

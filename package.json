@@ -15,7 +15,8 @@
     "test:all": "npm run test:all:log",
     "test:all:log": "node scripts/executar-test-all-log.mjs",
     "test:all:verificar": "node scripts/verificar-log-test-all.mjs",
-    "check:rastreabilidade": "node scripts/verificar-rastreabilidade.mjs"
+    "check:rastreabilidade": "node scripts/verificar-rastreabilidade.mjs",
+    "orquestrar": "node scripts/orquestrar-tasks.mjs"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",
