@@ -1,6 +1,48 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-08-03 (branch `redesign`) — **TASK-128, rodada de
+**Atualização mais recente:** 2026-08-04 (branch `redesign`) — **TASK-129: entrega APROVADA
+COM RESSALVAS; o bloco de itinerário do PDF sai da fila.** O commit `b22223d`, fundamentado na
+**DEC-109** e na **DEC-111** (`aeae0db`, Q-089 opção 1 customizada), reordena o bloco para
+título → imagem do mapa → lista numerada de Seções → descrição por vias, remove a **sequência
+de Seções ligada por seta** do desenho, do modelo (`sequenciaSecoes`, `sequenciaDeSecoes`,
+`SETA_SEQUENCIA`) e dos estilos, divide a lista numerada em **duas colunas a partir de 12
+Seções** lidas coluna a coluna (`legenda-itinerario.ts:151-172`), põe **teto de altura** na
+imagem (`imagemMapa.maxHeight: 309.17`) e transforma a escada de acomodação da DEC-111 item 4
+em função pura `calcularAcomodacaoItinerario` (`legenda-itinerario.ts:213-272`), com o trio
+título+mapa+lista nascendo como envelope `wrap={false}`. Verificado por medição própria na
+revisão (`_INTERNAL__LAYOUT__DATA_` sobre `DocumentoPdfOperacional`, modelo sintético com
+imagem real): a imagem sai a **515,28 pt** — exatamente a largura útil `595,28 − 2 × 40` — e o
+`maxHeight` é real (uma imagem quadrada sai com 309,17 pt de altura, não 515,28). O parecer
+`14-REVISOES/TASK-129-20260804.md` registra **checklist 07 com 21 ok, 33 N/A e 0 violados** e
+quatro problemas, nenhum violando RN Alta ou NEG-xxx. O principal: a constante
+`alturaItemLegenda = 20` **subestima** a linha real da legenda (medidos **24 pt** por item,
+17,9 pt no último da coluna), de modo que `calcularAcomodacaoItinerario` afirma
+`unidadeIntegra: true` além do ponto em que o trio cabe — com **34 Seções** o motor comprime o
+envelope por conta própria (imagem a 287,12 pt, linhas a 22,29 pt), reduzindo o mapa **sem**
+passar pelo degrau (ii) e invertendo a prioridade da **DEC-111 item 4**, contra a proibição de
+deformação silenciosa do **item 6**. O caso só aparece por volta de 30+ Seções por
+Serviço/sentido, muito acima da escala real (11–12 Seções, DEC-110), e por isso é ressalva e
+não reprovação. Os demais: nenhum teste de **layout real** guarda os degraus (ii)/(iii) — o
+risco que a própria task antecipou; o teto 309,17 é repetido em dois módulos sem derivar de
+`LARGURA_CAPTURA`/`ALTURA_CAPTURA`; e `pdf-regras-transversais.test.ts` foi alterado apesar do
+"sem alteração de expectativa" da task, embora preservando a semântica ao reancorar as três
+verificações em `legendaSecoes`. **Condições de merge:** **conferência visual** do PDF com um
+Serviço da escala real e outro no limiar de 12 Seções (colunas), e registro dos follow-ups de
+recalibrar `alturaItemLegenda` com teste de layout real e de derivar o teto da proporção da
+captura. A revisão reutilizou o log canônico verde (`test:all:verificar`: executor **Claude**,
+fingerprint `2627c90e…04afbecd`, identidade `498d7fa6…3a884f91763`, `Test Files 113 passed`,
+`Tests 1611 passed`, E2E `111 passed`, ambos com código 0, `Resultado geral: APROVADO`) e rodou
+`typecheck` e `lint`, ambos limpos; o arquivo de diagnóstico usado nas medições foi removido e
+`git status` ficou limpo antes e depois. **Contagem:** a TASK-129 **não** estava no total de 8
+tasks não concluídas (foi criada depois daquela contagem, em `d53130d`, no mesmo tratamento
+dado à TASK-120), então o total **permanece 8 — 6 executáveis, a TASK-038 com bloqueio parcial
+e a TASK-040 bloqueada**. Nenhuma task foi absorvida, substituída ou desbloqueada por esta. O
+follow-up herdado da TASK-128 (guardar por teste o orçamento de largura das matrizes, bloco de
+7 colunas) **não** foi tratado aqui: estava fora do objetivo da TASK-129 e segue **sem dono**.
+Permanece a pendência de **registro** herdada: a §3 termina na **125** e o total "102 tasks
+concluídas" diverge das linhas da tabela — esta revisão também **não** mexeu nisso.
+
+**Histórico anterior (2026-08-03) — TASK-128, rodada de
 correção: entrega APROVADA COM RESSALVAS; o desenho das matrizes do PDF sai da fila e, com
 ele, a TASK-034 é encerrada (DEC-108).** O commit `a05022d`, fundamentado na **DEC-110**
 (`69d5485`, Q-088 opção 2 "com as recomendações"), entrega as **cinco correções** que o
@@ -912,6 +954,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 033 | PDF operacional: estrutura e identificação (§13.1 itens 1–4 e 9; DEC-104) — aprovada com ressalvas em `14-REVISOES/TASK-033-20260731.md`; ressalvas fechadas em `1a77a85` e revisadas em `14-REVISOES/TASK-033-20260802-fechamento.md` (sem condição de merge remanescente; pendem 2 ressalvas documentais — DEC da estratificação por Serviço e task para o painel da TASK-031) |
 | 034 | PDF operacional: tabelas horárias, matrizes e anexo (§13.1 itens 5–8) — reprovada três vezes no desenho das matrizes (`14-REVISOES/TASK-034-20260803.md`, `-correcao.md`, `-task-128.md`) e **encerrada pela TASK-128** (DEC-108) |
 | 128 | Matrizes do PDF: rótulo de coluna horizontal no triângulo superior, matriz íntegra por página e acabamento (DEC-108/DEC-110) — 1ª rodada `31ff190` reprovada; rodada de correção `a05022d` **aprovada com ressalvas** em `14-REVISOES/TASK-128-20260803.md` (condições de merge: comentário do `MAX_COLUNAS_POR_BLOCO` e conferência visual) |
+| 129 | Bloco de itinerário do PDF: mapa no topo, lista numerada de Seções em duas colunas a partir de 12 e supressão da sequência por seta (DEC-109/DEC-111) — implementada em `b22223d` e **aprovada com ressalvas** em `14-REVISOES/TASK-129-20260804.md` (condições de merge: conferência visual e registro dos follow-ups de recalibrar `alturaItemLegenda` com teste de layout real e de derivar o teto de altura da proporção da captura) |
 
 ### Fase 12 — Qualidade e follow-ups
 
@@ -1018,8 +1061,10 @@ Nenhuma destas exige reimplementação — são lacunas de rastreabilidade.
 **Estado atual: 8 tasks não concluídas: 6 executáveis, a TASK-038 com bloqueio
 parcial e a TASK-040 bloqueada.** Em 2026-08-03, a **TASK-034 saiu da fila**: encerrada pela
 **TASK-128** (DEC-108), cuja rodada de correção `a05022d` foi aprovada com ressalvas em
-`14-REVISOES/TASK-128-20260803.md`. A **TASK-129** (itinerários do PDF, DEC-109) foi criada
-depois desta contagem, em `d53130d`, e por isso não altera o total — mesmo tratamento dado à
+`14-REVISOES/TASK-128-20260803.md`. Em 2026-08-04, a **TASK-129** (itinerários do PDF,
+DEC-109/DEC-111) foi implementada em `b22223d` e **aprovada com ressalvas** em
+`14-REVISOES/TASK-129-20260804.md`, saindo da fila; ela havia sido criada depois desta
+contagem, em `d53130d`, e por isso **não** altera o total — mesmo tratamento dado à
 TASK-120. Em 2026-07-31, a **TASK-033 saiu da fila**:
 implementada em `32cd8ae` e aprovada com ressalvas em
 `14-REVISOES/TASK-033-20260731.md`; a **TASK-034** fica desbloqueada e herda a
