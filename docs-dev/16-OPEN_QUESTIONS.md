@@ -1722,3 +1722,53 @@ responsável adotou explicitamente a recomendação técnica desta Q e as demais
 "Análise da Task" da rodada de correção da TASK-128: rodada única (as cinco correções juntas),
 réguas verticais em `CINZA_500` e preservação de ao menos um bloco no descarte do bloco
 degenerado. `MAX_COLUNAS_POR_BLOCO` **permanece 7**. Ver DEC-110.
+
+---
+
+## Q-089 — Lista numerada de Seções do PDF: colunas, teto de altura do mapa e ordem de sacrifício quando o bloco não couber
+
+**Contexto:** Levantada em 2026-08-04 na "Análise da Task" da **TASK-129**. A **DEC-109**
+itens 3 e 4 fixou que **título + mapa + lista numerada** são unidade inquebrável e que a
+imagem do mapa tem **altura máxima**, encolhendo "quando o bloco precisar do espaço" — sem
+dizer *quanto*, nem o que cede primeiro. Ao aprovar a análise, o responsável acrescentou o
+mecanismo que faltava: com muitas Seções, o espaço deve vir da **divisão da lista em
+colunas**, preservando o mapa, e não do encolhimento da imagem.
+
+Aritmética que instrui a decisão (A4, `estilosPdf.pagina`): largura útil **515,3 pt**
+(595,3 − 2×40); altura útil **745,9 pt** (841,9 − 40 − 56). Imagem do mapa em largura plena,
+com a proporção da captura (`LARGURA_CAPTURA = 1400` × `ALTURA_CAPTURA = 840`), ocupa
+**309,2 pt** de altura, mais 12 pt de margens. Título do itinerário ≈ **29 pt** (corpo 11 +
+`marginTop` 12 + `marginBottom` 4). Item da legenda ≈ **19–21 pt** (símbolo de 13 pt, nome com
+`paddingBottom` 8). Sobra para a lista ≈ **384 pt** — ou seja, **~18 Seções em coluna única**,
+já sem folga nenhuma para a descrição por vias na mesma página.
+
+**Spec relacionada:** Spec 04 §13.1 item 4c ("no padrão de lista, numerada na ordem das
+seções", sem fixar número de colunas); §13.3 ("uma página por bloco lógico quando possível");
+§13.4 (a descrição é parágrafo corrido e **nunca** vira tabela); DEC-109 itens 3 e 4;
+DEC-105 (a numeração da lista é a mesma do símbolo no mapa); RN-076, RN-031, RN-044.
+
+**Impacto se não decidir:** a TASK-129 implementa o `wrap={false}` do trio sem regra de
+acomodação e, no Serviço com muitas Seções, o bloco excede a altura útil e é **cortado em
+silêncio** — o mesmo modo de falha que reprovou a TASK-034 duas vezes.
+
+**Opções:**
+1. **Escada com 2 colunas no máximo:** 1 coluna enquanto couber; 2 colunas acima do limiar;
+   só então o mapa encolhe até um piso; se ainda não couber, o envelope deixa de ser
+   `wrap={false}` e a lista quebra (perder a unidade é melhor que cortar).
+2. **Até 3 colunas antes de encolher o mapa** — ganha altura, mas 171 pt por coluna fazem
+   `Cidade - Nome da Seção` quebrar em 2–3 linhas na escala real, anulando o ganho.
+3. **Manter só o encolhimento do mapa** (DEC-109 item 3 literal), sem colunas.
+
+**Sub-questões:** (a) ordem de leitura nas colunas — coluna a coluna ou linha a linha;
+(b) valor do teto e do piso de altura do mapa; (c) a lista deve ir a colunas antes da
+necessidade aritmética, para sobrar página para a descrição?
+
+**Recomendação técnica:** opção **1**, com leitura **coluna a coluna** (preserva a leitura
+vertical numerada que casa com o mapa) e teto igual à **altura natural em largura plena**
+(≈ 309 pt), de modo que o teto nunca produza faixa vazia lateral no caso comum.
+
+**Decisão:** **Decidida (DEC-111, 2026-08-04).** Opção 1 **customizada** pelo responsável:
+limiar em **12 Seções**, leitura **coluna a coluna**, teto do mapa na **altura natural
+(≈ 309 pt)** e, sobretudo, **ordem de sacrifício invertida em relação à DEC-109 item 4** —
+dividir em colunas, depois **quebrar a unidade**, e **reduzir o mapa só em último caso**. Ver
+DEC-111.

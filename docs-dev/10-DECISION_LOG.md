@@ -1945,3 +1945,86 @@ célula de valor", ambos verificáveis em Vitest (o primeiro por
 não é afetada; **TASK-129** toca os mesmos arquivos e, se implementada em
 sequência, revalida a suíte de PDF inteira; TASK-037/TASK-039 (matrizes
 comparativas) permanecem regidas pela Spec 05, sem herança automática.
+
+---
+
+## DEC-111 — Lista numerada de Seções do PDF: duas colunas a partir de 12 Seções e ordem de sacrifício com o mapa por último
+
+**Status:** Aceita · **Origem:** decisão do responsável pelo domínio, **opção 1 da
+Q-089 customizada** (dada explicitamente em conversa de 2026-08-04 e confirmada
+por `/registrar-decisao`; sub-questões (a) e (b) respondidas na mesma conversa);
+Spec 04 §13.1 item 4c, §13.3, §13.4; DEC-109 itens 3 e 4; DEC-105; RN-076,
+RN-031, RN-044 · **Data:** 2026-08-04
+
+**Decisão:** na **lista numerada de Seções** do bloco de itinerário do **PDF
+operacional** (§13.1 item 4c):
+
+1. **Duas colunas a partir de 12 Seções.** Com **até 11** Seções no
+   Serviço/sentido, a lista sai em **coluna única**, como hoje; com **12 ou
+   mais**, sai em **duas colunas** de larguras iguais dentro da largura útil.
+   **Duas é o máximo** — três colunas ficam recusadas (a 171 pt por coluna,
+   `Cidade - Nome da Seção` quebraria em 2–3 linhas na escala real, anulando o
+   ganho de altura).
+2. **Ordem de leitura coluna a coluna:** a primeira metade da lista ocupa a
+   coluna esquerda de cima para baixo, e a segunda metade a direita — 12 Seções
+   dão `1º…6º` à esquerda e `7º…12º` à direita. A numeração e os rótulos são os
+   mesmos de hoje (DEC-105, RN-076): a divisão é só de apresentação.
+3. **Teto de altura da imagem do mapa = altura natural em largura plena**, ou
+   seja **≈ 309 pt** (largura útil 515,3 pt sobre a proporção da captura
+   1400×840). Assim o teto exigido pela DEC-109 item 3 existe e é verificável,
+   mas **não** produz faixa vazia lateral no caso comum.
+4. **Ordem de sacrifício quando o conjunto não couber na página — nesta ordem,
+   e não em outra:** (i) **dividir a lista em colunas**; (ii) **quebrar a
+   unidade**, deixando a lista fluir para a página seguinte; (iii) **reduzir a
+   altura do mapa**, e **só em último caso**. Isto **inverte a prioridade do
+   item 4 da DEC-109**, que mandava preservar a unidade e encolher o mapa: a
+   unidade título+mapa+lista continua sendo o alvo, mas deixa de ser
+   inegociável diante da redução do mapa.
+5. **A descrição textual por vias continua livre para quebrar** de página
+   (DEC-109 item 4, parte não alterada) e continua parágrafo corrido com as
+   Seções realçadas (§13.4). Locais seguem fora da lista e da descrição
+   (RN-031, RN-044).
+6. **Corte silencioso é proibido em qualquer degrau da escada:** se, esgotados
+   os três degraus, o conteúdo ainda não couber, o bloco quebra de página — não
+   se admite conteúdo perdido por transbordo de um envelope inquebrável.
+
+**Motivo:** o mapa é a peça que o responsável quer ler primeiro e inteira — foi
+por isso que a DEC-109 o pôs no topo; encolhê-lo para caber uma lista contraria o
+próprio motivo da reordenação. A lista, ao contrário, tem folga de largura: a
+515,3 pt, duas colunas de ~257 pt ainda comportam `Cidade - Nome da Seção` em uma
+linha, de modo que dividir custa **nada** de legibilidade e devolve metade da
+altura. O limiar de 12 é o ponto em que a lista começa a comprimir a página na
+escala real do ROTA (11–12 Seções por Serviço, conforme a aritmética da DEC-110):
+até 11 a coluna única ainda deixa espaço para a descrição começar na mesma
+página. A inversão do item 4 da DEC-109 segue o mesmo raciocínio: uma lista que
+continua na página seguinte permanece legível e completa; um mapa reduzido perde
+o que ele existe para mostrar.
+
+**Consequências:** resolve a **Q-089** e **substitui a prioridade fixada no item 4
+da DEC-109** (os itens 1, 2, 3 e 5 daquela decisão permanecem vigentes; o item 3
+ganha o valor numérico do teto). **Nenhuma alteração de spec:** §13.1 item 4c
+pede "o padrão de lista, numerada", sem fixar colunas, e §13.3 pede "uma página
+por bloco lógico quando possível" — a divisão em colunas é exatamente o meio de
+cumpri-lo; §13.4 permanece intocado e a descrição **não** vira tabela nem ganha
+colunas. **Nenhuma mudança de contrato JSON**, nenhum recálculo (RN-015), nenhuma
+alteração na captura do mapa, nos símbolos numerados ou na numeração hierárquica
+`n.m` (DEC-104/DEC-105). O painel equivalente da UI (§7.4 e §11) **não** é
+afetado: a decisão vale só para o PDF.
+
+**Impacto em implementação:** aplica-se à **TASK-129**, que permanece
+desbloqueada e passa a ter também este mecanismo no escopo. Módulos:
+`src/formulario/pdf/legenda-itinerario.ts` (função pura de repartição em
+colunas — limiar 12, máximo 2, distribuição coluna a coluna),
+`src/formulario/pdf/documento-pdf-operacional.tsx` (`LegendaItinerarioPdf` em
+duas colunas; envelope de integridade título+mapa+lista e a escada de sacrifício
+do item 4) e `src/formulario/pdf/estilos-pdf.ts` (teto de altura da imagem;
+estilos de coluna da legenda). **RN:** nenhuma RN muda de texto — RN-076, RN-031
+e RN-044 continuam sendo as regras verificadas, e o critério de revisão passa a
+incluir "lista em duas colunas a partir de 12 Seções", "ordem coluna a coluna" e
+"nenhum conteúdo perdido por transbordo", os três verificáveis em Vitest (os dois
+últimos por `@react-pdf/layout`). **Derivados a atualizar quando o responsável
+pedir:** `docs-dev/03-TRACEABILITY_MATRIX.md` e `docs-dev/01-RULE_INDEX.md`, nas
+linhas que descrevem o §13.1 item 4 pela ordem antiga. **Tasks:** **TASK-129**
+(escopo ampliado por esta decisão); **TASK-128** não é afetada, embora toque os
+mesmos arquivos; **TASK-039** (PDF comparativo) permanece regida pela Spec 05,
+sem herança automática.
