@@ -202,11 +202,6 @@ export const estilosPdf = StyleSheet.create({
     paddingHorizontal: 3,
     textAlign: "right",
   },
-  sequenciaSecoes: {
-    marginBottom: 4,
-    fontFamily: "Helvetica-Bold",
-    color: AZUL_700,
-  },
   // §13.4 — parágrafo corrido, nunca tabela; Seções em destaque, vias simples.
   paragrafoDescricao: {
     marginBottom: 6,
@@ -219,10 +214,16 @@ export const estilosPdf = StyleSheet.create({
   descricaoVia: {
     color: CINZA_700,
   },
+  // DEC-109 item 3/DEC-111 item 3 — largura útil (515,28 pt) na proporção
+  // 1400×840 da captura (`LARGURA_CAPTURA`/`ALTURA_CAPTURA`) = 309,17 pt; o
+  // teto é a própria altura natural, então não recorta a imagem no caso
+  // comum — só quando `documento-pdf-operacional.tsx` sobrepõe `height`
+  // menor, no último degrau da escada de acomodação (DEC-111 item 4-iii).
   imagemMapa: {
     marginTop: 4,
     marginBottom: 8,
     width: "100%",
+    maxHeight: 309.17,
     objectFit: "contain",
   },
   avisoSemImagem: {
@@ -235,6 +236,16 @@ export const estilosPdf = StyleSheet.create({
   legendaItinerario: {
     marginTop: 4,
     marginBottom: 8,
+  },
+  // Duas colunas lado a lado a partir de 12 Seções (DEC-111 item 1); a
+  // largura de 48% com `space-between` deixa uma margem entre as colunas sem
+  // depender de `gap`.
+  legendaColunas: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  legendaColuna: {
+    width: "48%",
   },
   legendaLinha: {
     flexDirection: "row",

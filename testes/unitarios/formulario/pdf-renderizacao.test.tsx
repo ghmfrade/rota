@@ -7,7 +7,10 @@ import { estilosPdf, PALETA_PDF } from "@/formulario/pdf/estilos-pdf";
 import {
   AVISO_SEI,
   montarModeloPdfOperacional,
+  ORDEM_BLOCOS,
   ROTULO_FAIXA_TOTAL_AUTOS,
+  TITULO_PDF,
+  type BlocoItinerario,
   type ModeloPdfOperacional,
 } from "@/formulario/pdf/modelo-pdf-operacional";
 import { AVISO_GRADE_VAZIA } from "@/formulario/pdf/tabelas-horarias-pdf";
@@ -15,7 +18,8 @@ import {
   MARCA_DIAGONAL,
   MARCA_PAR_NAO_HABILITADO,
 } from "@/formulario/pdf/matrizes-pdf";
-import { esquemaDocumentoOperacao } from "@/shared/contrato";
+import type { ItemLegendaSecao } from "@/formulario/pdf/legenda-itinerario";
+import { esquemaDocumentoOperacao, type DocumentoOperacao } from "@/shared/contrato";
 import { FAIXAS_HORARIO, rotuloFaixaComIntervalo } from "@/shared/contagens";
 import {
   documentoBidirecionalMultiServico,
@@ -728,6 +732,217 @@ describe("Legenda do itinerário (DEC-105/TASK-127)", () => {
     const paginaItinerarios = paginasDe(arvoreDo(modelo))[3];
 
     expect(textoDe(paginaItinerarios)).not.toContain("Local Que Não Pode Vazar");
+  });
+});
+
+// TASK-129/DEC-109/DEC-111 — mapa antes da lista numerada, sem a sequência de
+// Seções ligada por seta, colunas a partir de 12 Seções e a ordem de
+// sacrifício quando o trio título+mapa+lista não cabe na página.
+
+// PNG 1×1 real (não um placeholder de string) — o layout REAL do @react-pdf
+// decodifica a imagem para calcular `objectFit`, então um data-URI inválido
+// quebraria `pdf(...).toBuffer()`. O teste de largura só depende da largura
+// do nó, não da proporção real de uma captura de mapa.
+const IMAGEM_MAPA_TESTE =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+
+function modeloComImagem(documento: DocumentoOperacao): ModeloPdfOperacional {
+  return montarModeloPdfOperacional(esquemaDocumentoOperacao.parse(documento), {
+    geradoEm: new Date(2026, 6, 31, 14, 5),
+    obterImagemDoItinerario: () => IMAGEM_MAPA_TESTE,
+  });
+}
+
+// `DocumentoPdfOperacional` é componente burro (só desenha o `ModeloPdfOperacional`
+// que recebe — comentário no topo de `documento-pdf-operacional.tsx`): construir
+// o modelo à mão, com uma legenda sintética grande, exercita a divisão em
+// colunas e a escada de acomodação (DEC-111) sem depender de um Autos válido
+// com dezenas de Seções e todos os pares da matriz (RN-054) — mesmo precedente
+// de `matrizSintetica` em `pdf-matrizes.test.ts`.
+function legendaSintetica(quantidade: number): ItemLegendaSecao[] {
+  return Array.from({ length: quantidade }, (_, i) => ({
+    rotulo: `${i + 1}º`,
+    nome: `Cidade ${i} - Seção ${i}`,
+  }));
+}
+
+function blocoItinerarioSintetico(quantidadeSecoes: number): BlocoItinerario {
+  return {
+    servicoUuid: "servico-sintetico",
+    sentido: "ida",
+    titulo: "Serviço SINT-1 — Ida",
+    descricaoTexto: "Cidade 0 - Seção 0, Rua Sintética, Cidade 1 - Seção 1.",
+    descricaoItens: [],
+    legendaSecoes: legendaSintetica(quantidadeSecoes),
+    identificadoresLocais: [],
+  };
+}
+
+function modeloComItinerarioSintetico(quantidadeSecoes: number): ModeloPdfOperacional {
+  return {
+    ordemBlocos: ORDEM_BLOCOS,
+    capa: {
+      titulo: TITULO_PDF,
+      codigo: "0000",
+      empresa: "Empresa Sintética",
+      tipo: "intermunicipal",
+      status: "proposta",
+      rotuloData: "Data de criação",
+      data: "01/07/2026",
+    },
+    resumo: {
+      rotuloSemanaPadrao: "semana padrão (sem feriados nem operação excepcional)",
+      porServico: [],
+      totalViagensSemana: 0,
+      totalOpcoesDeslocamento: 0,
+      porFaixa: [],
+      porFaixaPorServico: [],
+    },
+    servicos: [],
+    itinerarios: [blocoItinerarioSintetico(quantidadeSecoes)],
+    tabelasHorarias: [],
+    matrizesDistancias: [],
+    matrizesSeccionamento: [],
+    anexoTecnico: { tabelasDetalhadas: [], locaisPorItinerario: [] },
+    rodape: { versaoSchema: "1.1", geradoEm: "31/07/2026 14:05", aviso: AVISO_SEI },
+  };
+}
+
+describe("DEC-109/DEC-111 — bloco de itinerário: mapa primeiro, lista numerada, sem seta", () => {
+  test("ordem exata dos filhos do bloco: título → mapa/aviso → lista numerada → descrição", () => {
+    const modelo = modeloDe(documentoBidirecionalMultiServico());
+    const paginaItinerarios = paginasDe(arvoreDo(modelo))[3];
+    const texto = textoDe(paginaItinerarios);
+    const bloco = modelo.itinerarios[0];
+
+    const posTitulo = texto.indexOf(bloco.titulo);
+    const posAviso = texto.indexOf("Imagem do mapa indisponível");
+    const posLegenda = texto.indexOf(bloco.legendaSecoes[0].nome);
+    // O último item da legenda é o fim da lista numerada: a descrição (que
+    // repete nomes de Seção como marcos — §13.4) só pode ser buscada DEPOIS
+    // dele, senão a primeira ocorrência encontrada é a da própria legenda.
+    const ultimoItemLegenda = bloco.legendaSecoes[bloco.legendaSecoes.length - 1];
+    const posUltimoItemLegenda = texto.indexOf(ultimoItemLegenda.nome, posLegenda);
+    const posDescricao = texto.indexOf(
+      bloco.descricaoTexto.slice(0, 20),
+      posUltimoItemLegenda + ultimoItemLegenda.nome.length,
+    );
+
+    expect(posTitulo).toBeGreaterThanOrEqual(0);
+    // Nenhuma fixture destes testes passa `obterImagemDoItinerario`: o aviso
+    // da DEC-104 ocupa o lugar da imagem, na mesma posição da ordem (b).
+    expect(posAviso).toBeGreaterThan(posTitulo);
+    expect(posLegenda).toBeGreaterThan(posAviso);
+    expect(posDescricao).toBeGreaterThan(posUltimoItemLegenda);
+  });
+
+  test("a sequência de Seções ligada por seta não aparece em nenhuma página", () => {
+    const documento = arvoreDo(modeloDe(documentoBidirecionalMultiServico()));
+    for (const pagina of paginasDe(documento)) {
+      expect(textoDe(pagina)).not.toContain(" → ");
+    }
+  });
+
+  test("caso inválido — a mesma varredura detectaria a seta se ela ainda existisse", () => {
+    // Prova de poder de detecção: um nó de texto com seta, se existisse na
+    // árvore, seria pego pela mesma asserção acima.
+    const paginaComSeta: NoPdf = {
+      tipo: "PAGE",
+      props: {},
+      filhos: [{ tipo: "#texto", props: { valor: "Cidade A → Cidade B" }, filhos: [] }],
+    };
+    expect(textoDe(paginaComSeta)).toContain(" → ");
+  });
+
+  test("sem imagem de mapa: o aviso da DEC-104 aparece, e a ordem título → aviso → lista é preservada", () => {
+    const modelo = modeloDe(documentoUnidirecional());
+    expect(modelo.itinerarios.every((i) => i.imagemMapa === undefined)).toBe(true);
+
+    const texto = textoDe(paginasDe(arvoreDo(modelo))[3]);
+    const bloco = modelo.itinerarios[0];
+
+    expect(texto).toContain("Imagem do mapa indisponível para este itinerário.");
+    expect(texto.indexOf(bloco.titulo)).toBeLessThan(
+      texto.indexOf("Imagem do mapa indisponível"),
+    );
+    expect(texto.indexOf("Imagem do mapa indisponível")).toBeLessThan(
+      texto.indexOf(bloco.legendaSecoes[0].nome),
+    );
+  });
+
+  test(
+    "layout real — a imagem do mapa ocupa a largura útil da página (DEC-109 item 3)",
+    async () => {
+      const layout = await layoutRealDoDocumento(modeloComImagem(documentoExemploMinimo()));
+      const paginas = descendentesLayout(layout).filter((no) => no.type === "PAGE");
+      const imagens = descendentesLayout(layout).filter((no) => no.type === "IMAGE");
+
+      expect(paginas.length).toBeGreaterThan(0);
+      expect(imagens.length).toBeGreaterThan(0);
+
+      const larguraUtil =
+        (paginas[0].box?.width ?? 0) - 2 * (estilosPdf.pagina.paddingHorizontal as number);
+
+      for (const imagem of imagens) {
+        expect(imagem.box?.width).toBeCloseTo(larguraUtil, 1);
+      }
+    },
+    30_000,
+  );
+
+  test("título + mapa + lista numerada saem no mesmo envelope `wrap={false}` quando a unidade é íntegra", () => {
+    const documento = arvoreDo(modeloComItinerarioSintetico(3));
+    const paginaItinerarios = paginasDe(documento)[3];
+    const blocoItinerario = paginaItinerarios.filhos.find((filho) => filho.props.break === false);
+    expect(blocoItinerario).toBeDefined();
+
+    const unidade = blocoItinerario?.filhos.find((filho) => filho.props.wrap === false);
+    expect(unidade).toBeDefined();
+    // A lista numerada (rótulo "1º") está DENTRO do envelope inquebrável.
+    expect(textoDe(unidade as NoPdf)).toContain("1º");
+  });
+
+  test("com 12 Seções ou mais, a lista numerada divide em duas colunas (DEC-111 item 1)", () => {
+    const documento = arvoreDo(modeloComItinerarioSintetico(12));
+    const paginaItinerarios = paginasDe(documento)[3];
+    const colunas = descendentes(paginaItinerarios).filter(
+      (no) => no.props.style === estilosPdf.legendaColuna,
+    );
+
+    expect(colunas).toHaveLength(2);
+    expect(textoDe(colunas[0])).not.toContain("7º");
+    expect(textoDe(colunas[0])).toContain("6º");
+    expect(textoDe(colunas[1])).toContain("7º");
+    expect(textoDe(colunas[1])).not.toContain("6º");
+  });
+
+  test("com menos de 12 Seções, a lista numerada permanece em uma única coluna", () => {
+    const documento = arvoreDo(modeloComItinerarioSintetico(11));
+    const paginaItinerarios = paginasDe(documento)[3];
+    const colunas = descendentes(paginaItinerarios).filter(
+      (no) => no.props.style === estilosPdf.legendaColuna,
+    );
+
+    expect(colunas).toHaveLength(0);
+  });
+
+  test("DEC-111 item 4-ii — quando o trio não cabe nem em duas colunas, a lista sai do envelope inquebrável (não corta em silêncio)", () => {
+    // 39 Seções sintéticas: acima do ponto em que `calcularAcomodacaoItinerario`
+    // (parâmetros padrão) deixa de caber como unidade única, mesmo em duas
+    // colunas (ver `pdf-legenda-itinerario.test.ts`).
+    const documento = arvoreDo(modeloComItinerarioSintetico(39));
+    const paginaItinerarios = paginasDe(documento)[3];
+    const blocoItinerario = paginaItinerarios.filhos.find((filho) => filho.props.break === false);
+    expect(blocoItinerario).toBeDefined();
+
+    const unidade = blocoItinerario?.filhos.find((filho) => filho.props.wrap === false);
+    expect(unidade).toBeDefined();
+    // O título e o aviso de mapa continuam no envelope inquebrável...
+    expect(textoDe(unidade as NoPdf)).toContain("Serviço SINT-1");
+    // ...mas a lista numerada não: nenhum item aparece dentro dele.
+    expect(textoDe(unidade as NoPdf)).not.toContain("1º");
+    // A lista aparece em algum lugar do bloco, fora do envelope.
+    expect(textoDe(blocoItinerario as NoPdf)).toContain("1º");
   });
 });
 

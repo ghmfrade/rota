@@ -1,5 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { numerarItinerario } from "@/formulario/pdf/legenda-itinerario";
+import {
+  calcularAcomodacaoItinerario,
+  colunasDaLegenda,
+  LIMIAR_COLUNAS_LEGENDA,
+  numerarItinerario,
+  PARAMETROS_ACOMODACAO_PADRAO,
+  type ItemLegendaSecao,
+} from "@/formulario/pdf/legenda-itinerario";
 import { esquemaDocumentoOperacao } from "@/shared/contrato";
 import type { Itinerario, Local, Parada, Secao } from "@/shared/contrato";
 import { documentoExemploMinimo } from "../../fixtures";
@@ -307,5 +314,127 @@ describe("numerarItinerario — casos inválidos", () => {
 
     // A Seção B é "2º" — o Local intermediário não consumiu um número de Seção.
     expect(resultado.legendaSecoes[1].rotulo).toBe("2º");
+  });
+});
+
+// TASK-129/DEC-111 — colunas da lista numerada e acomodação do bloco de
+// itinerário. Módulos puros, testados com legendas sintéticas (nenhuma
+// fixture do projeto chega perto de 12 Seções por Serviço — mesmo precedente
+// de `matrizSintetica` em `pdf-matrizes.test.ts`).
+
+function legendaSintetica(quantidade: number): ItemLegendaSecao[] {
+  return Array.from({ length: quantidade }, (_, i) => ({
+    rotulo: `${i + 1}º`,
+    nome: `Cidade ${i} - Seção ${i}`,
+  }));
+}
+
+describe("colunasDaLegenda — DEC-111 item 1", () => {
+  test("abaixo do limiar (11 Seções): uma coluna só, com todos os itens", () => {
+    const colunas = colunasDaLegenda(legendaSintetica(11));
+    expect(colunas).toHaveLength(1);
+    expect(colunas[0]).toHaveLength(11);
+  });
+
+  test("no limiar (12 Seções): duas colunas de 6", () => {
+    const colunas = colunasDaLegenda(legendaSintetica(12));
+    expect(colunas).toHaveLength(2);
+    expect(colunas[0]).toHaveLength(6);
+    expect(colunas[1]).toHaveLength(6);
+  });
+
+  test("acima do limiar, quantidade ímpar (13 Seções): a coluna esquerda absorve o item extra", () => {
+    const colunas = colunasDaLegenda(legendaSintetica(13));
+    expect(colunas).toHaveLength(2);
+    expect(colunas[0]).toHaveLength(7);
+    expect(colunas[1]).toHaveLength(6);
+  });
+
+  test("leitura coluna a coluna: a primeira metade da numeração fica à esquerda, a segunda à direita", () => {
+    const colunas = colunasDaLegenda(legendaSintetica(12));
+    expect(colunas[0].map((item) => item.rotulo)).toEqual([
+      "1º", "2º", "3º", "4º", "5º", "6º",
+    ]);
+    expect(colunas[1].map((item) => item.rotulo)).toEqual([
+      "7º", "8º", "9º", "10º", "11º", "12º",
+    ]);
+  });
+
+  test("caso inválido — nunca mais de duas colunas (máximo fixado pela DEC-111 item 1)", () => {
+    const colunas = colunasDaLegenda(legendaSintetica(60));
+    expect(colunas.length).toBeLessThanOrEqual(2);
+  });
+
+  test("legenda vazia: uma coluna vazia, sem quebrar", () => {
+    expect(colunasDaLegenda([])).toEqual([[]]);
+  });
+
+  test("limiar customizado é respeitado", () => {
+    expect(colunasDaLegenda(legendaSintetica(5), 5)).toHaveLength(2);
+    expect(colunasDaLegenda(legendaSintetica(4), 5)).toHaveLength(1);
+  });
+
+  test("LIMIAR_COLUNAS_LEGENDA é 12 (DEC-111 item 1)", () => {
+    expect(LIMIAR_COLUNAS_LEGENDA).toBe(12);
+  });
+});
+
+describe("calcularAcomodacaoItinerario — ordem de sacrifício da DEC-111 item 4", () => {
+  test("poucas Seções: uma coluna, mapa na altura natural, unidade íntegra", () => {
+    const acomodacao = calcularAcomodacaoItinerario(legendaSintetica(3));
+    expect(acomodacao).toEqual({
+      colunas: 1,
+      alturaImagemMapa: PARAMETROS_ACOMODACAO_PADRAO.alturaImagemNatural,
+      unidadeIntegra: true,
+    });
+  });
+
+  test("no limiar de colunas (12 Seções): duas colunas bastam, unidade continua íntegra", () => {
+    const acomodacao = calcularAcomodacaoItinerario(legendaSintetica(12));
+    expect(acomodacao.colunas).toBe(2);
+    expect(acomodacao.unidadeIntegra).toBe(true);
+    expect(acomodacao.alturaImagemMapa).toBe(PARAMETROS_ACOMODACAO_PADRAO.alturaImagemNatural);
+  });
+
+  test("degrau (i)→(ii) — 38 Seções ainda cabem em duas colunas; 39 já não cabem e quebram a unidade, sem reduzir o mapa", () => {
+    const aindaIntegra = calcularAcomodacaoItinerario(legendaSintetica(38));
+    expect(aindaIntegra.unidadeIntegra).toBe(true);
+    expect(aindaIntegra.alturaImagemMapa).toBe(PARAMETROS_ACOMODACAO_PADRAO.alturaImagemNatural);
+
+    const quebraUnidade = calcularAcomodacaoItinerario(legendaSintetica(39));
+    expect(quebraUnidade.unidadeIntegra).toBe(false);
+    // (ii) antes de (iii): o mapa NÃO encolhe só porque a lista não coube.
+    expect(quebraUnidade.alturaImagemMapa).toBe(PARAMETROS_ACOMODACAO_PADRAO.alturaImagemNatural);
+  });
+
+  test("degrau (iii) — só reduz o mapa quando nem título+mapa cabem sozinhos (parâmetros injetados)", () => {
+    const parametrosExtremos = { ...PARAMETROS_ACOMODACAO_PADRAO, alturaUtilPagina: 100 };
+
+    const acomodacao = calcularAcomodacaoItinerario(legendaSintetica(20), parametrosExtremos);
+
+    expect(acomodacao.unidadeIntegra).toBe(false);
+    expect(acomodacao.alturaImagemMapa).toBeLessThan(
+      PARAMETROS_ACOMODACAO_PADRAO.alturaImagemNatural,
+    );
+    expect(acomodacao.alturaImagemMapa).toBe(
+      100 - parametrosExtremos.alturaTitulo - parametrosExtremos.margensImagem,
+    );
+  });
+
+  test("caso inválido — a altura do mapa nunca fica negativa, mesmo sem página nenhuma sobrando", () => {
+    const parametrosSemPagina = { ...PARAMETROS_ACOMODACAO_PADRAO, alturaUtilPagina: 0 };
+
+    const acomodacao = calcularAcomodacaoItinerario(legendaSintetica(20), parametrosSemPagina);
+
+    expect(acomodacao.alturaImagemMapa).toBeGreaterThanOrEqual(0);
+  });
+
+  test("legenda vazia: uma coluna, unidade íntegra, mapa na altura natural", () => {
+    const acomodacao = calcularAcomodacaoItinerario([]);
+    expect(acomodacao).toEqual({
+      colunas: 1,
+      alturaImagemMapa: PARAMETROS_ACOMODACAO_PADRAO.alturaImagemNatural,
+      unidadeIntegra: true,
+    });
   });
 });

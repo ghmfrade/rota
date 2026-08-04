@@ -1,7 +1,6 @@
 import type {
   DocumentoOperacao,
   Itinerario,
-  Secao,
   Servico,
 } from "@/shared/contrato";
 import {
@@ -12,10 +11,6 @@ import {
   ROTULO_SEMANA_PADRAO,
   rotuloFaixaComIntervalo,
 } from "@/shared/contagens";
-// Import profundo deliberado (precedente: `pendencias/pendencias.ts`): o índice
-// de `secoes` reexporta o editor React, e este módulo é puro — o modelo do PDF
-// não deve arrastar componente de mapa nem de UI.
-import { nomeExibicaoSecao } from "@/formulario/secoes/fluxos-secao";
 import {
   numerarItinerario,
   type IdentificadorLocal,
@@ -56,9 +51,6 @@ export const TITULO_PDF = "ROTA — Tabela Operacional";
 /** Aviso obrigatório de fronteira com o SEI (RN-077; §13.1 item 9). */
 export const AVISO_SEI =
   "O fluxo administrativo (análise, pendências e aprovação) permanece no SEI. Este documento não substitui a publicação oficial.";
-
-/** Separador da sequência resumida de Seções (§13.1 item 4b). */
-export const SETA_SEQUENCIA = " → ";
 
 /** Ordem dos blocos do §13.1 — a peça inteira, itens 1 a 9. */
 export const ORDEM_BLOCOS = [
@@ -165,23 +157,26 @@ export interface ItemDescricaoPdf {
   texto: string;
 }
 
-/** §13.1 item 4 — itinerário por Serviço e sentido, na ordem a→d. */
+/**
+ * §13.1 item 4 — itinerário por Serviço e sentido, na ordem a→d (DEC-109:
+ * mapa antes da lista numerada; sem a sequência de Seções ligada por seta,
+ * que a legenda vertical já cobre com o mesmo número do símbolo no mapa).
+ */
 export interface BlocoItinerario {
   servicoUuid: string;
   sentido: Itinerario["sentido"];
   /** (a) `Serviço 0000-NXX — Ida`. */
   titulo: string;
-  /** (b) `Cidade A - Seção A → Cidade B - Seção B` — só Seções (RN-076). */
-  sequenciaSecoes: string;
-  /** (c) `rota.descricao_itinerario.texto`, parágrafo corrido (§13.4). */
+  /** (d) `rota.descricao_itinerario.texto`, parágrafo corrido (§13.4). */
   descricaoTexto: string;
-  /** (c) itens estruturados para o realce das Seções (§13.4). */
+  /** (d) itens estruturados para o realce das Seções (§13.4). */
   descricaoItens: ItemDescricaoPdf[];
-  /** (d) data-URI da captura do mapa; ausente quando a captura não veio (DEC-104). */
+  /** (b) data-URI da captura do mapa; ausente quando a captura não veio (DEC-104). */
   imagemMapa?: string;
   /**
-   * Legenda vertical do bloco — só Seções, numeradas e ligadas por conector
-   * (DEC-105; RN-076). Preenchida independentemente de `imagemMapa`: falha de
+   * (c) Legenda vertical do bloco — só Seções, numeradas e ligadas por
+   * conector (DEC-105; RN-076), dividida em colunas a partir de 12 itens
+   * (DEC-111). Preenchida independentemente de `imagemMapa`: falha de
    * captura não impede a legenda de ser renderizada.
    */
   legendaSecoes: ItemLegendaSecao[];
@@ -297,34 +292,6 @@ function direcionalidadeDoServico(servico: Servico): string {
   return sentidos.has("volta") ? "Volta" : "Ida";
 }
 
-function indicePorUuid(secoes: readonly Secao[]): Map<string, Secao> {
-  return new Map(secoes.map((secao) => [secao.uuid, secao]));
-}
-
-/**
- * Sequência resumida de Seções do itinerário (§13.1 item 4b), no padrão
- * `Cidade - Nome da Seção` (RN-076) ligado por seta. Paradas que referenciam
- * Local são ignoradas: Locais não aparecem no corpo do PDF, só no anexo
- * técnico (RN-031/RN-076; §13.1 item 8b, TASK-034).
- */
-export function sequenciaDeSecoes(
-  itinerario: Itinerario,
-  secoes: readonly Secao[],
-): string {
-  const porUuid = indicePorUuid(secoes);
-  // A Spec 02 §10 exige `paradas` ordenado por `ordem`, mas o PDF ordena
-  // defensivamente antes de ler, como já fazem `motor-montagem.ts`,
-  // `montagem-grade.ts` e `redistribuicao-offsets.ts`: a travessia é o que a
-  // peça operacional afirma, e ela não pode depender da ordem do array.
-  return [...itinerario.paradas]
-    .sort((a, b) => a.ordem - b.ordem)
-    .filter((parada) => parada.secao_uuid !== undefined)
-    .map((parada) => porUuid.get(parada.secao_uuid as string))
-    .filter((secao): secao is Secao => secao !== undefined)
-    .map(nomeExibicaoSecao)
-    .join(SETA_SEQUENCIA);
-}
-
 function itensDaDescricao(itinerario: Itinerario): ItemDescricaoPdf[] {
   return itinerario.rota.descricao_itinerario.itens.map((item) =>
     item.tipo === "secao"
@@ -433,7 +400,6 @@ function montarItinerarios(
         servicoUuid: servico.uuid,
         sentido: itinerario.sentido,
         titulo: `Serviço ${servico.numero_n} — ${ROTULO_SENTIDO[itinerario.sentido]}`,
-        sequenciaSecoes: sequenciaDeSecoes(itinerario, documento.autos.secoes),
         descricaoTexto: itinerario.rota.descricao_itinerario.texto,
         descricaoItens: itensDaDescricao(itinerario),
         ...(imagem ? { imagemMapa: imagem } : {}),

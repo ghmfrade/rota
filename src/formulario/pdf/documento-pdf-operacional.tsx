@@ -1,4 +1,5 @@
 import { Document, Image, Page, Text, View } from "@react-pdf/renderer";
+import type { Style } from "@react-pdf/types";
 import { estilosPdf } from "./estilos-pdf";
 import {
   paragrafoDaDescricao,
@@ -8,7 +9,12 @@ import {
   type BlocoServico,
   type ModeloPdfOperacional,
 } from "./modelo-pdf-operacional";
-import type { ItemLegendaSecao } from "./legenda-itinerario";
+import {
+  calcularAcomodacaoItinerario,
+  colunasDaLegenda,
+  PARAMETROS_ACOMODACAO_PADRAO,
+  type ItemLegendaSecao,
+} from "./legenda-itinerario";
 import {
   AVISO_GRADE_VAZIA,
   type GradeHorariaPdf,
@@ -251,30 +257,72 @@ function BlocoServicoPdf({ servico }: { servico: BlocoServico }) {
 }
 
 /**
- * Legenda vertical do bloco de itinerário (DEC-105; §13.1 item 4d) — só
+ * Legenda vertical do bloco de itinerário (DEC-105; §13.1 item 4c) — só
  * Seções (RN-076), símbolo numerado (mesma cor/forma do quadrado da DEC-069,
  * em escala de legenda) + `Cidade - Nome`, ligados por um conector azul entre
- * itens consecutivos. Renderizada mesmo sem `imagemMapa`: falha de captura
- * (DEC-104) não impede a legenda.
+ * itens consecutivos DA MESMA coluna (o conector não atravessa colunas — a
+ * numeração continua contínua, mas a ligação visual é só dentro da coluna).
+ * Recebe as colunas já divididas (`colunasDaLegenda`, DEC-111 item 1) e
+ * renderiza em uma ou duas, lado a lado. Renderizada mesmo sem `imagemMapa`:
+ * falha de captura (DEC-104) não impede a legenda.
  */
-function LegendaItinerarioPdf({ legenda }: { legenda: ItemLegendaSecao[] }) {
-  if (legenda.length === 0) return null;
-  return (
-    <View style={estilosPdf.legendaItinerario}>
-      {legenda.map((item, indice) => (
+function LegendaItinerarioPdf({
+  colunas,
+}: {
+  colunas: readonly (readonly ItemLegendaSecao[])[];
+}) {
+  const totalItens = colunas.reduce((total, coluna) => total + coluna.length, 0);
+  if (totalItens === 0) return null;
+
+  const conteudo = colunas.map((coluna, indiceColuna) => (
+    <View key={indiceColuna} style={colunas.length > 1 ? estilosPdf.legendaColuna : undefined}>
+      {coluna.map((item, indice) => (
         <View key={item.rotulo} style={estilosPdf.legendaLinha} wrap={false}>
           <View style={estilosPdf.legendaColunaSimbolo}>
             <View style={estilosPdf.legendaSimbolo}>
               <Text style={estilosPdf.legendaNumero}>{item.rotulo}</Text>
             </View>
-            {indice < legenda.length - 1 ? (
-              <View style={estilosPdf.legendaConector} />
-            ) : null}
+            {indice < coluna.length - 1 ? <View style={estilosPdf.legendaConector} /> : null}
           </View>
           <Text style={estilosPdf.legendaNome}>{item.nome}</Text>
         </View>
       ))}
     </View>
+  ));
+
+  return (
+    <View style={estilosPdf.legendaItinerario}>
+      {colunas.length > 1 ? <View style={estilosPdf.legendaColunas}>{conteudo}</View> : conteudo}
+    </View>
+  );
+}
+
+/** (a) título + (b) imagem do mapa (ou aviso da DEC-104), sem envelope próprio
+ * — quem decide se isso é `wrap={false}` sozinho ou junto com a lista é
+ * `BlocoItinerarioPdf`, conforme a acomodação da DEC-111. */
+function TituloEMapaPdf({
+  titulo,
+  imagemMapa,
+  estiloImagemMapa,
+}: {
+  titulo: string;
+  imagemMapa: string | undefined;
+  estiloImagemMapa: Style;
+}) {
+  return (
+    <>
+      <Text style={estilosPdf.tituloItinerario}>{titulo}</Text>
+      {imagemMapa ? (
+        // `Image` aqui é o primitivo do @react-pdf, não `<img>` do DOM: não
+        // aceita `alt` (a acessibilidade do PDF vem do texto do bloco).
+        // eslint-disable-next-line jsx-a11y/alt-text
+        <Image style={estiloImagemMapa} src={imagemMapa} />
+      ) : (
+        <Text style={estilosPdf.avisoSemImagem}>
+          Imagem do mapa indisponível para este itinerário.
+        </Text>
+      )}
+    </>
   );
 }
 
@@ -286,17 +334,44 @@ function BlocoItinerarioPdf({
   quebraPagina: boolean;
 }) {
   const paragrafo = paragrafoDaDescricao(itinerario);
+  // DEC-111 — colunas da lista numerada e ordem de sacrifício quando o trio
+  // título+mapa+lista não cabe na página: dividir em colunas, depois quebrar
+  // a unidade, só então reduzir o mapa.
+  const colunasLegenda = colunasDaLegenda(itinerario.legendaSecoes);
+  const acomodacao = calcularAcomodacaoItinerario(itinerario.legendaSecoes);
+  const estiloImagemMapa =
+    acomodacao.alturaImagemMapa === PARAMETROS_ACOMODACAO_PADRAO.alturaImagemNatural
+      ? estilosPdf.imagemMapa
+      : { ...estilosPdf.imagemMapa, height: acomodacao.alturaImagemMapa };
+  const tituloEMapa = (
+    <TituloEMapaPdf
+      titulo={itinerario.titulo}
+      imagemMapa={itinerario.imagemMapa}
+      estiloImagemMapa={estiloImagemMapa}
+    />
+  );
+  // (c) lista numerada das Seções no mapa acima (DEC-105/DEC-111) —
+  // renderizada independentemente de `imagemMapa` ter vindo.
+  const listaNumerada = <LegendaItinerarioPdf colunas={colunasLegenda} />;
+
   return (
-    <View wrap={false} break={quebraPagina}>
-      {/* (a) título */}
-      <Text style={estilosPdf.tituloItinerario}>{itinerario.titulo}</Text>
-      {/* (b) sequência resumida de Seções, ligada por seta */}
-      <Text style={estilosPdf.sequenciaSecoes}>{itinerario.sequenciaSecoes}</Text>
-      {/* (c) descrição por vias — parágrafo corrido, Seções em destaque (§13.4).
-          O realce usa `itens` (o §13.4 manda), e o parágrafo fecha com o mesmo
-          ponto final do texto congelado (`compor-descricao.ts`), como faz o
-          painel equivalente da UI. Sem `itens` — documento antigo ou descrição
-          só com texto — cai no texto congelado em vez de sumir. */}
+    <View break={quebraPagina}>
+      {/* Envelope inquebrável: título+mapa sempre; a lista numerada só entra
+          aqui dentro enquanto a unidade for íntegra (DEC-109 item 4). Quando
+          `calcularAcomodacaoItinerario` decide o degrau (ii) da DEC-111, a
+          lista sai do envelope e vira o próximo filho do bloco, livre para
+          fluir de página — nunca cortada em silêncio. */}
+      <View wrap={false}>
+        {tituloEMapa}
+        {acomodacao.unidadeIntegra ? listaNumerada : null}
+      </View>
+      {!acomodacao.unidadeIntegra ? listaNumerada : null}
+      {/* (d) descrição por vias — parágrafo corrido, Seções em destaque (§13.4).
+          Livre para quebrar de página (DEC-109 item 4). O realce usa `itens`
+          (o §13.4 manda), e o parágrafo fecha com o mesmo ponto final do texto
+          congelado (`compor-descricao.ts`), como faz o painel equivalente da
+          UI. Sem `itens` — documento antigo ou descrição só com texto — cai no
+          texto congelado em vez de sumir. */}
       {paragrafo.origem === "itens" ? (
         <Text style={estilosPdf.paragrafoDescricao}>
           {paragrafo.itens.map((item, indice) => (
@@ -317,20 +392,6 @@ function BlocoItinerarioPdf({
       ) : (
         <Text style={estilosPdf.paragrafoDescricao}>{paragrafo.texto}</Text>
       )}
-      {/* (d) imagem do mapa; ausência é tolerada (DEC-104) */}
-      {itinerario.imagemMapa ? (
-        // `Image` aqui é o primitivo do @react-pdf, não `<img>` do DOM: não
-        // aceita `alt` (a acessibilidade do PDF vem do texto do bloco).
-        // eslint-disable-next-line jsx-a11y/alt-text
-        <Image style={estilosPdf.imagemMapa} src={itinerario.imagemMapa} />
-      ) : (
-        <Text style={estilosPdf.avisoSemImagem}>
-          Imagem do mapa indisponível para este itinerário.
-        </Text>
-      )}
-      {/* Legenda das Seções numeradas no mapa acima (DEC-105) — renderizada
-          independentemente de `imagemMapa` ter vindo. */}
-      <LegendaItinerarioPdf legenda={itinerario.legendaSecoes} />
     </View>
   );
 }

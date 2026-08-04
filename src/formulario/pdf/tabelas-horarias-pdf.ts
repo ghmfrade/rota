@@ -197,7 +197,7 @@ export function montarTabelaHoraria(
         : { ordem: parada.ordem, secao: nomeExibicaoSecao(secao) };
     })
     // Parada apontando para Seção inexistente é ignorada por inteiro, como já
-    // fazem `sequenciaDeSecoes` e `numerarItinerario`.
+    // faz `numerarItinerario`.
     .filter((linha): linha is { ordem: number; secao: string } => linha !== undefined);
 
   const grades = escoposDoServico(servico).map((escopo) => {

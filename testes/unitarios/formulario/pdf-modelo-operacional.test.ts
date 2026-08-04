@@ -4,8 +4,6 @@ import {
   montarModeloPdfOperacional,
   ORDEM_BLOCOS,
   paragrafoDaDescricao,
-  sequenciaDeSecoes,
-  SETA_SEQUENCIA,
   TITULO_PDF,
   type ModeloPdfOperacional,
 } from "@/formulario/pdf/modelo-pdf-operacional";
@@ -115,16 +113,9 @@ describe("estrutura do §13.1 (RN-074)", () => {
     expect(doServico.map((i) => i.sentido)).toEqual(["ida", "volta"]);
   });
 
-  test("item 4a/4b — título e sequência de Seções no padrão Cidade - Nome com seta", () => {
+  test("item 4a — título no padrão `Serviço 0000-NXX — Ida/Volta`", () => {
     const bloco = modeloDo().itinerarios[0];
     expect(bloco.titulo).toBe("Serviço 0000-1CR — Ida");
-    expect(bloco.sequenciaSecoes).toBe(
-      [
-        "Santos - Terminal Central",
-        "São Vicente - Terminal Norte",
-        "Praia Grande - Rodoviária Praia Grande",
-      ].join(SETA_SEQUENCIA),
-    );
   });
 
   test("item 4c — descrição textual vem congelada do documento, com itens para realce", () => {
@@ -379,31 +370,8 @@ describe("item 4c — composição do parágrafo da descrição (§13.4)", () =>
   });
 });
 
-describe("sequenciaDeSecoes — casos de borda", () => {
-  test("parada de Seção inexistente no Autos é ignorada em vez de quebrar", () => {
-    const documento = documentoExemploMinimo();
-    const itinerario = documento.autos.servicos[0].itinerarios[0];
-    itinerario.paradas.push({
-      ordem: itinerario.paradas.length + 1,
-      secao_uuid: "00000000-0000-4000-8000-000000000000",
-    });
-
-    const sequencia = sequenciaDeSecoes(itinerario, documento.autos.secoes);
-
-    expect(sequencia).not.toContain("undefined");
-    expect(sequencia.split(SETA_SEQUENCIA)).toHaveLength(3);
-  });
-
-  test("a travessia segue o campo `ordem`, não a posição no array", () => {
-    const documento = documentoExemploMinimo();
-    const itinerario = documento.autos.servicos[0].itinerarios[0];
-    const esperado = sequenciaDeSecoes(itinerario, documento.autos.secoes);
-
-    // Array fora de ordem (documento tecnicamente irregular perante a Spec 02
-    // §10, mas estruturalmente válido): a peça operacional não pode afirmar
-    // uma travessia diferente por causa disso.
-    itinerario.paradas.reverse();
-
-    expect(sequenciaDeSecoes(itinerario, documento.autos.secoes)).toBe(esperado);
-  });
-});
+// A sequência de Seções ligada por seta (`sequenciaDeSecoes`) foi removida
+// pela DEC-109 item 2 — a lista numerada (`legendaSecoes`, `numerarItinerario`)
+// a substitui, e as mesmas garantias de robustez da travessia (parada
+// inexistente ignorada; ordem por `paradas[].ordem`, não pela posição no
+// array) já são cobertas para ela em `pdf-legenda-itinerario.test.ts`.

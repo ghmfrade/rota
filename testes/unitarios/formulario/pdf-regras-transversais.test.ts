@@ -118,7 +118,7 @@ describe("RN-076 — offsets não aparecem em lugar nenhum do PDF", () => {
 });
 
 describe("RN-031/RN-076 — Locais não aparecem no corpo, só no anexo técnico", () => {
-  test("o Local do itinerário não entra na sequência de Seções nem na descrição", () => {
+  test("o Local do itinerário não entra na lista numerada de Seções nem na descrição", () => {
     const documento = documentoExemploMinimo();
     const local = documento.autos.servicos[0].locais[0];
     expect(local.nome).toBe("Ponto de Embarque Praia"); // guarda da fixture
@@ -128,7 +128,7 @@ describe("RN-031/RN-076 — Locais não aparecem no corpo, só no anexo técnico
 
     expect(textos.some((t) => t.includes(local.nome))).toBe(false);
     for (const itinerario of modelo.itinerarios) {
-      expect(itinerario.sequenciaSecoes).not.toContain(local.nome);
+      expect(itinerario.legendaSecoes.some((item) => item.nome === local.nome)).toBe(false);
       expect(itinerario.descricaoTexto).not.toContain(local.nome);
       expect(
         itinerario.descricaoItens.some((item) => item.texto.includes(local.nome)),
@@ -136,25 +136,29 @@ describe("RN-031/RN-076 — Locais não aparecem no corpo, só no anexo técnico
     }
   });
 
-  test("a sequência só tem Seções — uma a menos que o total de paradas", () => {
+  test("a lista numerada só tem Seções — uma a menos que o total de paradas", () => {
     const documento = documentoExemploMinimo();
     const itinerario = documento.autos.servicos[0].itinerarios[0];
     const paradasDeSecao = itinerario.paradas.filter(
       (p) => p.secao_uuid !== undefined,
     ).length;
 
-    const sequencia = modeloDe(documento).itinerarios[0].sequenciaSecoes;
+    const legendaSecoes = modeloDe(documento).itinerarios[0].legendaSecoes;
 
-    expect(sequencia.split(" → ")).toHaveLength(paradasDeSecao);
+    expect(legendaSecoes).toHaveLength(paradasDeSecao);
     expect(paradasDeSecao).toBeLessThan(itinerario.paradas.length);
   });
 
-  test("TASK-127/DEC-105 — a legenda vertical do bloco só lista Seções, na mesma contagem da sequência", () => {
+  test("TASK-127/DEC-105 — a legenda vertical do bloco só lista Seções, na mesma contagem das paradas de Seção", () => {
     const documento = documentoExemploMinimo();
     const modelo = modeloDe(documento);
 
     for (const bloco of modelo.itinerarios) {
-      expect(bloco.legendaSecoes).toHaveLength(bloco.sequenciaSecoes.split(" → ").length);
+      const servico = documento.autos.servicos.find((s) => s.uuid === bloco.servicoUuid);
+      const itinerarioDoBloco = servico?.itinerarios.find((i) => i.sentido === bloco.sentido);
+      const paradasDeSecao =
+        itinerarioDoBloco?.paradas.filter((p) => p.secao_uuid !== undefined).length ?? 0;
+      expect(bloco.legendaSecoes).toHaveLength(paradasDeSecao);
       for (const item of bloco.legendaSecoes) {
         const secao = documento.autos.secoes.find(
           (s) => item.nome === `${s.municipio} - ${s.nome}`,
@@ -194,16 +198,16 @@ describe("RN-031/RN-076 — Locais não aparecem no corpo, só no anexo técnico
 });
 
 describe("RN-076 — nomes de Seção sempre no padrão Cidade - Nome", () => {
-  test("cada elemento da sequência tem municipio e nome separados por hífen", () => {
+  test("cada item da lista numerada tem municipio e nome separados por hífen", () => {
     const documento = documentoExemploMinimo();
     const modelo = modeloDe(documento);
 
     for (const bloco of modelo.itinerarios) {
-      for (const rotulo of bloco.sequenciaSecoes.split(" → ")) {
+      for (const item of bloco.legendaSecoes) {
         const secao = documento.autos.secoes.find(
-          (s) => rotulo === `${s.municipio} - ${s.nome}`,
+          (s) => item.nome === `${s.municipio} - ${s.nome}`,
         );
-        expect(secao, `rótulo fora do padrão: ${rotulo}`).toBeDefined();
+        expect(secao, `rótulo fora do padrão: ${item.nome}`).toBeDefined();
       }
     }
   });
