@@ -1407,24 +1407,26 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
               onChange={(evento) => definirNomeCriacaoInline(evento.target.value)}
             />
             <div className="flex gap-2">
-              <Campo
-                rotulo="Latitude"
-                densidade="compacta"
-                inputMode="decimal"
-                data-testid="latitude-criacao-input"
-                className="flex-1"
-                value={latitudeCriacaoInline}
-                onChange={(evento) => definirLatitudeCriacaoInline(evento.target.value)}
-              />
-              <Campo
-                rotulo="Longitude"
-                densidade="compacta"
-                inputMode="decimal"
-                data-testid="longitude-criacao-input"
-                className="flex-1"
-                value={longitudeCriacaoInline}
-                onChange={(evento) => definirLongitudeCriacaoInline(evento.target.value)}
-              />
+              <div className="flex-1 min-w-0">
+                <Campo
+                  rotulo="Latitude"
+                  densidade="compacta"
+                  inputMode="decimal"
+                  data-testid="latitude-criacao-input"
+                  value={latitudeCriacaoInline}
+                  onChange={(evento) => definirLatitudeCriacaoInline(evento.target.value)}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <Campo
+                  rotulo="Longitude"
+                  densidade="compacta"
+                  inputMode="decimal"
+                  data-testid="longitude-criacao-input"
+                  value={longitudeCriacaoInline}
+                  onChange={(evento) => definirLongitudeCriacaoInline(evento.target.value)}
+                />
+              </div>
             </div>
             {mensagemCriacaoInline ? (
               <p

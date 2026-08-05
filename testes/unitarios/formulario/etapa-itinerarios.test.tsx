@@ -9,6 +9,8 @@ import {
   paradaDeSecao,
 } from "@/formulario/itinerarios";
 import { coletarPendencias } from "@/formulario/pendencias";
+import { MENSAGEM_FORA_DE_SP as MENSAGEM_FORA_DE_SP_LOCAL } from "@/formulario/locais/fluxos-local";
+import { MENSAGEM_FORA_DE_SP as MENSAGEM_FORA_DE_SP_SECAO } from "@/formulario/secoes/fluxos-secao";
 import type { ServicoEmConstrucao, SessaoFormulario } from "@/formulario/sessao";
 import * as mapa from "@/shared/mapa";
 import type { Coordenada } from "@/shared/mapa";
@@ -26,6 +28,12 @@ import { documentoExemploMinimo } from "../../fixtures";
 // passa pela derivação de município de verdade (`criarLocalNoPonto`/
 // `criarSecaoNoPonto`), então os testes que simulam o gesto do usuário na
 // linha-formulário precisam de um recurso que resolva "dentro de SP".
+// TASK-132 (correção rodada 1): a caixa é DELIBERADAMENTE estreita — lng
+// [-60,-40] × lat [-30,-20] — para que uma coordenada em faixa válida
+// ([-90,90]/[-180,180]) mas fora dela ainda caia em "fora de SP" pela
+// derivação real (ray-casting), e não seja barrada antes pela validação de
+// faixa da TASK-132. Cobre todos os literais de coordenada usados no
+// arquivo, inclusive o ponto distante (-25,-50) do teste da âncora.
 const RECURSOS_MUNICIPIO_TESTE = vi.hoisted(() => ({
   features: [
     {
@@ -35,11 +43,11 @@ const RECURSOS_MUNICIPIO_TESTE = vi.hoisted(() => ({
         type: "Polygon",
         coordinates: [
           [
-            [-180, -90],
-            [180, -90],
-            [180, 90],
-            [-180, 90],
-            [-180, -90],
+            [-60, -30],
+            [-40, -30],
+            [-40, -20],
+            [-60, -20],
+            [-60, -30],
           ],
         ],
       },
@@ -2530,16 +2538,18 @@ describe("EtapaItinerarios — linha-formulário de criação inline na tabela (
     resultado.desmontar();
   });
 
-  test("[inválido] ponto fora de SP: mensagem de recusa inline e NENHUMA Parada criada", async () => {
+  test("[inválido] ponto fora de SP (Local): mensagem existente de fora de SP e NENHUMA Parada criada", async () => {
     const { obterSessao, resultado } = await montarEtapa(1);
     const paradasAntes = obterSessao().paradasEmEdicao;
 
     act(() => {
-      // Latitude/longitude fora do polígono sintético de qualquer município
-      // conhecido pelos recursos de teste (fora do planeta é garantidamente
-      // fora do polígono — RECURSOS_MUNICIPIO_TESTE cobre todo o globo, então
-      // usamos coordenadas inválidas para o ray-casting não achar match).
-      editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: 200, lat: 100 });
+      // Coordenada EM FAIXA VÁLIDA ([-90,90]/[-180,180]) mas fora do polígono
+      // sintético de RECURSOS_MUNICIPIO_TESTE (lng [-60,-40] × lat [-30,-20]):
+      // TASK-132 (correção rodada 1) — precisa passar pela validação de faixa
+      // nova (`interpretarParDeCoordenadas`) para exercitar a derivação real
+      // de município e cair em "fora de SP", não na mensagem de coordenada
+      // inválida.
+      editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: -55, lat: -10 });
     });
     const input = resultado.container.querySelector(
       '[data-testid="nome-local-input"]',
@@ -2547,11 +2557,37 @@ describe("EtapaItinerarios — linha-formulário de criação inline na tabela (
     digitar(input, "Fora de SP");
     clicar(resultado.container.querySelector('[data-testid="confirmar-criar-local"]')!);
 
-    expect(
-      resultado.container.querySelector('[data-testid="mensagem-recusa-criacao-inline"]'),
-    ).not.toBeNull();
+    const mensagem = resultado.container.querySelector(
+      '[data-testid="mensagem-recusa-criacao-inline"]',
+    );
+    expect(mensagem).not.toBeNull();
+    expect(mensagem?.textContent).toBe(MENSAGEM_FORA_DE_SP_LOCAL);
     // A linha-formulário permanece aberta (recusa não fecha o gesto).
     expect(resultado.container.querySelector('[data-testid="form-criar-local"]')).not.toBeNull();
+    expect(obterSessao().paradasEmEdicao).toEqual(paradasAntes);
+
+    resultado.desmontar();
+  });
+
+  test("[inválido] ponto fora de SP (Seção): mensagem existente de fora de SP e NENHUMA Parada criada", async () => {
+    const { obterSessao, resultado } = await montarEtapa(1);
+    const paradasAntes = obterSessao().paradasEmEdicao;
+
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada("secao", { lng: -55, lat: -10 });
+    });
+    const input = resultado.container.querySelector(
+      '[data-testid="nome-secao-input"]',
+    ) as HTMLInputElement;
+    digitar(input, "Fora de SP");
+    clicar(resultado.container.querySelector('[data-testid="confirmar-criar-secao"]')!);
+
+    const mensagem = resultado.container.querySelector(
+      '[data-testid="mensagem-recusa-criacao-inline"]',
+    );
+    expect(mensagem).not.toBeNull();
+    expect(mensagem?.textContent).toBe(MENSAGEM_FORA_DE_SP_SECAO);
+    expect(resultado.container.querySelector('[data-testid="form-criar-secao"]')).not.toBeNull();
     expect(obterSessao().paradasEmEdicao).toEqual(paradasAntes);
 
     resultado.desmontar();
