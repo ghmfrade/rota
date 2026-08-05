@@ -1,6 +1,43 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-08-04 (branch `orquestracao/20260805-0057`) — **TASK-132:
+**Atualização mais recente:** 2026-08-04 (branch `orquestracao/20260805-0057`) — **TASK-132,
+rodada de correção 1: APROVADA, sem ressalva remanescente; o ciclo da task está encerrado.**
+O commit `c3b9628` fecha as duas ressalvas do parecer da 1ª rodada, em **dois arquivos,
++70/−32**, sem tocar lógica de produção. (1) **Condição de merge cumprida:** o polígono
+sintético de `RECURSOS_MUNICIPIO_TESTE` deixa de cobrir o globo e vira a caixa lng [-60,-40] ×
+lat [-30,-20] (`etapa-itinerarios.test.tsx:37-57`), de modo que o teste "fora de SP" da criação
+inline usa `{lng:-55, lat:-10}` — **em faixa válida**, logo atravessa a validação da TASK-132 e
+chega à derivação real de município — e assevera a **mensagem** exibida
+(`MENSAGEM_FORA_DE_SP_LOCAL`, `:2541-2578`), não mais a mera presença do elemento; um teste
+irmão **novo** cobre o mesmo ramo para **Seção** (`:2582-2604`), que nunca tivera cobertura por
+esse caminho. A revisão confirmou que `criarSecaoNoPonto`/`criarLocalNoPonto` têm `fora_de_sp`
+como **único** motivo de recusa na criação (`fluxos-secao.ts:146-155`, `fluxos-local.ts:64,86`;
+o motivo `350m` só existe no fluxo de contribuição), e que o estreitamento **não esvaziou**
+nenhum outro teste: todos os literais de coordenada do arquivo — inclusive o `-25/-50` do teste
+da âncora (`:2768-2769`) — caem dentro da caixa, e a constante é local ao arquivo. (2)
+**Follow-up de layout resolvido na raiz certa:** o `flex-1` sai do `className` do `Campo` (que
+o repassava ao `<input>` dentro do `div flex flex-col` de `MolduraControle`, eixo errado, no-op)
+e vai para um wrapper `flex-1 min-w-0` por campo (`etapa-itinerarios.tsx:1409-1430`); com o
+`w-full` que `classesDeControle` já aplica, os dois campos dividem a faixa meio a meio. O
+parecer `14-REVISOES/TASK-132-20260804-correcao.md` registra **checklist 07 com 25 ok, 28 N/A
+e 0 violados** (o item "toda regra com teste" sai de "ok com ressalva" para **ok pleno**),
+**nenhum problema** de severidade Baixa ou superior e uma observação informativa: a caixa
+estreita cria acoplamento — todo teste futuro neste arquivo precisa usar coordenada dentro dela
+(mitigado por comentário em `:31-36`, e a falha seria ruidosa, não silenciosa). **Nenhuma
+condição de merge remanescente**: as duas ressalvas foram resolvidas dentro do próprio ciclo.
+A revisão reutilizou o log canônico verde sem repetir a suíte (`test:all:verificar`: executor
+**Claude-orquestrado**, fingerprint `f909ea4d…547299f8`, identidade `498d7fa6…3a884f91763`,
+`Test Files 116 passed`, `Tests 1714 passed` — os 1713 da 1ª rodada **mais o teste de Seção**
+—, E2E `112 passed`, ambos com código 0, `Resultado geral: APROVADO`) e rodou `typecheck` e
+`lint`, ambos limpos. **Contagem inalterada:** total **permanece 8 — 6 executáveis, a TASK-038
+com bloqueio parcial e a TASK-040 bloqueada**; a TASK-132 nasceu fora daquela contagem. Nenhuma
+task foi absorvida ou substituída. A **TASK-133 segue pendente**, com a dependência dura
+cumprida (botão "Atualizar ponto" e handler existem) e duas heranças concretas para quem a
+implementar: a caixa municipal estreita nos testes e a faixa horizontal já ocupada pelos dois
+campos. O código das **TASK-130/131/133 não foi verificado nesta revisão**. Permanecem sem dono
+os follow-ups herdados da TASK-128/129/130 e a pendência de **registro** da §3.
+
+**Histórico anterior (2026-08-04) — TASK-132, 1ª rodada:
 entrega APROVADA COM RESSALVAS; latitude/longitude editáveis saem da fila.** O commit `81d5654`,
 fundamentado na **DEC-112 item 5** (Q-090 opção 1), cria
 `src/formulario/itinerarios/coordenada-criacao.ts` (módulo puro: `formatarCoordenada` com
