@@ -345,8 +345,8 @@ function criarCorrida(args, fila) {
   const id = new Date()
     .toISOString()
     .replace(/[-:T]/g, "")
-    .slice(0, 13)
-    .replace(/(\d{8})(\d{4})/, "$1-$2");
+    .slice(0, 12)
+    .replace(/(\d{8})(\d{4})/, "$1-$2"); // AAAAMMDD-hhmm
   const dir = join(DIR_CORRIDAS, id);
   mkdirSync(dir, { recursive: true });
   const ledger = {
@@ -402,6 +402,15 @@ async function executarFase({ cli, ledger, task, nome, config, prompt, sessionId
   if (resumir) args.push("--resume", sessionId);
   else if (sessionId) args.push("--session-id", sessionId);
 
+  // O budget é conferido ANTES de gastar, nunca depois: uma fase que terminou
+  // precisa ter seu resultado LIDO e roteado, senão o veredito que ela produziu
+  // se perde e a corrida reporta "falha" no lugar do desfecho real. Estourado o
+  // budget, o que não acontece é a PRÓXIMA fase começar.
+  const estouroPrevio = verificarBudget(ledger);
+  if (estouroPrevio) {
+    return { ok: false, motivo: `${estouroPrevio} — fase ${nome} não chegou a ser iniciada` };
+  }
+
   log(`  ▸ ${nome} (${config.modelo}, teto ${config.turnos} turnos / ${config.minutos} min)`);
 
   const inicio = Date.now();
@@ -456,8 +465,6 @@ async function executarFase({ cli, ledger, task, nome, config, prompt, sessionId
       motivo: `fase ${nome} gastou ${turnos} turnos, acima do teto de ${config.turnos} — sinal de que se enrolou`,
     };
   }
-  const estouro = verificarBudget(ledger);
-  if (estouro) return { ok: false, motivo: estouro };
 
   return { ok: true, resultado, sessionId: resultado.session_id ?? sessionId };
 }
@@ -674,6 +681,9 @@ async function executarTask({ cli, ledger, task, maxCorrecoes }) {
 
     const parecer = acharParecer(task);
     if (!parecer) return parar("parada-por-falha", "a revisão não deixou parecer em docs-dev/14-REVISOES/");
+    // Registrado já aqui: o parecer é o artefato mais útil do relatório, e
+    // precisa aparecer nele mesmo quando o desfecho é PARAR.
+    estado.parecer = parecer;
 
     const arqVeredito = join(dir, `veredito-${task}-r${rodada}.json`);
     if (existsSync(arqVeredito)) rmSync(arqVeredito);
@@ -794,7 +804,10 @@ function escreverRelatorio(ledger) {
   for (const t of paradas) {
     l.push(`- **${t.task}** (${t.situacao}): ${t.motivo}`);
     if (t.situacao === "parada-por-q") {
-      l.push("  - Decida a Q em \`docs-dev/16-OPEN_QUESTIONS.md\` e rode \`/registrar-decisao\`.");
+      l.push("  - Decida a Q em `docs-dev/16-OPEN_QUESTIONS.md` e rode `/registrar-decisao`.");
+    }
+    if (t.situacao === "parada-por-parecer" && t.parecer) {
+      l.push(`  - Leia as ressalvas em \`${t.parecer.replace(/\\/g, "/")}\` e decida o que fazer com elas.`);
     }
   }
   l.push("", `Retomar: \`node scripts/orquestrar-tasks.mjs --retomar ${ledger.id} --executar\``, "");

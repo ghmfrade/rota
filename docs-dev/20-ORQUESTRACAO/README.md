@@ -424,12 +424,36 @@ destruir trabalho:
   cada task para você desfazer manualmente se quiser.
 - **`corridas/` no `.gitignore`** — registro efêmero, como o `ultimo-test-all.log`.
 
-### Verificado até aqui
+### Primeira corrida real — 2026-08-05, TASK-130
 
-Sintaxe, `--ajuda`, ensaio real sobre a fila TASK-130..133 com as dependências corretas, e as
-recusas: working tree sujo, `--max-correcoes` acima do teto, task inexistente, intervalo
-invertido, ausência de argumentos. `npm run lint` limpo.
+`npm run orquestrar -- --tasks TASK-130 --executar --budget-usd 5`. O ciclo completo rodou:
+análise (opus) → triagem → implementação (sonnet, mesma sessão) → revisão (opus, conversa
+nova) → veredito. **88 turnos, US$ 5,07, 15 min de parede**, dois commits gerados
+(implementação e revisão) e parecer arquivado em `docs-dev/14-REVISOES/TASK-130-20260804.md`.
 
-**Não verificado:** nenhuma corrida real foi executada — o caminho de execução (`--executar`)
-nunca rodou uma fase. A primeira corrida de verdade deve ser de **uma task só**
-(`--tasks TASK-130`), com budget curto, e acompanhada.
+O veredito foi `PARAR`, corretamente: o parecer trouxe uma ressalva declarada **condição de
+merge** que exige decisão de leitura do critério de aceite — exatamente o caso reservado ao
+humano. O diff-guard bateu: 3 arquivos tocados, 3 previstos.
+
+**Dois defeitos apareceram e foram corrigidos:**
+
+1. **O budget mascarava o desfecho real.** A checagem de budget rodava *depois* da fase, então
+   a fase de veredito terminou, escreveu o JSON — e o script devolveu "falha: budget
+   estourado" sem nunca ler o veredito. O relatório dizia `parada-por-falha` quando o desfecho
+   verdadeiro era `parada-por-parecer`. Agora a checagem é **antes** de cada fase: estourado o
+   budget, o que não acontece é a *próxima* fase começar; a fase concluída sempre tem seu
+   resultado lido e roteado. Regra geral que ficou: **nenhuma trava pode descartar o resultado
+   de trabalho já pago.**
+2. **Id da corrida truncado errado** (`20260805-00241`, cinco dígitos de hora) — `slice(0,13)`
+   onde cabia `slice(0,12)`.
+
+Também passou a registrar o caminho do parecer no relatório mesmo quando o desfecho é `PARAR`
+— é o artefato mais útil para quem vai decidir.
+
+**Calibragem observada:** ~US$ 5 e ~90 turnos para uma task pequena de módulo puro, sem UI e
+sem OSRM. Uma fila de 4 tasks desse porte pede budget na casa de US$ 25–30; tasks de UI devem
+custar mais.
+
+**Ainda não exercitado:** rodada de correção (`CORRIGIR`), `--pular-bloqueadas`, `--retomar`,
+abertura de Q por `/registrar-questao` em corrida, e os caminhos de timeout e de teto de
+turnos.
