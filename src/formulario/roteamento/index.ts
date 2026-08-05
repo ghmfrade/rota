@@ -60,3 +60,11 @@ export {
   reancorarPontosDeRotaNaInsercaoPosicional,
   type MudancaSequenciaParadas,
 } from "./reancorar-pontos-de-rota";
+// `/nearest` (TASK-131; Q-090/DEC-112) — cliente distinto do `/route`, com
+// política de falha oposta: não bloqueante, sem retry (ver nearest-osrm.ts).
+export {
+  consultarViaMaisProxima,
+  NEAREST_TIMEOUT_PADRAO_MS,
+  type OpcoesNearestOsrm,
+  type ResultadoViaMaisProxima,
+} from "./nearest-osrm";
