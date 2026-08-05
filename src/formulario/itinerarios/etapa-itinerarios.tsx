@@ -29,6 +29,7 @@ import {
   formatarCoordenada,
   interpretarParDeCoordenadas,
 } from "./coordenada-criacao";
+import { sugerirNomeDeParada } from "./sugerir-nome-de-parada";
 import { EditorMapaItinerario } from "./editor-mapa-itinerario";
 import { PainelReusoSecao } from "./painel-reuso-secao";
 import { ALTURA_MAPA_CLASSE_LG } from "./altura-mapa";
@@ -127,6 +128,13 @@ function sentidosDeDirecionalidade(direcionalidade: Direcionalidade): Sentido[] 
 
 const ROTULO_SENTIDO: Record<Sentido, string> = { ida: "Ida", volta: "Volta" };
 
+// Aviso discreto e não bloqueante da sugestão de nome (TASK-133; DEC-112 §3):
+// nunca menciona tarifa/indisponibilidade de rota (RN-049 é sobre `/route`;
+// aplicada aqui por analogia de linguagem) — apenas informa que o campo
+// segue livre para digitação manual.
+const MENSAGEM_AVISO_SUGESTAO_NOME =
+  "Não foi possível sugerir um nome para este ponto. Digite o nome manualmente.";
+
 function mensagemLocalExtremo(posicoes: readonly ("inicio" | "fim")[]): string {
   if (posicoes.length === 2) {
     return "Este Local ocupa a primeira e a última Parada. Locais (pontos de parada) só podem ocupar posições intermediárias; os extremos devem ser Seções.";
@@ -202,6 +210,25 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
   const [mensagemCriacaoInline, definirMensagemCriacaoInline] = useState<string | null>(null);
   const refLinhaFormularioCriacao = useRef<HTMLTableRowElement | null>(null);
 
+  // Sugestão de nome pela via mais próxima (TASK-133; DEC-112) — conveniência
+  // efêmera (RN-096), nunca regra. `sugerindoNome` alimenta o indicador de
+  // carregamento (Spec 04 §7.3 item 2); `avisoSugestaoNome` é o aviso
+  // discreto e não bloqueante de falha (DEC-112 §3), distinto de
+  // `mensagemCriacaoInline` (recusa de coordenada/fora de SP).
+  const [sugerindoNome, definirSugerindoNome] = useState(false);
+  const [avisoSugestaoNome, definirAvisoSugestaoNome] = useState<string | null>(null);
+  // Token de descarte de resposta obsoleta: cada disparo incrementa o
+  // contador e só aplica o resultado se ainda for o token corrente — cobre
+  // dupla consulta (a mais recente vence) e formulário já cancelado/trocado.
+  const sugestaoTokenRef = useRef(0);
+  // "Latest ref" do nome digitado (mesmo padrão de `sessaoRef` abaixo): a
+  // `.then` da sugestão resolve depois de possíveis novas teclas do usuário,
+  // e precisa ler o valor CORRENTE do campo, não o do closure em que nasceu.
+  const nomeCriacaoInlineRef = useRef(nomeCriacaoInline);
+  useEffect(() => {
+    nomeCriacaoInlineRef.current = nomeCriacaoInline;
+  }, [nomeCriacaoInline]);
+
   function alternarSelecao(chave: string, origem: "tabela" | "mapa") {
     definirSelecao((atual) => (atual?.chave === chave ? null : { chave, origem }));
   }
@@ -223,8 +250,26 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
       definirLatitudeCriacaoInline("");
       definirLongitudeCriacaoInline("");
       definirMensagemCriacaoInline(null);
+      definirSugerindoNome(false);
+      definirAvisoSugestaoNome(null);
     }
   }
+
+  // Invalida qualquer sugestão de nome pendente ao trocar de itinerário
+  // (cleanup de efeito, não durante o render — refs não podem ser mutadas em
+  // render). A troca de `chaveItinerarioAtual` já reseta `criacaoInline` no
+  // bloco de ajuste de estado acima; este cleanup cobre só a consulta de
+  // `/nearest` em voo, para que sua resposta tardia não sobrescreva o nome
+  // de um formulário já reaberto no itinerário novo.
+  useEffect(() => {
+    return () => {
+      // Falso positivo do lint: `sugestaoTokenRef` é um contador, não um nó
+      // de DOM — o ponto do cleanup é justamente ler/incrementar o valor
+      // CORRENTE no momento da troca, não um snapshot congelado do commit.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      sugestaoTokenRef.current++;
+    };
+  }, [chaveItinerarioAtual]);
 
   // Rola a linha selecionada para dentro da viewport própria da tabela
   // (`overflow-y-auto`, TASK-074) somente quando a seleção nasceu no MAPA —
@@ -998,6 +1043,33 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     });
   }
 
+  // Sugestão de nome pela via mais próxima (TASK-133; DEC-112): dispara
+  // `/nearest` para `posicao` e, na resposta, preenche `nomeCriacaoInline`
+  // conforme `sobrescrever` — `false` na abertura (só entra se o campo
+  // seguir vazio no momento em que a resposta chega, lido do "latest ref"),
+  // `true` no clique de "Atualizar ponto" (gesto explícito, DEC-112 §2). O
+  // token descarta qualquer resposta de um disparo anterior — dupla consulta
+  // ou cancelamento no meio do caminho (RN-052: só dispara em gesto de
+  // criação, nunca ao digitar coordenada, importar ou renderizar).
+  function dispararSugestaoNome(posicao: Coordenada, opcoes: { sobrescrever: boolean }) {
+    const meuToken = ++sugestaoTokenRef.current;
+    definirSugerindoNome(true);
+    definirAvisoSugestaoNome(null);
+    void sugerirNomeDeParada({ latitude: posicao.lat, longitude: posicao.lng }).then(
+      (resultado) => {
+        if (sugestaoTokenRef.current !== meuToken) return;
+        definirSugerindoNome(false);
+        if (!resultado.ok) {
+          definirAvisoSugestaoNome(MENSAGEM_AVISO_SUGESTAO_NOME);
+          return;
+        }
+        if (opcoes.sobrescrever || !nomeCriacaoInlineRef.current.trim()) {
+          definirNomeCriacaoInline(resultado.nome);
+        }
+      },
+    );
+  }
+
   // Criação inline de Seção/Local (TASK-095; DEC-077): o usuário escolhe o
   // tipo no menu do mapa (`EditorMapaItinerario.aoIniciarCriacaoParada`) e a
   // linha-formulário abre na tabela lateral, na posição de inserção. Confirmar
@@ -1014,6 +1086,7 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     definirLatitudeCriacaoInline(formatarCoordenada(posicao.lat));
     definirLongitudeCriacaoInline(formatarCoordenada(posicao.lng));
     definirMensagemCriacaoInline(null);
+    dispararSugestaoNome(posicao, { sobrescrever: false });
   }
 
   function cancelarCriacaoInline() {
@@ -1022,10 +1095,15 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     definirLatitudeCriacaoInline("");
     definirLongitudeCriacaoInline("");
     definirMensagemCriacaoInline(null);
+    sugestaoTokenRef.current++;
+    definirSugerindoNome(false);
+    definirAvisoSugestaoNome(null);
   }
 
   // Botão "Atualizar ponto" (TASK-132): só move o marcador pendente no mapa —
   // não cria nada, não recalcula rota (RN-052 só dispara na confirmação).
+  // TASK-133: também recarrega a sugestão de nome para o novo ponto,
+  // sobrescrevendo o campo (gesto explícito, DEC-112 §2).
   function atualizarPontoCriacaoInline() {
     if (!criacaoInline) return;
     const resultado = interpretarParDeCoordenadas(latitudeCriacaoInline, longitudeCriacaoInline);
@@ -1035,6 +1113,7 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     }
     definirCriacaoInline({ ...criacaoInline, posicao: resultado.posicao });
     definirMensagemCriacaoInline(null);
+    dispararSugestaoNome(resultado.posicao, { sobrescrever: true });
   }
 
   function confirmarCriacaoInline() {
@@ -1406,6 +1485,19 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
               value={nomeCriacaoInline}
               onChange={(evento) => definirNomeCriacaoInline(evento.target.value)}
             />
+            {sugerindoNome ? (
+              <p data-testid="sugerindo-nome" className="text-sm text-cinza-500">
+                Sugerindo nome…
+              </p>
+            ) : null}
+            {avisoSugestaoNome ? (
+              <p
+                data-testid="aviso-sugestao-nome"
+                className="text-sm text-cinza-500"
+              >
+                {avisoSugestaoNome}
+              </p>
+            ) : null}
             <div className="flex gap-2">
               <div className="flex-1 min-w-0">
                 <Campo

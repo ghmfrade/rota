@@ -242,6 +242,18 @@ function criarLocalPelaLinhaFormularioInline(
   clicar(resultado.container.querySelector('[data-testid="confirmar-criar-local"]')!);
 }
 
+// TASK-133: abrir a linha-formulário (ou clicar "Atualizar ponto") passou a
+// disparar `/nearest` para a sugestão de nome — um fetch LEGÍTIMO que os
+// testes de "não chama OSRM"/"não recalcula rota" (anteriores à TASK-133)
+// não previam. Esses testes verificam a ausência de recálculo de ROTA
+// (`/route`), não a ausência de qualquer fetch; este contador isola as
+// chamadas de `/route` das de `/nearest`.
+function chamadasDeRota(): number {
+  return vi
+    .mocked(fetch)
+    .mock.calls.filter(([url]) => String(url).includes("/route/")).length;
+}
+
 function sessaoComTresSecoes(
   aposParadaOrdem: number,
   latitudePontoDeRota = -23.97,
@@ -768,7 +780,9 @@ describe("EtapaItinerarios — inserção posicional pelo mapa (TASK-067/DEC-055
       expect(itinerario.paradas[2]).toEqual({ ordem: 3, local_uuid: localCriado.uuid });
       expect(itinerario.rota.trechos).toHaveLength(3);
       expect(esquemaDocumentoOperacao.safeParse(sessaoAtual.documento).success).toBe(true);
-      expect(fetchMock).toHaveBeenCalledTimes(1);
+      // TASK-133: abrir a linha-formulário também dispara `/nearest`
+      // (sugestão de nome) — o recálculo de ROTA (`/route`) continua único.
+      expect(chamadasDeRota()).toBe(1);
 
       resultado.desmontar();
     },
@@ -781,7 +795,7 @@ describe("EtapaItinerarios — inserção posicional pelo mapa (TASK-067/DEC-055
     // a última linha válida desenhada, cenário que antes descartava o gesto.
     await removerParada(resultado, 0);
     await removerParada(resultado, 0);
-    const chamadasAntesDaInsercao = vi.mocked(fetch).mock.calls.length;
+    const chamadasDeRotaAntesDaInsercao = chamadasDeRota();
 
     // TASK-095/DEC-077: gesto real via linha-formulário inline.
     criarLocalPelaLinhaFormularioInline(
@@ -800,7 +814,9 @@ describe("EtapaItinerarios — inserção posicional pelo mapa (TASK-067/DEC-055
       "secao",
       "local",
     ]);
-    expect(vi.mocked(fetch).mock.calls).toHaveLength(chamadasAntesDaInsercao);
+    // Nenhum recálculo de ROTA (`/route`) — a sugestão de nome (`/nearest`,
+    // TASK-133) é chamada legítima ao abrir a linha-formulário, distinta.
+    expect(chamadasDeRota()).toBe(chamadasDeRotaAntesDaInsercao);
     const paradaLocal = obterSessao().paradasEmEdicao?.[chave]?.find(
       (p) => p.tipo === "local",
     );
@@ -836,7 +852,7 @@ describe("EtapaItinerarios — inserção posicional pelo mapa (TASK-067/DEC-055
     // antes de confirmar — a falha geométrica precisa persistir em todas as
     // chamadas para que o gesto de CRIAÇÃO em si reproduza o cenário.
     const ancoragem = vi.spyOn(mapa, "ancorarPontoNaRota").mockReturnValue(undefined);
-    const chamadasAntesDaInsercao = vi.mocked(fetch).mock.calls.length;
+    const chamadasDeRotaAntesDaInsercao = chamadasDeRota();
 
     criarLocalPelaLinhaFormularioInline(
       resultado,
@@ -857,7 +873,8 @@ describe("EtapaItinerarios — inserção posicional pelo mapa (TASK-067/DEC-055
       "secao",
       "local",
     ]);
-    expect(vi.mocked(fetch).mock.calls).toHaveLength(chamadasAntesDaInsercao);
+    // Nenhum recálculo de ROTA (`/route`) — só a sugestão de nome (TASK-133).
+    expect(chamadasDeRota()).toBe(chamadasDeRotaAntesDaInsercao);
     const paradaLocal = obterSessao().paradasEmEdicao?.[chave]?.find((p) => p.tipo === "local");
     const localUuidCriado = paradaLocal?.tipo === "local" ? paradaLocal.localUuid : undefined;
     expect(editorCapturado.props?.locaisInvalidos).toEqual([localUuidCriado]);
@@ -2510,15 +2527,16 @@ describe("EtapaItinerarios — linha-formulário de criação inline na tabela (
     resultado.desmontar();
   });
 
-  test("[inválido] cancelar remove a linha-formulário sem criar nada e sem disparar recálculo/OSRM", async () => {
+  test("[inválido] cancelar remove a linha-formulário sem criar nada e sem disparar recálculo de rota", async () => {
     const { obterSessao, resultado } = await montarEtapa(1);
-    const chamadasAntes = vi.mocked(fetch).mock.calls.length;
+    const chamadasDeRotaAntes = chamadasDeRota();
     const paradasAntes = obterSessao().paradasEmEdicao;
 
     act(() => {
       editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: -46.38, lat: -23.98 });
     });
-    expect(vi.mocked(fetch).mock.calls).toHaveLength(chamadasAntes);
+    // TASK-133: abrir dispara `/nearest` (sugestão de nome) — nunca `/route`.
+    expect(chamadasDeRota()).toBe(chamadasDeRotaAntes);
     expect(resultado.container.querySelector('[data-testid="form-criar-local"]')).not.toBeNull();
 
     const input = resultado.container.querySelector(
@@ -2532,7 +2550,7 @@ describe("EtapaItinerarios — linha-formulário de criação inline na tabela (
     );
 
     expect(resultado.container.querySelector('[data-testid="form-criar-local"]')).toBeNull();
-    expect(vi.mocked(fetch).mock.calls).toHaveLength(chamadasAntes);
+    expect(chamadasDeRota()).toBe(chamadasDeRotaAntes);
     expect(obterSessao().paradasEmEdicao).toEqual(paradasAntes);
 
     resultado.desmontar();
@@ -2656,7 +2674,7 @@ describe("EtapaItinerarios — latitude/longitude editáveis na criação inline
   test("'Atualizar ponto' com valor válido move o marcador pendente sem criar nada", async () => {
     const { obterSessao, resultado } = await montarEtapa(1);
     const paradasAntes = obterSessao().paradasEmEdicao;
-    const chamadasAntes = vi.mocked(fetch).mock.calls.length;
+    const chamadasDeRotaAntes = chamadasDeRota();
 
     act(() => {
       editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: -46.38, lat: -23.98 });
@@ -2672,9 +2690,11 @@ describe("EtapaItinerarios — latitude/longitude editáveis na criação inline
       lng: -46.38,
       lat: -23.99,
     });
-    // Nenhuma criação, nenhum recálculo de rota disparado só por "Atualizar ponto".
+    // Nenhuma criação, nenhum recálculo de ROTA (`/route`) disparado só por
+    // "Atualizar ponto" — o botão dispara `/nearest` (sugestão de nome,
+    // TASK-133), não `/route`.
     expect(obterSessao().paradasEmEdicao).toEqual(paradasAntes);
-    expect(vi.mocked(fetch).mock.calls).toHaveLength(chamadasAntes);
+    expect(chamadasDeRota()).toBe(chamadasDeRotaAntes);
 
     resultado.desmontar();
   });
@@ -2815,6 +2835,363 @@ describe("EtapaItinerarios — latitude/longitude editáveis na criação inline
     ) as HTMLInputElement;
     expect(latitudeInput.value).toBe("-23.500000");
     expect(longitudeInput.value).toBe("-46.400000");
+
+    resultado.desmontar();
+  });
+});
+
+// TASK-133 (Q-090/DEC-112) — sugestão de nome pela via mais próxima na
+// criação: `/nearest` (TASK-131) + `abreviarNomeDeVia` (TASK-130), disparada
+// só na abertura da linha-formulário e no clique de "Atualizar ponto"
+// (RN-052), nunca bloqueante (DEC-112 §3).
+
+/** Mock de fetch que diferencia `/nearest/` (sugestão de nome) de `/route/`
+ * (rota) pela URL — `nomeViaSugerida: null` simula falha do `/nearest`
+ * (`ok: false`, sem retry, DEC-112 §3). A resposta de `/route/` é sempre a
+ * genérica coerente com o nº de coordenadas da própria requisição. */
+function respostaCombinadaMock(nomeViaSugerida: string | null): typeof fetch {
+  return vi.fn().mockImplementation((url: string) => {
+    if (String(url).includes("/nearest/")) {
+      if (nomeViaSugerida === null) {
+        return Promise.resolve({ ok: false, json: () => Promise.resolve({}) });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            code: "Ok",
+            waypoints: [{ name: nomeViaSugerida, distance: 5 }],
+          }),
+      });
+    }
+    const casado = /\/driving\/([^?]+)/.exec(String(url));
+    const coordenadas = casado ? casado[1].split(";") : [];
+    const totalLegs = Math.max(coordenadas.length - 1, 0);
+    return Promise.resolve({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          code: "Ok",
+          routes: [
+            {
+              geometry: {
+                type: "LineString",
+                coordinates: coordenadas.map((par) => par.split(",").map(Number)),
+              },
+              legs: Array.from({ length: totalLegs }, () => ({
+                distance: 1000,
+                duration: 100,
+                steps: [{ name: "Via Teste" }],
+              })),
+            },
+          ],
+        }),
+    });
+  }) as unknown as typeof fetch;
+}
+
+/** Fetch com resolução MANUAL, na ordem em que o teste decidir — necessário
+ * para simular resposta obsoleta chegando depois de uma mais recente
+ * (descarte por token, critério de aceite da TASK-133). */
+function criarFetchControlavel() {
+  const pendentes: Array<{ url: string; resolver: (resposta: unknown) => void }> = [];
+  const fetchFn = vi.fn().mockImplementation((url: string) => {
+    return new Promise((resolve) => {
+      pendentes.push({ url: String(url), resolver: resolve });
+    });
+  }) as unknown as typeof fetch;
+  return { fetchFn, pendentes };
+}
+
+describe("EtapaItinerarios — sugestão de nome pela via mais próxima na criação (TASK-133; DEC-112)", () => {
+  test("abrir a linha-formulário dispara /nearest e preenche o nome com a sugestão abreviada", async () => {
+    const fetchMock = respostaCombinadaMock("Rua Francisco Aureliano Paiva");
+    vi.stubGlobal("fetch", fetchMock);
+    const { resultado } = await montarEtapa(1);
+
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: -46.38, lat: -23.98 });
+    });
+    await act(async () => {
+      await flush();
+    });
+
+    const nomeInput = resultado.container.querySelector(
+      '[data-testid="nome-local-input"]',
+    ) as HTMLInputElement;
+    expect(nomeInput.value).toBe("R. Franci. Aureli. Paiva");
+    expect(
+      vi.mocked(fetchMock).mock.calls.some(([url]) => String(url).includes("/nearest/")),
+    ).toBe(true);
+
+    resultado.desmontar();
+  });
+
+  test("[inválido] resposta da abertura não sobrescreve o nome já digitado pelo usuário", async () => {
+    const { fetchFn, pendentes } = criarFetchControlavel();
+    vi.stubGlobal("fetch", fetchFn);
+    const { resultado } = await montarEtapa(1);
+
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: -46.38, lat: -23.98 });
+    });
+
+    const nomeInput = resultado.container.querySelector(
+      '[data-testid="nome-local-input"]',
+    ) as HTMLInputElement;
+    digitar(nomeInput, "Nome Digitado Pelo Usuário");
+
+    // A resposta da consulta de abertura chega DEPOIS da digitação.
+    act(() => {
+      pendentes[0].resolver({
+        ok: true,
+        json: () =>
+          Promise.resolve({ code: "Ok", waypoints: [{ name: "Rua Nova", distance: 1 }] }),
+      });
+    });
+    await act(async () => {
+      await flush();
+    });
+
+    expect(nomeInput.value).toBe("Nome Digitado Pelo Usuário");
+
+    resultado.desmontar();
+  });
+
+  test("'Atualizar ponto' recarrega a sugestão e SOBRESCREVE o nome, mesmo já digitado (DEC-112 §2)", async () => {
+    const fetchMock = respostaCombinadaMock("Rua Nova Sugerida");
+    vi.stubGlobal("fetch", fetchMock);
+    const { resultado } = await montarEtapa(1);
+
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: -46.38, lat: -23.98 });
+    });
+    await act(async () => {
+      await flush();
+    });
+
+    const nomeInput = resultado.container.querySelector(
+      '[data-testid="nome-local-input"]',
+    ) as HTMLInputElement;
+    digitar(nomeInput, "Nome Manual do Usuário");
+
+    const latitudeInput = resultado.container.querySelector(
+      '[data-testid="latitude-criacao-input"]',
+    ) as HTMLInputElement;
+    digitar(latitudeInput, "-23.990000");
+    clicar(resultado.container.querySelector('[data-testid="atualizar-ponto-criacao"]')!);
+    await act(async () => {
+      await flush();
+    });
+
+    expect(nomeInput.value).toBe("R. Nova Sugerida");
+
+    resultado.desmontar();
+  });
+
+  test("clique duplo em 'Atualizar ponto': a resposta da PRIMEIRA consulta, chegando por último, é descartada", async () => {
+    const { fetchFn, pendentes } = criarFetchControlavel();
+    vi.stubGlobal("fetch", fetchFn);
+    const { resultado } = await montarEtapa(1);
+
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: -46.38, lat: -23.98 });
+    });
+    // pendentes[0] — consulta da abertura; resolvida logo, sem relevância aqui.
+    act(() => {
+      pendentes[0].resolver({
+        ok: true,
+        json: () =>
+          Promise.resolve({ code: "Ok", waypoints: [{ name: "Via Abertura", distance: 1 }] }),
+      });
+    });
+    await act(async () => {
+      await flush();
+    });
+
+    const latitudeInput = resultado.container.querySelector(
+      '[data-testid="latitude-criacao-input"]',
+    ) as HTMLInputElement;
+    const botaoAtualizar = resultado.container.querySelector(
+      '[data-testid="atualizar-ponto-criacao"]',
+    )!;
+    digitar(latitudeInput, "-23.990000");
+    clicar(botaoAtualizar); // pendentes[1] — 1ª consulta do botão
+    digitar(latitudeInput, "-23.970000");
+    clicar(botaoAtualizar); // pendentes[2] — 2ª consulta do botão (a mais recente)
+
+    expect(pendentes).toHaveLength(3);
+
+    // A resposta MAIS RECENTE (pendentes[2]) chega primeiro...
+    act(() => {
+      pendentes[2].resolver({
+        ok: true,
+        json: () =>
+          Promise.resolve({ code: "Ok", waypoints: [{ name: "Via Recente", distance: 1 }] }),
+      });
+    });
+    await act(async () => {
+      await flush();
+    });
+    // ...e a resposta da 1ª consulta do botão chega DEPOIS — é descartada.
+    act(() => {
+      pendentes[1].resolver({
+        ok: true,
+        json: () =>
+          Promise.resolve({ code: "Ok", waypoints: [{ name: "Via Antiga", distance: 1 }] }),
+      });
+    });
+    await act(async () => {
+      await flush();
+    });
+
+    const nomeInput = resultado.container.querySelector(
+      '[data-testid="nome-local-input"]',
+    ) as HTMLInputElement;
+    expect(nomeInput.value).toBe("Via Recente");
+
+    resultado.desmontar();
+  });
+
+  test("[inválido] falha do /nearest exibe aviso discreto e não bloqueante; criar com nome digitado funciona", async () => {
+    const fetchMock = respostaCombinadaMock(null);
+    vi.stubGlobal("fetch", fetchMock);
+    const { obterSessao, resultado } = await montarEtapa(1);
+
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: -46.38, lat: -23.98 });
+    });
+    await act(async () => {
+      await flush();
+    });
+
+    const nomeInput = resultado.container.querySelector(
+      '[data-testid="nome-local-input"]',
+    ) as HTMLInputElement;
+    expect(nomeInput.value).toBe("");
+    expect(
+      resultado.container.querySelector('[data-testid="aviso-sugestao-nome"]'),
+    ).not.toBeNull();
+
+    digitar(nomeInput, "Nome Manual");
+    const botaoConfirmar = resultado.container.querySelector(
+      '[data-testid="confirmar-criar-local"]',
+    ) as HTMLButtonElement;
+    expect(botaoConfirmar.disabled).toBe(false);
+    clicar(botaoConfirmar);
+    await act(async () => {
+      await flush();
+    });
+
+    const sessaoFinal = obterSessao();
+    if (sessaoFinal.modo !== "carregado") throw new Error("esperava modo carregado");
+    expect(
+      sessaoFinal.documento.autos.servicos[0].locais.some((l) => l.nome === "Nome Manual"),
+    ).toBe(true);
+    // A falha da sugestão não gera pendência bloqueante nem impede a criação.
+    expect(
+      resultado.container.querySelector('[data-testid="mensagem-recusa-criacao-inline"]'),
+    ).toBeNull();
+
+    resultado.desmontar();
+  });
+
+  test("[inválido] resposta de /nearest chegando após 'Cancelar' não altera estado (sem setState em formulário fechado)", async () => {
+    const { fetchFn, pendentes } = criarFetchControlavel();
+    vi.stubGlobal("fetch", fetchFn);
+    const { resultado } = await montarEtapa(1);
+
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: -46.38, lat: -23.98 });
+    });
+    clicar(
+      [...resultado.container.querySelectorAll("button")].find(
+        (botao) => botao.textContent === "Cancelar",
+      )!,
+    );
+    expect(resultado.container.querySelector('[data-testid="form-criar-local"]')).toBeNull();
+
+    // Resposta da consulta do formulário JÁ CANCELADO chega tarde.
+    act(() => {
+      pendentes[0].resolver({
+        ok: true,
+        json: () =>
+          Promise.resolve({ code: "Ok", waypoints: [{ name: "Via Tardia", distance: 1 }] }),
+      });
+    });
+    await act(async () => {
+      await flush();
+    });
+
+    expect(resultado.container.querySelector('[data-testid="form-criar-local"]')).toBeNull();
+
+    // Reabrir noutro ponto não mostra resíduo da resposta obsoleta.
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: -46.4, lat: -23.5 });
+    });
+    const nomeInput = resultado.container.querySelector(
+      '[data-testid="nome-local-input"]',
+    ) as HTMLInputElement;
+    expect(nomeInput.value).toBe("");
+
+    resultado.desmontar();
+  });
+
+  test("contagem de chamadas ao /nearest: 1 na abertura, +1 por clique em 'Atualizar ponto', 0 ao digitar coordenada", async () => {
+    const fetchMock = respostaCombinadaMock("Via Contagem");
+    vi.stubGlobal("fetch", fetchMock);
+    const { resultado } = await montarEtapa(1);
+
+    function chamadasNearest() {
+      return vi
+        .mocked(fetchMock)
+        .mock.calls.filter(([url]) => String(url).includes("/nearest/")).length;
+    }
+
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: -46.38, lat: -23.98 });
+    });
+    await act(async () => {
+      await flush();
+    });
+    expect(chamadasNearest()).toBe(1);
+
+    const latitudeInput = resultado.container.querySelector(
+      '[data-testid="latitude-criacao-input"]',
+    ) as HTMLInputElement;
+    digitar(latitudeInput, "-23.990000");
+    digitar(latitudeInput, "-23.995000");
+    expect(chamadasNearest()).toBe(1);
+
+    clicar(resultado.container.querySelector('[data-testid="atualizar-ponto-criacao"]')!);
+    await act(async () => {
+      await flush();
+    });
+    expect(chamadasNearest()).toBe(2);
+
+    resultado.desmontar();
+  });
+
+  test("[regressão] suíte de criação inline permanece verde com o mock do /nearest falhando (sugestão não é bloqueante)", async () => {
+    const fetchMock = respostaCombinadaMock(null);
+    vi.stubGlobal("fetch", fetchMock);
+    const { obterSessao, resultado } = await montarEtapa(1);
+
+    criarLocalPelaLinhaFormularioInline(resultado, "Padaria Sem Sugestão", {
+      lng: -46.38,
+      lat: -23.98,
+    });
+    await act(async () => {
+      await flush();
+    });
+
+    const sessaoFinal = obterSessao();
+    if (sessaoFinal.modo !== "carregado") throw new Error("esperava modo carregado");
+    expect(
+      sessaoFinal.documento.autos.servicos[0].locais.some(
+        (l) => l.nome === "Padaria Sem Sugestão",
+      ),
+    ).toBe(true);
 
     resultado.desmontar();
   });

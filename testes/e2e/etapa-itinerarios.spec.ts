@@ -285,6 +285,47 @@ test.describe("Etapa Seções, Locais e Itinerários — criar Seção via mapa 
     await expect(page.getByTestId("descricao-texto")).toContainText("Via 3");
   });
 
+  test("criar Seção aceitando a sugestão de nome pela via mais próxima (TASK-133; DEC-112)", async ({
+    page,
+  }) => {
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      const url = rota.request().url();
+      if (url.includes("/nearest/")) {
+        return rota.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({
+            code: "Ok",
+            waypoints: [{ name: "Rua Francisco Aureliano Paiva", distance: 5 }],
+          }),
+        });
+      }
+      return rota.fulfill(respostaOsrmGenericaOk(url));
+    });
+
+    await abrirEtapaVolta(page);
+
+    const mapa = page.getByTestId("mapa-base");
+    await expect(mapa).toBeVisible();
+    await mapa.locator(".maplibregl-marker").first().waitFor();
+    await mapa.scrollIntoViewIfNeeded();
+    const caixa = await mapa.boundingBox();
+    if (!caixa) throw new Error("mapa sem bounding box");
+    await mapa.click({
+      button: "right",
+      position: { x: caixa.width / 2, y: caixa.height / 2 },
+    });
+    await page.getByRole("menuitem", { name: "Seção" }).click();
+
+    // A sugestão nasce preenchida (abreviada, DEC-112 §4), sem digitação.
+    await expect(page.getByTestId("nome-secao-input")).toHaveValue(
+      "R. Franci. Aureli. Paiva",
+    );
+    await page.getByTestId("confirmar-criar-secao").click();
+
+    const itens = page.getByTestId("tabela-paradas").getByTestId("parada-rotulo");
+    await expect(itens.last()).toContainText("R. Franci. Aureli. Paiva");
+  });
+
   test("editar latitude e clicar 'Atualizar ponto' usa a coordenada digitada ao criar (TASK-132; DEC-112 item 5)", async ({
     page,
   }) => {
@@ -365,7 +406,10 @@ test.describe("TASK-068 — vocabulário visual e Local extremo contextual", () 
   }) => {
     let chamadasOsrm = 0;
     await page.route("https://router.project-osrm.org/**", (rota) => {
-      chamadasOsrm += 1;
+      // TASK-133: conta só recálculo de ROTA — abrir/"Atualizar ponto" na
+      // linha-formulário de criação também chama `/nearest` (sugestão de
+      // nome), requisição legítima e distinta desta contagem.
+      if (rota.request().url().includes("/route/")) chamadasOsrm += 1;
       return rota.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
@@ -522,7 +566,10 @@ test.describe("Etapa Seções, Locais e Itinerários — hover da linha (TASK-06
   }) => {
     let chamadasOsrm = 0;
     await page.route("https://router.project-osrm.org/**", (rota) => {
-      chamadasOsrm += 1;
+      // TASK-133: conta só recálculo de ROTA — abrir/"Atualizar ponto" na
+      // linha-formulário de criação também chama `/nearest` (sugestão de
+      // nome), requisição legítima e distinta desta contagem.
+      if (rota.request().url().includes("/route/")) chamadasOsrm += 1;
       return rota.abort();
     });
     await abrirEtapaVolta(page);
@@ -911,7 +958,10 @@ test.describe("Etapa Seções, Locais e Itinerários — gesto de ponto de rota 
   }) => {
     let chamadasOsrm = 0;
     await page.route("https://router.project-osrm.org/**", (rota) => {
-      chamadasOsrm += 1;
+      // TASK-133: conta só recálculo de ROTA — abrir/"Atualizar ponto" na
+      // linha-formulário de criação também chama `/nearest` (sugestão de
+      // nome), requisição legítima e distinta desta contagem.
+      if (rota.request().url().includes("/route/")) chamadasOsrm += 1;
       return rota.abort();
     });
     await abrirEtapaVolta(page);
@@ -938,7 +988,10 @@ test.describe("Etapa Seções, Locais e Itinerários — sincronização de sele
   test("clicar numa linha da tabela realça o marcador correspondente no mapa", async ({ page }) => {
     let chamadasOsrm = 0;
     await page.route("https://router.project-osrm.org/**", (rota) => {
-      chamadasOsrm += 1;
+      // TASK-133: conta só recálculo de ROTA — abrir/"Atualizar ponto" na
+      // linha-formulário de criação também chama `/nearest` (sugestão de
+      // nome), requisição legítima e distinta desta contagem.
+      if (rota.request().url().includes("/route/")) chamadasOsrm += 1;
       return rota.abort();
     });
     await abrirEtapaVolta(page);
@@ -991,7 +1044,10 @@ test.describe("Etapa Seções, Locais e Itinerários — sincronização de sele
   }) => {
     let chamadasOsrm = 0;
     await page.route("https://router.project-osrm.org/**", (rota) => {
-      chamadasOsrm += 1;
+      // TASK-133: conta só recálculo de ROTA — abrir/"Atualizar ponto" na
+      // linha-formulário de criação também chama `/nearest` (sugestão de
+      // nome), requisição legítima e distinta desta contagem.
+      if (rota.request().url().includes("/route/")) chamadasOsrm += 1;
       return rota.abort();
     });
     await abrirEtapaVolta(page);
@@ -1116,7 +1172,10 @@ test.describe("Etapa Seções, Locais e Itinerários — feedback de montagem in
   }) => {
     let chamadasOsrm = 0;
     await page.route("https://router.project-osrm.org/**", (rota) => {
-      chamadasOsrm += 1;
+      // TASK-133: conta só recálculo de ROTA — abrir/"Atualizar ponto" na
+      // linha-formulário de criação também chama `/nearest` (sugestão de
+      // nome), requisição legítima e distinta desta contagem.
+      if (rota.request().url().includes("/route/")) chamadasOsrm += 1;
       return rota.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
@@ -1171,7 +1230,10 @@ test.describe("Etapa Seções, Locais e Itinerários — feedback de montagem in
   }) => {
     let chamadasOsrm = 0;
     await page.route("https://router.project-osrm.org/**", (rota) => {
-      chamadasOsrm += 1;
+      // TASK-133: conta só recálculo de ROTA — abrir/"Atualizar ponto" na
+      // linha-formulário de criação também chama `/nearest` (sugestão de
+      // nome), requisição legítima e distinta desta contagem.
+      if (rota.request().url().includes("/route/")) chamadasOsrm += 1;
       return rota.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
@@ -1266,7 +1328,10 @@ test.describe("Etapa Seções, Locais e Itinerários — feedback de montagem in
   }) => {
     let chamadasOsrm = 0;
     await page.route("https://router.project-osrm.org/**", (rota) => {
-      chamadasOsrm += 1;
+      // TASK-133: conta só recálculo de ROTA — abrir/"Atualizar ponto" na
+      // linha-formulário de criação também chama `/nearest` (sugestão de
+      // nome), requisição legítima e distinta desta contagem.
+      if (rota.request().url().includes("/route/")) chamadasOsrm += 1;
       return rota.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
@@ -1660,7 +1725,10 @@ test.describe("Tabela lateral — redefinir Seção (TASK-100; DEC-080)", () => 
   }) => {
     let chamadasOsrm = 0;
     await page.route("https://router.project-osrm.org/**", (rota) => {
-      chamadasOsrm += 1;
+      // TASK-133: conta só recálculo de ROTA — abrir/"Atualizar ponto" na
+      // linha-formulário de criação também chama `/nearest` (sugestão de
+      // nome), requisição legítima e distinta desta contagem.
+      if (rota.request().url().includes("/route/")) chamadasOsrm += 1;
       return rota.fulfill(respostaOsrmGenericaOk(rota.request().url()));
     });
 
@@ -1695,7 +1763,10 @@ test.describe("Tabela lateral — redefinir Seção (TASK-100; DEC-080)", () => 
   test("Cancelar não altera nada nem chama o OSRM", async ({ page }) => {
     let chamadasOsrm = 0;
     await page.route("https://router.project-osrm.org/**", (rota) => {
-      chamadasOsrm += 1;
+      // TASK-133: conta só recálculo de ROTA — abrir/"Atualizar ponto" na
+      // linha-formulário de criação também chama `/nearest` (sugestão de
+      // nome), requisição legítima e distinta desta contagem.
+      if (rota.request().url().includes("/route/")) chamadasOsrm += 1;
       return rota.fulfill(respostaOsrmGenericaOk(rota.request().url()));
     });
 
