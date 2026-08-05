@@ -129,6 +129,51 @@ describe("consultarViaMaisProxima — casos válidos", () => {
     expect(NEAREST_TIMEOUT_PADRAO_MS).toBe(5_000);
     expect(NEAREST_TIMEOUT_PADRAO_MS).toBeLessThan(OSRM_TIMEOUT_PADRAO_MS);
   });
+
+  test("distance ausente ⇒ via preservada, sem distanciaM inventado (não é 0)", async () => {
+    const fetchFn = respostaFetchMock({
+      code: "Ok",
+      waypoints: [{ name: "Via X" }],
+    });
+
+    const resultado = await consultarViaMaisProxima(PONTO, { fetchFn });
+
+    expect(resultado).toEqual({ ok: true, via: "Via X", localizacao: undefined });
+    expect(resultado).not.toHaveProperty("distanciaM");
+  });
+
+  test("distance null ou fora do tipo (corpo fora do contrato) ⇒ sem distanciaM", async () => {
+    const fetchFn = respostaFetchMock({
+      code: "Ok",
+      waypoints: [{ name: "Via X", distance: null }],
+    });
+
+    const resultado = await consultarViaMaisProxima(PONTO, { fetchFn });
+
+    expect(resultado).not.toHaveProperty("distanciaM");
+  });
+
+  test("distance NaN ⇒ sem distanciaM", async () => {
+    const fetchFn = respostaFetchMock({
+      code: "Ok",
+      waypoints: [{ name: "Via X", distance: NaN }],
+    });
+
+    const resultado = await consultarViaMaisProxima(PONTO, { fetchFn });
+
+    expect(resultado).not.toHaveProperty("distanciaM");
+  });
+
+  test("distance 0 legítimo ⇒ distanciaM presente e igual a 0 (não confundir com ausência)", async () => {
+    const fetchFn = respostaFetchMock({
+      code: "Ok",
+      waypoints: [{ name: "Via X", distance: 0 }],
+    });
+
+    const resultado = await consultarViaMaisProxima(PONTO, { fetchFn });
+
+    expect(resultado).toEqual({ ok: true, via: "Via X", distanciaM: 0, localizacao: undefined });
+  });
 });
 
 describe("consultarViaMaisProxima — casos inválidos: semResposta (nunca nome inventado)", () => {

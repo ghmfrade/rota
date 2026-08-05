@@ -27,17 +27,19 @@ export interface OpcoesNearestOsrm {
  * Resultado discriminado de `consultarViaMaisProxima`:
  *
  * - `ok: true` — via encontrada; `via` é sempre uma string não vazia.
- *   `localizacao` é a coordenada **encaixada** na malha viária
- *   (`waypoints[0].location`), lida e devolvida só para uso futuro (Spec 03
- *   §3.6) — nenhum código desta task a consome nem move a coordenada do
- *   usuário com ela.
+ *   `distanciaM` só existe quando o OSRM informa `distance` finito; ausência
+ *   não vira `0` (zero seria a leitura mais forte — "sobre a via" — no caso
+ *   de menor informação). `localizacao` é a coordenada **encaixada** na
+ *   malha viária (`waypoints[0].location`), lida e devolvida só para uso
+ *   futuro (Spec 03 §3.6) — nenhum código desta task a consome nem move a
+ *   coordenada do usuário com ela.
  * - `ok: false, motivo: "semResposta"` — `code != "Ok"`, sem waypoints, ou
  *   nome ausente/vazio: nunca um nome inventado.
  * - `ok: false, motivo: "rede"` — falha de rede, HTTP != 2xx, corpo não-JSON
  *   ou timeout. **Sem retry** (falha silenciosa é aceitável e barata).
  */
 export type ResultadoViaMaisProxima =
-  | { ok: true; via: string; distanciaM: number; localizacao?: Ponto }
+  | { ok: true; via: string; distanciaM?: number; localizacao?: Ponto }
   | { ok: false; motivo: "rede" | "semResposta" };
 
 interface EnvelopeNearestOsrm {
@@ -98,7 +100,9 @@ export async function consultarViaMaisProxima(
   return {
     ok: true,
     via,
-    distanciaM: waypoint.distance ?? 0,
+    ...(Number.isFinite(waypoint.distance)
+      ? { distanciaM: waypoint.distance }
+      : {}),
     localizacao,
   };
 }
