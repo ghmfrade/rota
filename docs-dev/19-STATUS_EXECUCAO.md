@@ -1,6 +1,46 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-08-04 (branch `orquestracao/20260805-0057`) — **TASK-132,
+**Atualização mais recente:** 2026-08-05 (branch `redesign`) — **TASK-133: entrega APROVADA
+COM RESSALVAS; o bloco de quatro tasks da DEC-112 está fechado no código.** O commit `f7c8850`
+(**5 arquivos, +668/−22**) cria `src/formulario/itinerarios/sugerir-nome-de-parada.ts` —
+orquestração **pura** de `consultarViaMaisProxima` (TASK-131) + `abreviarNomeDeVia` (TASK-130),
+com resultado discriminado `{ok:true,nome}` / `{ok:false,motivo:"rede"|"semResposta"}` — e a fia
+em `etapa-itinerarios.tsx`: `dispararSugestaoNome` (`:1046-1071`) chamada **só** de
+`iniciarCriacaoParada` (`:1089`, `sobrescrever:false`) e de `atualizarPontoCriacaoInline`
+(`:1116`, `sobrescrever:true`, DEC-112 §2), com contador `sugestaoTokenRef` descartando resposta
+obsoleta nas três rotas (segunda consulta, `cancelarCriacaoInline`, cleanup de troca de
+itinerário em `:264-272`) e "latest ref" `nomeCriacaoInlineRef` (`:227-230`) impedindo que a
+resposta assíncrona apague digitação — o risco central declarado pela task. `abreviarNomeDeVia`
+é chamada sem `limite`, logo com o default `LIMITE_PADRAO_NOME_SUGERIDO = 25` (DEC-112 §4); a
+`localizacao` encaixada na malha é ignorada (DEC-112 §6); `disabled` do "Criar" segue sendo só
+`!nomeCriacaoInline.trim()` (`:1536`), sem travar pela consulta. **Nenhum campo novo no JSON e
+`/route` intocado** — a política bloqueante da RN-048 continua exclusiva da rota, e a falha do
+`/nearest` produz apenas `aviso-sugestao-nome`, sem pendência e sem gate de exportação. O parecer
+`14-REVISOES/TASK-133-20260805.md` registra **checklist 07 com 21 ok, 33 N/A e 0 violados** e
+seis problemas, **nenhum** violando RN de criticidade Alta nem NEG-xxx. **Condição de merge
+(única):** o critério de aceite do **indicador de carregamento** não tem verificação —
+`grep -rn "sugerindo-nome" testes/` não retorna nada, e a não-travagem do "Criar" só é provada
+*depois* da resposta, não durante; a infraestrutura para o teste já existe na própria suíte
+(`criarFetchControlavel()` mantém a promessa pendente). **Follow-ups (não impeditivos):**
+os sete testes de componente da task usam exclusivamente `aoIniciarCriacaoParada("local", …)`
+sem `posicaoNaLinha`, deixando as combinações `"secao"` e "sobre a linha" sem congelamento nessa
+camada; o filtro `if (url().includes("/route/"))` foi aplicado a **oito** blocos de
+`testes/e2e/etapa-itinerarios.spec.ts`, incluindo testes que nunca abrem a linha-formulário
+(redefinir Seção da TASK-100, hover, sincronização de seleção), afrouxando ali a asserção de
+"não chama o OSRM" sem contrapartida; e duas observações informativas (aviso sem `role="status"`,
+`eslint-disable` sem efeito em `:266-270`). O `data-testid` `sugerindo-nome` é um seletor além do
+que a task autorizou — justificável, mas hoje sem uso em teste. A revisão **reutilizou o log
+canônico verde sem repetir a suíte** (`test:all:verificar`: executor **Claude**, fingerprint
+`5f9281fd…fcec3192`, identidade `498d7fa6…3a884f91763`, `Test Files 117 passed`,
+`Tests 1728 passed`, E2E `112 passed`, ambos com código 0, `Resultado geral: APROVADO`) e rodou
+`typecheck` e `lint`, ambos limpos. **Contagem inalterada:** total **permanece 8 — 6 executáveis,
+a TASK-038 com bloqueio parcial e a TASK-040 bloqueada**; a TASK-133 nasceu fora daquela
+contagem, junto com as TASK-130..132. Nenhuma task foi absorvida ou substituída. Com esta
+entrega, **nenhuma task da DEC-112 segue pendente** — restam apenas a condição de merge acima e
+os follow-ups das quatro. Permanecem sem dono os follow-ups herdados da TASK-128/129/130/132 e a
+pendência de **registro** da §3.
+
+**Histórico anterior (2026-08-04) — TASK-132,
 rodada de correção 1: APROVADA, sem ressalva remanescente; o ciclo da task está encerrado.**
 O commit `c3b9628` fecha as duas ressalvas do parecer da 1ª rodada, em **dois arquivos,
 +70/−32**, sem tocar lógica de produção. (1) **Condição de merge cumprida:** o polígono
@@ -1144,6 +1184,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 130 | Abreviação de nome de via para caber no nome sugerido de Parada — módulo puro `src/formulario/nomeacao/abreviar-nome-de-via.ts` (tabela fechada de 11 siglas, maior `L ≥ 5`, exceção nas duas primeiras palavras do corpo, truncamento por code point); implementada em `a2afbf3` e **aprovada com ressalvas** em `14-REVISOES/TASK-130-20260804.md` (condição de merge: decidir e congelar o tratamento da primeira palavra quando o tipo de logradouro é desconhecido; follow-ups de cobertura no teste de propriedade e na guarda da tabela). As **TASK-132..133** seguem pendentes |
 | 131 | Cliente OSRM `/nearest`: via mais próxima de uma coordenada — `src/formulario/roteamento/nearest-osrm.ts` (`consultarViaMaisProxima`, retorno discriminado próprio, timeout de 5 s, sem retry, sem exceção propagada, sem tocar `cliente-osrm.ts`/`url-osrm.ts`/`falhas-osrm.ts`); implementada em `0d08403` e **aprovada com ressalvas** em `14-REVISOES/TASK-131-20260804.md`; rodada de correção `14bc44b` (`distanciaM` opcional, só presente com `distance` finito, com os quatro casos fixados por teste) **aprovada sem ressalva remanescente** em `14-REVISOES/TASK-131-20260804-correcao.md` — ciclo encerrado, sem condição de merge e sem follow-up. Ponteiro para a TASK-133: `distanciaM` pode ser `undefined` e ausência **não** é zero. A **TASK-133** segue pendente |
 | 132 | Latitude e longitude editáveis na criação de Seção/Local, com reposicionamento do ponto pendente — `src/formulario/itinerarios/coordenada-criacao.ts` (parsing/validação puros, 6 casas, vírgula decimal aceita) + campos `latitude-criacao-input`/`longitude-criacao-input` e botão `atualizar-ponto-criacao` na linha-formulário de criação inline; âncora de inserção (`posicaoNaLinha`) preservada sob coordenada editada (DEC-112 item 5), coordenada usada literalmente, nenhum campo novo no JSON; implementada em `81d5654` e **aprovada com ressalvas** em `14-REVISOES/TASK-132-20260804.md` (condição de merge: repor a cobertura da recusa "fora de SP" na criação inline com coordenada dentro das faixas válidas, asseverando a mensagem — a validação de faixa nova esvaziou o teste de regressão existente; follow-up de layout no `flex-1` dos campos). A **TASK-133** segue pendente |
+| 133 | Nome de Seção/Local sugerido pela via mais próxima na criação — `src/formulario/itinerarios/sugerir-nome-de-parada.ts` (orquestração pura `consultarViaMaisProxima` + `abreviarNomeDeVia`, resultado discriminado) + fiação em `etapa-itinerarios.tsx` (disparo na abertura **sem** sobrescrever e no "Atualizar ponto" **com** sobrescrita, token de descarte de resposta obsoleta, "latest ref" do nome digitado, indicador `sugerindo-nome` e aviso não bloqueante `aviso-sugestao-nome`); nenhum campo novo no JSON, `/route` intocado; implementada em `f7c8850` e **aprovada com ressalvas** em `14-REVISOES/TASK-133-20260805.md` (condição de merge: cobrir por teste o critério de aceite do indicador de carregamento — `sugerindo-nome` não é exercitado por nenhum teste e o "Criar" só é verificado **depois** da resposta; follow-ups: sugestão sem teste de componente no caminho `"secao"`/`posicaoNaLinha`, asserções E2E afrouxadas com o filtro `/route/` em oito blocos que nunca abrem a linha-formulário, aviso sem `role="status"` e `eslint-disable` inócuo). **Encerra o bloco de quatro tasks da DEC-112** |
 
 ### Fase 12 — Qualidade e follow-ups
 
