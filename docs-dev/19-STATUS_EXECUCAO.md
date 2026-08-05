@@ -1,6 +1,42 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-08-04 (branch `orquestracao/20260805-00241`) — **TASK-130:
+**Atualização mais recente:** 2026-08-04 (branch `orquestracao/20260805-0057`) — **TASK-131:
+entrega APROVADA COM RESSALVAS; o cliente `/nearest` sai da fila.** O commit `0d08403`,
+fundamentado na **DEC-112** (Q-090 opção 1), cria `src/formulario/roteamento/nearest-osrm.ts` com
+`consultarViaMaisProxima(ponto, opcoes)` sobre `GET {base}/nearest/v1/driving/{lon},{lat}?number=1`:
+retorno discriminado próprio (`{ok:true, via, distanciaM, localizacao?}` ou
+`{ok:false, motivo:"rede"|"semResposta"}`), timeout próprio de **5 s**
+(`NEAREST_TIMEOUT_PADRAO_MS`, comparado por teste com os 15 s do `/route`), **sem retry** e **sem
+exceção propagada**. Três arquivos, +376 linhas, nenhuma removida: o módulo novo, o teste novo
+(`testes/unitarios/formulario/nearest-osrm.test.ts`, 17 testes, `fetchFn` mockado em todos) e um
+bloco de export em `roteamento/index.ts`. O **risco central da task está afastado por construção**:
+o módulo importa apenas `Ponto` e `urlBaseOsrm`, não `falhas-osrm.ts` nem `cliente-osrm.ts`, logo
+nenhuma `FalhaOsrm` bloqueante nasce dele e a **RN-048 (Alta) permanece com alcance restrito à
+rota**, como a DEC-112 fixou; `cliente-osrm.ts`, `url-osrm.ts`, `falhas-osrm.ts` e `extrair-rota.ts`
+ficaram **fora do diff**. Busca no repositório confirma **nenhum consumidor** de
+`consultarViaMaisProxima` fora dos três arquivos — RN-052 e RN-096 são atendidas por ausência de
+chamador e viram critério real na TASK-133. O parecer `14-REVISOES/TASK-131-20260804.md` registra
+**checklist 07 com 15 ok, 47 N/A e 0 violados** e três apontamentos, todos de severidade Baixa ou
+informativos, nenhum violando RN Alta ou NEG-xxx. A ressalva única: `distanciaM: waypoint.distance
+?? 0` (`nearest-osrm.ts:101`) inventa `0` — "coordenada exatamente sobre a via", a leitura mais
+forte possível — justamente no caso de menor informação, sem teste que fixe o comportamento.
+**Não é condição de merge** (não há consumidor de `distanciaM` hoje); é **follow-up com prazo**:
+resolver antes que a TASK-133 leia o campo, ou congelar a escolha por teste. A revisão reutilizou o
+log canônico verde sem repetir a suíte (`test:all:verificar`: executor **Claude**, fingerprint
+`be14e474…846df0b4`, identidade `498d7fa6…3a884f91763`, `Test Files 115 passed`,
+`Tests 1670 passed`, E2E `111 passed`, ambos com código 0, `Resultado geral: APROVADO`).
+**Contagem:** como a TASK-130, a **TASK-131 nasceu depois** do total de 8 tasks não concluídas (em
+`9cc4fa0`), então o total **permanece 8 — 6 executáveis, a TASK-038 com bloqueio parcial e a
+TASK-040 bloqueada**. Nenhuma task foi absorvida ou substituída. As **TASK-132 e TASK-133 seguem
+pendentes fora daquela contagem**; a **TASK-133** passa a ter cumpridas as suas duas dependências
+duras (TASK-130 e TASK-131) e herda três obrigações não cobertas por esta entrega: indicador de
+carregamento (Spec 04 §7.3), garantia da RN-052 no gesto de criação e o limite de volume (não
+consultar a cada tecla). O código das **TASK-130/132/133 não foi verificado nesta revisão** — sobre
+a TASK-130 só se afirma que a TASK-131 **não** a importa. Permanecem sem dono os follow-ups
+herdados da TASK-128/129/130 e a pendência de **registro** da §3 (a tabela terminava na 129 e o
+total "102 tasks concluídas" diverge das linhas) — esta revisão também **não** mexeu nisso.
+
+**Histórico anterior (2026-08-04) — TASK-130:
 entrega APROVADA COM RESSALVAS; a abreviação de nome de via sai da fila.** O commit `a2afbf3`,
 fundamentado na **DEC-112** (Q-090 opção 1), cria o módulo puro
 `src/formulario/nomeacao/abreviar-nome-de-via.ts` (+ barril `index.ts`) com a função
@@ -1001,7 +1037,8 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 
 | Task | Título resumido |
 |---|---|
-| 130 | Abreviação de nome de via para caber no nome sugerido de Parada — módulo puro `src/formulario/nomeacao/abreviar-nome-de-via.ts` (tabela fechada de 11 siglas, maior `L ≥ 5`, exceção nas duas primeiras palavras do corpo, truncamento por code point); implementada em `a2afbf3` e **aprovada com ressalvas** em `14-REVISOES/TASK-130-20260804.md` (condição de merge: decidir e congelar o tratamento da primeira palavra quando o tipo de logradouro é desconhecido; follow-ups de cobertura no teste de propriedade e na guarda da tabela). As **TASK-131..133** seguem pendentes |
+| 130 | Abreviação de nome de via para caber no nome sugerido de Parada — módulo puro `src/formulario/nomeacao/abreviar-nome-de-via.ts` (tabela fechada de 11 siglas, maior `L ≥ 5`, exceção nas duas primeiras palavras do corpo, truncamento por code point); implementada em `a2afbf3` e **aprovada com ressalvas** em `14-REVISOES/TASK-130-20260804.md` (condição de merge: decidir e congelar o tratamento da primeira palavra quando o tipo de logradouro é desconhecido; follow-ups de cobertura no teste de propriedade e na guarda da tabela). As **TASK-132..133** seguem pendentes |
+| 131 | Cliente OSRM `/nearest`: via mais próxima de uma coordenada — `src/formulario/roteamento/nearest-osrm.ts` (`consultarViaMaisProxima`, retorno discriminado próprio, timeout de 5 s, sem retry, sem exceção propagada, sem tocar `cliente-osrm.ts`/`url-osrm.ts`/`falhas-osrm.ts`); implementada em `0d08403` e **aprovada com ressalvas** em `14-REVISOES/TASK-131-20260804.md` (sem condição de merge; follow-up com prazo: resolver o `distanciaM: distance ?? 0` e fixá-lo por teste **antes** de a TASK-133 ler o campo). As **TASK-132..133** seguem pendentes |
 
 ### Fase 12 — Qualidade e follow-ups
 
