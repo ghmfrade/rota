@@ -1,6 +1,37 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-08-04 (branch `orquestracao/20260805-0057`) — **TASK-131:
+**Atualização mais recente:** 2026-08-04 (branch `orquestracao/20260805-0057`) — **TASK-131,
+rodada de correção 1: APROVADA, sem ressalva remanescente; o ciclo da task está encerrado.**
+O commit `14bc44b` fecha a ressalva única do parecer da 1ª rodada: `distanciaM` deixa de ser
+obrigatório em `ResultadoViaMaisProxima` (`nearest-osrm.ts:42`) e o `?? 0` vira spread
+condicional guardado por `Number.isFinite` (`nearest-osrm.ts:103-105`) — o campo só existe
+quando o OSRM informa `distance` finito, e **nunca mais nasce `0` sintético** no caso de menor
+informação. O guarda preserva o **zero legítimo** (coordenada sobre a via), fixado junto com os
+outros três casos (`distance` ausente, `null`, `NaN`) em quatro testes novos
+(`nearest-osrm.test.ts:133-176`), que asseveram **ausência da chave**, não valor `undefined`.
+Diff cirúrgico de **dois arquivos, +55/−6**, ambos criados pela própria task; `cliente-osrm.ts`,
+`url-osrm.ts`, `falhas-osrm.ts` e `extrair-rota.ts` seguem fora do diff, e a **RN-048 (Alta)
+permanece com alcance restrito à rota**. O parecer
+`14-REVISOES/TASK-131-20260804-correcao.md` registra **checklist 07 com 15 ok, 47 N/A e 0
+violados** (o item de testes sai de "ok com ressalva" para **ok pleno**), **nenhum problema** de
+severidade Baixa ou superior e duas observações informativas: (a) o critério de aceite escrevia
+`distanciaM: number` obrigatório — a TASK-133 deve **ler o tipo, não o texto**, e tratar
+`undefined` sem convertê-lo em zero; (b) `Number.isFinite` não é type guard do TS, o que só
+importaria se `exactOptionalPropertyTypes` fosse ligado (hoje não está — `tsconfig.json:11`).
+O **follow-up com prazo** registrado na 1ª rodada ("resolver antes que a TASK-133 leia
+`distanciaM`") **deixa de existir como dívida**: foi resolvido dentro do próprio ciclo. A revisão
+reutilizou o log canônico verde sem repetir a suíte (`test:all:verificar`: executor
+**Claude-orquestrado**, fingerprint `0c471309…7725be6c`, identidade `498d7fa6…3a884f91763`,
+`Test Files 115 passed`, `Tests 1674 passed` — os 1670 originais **mais os 4 da correção** —,
+E2E `111 passed`, ambos com código 0, `Resultado geral: APROVADO`) e rodou `typecheck` e `lint`,
+ambos limpos. **Contagem inalterada:** total **permanece 8 — 6 executáveis, a TASK-038 com
+bloqueio parcial e a TASK-040 bloqueada**; a TASK-131 nasceu fora daquela contagem. As
+**TASK-132 e TASK-133 seguem pendentes**; o código das **TASK-130/132/133 não foi verificado
+nesta revisão**. Permanecem sem dono os follow-ups herdados da TASK-128/129/130 e a pendência de
+**registro** da §3 (a tabela terminava na 129 e o total "102 tasks concluídas" diverge das
+linhas).
+
+**Histórico anterior (2026-08-04) — TASK-131, 1ª rodada:
 entrega APROVADA COM RESSALVAS; o cliente `/nearest` sai da fila.** O commit `0d08403`,
 fundamentado na **DEC-112** (Q-090 opção 1), cria `src/formulario/roteamento/nearest-osrm.ts` com
 `consultarViaMaisProxima(ponto, opcoes)` sobre `GET {base}/nearest/v1/driving/{lon},{lat}?number=1`:
@@ -1038,7 +1069,7 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | Task | Título resumido |
 |---|---|
 | 130 | Abreviação de nome de via para caber no nome sugerido de Parada — módulo puro `src/formulario/nomeacao/abreviar-nome-de-via.ts` (tabela fechada de 11 siglas, maior `L ≥ 5`, exceção nas duas primeiras palavras do corpo, truncamento por code point); implementada em `a2afbf3` e **aprovada com ressalvas** em `14-REVISOES/TASK-130-20260804.md` (condição de merge: decidir e congelar o tratamento da primeira palavra quando o tipo de logradouro é desconhecido; follow-ups de cobertura no teste de propriedade e na guarda da tabela). As **TASK-132..133** seguem pendentes |
-| 131 | Cliente OSRM `/nearest`: via mais próxima de uma coordenada — `src/formulario/roteamento/nearest-osrm.ts` (`consultarViaMaisProxima`, retorno discriminado próprio, timeout de 5 s, sem retry, sem exceção propagada, sem tocar `cliente-osrm.ts`/`url-osrm.ts`/`falhas-osrm.ts`); implementada em `0d08403` e **aprovada com ressalvas** em `14-REVISOES/TASK-131-20260804.md` (sem condição de merge; follow-up com prazo: resolver o `distanciaM: distance ?? 0` e fixá-lo por teste **antes** de a TASK-133 ler o campo). As **TASK-132..133** seguem pendentes |
+| 131 | Cliente OSRM `/nearest`: via mais próxima de uma coordenada — `src/formulario/roteamento/nearest-osrm.ts` (`consultarViaMaisProxima`, retorno discriminado próprio, timeout de 5 s, sem retry, sem exceção propagada, sem tocar `cliente-osrm.ts`/`url-osrm.ts`/`falhas-osrm.ts`); implementada em `0d08403` e **aprovada com ressalvas** em `14-REVISOES/TASK-131-20260804.md`; rodada de correção `14bc44b` (`distanciaM` opcional, só presente com `distance` finito, com os quatro casos fixados por teste) **aprovada sem ressalva remanescente** em `14-REVISOES/TASK-131-20260804-correcao.md` — ciclo encerrado, sem condição de merge e sem follow-up. Ponteiro para a TASK-133: `distanciaM` pode ser `undefined` e ausência **não** é zero. As **TASK-132..133** seguem pendentes |
 
 ### Fase 12 — Qualidade e follow-ups
 
