@@ -1,6 +1,47 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-08-04 (branch `redesign`) — **TASK-129: entrega APROVADA
+**Atualização mais recente:** 2026-08-04 (branch `orquestracao/20260805-00241`) — **TASK-130:
+entrega APROVADA COM RESSALVAS; a abreviação de nome de via sai da fila.** O commit `a2afbf3`,
+fundamentado na **DEC-112** (Q-090 opção 1), cria o módulo puro
+`src/formulario/nomeacao/abreviar-nome-de-via.ts` (+ barril `index.ts`) com a função
+`abreviarNomeDeVia(nome, limite = 25)`: tabela **fechada em 11 siglas** de tipo de logradouro
+(reconhecimento sem acento e sem caixa), corte igualitário pelo **maior `L ≥ 5`** que faça caber,
+etapa de exceção abaixo de 5 restrita à 1ª e 2ª palavra do corpo e truncamento final por code
+point. Três arquivos, todos **novos**; nenhum arquivo existente alterado — sem UI, sem rede, sem
+contrato JSON, sem tocar `compor-descricao.ts` (RN-045) nem o schema (`nome: z.string().min(1)`
+permanece, DEC-112 §4). Os quatro exemplos numerados da task foram reproduzidos **ao caractere** por
+execução independente na revisão (`"Rua Francisco Aureliano Paiva"` → `"R. Franci. Aureli. Paiva"`
+com 24; `"Rodovia Presidente Castelo Branco"` → `"Rod. Presi. Caste. Branco"` com 25;
+`"Avenida Engenheiro Luís Carlos Berrini"` → `"Av. E. Luís Carlos Berri."` com 25), com o script
+temporário removido e `git status` limpo depois. O parecer
+`14-REVISOES/TASK-130-20260804.md` registra **checklist 07 com 11 ok, 1 ok com ressalva, 41 N/A e 0
+violados** e quatro problemas, nenhum violando RN Alta ou NEG-xxx. O principal: quando a primeira
+palavra **não** é tipo de logradouro conhecido, ela fica **imune à abreviação**
+(`abreviar-nome-de-via.ts:86` separa `palavras[0]` incondicionalmente), contra o critério de aceite
+"tipo desconhecido é tratado como palavra comum" e contra o "reduzir igualitariamente" da DEC-112
+§4 — `"Anhanguera Presidente Castelo Branco"` sai `"Anhanguera P. Cas. Branco"`, com a palavra longa
+intacta e as demais cortadas a 2 e 3 letras. Os demais: nenhum teste exercita o tipo desconhecido
+**sob pressão de limite** (os dois casos existentes cabem e saem pelo atalho); o teste de
+propriedade afere só `comprimento ≤ limite`, não a segunda metade pedida pela task ("nunca abrevia
+palavra ≤ 5 fora da etapa de exceção"); e o teste "tabela tem exatamente 11 pares" não verifica
+cardinalidade. **Condição de merge:** decidir a leitura do critério do tipo desconhecido e, conforme
+a decisão, corrigir `abreviar-nome-de-via.ts:86` com teste, ou congelar a escolha como inferência
+controlada em comentário e teste. Os outros três seguem como follow-up de cobertura. A revisão
+reutilizou o log canônico verde (`test:all:verificar`: executor **Claude**, fingerprint
+`800b7ac1…08fb1ac57`, identidade `498d7fa6…3a884f91763`, `Test Files 114 passed`,
+`Tests 1651 passed`, E2E `111 passed`, ambos com código 0, `Resultado geral: APROVADO`) e rodou
+`typecheck` e `lint`, ambos limpos. **Contagem:** a TASK-130 **não** estava no total de 8 tasks não
+concluídas (nasceu depois daquela contagem, em `9cc4fa0`, junto com as TASK-131..133, no mesmo
+tratamento dado às TASK-120/129), então o total **permanece 8 — 6 executáveis, a TASK-038 com
+bloqueio parcial e a TASK-040 bloqueada**. Nenhuma task foi absorvida ou substituída por esta; as
+**TASK-131, TASK-132 e TASK-133 seguem pendentes fora daquela contagem**, e a **TASK-133** passa a
+ter sua dependência dura desta função cumprida (o comportamento do código das 131/132/133 **não foi
+verificado nesta revisão** — os arquivos previstos pela DEC-112 para elas não existem no commit).
+Permanecem sem dono os follow-ups herdados da TASK-128/129 e a pendência de **registro** da §3 (a
+tabela terminava na 129 e o total "102 tasks concluídas" diverge das linhas) — esta revisão também
+**não** mexeu nisso.
+
+**Histórico anterior (2026-08-04) — TASK-129: entrega APROVADA
 COM RESSALVAS; o bloco de itinerário do PDF sai da fila.** O commit `b22223d`, fundamentado na
 **DEC-109** e na **DEC-111** (`aeae0db`, Q-089 opção 1 customizada), reordena o bloco para
 título → imagem do mapa → lista numerada de Seções → descrição por vias, remove a **sequência
@@ -955,6 +996,12 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | 034 | PDF operacional: tabelas horárias, matrizes e anexo (§13.1 itens 5–8) — reprovada três vezes no desenho das matrizes (`14-REVISOES/TASK-034-20260803.md`, `-correcao.md`, `-task-128.md`) e **encerrada pela TASK-128** (DEC-108) |
 | 128 | Matrizes do PDF: rótulo de coluna horizontal no triângulo superior, matriz íntegra por página e acabamento (DEC-108/DEC-110) — 1ª rodada `31ff190` reprovada; rodada de correção `a05022d` **aprovada com ressalvas** em `14-REVISOES/TASK-128-20260803.md` (condições de merge: comentário do `MAX_COLUNAS_POR_BLOCO` e conferência visual) |
 | 129 | Bloco de itinerário do PDF: mapa no topo, lista numerada de Seções em duas colunas a partir de 12 e supressão da sequência por seta (DEC-109/DEC-111) — implementada em `b22223d` e **aprovada com ressalvas** em `14-REVISOES/TASK-129-20260804.md` (condições de merge: conferência visual e registro dos follow-ups de recalibrar `alturaItemLegenda` com teste de layout real e de derivar o teto de altura da proporção da captura) |
+
+### Sugestão de nome de Parada pela via mais próxima (DEC-112)
+
+| Task | Título resumido |
+|---|---|
+| 130 | Abreviação de nome de via para caber no nome sugerido de Parada — módulo puro `src/formulario/nomeacao/abreviar-nome-de-via.ts` (tabela fechada de 11 siglas, maior `L ≥ 5`, exceção nas duas primeiras palavras do corpo, truncamento por code point); implementada em `a2afbf3` e **aprovada com ressalvas** em `14-REVISOES/TASK-130-20260804.md` (condição de merge: decidir e congelar o tratamento da primeira palavra quando o tipo de logradouro é desconhecido; follow-ups de cobertura no teste de propriedade e na guarda da tabela). As **TASK-131..133** seguem pendentes |
 
 ### Fase 12 — Qualidade e follow-ups
 
