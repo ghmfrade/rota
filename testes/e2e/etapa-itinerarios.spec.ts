@@ -284,6 +284,79 @@ test.describe("Etapa Seções, Locais e Itinerários — criar Seção via mapa 
     expect((ultimaUrlOsrm as unknown as string).split(";").length).toBe(4);
     await expect(page.getByTestId("descricao-texto")).toContainText("Via 3");
   });
+
+  test("editar latitude e clicar 'Atualizar ponto' usa a coordenada digitada ao criar (TASK-132; DEC-112 item 5)", async ({
+    page,
+  }) => {
+    let ultimaUrlOsrm: string | null = null;
+    await page.route("https://router.project-osrm.org/**", (rota) => {
+      const url = rota.request().url();
+      if (ehCoordenadaDaVolta(url)) ultimaUrlOsrm = url;
+      return rota.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          code: "Ok",
+          routes: [
+            {
+              geometry: {
+                type: "LineString",
+                coordinates: [
+                  [-46.402, -24.0081],
+                  [-46.3919, -23.9631],
+                  [-46.3339, -23.9608],
+                  [-48.5, -22.2],
+                ],
+              },
+              legs: [
+                { distance: 6100, duration: 750, steps: [{ name: "Via 1" }] },
+                { distance: 8000, duration: 1080, steps: [{ name: "Via 2" }] },
+                { distance: 90000, duration: 5400, steps: [{ name: "Via 3" }] },
+              ],
+            },
+          ],
+        }),
+      });
+    });
+
+    await abrirEtapaVolta(page);
+
+    const mapa = page.getByTestId("mapa-base");
+    await expect(mapa).toBeVisible();
+    await mapa.locator(".maplibregl-marker").first().waitFor();
+    await mapa.scrollIntoViewIfNeeded();
+    const caixa = await mapa.boundingBox();
+    if (!caixa) throw new Error("mapa sem bounding box");
+    await mapa.click({
+      button: "right",
+      position: { x: caixa.width / 2, y: caixa.height / 2 },
+    });
+    await page.getByRole("menuitem", { name: "Seção" }).click();
+
+    // Os campos nascem preenchidos com a coordenada do clique — desloca a
+    // latitude por um valor pequeno (permanece dentro do mesmo município,
+    // Jaú, sem acionar a recusa de "fora de SP").
+    const campoLatitude = page.getByTestId("latitude-criacao-input");
+    const latitudeClicada = Number(await campoLatitude.inputValue());
+    const latitudeEditada = (latitudeClicada + 0.001).toFixed(6);
+    await campoLatitude.fill(latitudeEditada);
+    await page.getByTestId("atualizar-ponto-criacao").click();
+
+    await page.getByTestId("nome-secao-input").fill("Seção Editada E2E");
+    await page.getByTestId("confirmar-criar-secao").click();
+
+    const itens = page.getByTestId("tabela-paradas").getByTestId("parada-rotulo");
+    await expect(itens).toHaveText([
+      "Praia Grande - Rodoviária Praia Grande",
+      "São Vicente - Terminal São Vicente",
+      "Santos - Terminal Santos",
+      "Jaú - Seção Editada E2E",
+    ]);
+
+    // A URL do OSRM carrega a coordenada EDITADA (não a do clique original) —
+    // sem zeros à direita, como o cliente OSRM serializa o número.
+    expect(ultimaUrlOsrm).not.toBeNull();
+    expect(ultimaUrlOsrm as unknown as string).toContain(String(Number(latitudeEditada)));
+  });
 });
 
 test.describe("TASK-068 — vocabulário visual e Local extremo contextual", () => {

@@ -70,6 +70,7 @@ interface PropsEditorCapturadas {
     posicao: Coordenada,
     posicaoNaLinha?: Coordenada,
   ) => void;
+  posicaoCriacaoPendente?: Coordenada;
   aoTransladarSecao?: (secao: Secao) => void;
   locaisInvalidos?: readonly string[];
   selecaoAtual?: string | null;
@@ -2552,6 +2553,232 @@ describe("EtapaItinerarios — linha-formulário de criação inline na tabela (
     // A linha-formulário permanece aberta (recusa não fecha o gesto).
     expect(resultado.container.querySelector('[data-testid="form-criar-local"]')).not.toBeNull();
     expect(obterSessao().paradasEmEdicao).toEqual(paradasAntes);
+
+    resultado.desmontar();
+  });
+});
+
+describe("EtapaItinerarios — latitude/longitude editáveis na criação inline (TASK-132; DEC-112 item 5)", () => {
+  test("os quatro casos (Seção/Local × com/sem âncora de linha) abrem com os campos preenchidos, 6 casas decimais", async () => {
+    const casos: Array<{
+      tipo: "secao" | "local";
+      posicaoNaLinha?: Coordenada;
+    }> = [
+      { tipo: "secao" },
+      { tipo: "secao", posicaoNaLinha: { lng: -46.38, lat: -23.98 } },
+      { tipo: "local" },
+      { tipo: "local", posicaoNaLinha: { lng: -46.38, lat: -23.98 } },
+    ];
+
+    for (const caso of casos) {
+      const { resultado } = await montarEtapa(2, -23.97);
+      act(() => {
+        editorCapturado.props?.aoIniciarCriacaoParada(
+          caso.tipo,
+          { lng: -46.38, lat: -23.98 },
+          caso.posicaoNaLinha,
+        );
+      });
+
+      const latitudeInput = resultado.container.querySelector(
+        '[data-testid="latitude-criacao-input"]',
+      ) as HTMLInputElement;
+      const longitudeInput = resultado.container.querySelector(
+        '[data-testid="longitude-criacao-input"]',
+      ) as HTMLInputElement;
+      expect(latitudeInput.value).toBe("-23.980000");
+      expect(longitudeInput.value).toBe("-46.380000");
+
+      resultado.desmontar();
+    }
+  });
+
+  test("[inválido] 'Atualizar ponto' com valor inválido exibe recusa e NÃO move o marcador pendente", async () => {
+    const { resultado } = await montarEtapa(1);
+
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: -46.38, lat: -23.98 });
+    });
+    const posicaoPendenteAntes = editorCapturado.props?.posicaoCriacaoPendente;
+
+    const latitudeInput = resultado.container.querySelector(
+      '[data-testid="latitude-criacao-input"]',
+    ) as HTMLInputElement;
+    digitar(latitudeInput, "abc");
+    clicar(resultado.container.querySelector('[data-testid="atualizar-ponto-criacao"]')!);
+
+    expect(
+      resultado.container.querySelector('[data-testid="mensagem-recusa-criacao-inline"]'),
+    ).not.toBeNull();
+    expect(editorCapturado.props?.posicaoCriacaoPendente).toEqual(posicaoPendenteAntes);
+    // O texto digitado é preservado, não descartado pela recusa.
+    expect(latitudeInput.value).toBe("abc");
+
+    resultado.desmontar();
+  });
+
+  test("'Atualizar ponto' com valor válido move o marcador pendente sem criar nada", async () => {
+    const { obterSessao, resultado } = await montarEtapa(1);
+    const paradasAntes = obterSessao().paradasEmEdicao;
+    const chamadasAntes = vi.mocked(fetch).mock.calls.length;
+
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: -46.38, lat: -23.98 });
+    });
+
+    const latitudeInput = resultado.container.querySelector(
+      '[data-testid="latitude-criacao-input"]',
+    ) as HTMLInputElement;
+    digitar(latitudeInput, "-23.990000");
+    clicar(resultado.container.querySelector('[data-testid="atualizar-ponto-criacao"]')!);
+
+    expect(editorCapturado.props?.posicaoCriacaoPendente).toEqual({
+      lng: -46.38,
+      lat: -23.99,
+    });
+    // Nenhuma criação, nenhum recálculo de rota disparado só por "Atualizar ponto".
+    expect(obterSessao().paradasEmEdicao).toEqual(paradasAntes);
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(chamadasAntes);
+
+    resultado.desmontar();
+  });
+
+  test("confirmar sem clicar 'Atualizar ponto' usa a coordenada CORRENTE dos campos (DEC-112 item 5)", async () => {
+    vi.stubGlobal("fetch", respostaOsrmGenericaMock());
+    const { obterSessao, resultado } = await montarEtapa(1);
+
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: -46.38, lat: -23.98 });
+    });
+
+    const latitudeInput = resultado.container.querySelector(
+      '[data-testid="latitude-criacao-input"]',
+    ) as HTMLInputElement;
+    const longitudeInput = resultado.container.querySelector(
+      '[data-testid="longitude-criacao-input"]',
+    ) as HTMLInputElement;
+    digitar(latitudeInput, "-23.500000");
+    digitar(longitudeInput, "-46.500000");
+    // Confirma SEM clicar em "Atualizar ponto".
+    const nomeInput = resultado.container.querySelector(
+      '[data-testid="nome-local-input"]',
+    ) as HTMLInputElement;
+    digitar(nomeInput, "Rodoviária Nova");
+    clicar(resultado.container.querySelector('[data-testid="confirmar-criar-local"]')!);
+    await act(async () => {
+      await flush();
+    });
+
+    const sessaoFinal = obterSessao();
+    if (sessaoFinal.modo !== "carregado") throw new Error("esperava modo carregado");
+    const localCriado = sessaoFinal.documento.autos.servicos[0].locais.find(
+      (l) => l.nome === "Rodoviária Nova",
+    );
+    expect(localCriado).toBeDefined();
+    expect(localCriado!.geolocalizacao_ida).toEqual({ latitude: -23.5, longitude: -46.5 });
+
+    resultado.desmontar();
+  });
+
+  test("[inválido] confirmar com campo de coordenada inválido não cria Seção/Local", async () => {
+    const { obterSessao, resultado } = await montarEtapa(1);
+    const paradasAntes = obterSessao().paradasEmEdicao;
+
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: -46.38, lat: -23.98 });
+    });
+    const longitudeInput = resultado.container.querySelector(
+      '[data-testid="longitude-criacao-input"]',
+    ) as HTMLInputElement;
+    digitar(longitudeInput, "200");
+    const nomeInput = resultado.container.querySelector(
+      '[data-testid="nome-local-input"]',
+    ) as HTMLInputElement;
+    digitar(nomeInput, "Padaria");
+    clicar(resultado.container.querySelector('[data-testid="confirmar-criar-local"]')!);
+
+    expect(
+      resultado.container.querySelector('[data-testid="mensagem-recusa-criacao-inline"]'),
+    ).not.toBeNull();
+    expect(resultado.container.querySelector('[data-testid="form-criar-local"]')).not.toBeNull();
+    expect(obterSessao().paradasEmEdicao).toEqual(paradasAntes);
+
+    resultado.desmontar();
+  });
+
+  test("a âncora de inserção (posicaoNaLinha) é preservada mesmo com a coordenada editada para longe da linha", async () => {
+    // Mesma âncora usada em "escolher Local COM âncora de linha" — insere
+    // após a 2ª Parada — mas agora a coordenada é editada para um ponto
+    // distante da rota antes de confirmar (DEC-112 item 5: âncora não muda).
+    // Mock genérico: a inserção passa de 3 para 4 paradas, exigindo 3 legs.
+    vi.stubGlobal("fetch", respostaOsrmGenericaMock());
+    const { resultado } = await montarEtapa(2, -23.97);
+
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada(
+        "local",
+        { lng: -46.38, lat: -23.98 },
+        { lng: -46.38, lat: -23.98 },
+      );
+    });
+
+    const latitudeInput = resultado.container.querySelector(
+      '[data-testid="latitude-criacao-input"]',
+    ) as HTMLInputElement;
+    const longitudeInput = resultado.container.querySelector(
+      '[data-testid="longitude-criacao-input"]',
+    ) as HTMLInputElement;
+    // Bem longe da linha da rota — a Parada deve nascer na MESMA posição.
+    digitar(latitudeInput, "-25.000000");
+    digitar(longitudeInput, "-50.000000");
+    const nomeInput = resultado.container.querySelector(
+      '[data-testid="nome-local-input"]',
+    ) as HTMLInputElement;
+    digitar(nomeInput, "Padaria Distante");
+    clicar(resultado.container.querySelector('[data-testid="confirmar-criar-local"]')!);
+    await act(async () => {
+      await flush();
+    });
+
+    const rotulos = [
+      ...resultado.container.querySelectorAll('[data-testid="parada-rotulo"]'),
+    ].map((el) => el.textContent);
+    const indiceCriada = rotulos.findIndex((texto) => texto?.includes("Padaria Distante"));
+    // Mesma posição que o caso não editado: logo antes da 3ª Parada (índice 2
+    // na lista de paradas — "escolher Local COM âncora de linha").
+    expect(indiceCriada).toBe(2);
+
+    resultado.desmontar();
+  });
+
+  test("cancelar e reabrir em outro ponto repõe os campos com o novo clique, sem resíduo do anterior", async () => {
+    const { resultado } = await montarEtapa(1);
+
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: -46.38, lat: -23.98 });
+    });
+    let latitudeInput = resultado.container.querySelector(
+      '[data-testid="latitude-criacao-input"]',
+    ) as HTMLInputElement;
+    digitar(latitudeInput, "-1.111111");
+    clicar(
+      [...resultado.container.querySelectorAll("button")].find(
+        (botao) => botao.textContent === "Cancelar",
+      )!,
+    );
+    expect(resultado.container.querySelector('[data-testid="form-criar-local"]')).toBeNull();
+
+    act(() => {
+      editorCapturado.props?.aoIniciarCriacaoParada("local", { lng: -46.4, lat: -23.5 });
+    });
+    latitudeInput = resultado.container.querySelector(
+      '[data-testid="latitude-criacao-input"]',
+    ) as HTMLInputElement;
+    const longitudeInput = resultado.container.querySelector(
+      '[data-testid="longitude-criacao-input"]',
+    ) as HTMLInputElement;
+    expect(latitudeInput.value).toBe("-23.500000");
+    expect(longitudeInput.value).toBe("-46.400000");
 
     resultado.desmontar();
   });

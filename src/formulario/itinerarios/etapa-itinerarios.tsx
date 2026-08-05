@@ -25,6 +25,10 @@ import {
   nomeExibicaoLocal,
   removerEntidadeLocal,
 } from "@/formulario/locais";
+import {
+  formatarCoordenada,
+  interpretarParDeCoordenadas,
+} from "./coordenada-criacao";
 import { EditorMapaItinerario } from "./editor-mapa-itinerario";
 import { PainelReusoSecao } from "./painel-reuso-secao";
 import { ALTURA_MAPA_CLASSE_LG } from "./altura-mapa";
@@ -188,6 +192,13 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     posicaoNaLinha?: Coordenada;
   } | null>(null);
   const [nomeCriacaoInline, definirNomeCriacaoInline] = useState("");
+  // Textos de latitude/longitude em edição (TASK-132; DEC-112 item 5) — de
+  // propósito SEPARADOS de `criacaoInline`: este guarda a posição do
+  // marcador (só muda em "Atualizar ponto" ou ao abrir), aqueles mudam a
+  // cada tecla. Misturá-los recalcularia `indiceInsercaoParaPosicao` (useMemo
+  // abaixo) a cada dígito digitado.
+  const [latitudeCriacaoInline, definirLatitudeCriacaoInline] = useState("");
+  const [longitudeCriacaoInline, definirLongitudeCriacaoInline] = useState("");
   const [mensagemCriacaoInline, definirMensagemCriacaoInline] = useState<string | null>(null);
   const refLinhaFormularioCriacao = useRef<HTMLTableRowElement | null>(null);
 
@@ -209,6 +220,8 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
     if (criacaoInline) {
       definirCriacaoInline(null);
       definirNomeCriacaoInline("");
+      definirLatitudeCriacaoInline("");
+      definirLongitudeCriacaoInline("");
       definirMensagemCriacaoInline(null);
     }
   }
@@ -998,19 +1011,49 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
   ) {
     definirCriacaoInline({ tipo, posicao, posicaoNaLinha });
     definirNomeCriacaoInline("");
+    definirLatitudeCriacaoInline(formatarCoordenada(posicao.lat));
+    definirLongitudeCriacaoInline(formatarCoordenada(posicao.lng));
     definirMensagemCriacaoInline(null);
   }
 
   function cancelarCriacaoInline() {
     definirCriacaoInline(null);
     definirNomeCriacaoInline("");
+    definirLatitudeCriacaoInline("");
+    definirLongitudeCriacaoInline("");
+    definirMensagemCriacaoInline(null);
+  }
+
+  // Botão "Atualizar ponto" (TASK-132): só move o marcador pendente no mapa —
+  // não cria nada, não recalcula rota (RN-052 só dispara na confirmação).
+  function atualizarPontoCriacaoInline() {
+    if (!criacaoInline) return;
+    const resultado = interpretarParDeCoordenadas(latitudeCriacaoInline, longitudeCriacaoInline);
+    if (!resultado.ok) {
+      definirMensagemCriacaoInline(resultado.mensagem);
+      return;
+    }
+    definirCriacaoInline({ ...criacaoInline, posicao: resultado.posicao });
     definirMensagemCriacaoInline(null);
   }
 
   function confirmarCriacaoInline() {
     if (!criacaoInline || !nomeCriacaoInline.trim() || !recursosMunicipio) return;
     if (!linhaAtual || !sentidoSelecionado) return;
-    const ponto = { latitude: criacaoInline.posicao.lat, longitude: criacaoInline.posicao.lng };
+    // A coordenada que vale é a CORRENTE dos campos (DEC-112 item 5): "o que
+    // está no campo é o que vale", mesmo sem clicar em "Atualizar ponto".
+    const resultadoCoordenada = interpretarParDeCoordenadas(
+      latitudeCriacaoInline,
+      longitudeCriacaoInline,
+    );
+    if (!resultadoCoordenada.ok) {
+      definirMensagemCriacaoInline(resultadoCoordenada.mensagem);
+      return;
+    }
+    const ponto = {
+      latitude: resultadoCoordenada.posicao.lat,
+      longitude: resultadoCoordenada.posicao.lng,
+    };
 
     if (criacaoInline.tipo === "secao") {
       const resultado = criarSecaoNoPonto({
@@ -1363,6 +1406,26 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
               value={nomeCriacaoInline}
               onChange={(evento) => definirNomeCriacaoInline(evento.target.value)}
             />
+            <div className="flex gap-2">
+              <Campo
+                rotulo="Latitude"
+                densidade="compacta"
+                inputMode="decimal"
+                data-testid="latitude-criacao-input"
+                className="flex-1"
+                value={latitudeCriacaoInline}
+                onChange={(evento) => definirLatitudeCriacaoInline(evento.target.value)}
+              />
+              <Campo
+                rotulo="Longitude"
+                densidade="compacta"
+                inputMode="decimal"
+                data-testid="longitude-criacao-input"
+                className="flex-1"
+                value={longitudeCriacaoInline}
+                onChange={(evento) => definirLongitudeCriacaoInline(evento.target.value)}
+              />
+            </div>
             {mensagemCriacaoInline ? (
               <p
                 role="alert"
@@ -1380,6 +1443,13 @@ export function EtapaItinerarios({ sessao, aoAtualizarSessao }: PropsEtapaItiner
                 onClick={confirmarCriacaoInline}
               >
                 {rotuloBotao}
+              </Botao>
+              <Botao
+                variante="secundario"
+                data-testid="atualizar-ponto-criacao"
+                onClick={atualizarPontoCriacaoInline}
+              >
+                Atualizar ponto
               </Botao>
               <Botao variante="fantasma" onClick={cancelarCriacaoInline}>
                 Cancelar
