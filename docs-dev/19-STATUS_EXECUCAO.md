@@ -1,6 +1,42 @@
 # 19 — STATUS_EXECUCAO: o que já foi executado e o que falta
 
-**Atualização mais recente:** 2026-08-04 (branch `orquestracao/20260805-0057`) — **TASK-131,
+**Atualização mais recente:** 2026-08-04 (branch `orquestracao/20260805-0057`) — **TASK-132:
+entrega APROVADA COM RESSALVAS; latitude/longitude editáveis saem da fila.** O commit `81d5654`,
+fundamentado na **DEC-112 item 5** (Q-090 opção 1), cria
+`src/formulario/itinerarios/coordenada-criacao.ts` (módulo puro: `formatarCoordenada` com
+6 casas, `interpretarLatitude`/`interpretarLongitude` nas faixas [-90,90]/[-180,180],
+`interpretarParDeCoordenadas` ⇒ `Coordenada`, aceitando **vírgula decimal** como inferência
+controlada documentada em comentário) e liga os dois campos à linha-formulário de criação
+inline em `etapa-itinerarios.tsx`: textos em estado **separado** de `criacaoInline` para não
+invalidar o `useMemo` da âncora a cada tecla (`:196-201`, `:369-380`), preenchimento no
+`iniciarCriacaoParada` (`:1014-1015`), botão `atualizar-ponto-criacao` que **só** move o
+marcador pendente (`:1029-1039`, sem `fetch`), e confirmação que reinterpreta os **campos
+correntes** antes de `criarSecaoNoPonto`/`criarLocalNoPonto` (`:1043-1056`). O ponto crítico da
+DEC-112 — **âncora de inserção preservada** — está correto (`:1036`, `:1072`, `:1085`) e fixado
+por teste com coordenada editada a 200 km da rota, que ainda assim nasce no mesmo índice.
+**Escopo exato:** cinco arquivos, +527/−1, nenhum `/nearest`, nenhum pré-preenchimento de nome,
+nenhum `data-testid`/`aria-*` existente alterado. O parecer
+`14-REVISOES/TASK-132-20260804.md` registra **checklist 07 com 14 ok, 40 N/A, 1 ok com ressalva
+e 0 violados** e **uma condição de merge**: a validação de faixa nova passou a
+**curto-circuitar** o teste de regressão "ponto fora de SP" da criação inline
+(`etapa-itinerarios.test.tsx:2532-2557` usa `{lng:200, lat:100}`, porque a fixture de município
+cobre o globo inteiro), que segue verde apenas por aferir **presença** do elemento de recusa e
+não a mensagem — o caso inválido "coordenada válida mas fora de SP", nomeado pela task, ficou
+**sem cobertura**; o código de produção está correto, é lacuna de teste. Follow-up não
+impeditivo: `className="flex-1"` cai no `<input>` dentro de `MolduraControle` (eixo vertical,
+no-op) em vez da moldura, então os dois campos não dividem a faixa meio a meio. A revisão
+reutilizou o log canônico verde sem repetir a suíte (`test:all:verificar`: executor **Claude**,
+fingerprint `792cdc58…582ed9ac`, identidade `498d7fa6…3a884f91763`, `Test Files 116 passed`,
+`Tests 1713 passed`, E2E `112 passed`, ambos com código 0, `Resultado geral: APROVADO`) e rodou
+`typecheck` e `lint`, ambos limpos. **Contagem inalterada:** total **permanece 8 — 6
+executáveis, a TASK-038 com bloqueio parcial e a TASK-040 bloqueada**; a TASK-132 nasceu fora
+daquela contagem (junto com as TASK-130/131/133, em `9cc4fa0`). Nenhuma task foi absorvida ou
+substituída. A **TASK-133 segue pendente** e tem agora sua dependência dura cumprida: o botão
+"Atualizar ponto" e seu handler existem e são o ponto de entrada da recarga da sugestão de
+nome. O código das **TASK-130/131/133 não foi verificado nesta revisão**. Permanecem sem dono os
+follow-ups herdados da TASK-128/129/130 e a pendência de **registro** da §3.
+
+**Histórico anterior (2026-08-04) — TASK-131,
 rodada de correção 1: APROVADA, sem ressalva remanescente; o ciclo da task está encerrado.**
 O commit `14bc44b` fecha a ressalva única do parecer da 1ª rodada: `distanciaM` deixa de ser
 obrigatório em `ResultadoViaMaisProxima` (`nearest-osrm.ts:42`) e o `?? 0` vira spread
@@ -1069,7 +1105,8 @@ Escala de **1 a 5**, combinando esforço e risco de regressão — não só volu
 | Task | Título resumido |
 |---|---|
 | 130 | Abreviação de nome de via para caber no nome sugerido de Parada — módulo puro `src/formulario/nomeacao/abreviar-nome-de-via.ts` (tabela fechada de 11 siglas, maior `L ≥ 5`, exceção nas duas primeiras palavras do corpo, truncamento por code point); implementada em `a2afbf3` e **aprovada com ressalvas** em `14-REVISOES/TASK-130-20260804.md` (condição de merge: decidir e congelar o tratamento da primeira palavra quando o tipo de logradouro é desconhecido; follow-ups de cobertura no teste de propriedade e na guarda da tabela). As **TASK-132..133** seguem pendentes |
-| 131 | Cliente OSRM `/nearest`: via mais próxima de uma coordenada — `src/formulario/roteamento/nearest-osrm.ts` (`consultarViaMaisProxima`, retorno discriminado próprio, timeout de 5 s, sem retry, sem exceção propagada, sem tocar `cliente-osrm.ts`/`url-osrm.ts`/`falhas-osrm.ts`); implementada em `0d08403` e **aprovada com ressalvas** em `14-REVISOES/TASK-131-20260804.md`; rodada de correção `14bc44b` (`distanciaM` opcional, só presente com `distance` finito, com os quatro casos fixados por teste) **aprovada sem ressalva remanescente** em `14-REVISOES/TASK-131-20260804-correcao.md` — ciclo encerrado, sem condição de merge e sem follow-up. Ponteiro para a TASK-133: `distanciaM` pode ser `undefined` e ausência **não** é zero. As **TASK-132..133** seguem pendentes |
+| 131 | Cliente OSRM `/nearest`: via mais próxima de uma coordenada — `src/formulario/roteamento/nearest-osrm.ts` (`consultarViaMaisProxima`, retorno discriminado próprio, timeout de 5 s, sem retry, sem exceção propagada, sem tocar `cliente-osrm.ts`/`url-osrm.ts`/`falhas-osrm.ts`); implementada em `0d08403` e **aprovada com ressalvas** em `14-REVISOES/TASK-131-20260804.md`; rodada de correção `14bc44b` (`distanciaM` opcional, só presente com `distance` finito, com os quatro casos fixados por teste) **aprovada sem ressalva remanescente** em `14-REVISOES/TASK-131-20260804-correcao.md` — ciclo encerrado, sem condição de merge e sem follow-up. Ponteiro para a TASK-133: `distanciaM` pode ser `undefined` e ausência **não** é zero. A **TASK-133** segue pendente |
+| 132 | Latitude e longitude editáveis na criação de Seção/Local, com reposicionamento do ponto pendente — `src/formulario/itinerarios/coordenada-criacao.ts` (parsing/validação puros, 6 casas, vírgula decimal aceita) + campos `latitude-criacao-input`/`longitude-criacao-input` e botão `atualizar-ponto-criacao` na linha-formulário de criação inline; âncora de inserção (`posicaoNaLinha`) preservada sob coordenada editada (DEC-112 item 5), coordenada usada literalmente, nenhum campo novo no JSON; implementada em `81d5654` e **aprovada com ressalvas** em `14-REVISOES/TASK-132-20260804.md` (condição de merge: repor a cobertura da recusa "fora de SP" na criação inline com coordenada dentro das faixas válidas, asseverando a mensagem — a validação de faixa nova esvaziou o teste de regressão existente; follow-up de layout no `flex-1` dos campos). A **TASK-133** segue pendente |
 
 ### Fase 12 — Qualidade e follow-ups
 
